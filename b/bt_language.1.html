@@ -1,0 +1,345 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>bt_language(1) — Arch manual pages</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">bt_language(1)</h1>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">BT_LANGUAGE(1)</td>
+    <td class="head-vol">btparse</td>
+    <td class="head-rtitle">BT_LANGUAGE(1)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">bt_language - le langage de données BibTeX, tel que reconnu par
+  btparse</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre># Grammaire lexicale, mode 1 : niveau supérieur
+AT                    \@
+NEWLINE               \n
+COMMENT               \%~[\n]*\n
+WHITESPACE            [\ \r\t]+
+JUNK                  ~[\@\n\ \r\t]+
+# Grammaire lexicale, mode 2 : dans une entrée
+NEWLINE               \n
+COMMENT               \%~[\n]*\n
+WHITESPACE            [\ \r\t]+
+NUMBER                [0-9]+
+NAME                  [a-z0-9\!\$\&amp;\*\+\-\.\/\:\;\&lt;\&gt;\?\[\]\^\_\`\|]+
+LBRACE                \{
+RBRACE                \}
+LPAREN                \(
+RPAREN                \)
+EQUALS                =
+HASH                  \#
+COMMA                 ,
+QUOTE                 \"
+# Grammaire lexicale, mode 3 : chaînes
+# (très compliqué -- voir le texte)
+# Grammaire syntaxique :
+bibfile : ( entry )*
+entry : AT NAME body
+body : STRING                    # pour les entrées de type commentaire
+     | ENTRY_OPEN contents ENTRY_CLOSE
+contents : ( NAME | NUMBER ) COMMA fields   # pour les entrées régulières
+         | fields                # pour les définitions de macro
+         | value                 # pour les entrées de préambule
+fields : field { COMMA fields }
+       | 
+field : NAME EQUALS value
+value : simple_value ( HASH simple_value )*
+simple_value : STRING
+             | NUMBER
+             | NAME</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">L'un des problèmes de BibTeX est qu'il n'existe pas de
+    spécification formelle du langage. Cela signifie que les utilisateurs qui
+    explorent les recoins arcanes du langage sont largement livrés à eux-mêmes,
+    et que les programmeurs qui implémentent leurs propres analyseurs sont
+    complètement livrés à eux-mêmes---sauf à observer le comportement de
+    l'implémentation originale.</p>
+<p class="Pp">D'autres implémenteurs d'analyseurs (Nelson Beebe de
+    <span class="Li">"bibclean"</span> en particulier) ont pris la
+    peine d'expliquer le langage accepté par leur analyseur, et dans cet esprit,
+    ce qui suit est présenté.</p>
+<p class="Pp">Si vous n'êtes pas familier avec les arcanes des langages réguliers et
+    sans contexte, vous n'aurez pas une vie facile pour comprendre ceci. Ceci
+    <i>n'est</i> pas une introduction au langage BibTeX ; n'importe quel livre
+    LaTeX serait plus adapté pour apprendre le langage de données lui-même.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='LEXICAL_GRAMMAR'><a class='permalink' href='#LEXICAL_GRAMMAR'>GRAMMAIRE   LEXICALE</a></h1>
+<p class="Pp">Le scanner lexical a trois modes distincts : niveau supérieur, dans une
+    entrée, et chaîne. Grossièrement, le niveau supérieur est le mode initial ;
+    nous entrons dans le mode « dans une entrée » en voyant un <span class="Li">"@"</span> au
+    niveau supérieur ; et en voyant le <span class="Li">"}"</span> ou
+    <span class="Li">")"</span> qui termine l'entrée, nous retournons au
+    niveau supérieur. Nous entrons dans le mode chaîne en voyant un
+    <span class="Li">"</span> ou un
+    <span class="Li">"{"</span> non délimiteur d'entrée depuis le mode « dans une entrée ». Notez que le
+    langage lexical est à la fois non régulier (parce que les accolades doivent
+    s'équilibrer) et sensible au contexte (parce que <span class="Li">"{"</span> peut signifier
+    des choses différentes selon son contexte syntaxique). Cela dit, nous
+    utiliserons des expressions régulières pour décrire les éléments lexicaux,
+    car elles sont le point de départ utilisé par le scanner lexical lui-même.
+    Le reste de la grammaire lexicale sera expliqué de manière informelle dans
+    le texte.</p>
+<p class="Pp">Depuis le niveau supérieur, les jetons suivants sont reconnus selon les
+    expressions régulières à droite :</p>
+<pre>AT                    \@
+NEWLINE               \n
+COMMENT               \%~[\n]*\n
+WHITESPACE            [\ \r\t]+
+JUNK                  ~[\@\n\ \r\t]+</pre>
+<p class="Pp">(Notez qu'il s'agit de la syntaxe d'expressions régulières PCCTS, qui
+    devrait être assez familière aux utilisateurs d'autres moteurs de regex. Une
+    bizarrerie est qu'une classe de caractères est négée avec <span class="Li">"~[...]"</span>
+    plutôt qu'avec <span class="Li">"[^...]"</span>.)</p>
+<p class="Pp">En voyant <span class="Li">"at"</span> au niveau supérieur, nous
+    entrons dans le mode « dans une entrée ». Les espaces blancs, le bruit, les
+    nouvelles lignes et les commentaires sont tous ignorés, ces deux derniers
+    incrémentant un compteur de lignes. (Le bruit est explicitement reconnu pour
+    permettre le schéma de « commentaire implicite » de
+    <span class="Li">"bibtex"</span>.)</p>
+<p class="Pp">Depuis le mode « dans une entrée », nous reconnaissons la nouvelle ligne,
+    le commentaire et l'espace blanc de manière identique au mode niveau
+    supérieur. De plus, les jetons suivants sont reconnus :</p>
+<pre>NUMBER                [0-9]+
+NAME                  [a-z0-9\!\$\&amp;\*\+\-\.\/\:\;\&lt;\&gt;\?\[\]\^\_\`\|]+
+LBRACE                \{
+RBRACE                \}
+LPAREN                \(
+RPAREN                \)
+EQUALS                =
+HASH                  \#
+COMMA                 ,
+QUOTE                 \"</pre>
+<p class="Pp">À ce stade, le scanner lexical commence à ressembler suspectement à une
+    grammaire sans contexte plutôt qu'à une collection d'expressions régulières
+    indépendantes. Cependant, il est nécessaire de conserver cette complexité
+    dans le scanner car certains caractères (<span class="Li">"{"</span> et
+    <span class="Li">"("</span> en particulier) ont des significations lexicales très différentes
+    selon les jetons qui les ont précédés dans le flux d'entrée.</p>
+<p class="Pp">En particulier, <span class="Li">"{"</span> et
+    <span class="Li">"("</span> sont traités comme des « ouvreurs
+    d'entrée » s'ils suivent un jeton <span class="Li">"at"</span> et
+    un jeton <span class="Li">"name"</span> , à moins que la valeur du jeton
+    <span class="Li">"name"</span> ne soit
+    <span class="Li">"comment"</span>. (Notez le passage du niveau supérieur au mode « dans une entrée » entre
+    les deux jetons.) Dans le cas <span class="Li">@comment</span>
+    , le délimiteur est considéré comme démarrant une chaîne, et nous entrons
+    dans le mode chaîne. Sinon, le délimiteur est enregistré, et quand nous
+    voyons un
+    <span class="Li">"}"</span> ou
+    <span class="Li">")"</span> correspondant, il est considéré comme un « fermeur
+    d'entrée ». (Les accolades sont équilibrées automatiquement ici car l'analyseur
+    lexical des chaînes prend soin de compter la profondeur des accolades.)</p>
+<p class="Pp">Partout ailleurs, <span class="Li">"{"</span> est considéré comme
+    démarrant une chaîne, et nous entrons dans le mode chaîne.
+    <span class="Li">"</span> démarre toujours une chaîne,
+    quel que soit le contexte. Les autres jetons
+    (<span class="Li">"name"</span>,
+    <span class="Li">"number"</span>,
+    <span class="Li">"equals"</span>,
+    <span class="Li">"hash"</span>, et
+    <span class="Li">"comma"</span>) sont reconnus
+  inconditionnellement.</p>
+<p class="Pp">Notez que <span class="Li">"name"</span> est un jeton fourre-tout
+    utilisé pour les types d'entrées, les clés de citation, les noms de champs et
+    les noms de macro ; parce que BibTeX a des règles légèrement différentes
+    (largement non documentées) pour ces divers éléments, un peu de ruse est
+    nécessaire pour faire fonctionner les choses. Comme point de départ,
+    considérez la définition de BibTeX de ce qui est autorisé pour une clé
+    d'entrée : une séquence de n'importe quels caractères <i>sauf</i></p>
+<pre>" # % ' ( ) , = { }</pre>
+<p class="Pp">plus l'espace. Il y a quelques problèmes avec ce schéma.
+    D'abord, sans spécifier le jeu de caractères dont sont tirés ces « 10
+    magiques », c'est un peu difficile de savoir ce qui est réellement autorisé.
+    Deuxièmement, autoriser les caractères <span class="Li">"@"</span> pourrait conduire à une
+    syntaxe BibTeX confuse (cela ne confond pas BibTeX, mais cela pourrait
+    confondre un lecteur humain). Enfin, autoriser certains caractères qui sont
+    spéciaux pour TeX signifie que BibTeX peut générer du code TeX invalide :
+    essayez de mettre une barre oblique inverse (<span class="Li">"\"</span>) ou un tilde
+    (<span class="Li">"~"</span>) dans une clé de citation. (Cette dernière
+    exception est plutôt spécifique à l'application « générer du code (La)TeX à
+    partir d'une base de données BibTeX », mais comme c'est l'application
+    principale pour les bases de données BibTeX, alors ce sera probablement
+    l'application principale pour
+    <b>btparse</b>, au moins initialement. Ainsi, il est logique de prêter attention à
+    ce problème.)</p>
+<p class="Pp">Dans <b>btparse</b>, donc, un nom est défini comme toute séquence de
+    lettres, chiffres, soulignés, et des caractères suivants :</p>
+<pre>! $ &amp; * + - . / : ; &lt; &gt; ? [ ] ^ _ ` |</pre>
+<p class="Pp">Cette liste a été dérivée en retirant les « 10 magiques » de BibTeX
+    de l'ensemble des caractères ASCII 7 bits imprimables (32-126), puis en
+    retirant en outre <span class="Li">"@"</span>,
+    <span class="Li">"\"</span>, et
+    <span class="Li">"~"</span>. Cela signifie que <b>btparse</b>
+    interdit certaines des clés d'entrée les plus bizarres que BibTeX
+    accepterait, comme
+    <span class="Li">"\foo@bar"</span>, mais autorise toujours une chaîne avec
+    des chiffres initiaux. En fait, d'après la définition ci-dessus, il semble
+    que
+    <b>btparse</b> accepterait une chaîne de tous chiffres comme un « nom ; »
+    Ce n'est pas le cas, cependant, car le scanner lexical reconnaît d'abord une
+    telle chaîne de chiffres comme un nombre. Il y a deux problèmes ici : les clés
+    d'entrée BibTeX peuvent en fait être entièrement numériques, et les noms de
+    champs ne peuvent pas commencer par un chiffre. (Ce sont deux des différences
+    pas si évidentes dans le traitement par BibTeX des clés et des noms de
+    champs.) Les astuces utilisées pour gérer ces problèmes sont implémentées
+    dans l'analyseur syntaxique plutôt que dans le scanner lexical, donc <div class="manual-content">
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NAME</a></h1>
+<p class="Pp">btparse - A parser for the BibTeX language</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<p class="Pp"><span class="Nd">btparse</span> [options] filename</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">This manual page describes the BibTeX language syntax as recognized
+    by the <span class="Nm">btparse</span> parser.</p>
+<p class="Pp">The parser is written using PCCTS (Purdue Compiler Construction
+    Tool Set), and it is organized into two main parts: a lexical analyzer (lexer)
+    and a syntactic analyzer (parser). The lexical grammar defines the smallest
+    meaningful units (tokens) of the language, and the syntactic grammar defines
+    how these tokens are combined to form valid statements.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='LEXICAL_GRAMMAR'><a class='permalink' href='#LEXICAL_GRAMMAR'>LEXICAL GRAMMAR</a></h1>
+<p class="Pp">The lexical grammar is described in terms of the tokens recognized by
+    the lexer. The syntactic grammar is described in &quot;SYNTACTIC GRAMMAR&quot;
+    below.</p>
+<p class="Pp">The string lexer recognizes <span class="Li">&quot;lbrace&quot;</span>,
+    <span class="Li">&quot;rbrace&quot;</span>, <span class="Li">&quot;lparen&quot;</span>,
+    and <span class="Li">&quot;rparen&quot;</span> tokens in order to count brace-
+    or parenthesis-depth. This is necessary so it knows when to accept a string
+    delimited by braces or parentheses. (Note that a parenthesis-delimited
+    string is only allowed after <span class="Li">@comment</span>---this is not
+    a normal BibTeX construct.) In addition, it converts each non-space
+    whitespace character (newline, carriage-return, and tab) to a single space.
+    (Sequences of whitespace are not collapsed; that's the domain of string
+    post-processing, which is well removed from the scanner or parser.) Finally,
+    it accepts <span class="Li">&quot;&quot;&quot;</span> to delimit
+    quote-delimited strings. Apart from those restrictions, the string lexer
+    accepts anything up to the end-of-string delimiter.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTACTIC_GRAMMAR'><a class='permalink' href='#SYNTACTIC_GRAMMAR'>SYNTACTIC GRAMMAR</a></h1>
+<p class="Pp">(The language used to describe the grammar here is the extended
+    Backus-Naur Form (EBNF) used by PCCTS. Terminals are represented by
+    uppercase strings, non-terminals by lowercase strings; terminal names are
+    the same as those given in the lexical grammar above.
+    <span class="Li">&quot;( foo )*&quot;</span> means zero or more repetitions
+    of the <span class="Li">&quot;foo&quot;</span> production, and
+    <span class="Li">&quot;{ foo }&quot;</span> means an optional
+    <span class="Li">&quot;foo&quot;</span>.)</p>
+<p class="Pp">A file is just a sequence of zero or more entries:</p>
+<pre>bibfile : ( entry )*</pre>
+<p class="Pp">An entry is an at-sign, a name (the &quot;entry type&quot;), and
+    the entry body:</p>
+<pre>entry : AT NAME body</pre>
+<p class="Pp">A body is either a string (this alternative is only tried if the
+    entry type is <span class="Li">&quot;comment&quot;</span>) or the entry
+    contents:</p>
+<pre>body : STRING                    # for comment entries
+     | ENTRY_OPEN contents ENTRY_CLOSE</pre>
+<p class="Pp">(<span class="Li">&quot;ENTRY_OPEN&quot;</span> and
+    <span class="Li">&quot;ENTRY_CLOSE&quot;</span> are either
+    <span class="Li">&quot;{&quot;</span> and
+    <span class="Li">&quot;}&quot;</span> or
+    <span class="Li">&quot;(&quot;</span> and
+    <span class="Li">&quot;)&quot;</span>, depending what is seen in the input
+    for a particular entry.)</p>
+<p class="Pp">There are three possible productions for the &quot;contents&quot;
+    non-terminal. Only one applies to any given entry, depending on the entry
+    metatype (which in turn depends on the entry type). Currently,
+    <b>btparse</b> supports four entry metatypes: comment, preamble, macro
+    definition, and regular. The first two correspond to
+    <span class="Li">@comment</span> and <span class="Li">@preamble</span>
+    entries; &quot;macro definition&quot; is for <span class="Li">@string</span>
+    entries; and &quot;regular&quot; is for all other entry types. (The library
+    will be extended to handle <span class="Li">@modify</span> and
+    <span class="Li">@alias</span> entry types, and corresponding
+    &quot;modify&quot; and &quot;alias&quot; metatypes, when BibTeX 1.0 is
+    released and the exact syntax is known.) The &quot;metatype&quot; concept is
+    necessary so that all entry types that aren't specifically recognized fall
+    into the &quot;regular&quot; metatype. It's also convenient not to have to
+    <span class="Li">&quot;strcmp&quot;</span> the entry type all the time.</p>
+<pre>contents : ( NAME | NUMBER ) COMMA fields     # for regular entries
+         | fields                # for macro definition entries
+         | value                 # for preamble entries</pre>
+<p class="Pp">Note that the entry key is not just a
+    <span class="Li">&quot;NAME&quot;</span>, but <span class="Li">&quot;( NAME
+    | NUMBER)&quot;</span>. This is necessary because BibTeX allows all-numeric
+    entry keys, but <b>btparse</b>'s lexical scanner recognizes such digit
+    strings as <span class="Li">&quot;NUMBER&quot;</span> tokens.</p>
+<p class="Pp"><span class="Li">&quot;fields&quot;</span> is a comma-separated
+    list of fields, with an optional single trailing comma:</p>
+<pre>fields : field { COMMA fields }
+       |</pre>
+<p class="Pp">A <span class="Li">&quot;field&quot;</span> is a single
+    &quot;field = value&quot; assignment:</p>
+<pre>field : NAME EQUALS value</pre>
+<p class="Pp">Note that <span class="Li">&quot;NAME&quot;</span> here is a
+    restricted version of the &quot;name&quot; token described in &quot;LEXICAL
+    GRAMMAR&quot; above. Any &quot;name&quot; token will be accepted by the
+    parser, but it is immediately checked to ensure that it doesn't begin with a
+    digit; if so, an artificial syntax error is triggered. (This is for
+    compatibility with BibTeX, which doesn't allow field names to start with a
+    digit.)</p>
+<p class="Pp">A <span class="Li">&quot;value&quot;</span> is a series of simple
+    values joined by <span class="Li">'#'</span> characters:</p>
+<pre>value : simple_value ( HASH simple_value )*</pre>
+<p class="Pp">A simple value is a string, number, or name (for macro
+    invocations):</p>
+<pre>simple_value : STRING
+             | NUMBER
+             | NAME</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>SEE ALSO</a></h1>
+<p class="Pp">btparse</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTHOR</a></h1>
+<p class="Pp">Greg Ward &lt;gward@python.net&gt;</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">btparse, version 0.91</td>
+  </tr>
+</table>

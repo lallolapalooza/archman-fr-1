@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>audit.rules(7) — Pages du manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">audit.rules(7)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/core/x86_64/audit/">audit</a></p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">AUDIT.RULES(7)</td>
+    <td class="head-vol">Utilitaires d'administration système</td>
+    <td class="head-rtitle">AUDIT.RULES(7)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">audit.rules - un ensemble de règles chargées dans le système d'audit du noyau</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp"><b>audit.rules</b> est un fichier contenant des règles d'audit qui seront chargées par le script d'initialisation du démon d'audit chaque fois que le démon est démarré. Le programme auditctl est utilisé par les scripts d'initialisation pour effectuer cette opération. La syntaxe des règles est essentiellement la même que celle utilisée lors de la saisie d'une commande auditctl à l'invite du shell, sauf que vous n'avez pas besoin de saisir le nom de la commande auditctl car cela est implicite. Les règles d'audit se présentent en 3 variétés : <i>contrôle</i>, <i>fichier</i> et <i>appel système</i>.</p>
+<section class="Ss">
+<h2 class="Ss" id='Contrôle'><a class='permalink' href='#Contrôle'>Contrôle</a></h2>
+<p class="Pp">Les commandes de contrôle impliquent généralement la configuration du système d'audit plutôt que de lui dire quoi surveiller. Ces commandes incluent généralement la suppression de toutes les règles, la définition de la taille de la file d'attente de rétroaction du noyau, la définition du mode d'échec, la définition de la limite de débit des événements, ou la demande à auditctl d'ignorer les erreurs de syntaxe dans les règles et de continuer le chargement. Généralement, ces règles se trouvent en haut du fichier de règles.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Système_de_fichiers'><a class='permalink' href='#Système_de_fichiers'>Système de fichiers</a></h2>
+<p class="Pp">Les règles du système de fichiers sont parfois appelées « watches ». Ces règles sont utilisées pour auditer l'accès à des fichiers ou des répertoires particuliers qui pourraient vous intéresser. Si le chemin donné dans une règle de surveillance est un répertoire, la règle utilisée est récursive jusqu'au fond de l'arborescence des répertoires, à l'exclusion de tout répertoire qui pourrait être des points de montage. La syntaxe de ces règles de surveillance suit généralement ce format :</p>
+<pre><b>-a always,exit -F arch=b64 -F path=chemin-vers-fichier -F perm=permissions -F key=nom-clé</b></pre>
+<p class="Pp">où les permissions sont l'une des suivantes :</p>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="r"><a class="permalink" href="#r"><b>r</b></a></dt>
+  <dd>- lecture du fichier</dd>
+  <dt id="w"><a class="permalink" href="#w"><b>w</b></a></dt>
+  <dd>- écriture dans le fichier</dd>
+  <dt id="x"><a class="permalink" href="#x"><b>x</b></a></dt>
+  <dd>- exécution du fichier</dd>
+  <dt id="a"><a class="permalink" href="#a"><b>a</b></a></dt>
+  <dd>- changement d'attribut du fichier</dd>
+</dl>
+</div>
+<p class="Pp">Pour de meilleures performances, vous devriez fournir un champ <b>arch</b> dans la règle. Les permissions individuelles déclencheront la sélection des appels système qui utilisent ce type d'accès. Ne pas fournir l'architecture entraînera la sélection de tous les appels système, ce qui affectera les performances car tous les appels système seront évalués.</p>
+<p class="Pp">Des surveillance peuvent également être créées en utilisant le format obsolète -w, qui permet une compatibilité ascendante au détriment des performances système, comme expliqué. En utilisant les règles d'appels système comme montré ci-dessus, vous pouvez choisir entre <b>path</b> et <b>dir</b>, qui visent respectivement un inode spécifique ou une arborescence de répertoires. Il convient également de noter que la surveillance récursive des répertoires s'arrêtera s'il y a un point de montage sous le répertoire parent. Il existe une option pour rendre le sous-répertoire monté équivalent en utilisant une règle <b>-q</b>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Appel_système'><a class='permalink' href='#Appel_système'>Appel système</a></h2>
+<p class="Pp">Les règles d'appels système sont chargées dans un moteur de correspondance qui intercepte chaque appel système effectué par tous les programmes du système. Par conséquent, il est très important de n'utiliser les règles d'appels système que lorsque c'est nécessaire, car elles affectent les performances. Plus il y a de règles, plus l'impact sur les performances est important. Vous pouvez améliorer les performances, cependant, en combinant les appels système dans une seule règle chaque fois que possible.</p>
+<p class="Pp">Le noyau Linux dispose de 6 listes de correspondance de règles ou filtres, comme on les appelle parfois. Ce sont : task, exit, user, exclude, filesystem, et io_uring. La liste task est vérifiée uniquement lors des appels système fork ou clone. Elle est rarement utilisée en pratique.</p>
+<p class="Pp">Le filtre exit est l'endroit où toutes les demandes d'audit d'appels système et de système de fichiers sont évaluées.</p>
+<p class="Pp">Le filtre user est utilisé pour filtrer (supprimer) certains événements provenant de l'espace utilisateur. Par défaut, tout événement provenant de l'espace utilisateur est autorisé. Donc, s'il y a des événements que vous ne souhaitez pas voir, c'est un endroit où certains peuvent être supprimés. Consultez auditctl(8) pour connaître les champs valides.</p>
+<p class="Pp">Le filtre exclude est utilisé pour exclure certains événements de l'émission. Le type de message et un certain nombre de champs d'attributs du sujet peuvent être utilisés pour indiquer au noyau quels types de messages vous ne souhaitez pas enregistrer. Ce filtre peut supprimer l'événement dans son ensemble et n'est pas sélectif quant à tout autre attribut. Les filtres user et exit sont plus adaptés à l'audit sélectif d'événements. L'action est ignorée pour ce filtre, et est par défaut « never ».</p>
+<p class="Pp">Le filtre io_uring est utilisé pour surveiller les appels système sous-jacents effectués par les opérations io_uring.</p>
+<p class="Pp">Les règles d'appels système ont la forme générale suivante :</p>
+<pre><b>-a action,liste -S appel_système -F champ=valeur -k nom-clé</b></pre>
+<p class="Pp">L'option <b>-a</b> indique au moteur de correspondance de règles du noyau que nous voulons ajouter une règle à la fin de la liste des règles. Mais nous devons spécifier sur quelle liste de règles elle va et quelle action entreprendre lorsqu'elle se déclenche. Les actions valides sont :</p>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="toujours"><a class="permalink" href="#toujours"><b>always</b></a></dt>
+  <dd>- crée toujours un événement</dd>
+  <dt id="jamais"><a class="permalink" href="#jamais"><b>never</b></a></dt>
+  <dd>- ne crée jamais d'événement</dd>
+</dl>
+</div>
+<p class="Pp">L'action et la liste sont séparées par une virgule, mais sans espace entre les deux. Les listes valides sont : <i>task</i>, <i>exit</i>, <i>user</i>, <i>exclude</i>, <i>filesystem</i> et <i>io_uring</i>. Leur signification a été expliquée précédemment.</p>
+<p class="Pp">La prochaine étape dans la règle serait normalement l'option <b>-S</b>. Ce champ peut être soit le nom de l'appel système, soit son numéro. Pour la lisibilité, le nom est presque toujours utilisé. Vous pouvez spécifier plusieurs appels système dans une règle en spécifiant une autre option <b>-S</b>. Lorsqu'ils sont envoyés au noyau, tous les champs d'appels système sont mis dans un masque afin qu'une seule comparaison puisse déterminer si l'appel système est pertinent. Ainsi, l'ajout de plusieurs appels système dans une seule règle est très efficace. Lorsque vous spécifiez un nom d'appel système, auditctl recherche le nom et obtient son numéro d'appel système. Cela pose quelques problèmes sur les machines bi-architecture. Les numéros d'appels système 32 bits et 64 bits correspondent parfois, mais pas toujours. Pour résoudre ce problème, vous devriez généralement diviser la règle en deux, l'une spécifiant -F arch=b32 et l'autre spécifiant -F arch=b64. Cela doit être placé devant l'option <b>-S</b> afin qu'auditctl consulte la bonne table de recherche lors du retour du numéro.</p>
+<p class="Pp">Après la spécification de l'appel système, vous auriez normalement une ou plusieurs options <b>-F</b> qui affinent ce à quoi il faut correspondre. Plutôt que de lister tous les types de champs valides ici, le lecteur devrait consulter la page de manuel de auditctl qui contient une liste complète de chaque champ et de sa signification. Mais il vaut la peine de mentionner quelques points.</p>
+<p class="Pp">Le système d'audit considère les UID comme des nombres non signés. Le système d'audit utilise le nombre -1 pour indiquer qu'un loginuid n'est pas défini. Cela signifie que lorsqu'il est affiché, il ressemble à 4294967295. Mais lorsque vous écrivez des règles, vous pouvez utiliser soit « unset » (facile à retenir), soit -1, soit 4294967295. Ils sont tous équivalents. Si vous écrivez une règle pour essayer d'obtenir les utilisateurs valides du système, vous devez consulter /etc/login.defs pour voir où commencent les comptes utilisateur. Par exemple, si UID_MIN est 1000, vous devrez également prendre en compte que la représentation non signée de -1 est supérieure à 500. Vous aborderiez donc cela avec le fragment de règle suivant :</p>
+<pre>-F auid&gt;=1000 -F auid!=unset</pre>
+<p class="Pp">Ces vérifications individuelles sont « ANDées » et les deux doivent être vraies.</p>
+<p class="Pp">La dernière chose à savoir sur les règles d'appels système est que vous pouvez ajouter un champ clé, qui est une chaîne de texte libre que vous souhaitez insérer dans l'événement pour aider à identifier sa signification. Ceci est discuté plus en détail dans la section NOTES.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='NOTES'><a class='permalink' href='#NOTES'>NOTES</a></h1>
+<p class="Pp">Le but de l'audit est de pouvoir effectuer une investigation périodiquement ou chaque fois qu'un incident survient. Quelques étapes simples de planification préalable faciliteront ce travail. Le meilleur conseil est d'utiliser des clés dans les règles de surveillance et d'appels système pour donner un sens à la règle. Si des règles sont liées ou satisfont ensemble une exigence spécifique, donnez-leur un nom de clé commun. Vous pouvez l'utiliser pendant votre investigation pour sélectionner uniquement les résultats ayant une signification spécifique.</p>
+<p class="Pp">Lors d'une investigation, vous commenceriez normalement par la sortie principale de aureport pour avoir juste une idée de ce qui se passe sur le système. Ce rapport vous informe principalement sur les événements codés en dur par le système d'audit tels que les connexions/déconnexions, l'utilisation de l'authentification, les anomalies système, le nombre d'utilisateurs connectés à la machine et si SE Linux a détecté des AVC.</p>
+<pre>aureport --start this-week</pre>
+<p class="Pp">Après avoir examiné le rapport, vous voudrez probablement obtenir un deuxième aperçu des règles que vous avez chargées et qui ont été déclenchées</p>
+</section>
+</div>
+</section>
+            </article>
+            
+        </main>
+        <footer>
+            
+        </footer>
+    </body>
+</html>
+aureport --start this-week --key --summary
+Cela donnera une liste triée des clés associées aux </p>règles
+<pre>qui se sont déclenchées. Si, par </pre>exemple,
+<p class="Pp">vous aviez une règle d'audit de syscall qui se déclenchait sur l'échec d'ouverture de fichiers avec EPERM et qui avait un champ de clé « access » comme ceci :
+-a always,exit -F arch=b64 -S open -S openat -S openat2 -F exit=-EPERM </p>-k
+<pre>access
+Alors vous pouvez isoler ces échecs avec ausearch et rediriger les </pre>résultats
+<p class="Pp">vers aureport pour l'affichage. Supposons que votre enquête ait révélé de nombreux événements d'accès refusé. Si vous vouliez voir les fichiers auxquels un accès non autorisé a été tenté, vous pourriez exécuter la commande suivante :
+ausearch --start this-week -k </p>access
+<pre>--raw | aureport --file --summary
+Cela donnera une liste triée </pre>montrant
+<p class="Pp">quels fichiers sont accessibles avec l'échec EPERM. Supposiez que vous vouliez voir quels utilisateurs pourraient subir des échecs d'accès, vous exécuteriez la commande suivante :
+ausearch </p>--start
+<pre>this-week -k access --raw | aureport --user --summary
+Si votre </pre>enquête
+<p class="Pp">a montré de nombreux échecs d'accès à un fichier particulier, vous pourriez exécuter le rapport suivant pour voir qui le fait </p>:
+<p class="Pp">
+  <br/>
+  ausearch --start this-week -k access -f /path-to/file --raw | aureport --user
+    -i
+Ce
+  <br/>
+</p>
+<p class="Pp">rapport vous donnera les tentatives d'accès individuelles par personne. Si vous deviez voir l'événement d'audit réel qui est rapporté, vous regarderiez les colonnes date, heure et événement. En supposant que l'événement était 822 et qu'il s'est produit à 2h30 le 09/01/2009 et que vous utilisez la locale en_US.utf8, la </p>commande
+<pre>ressemblerait à quelque chose comme ceci :
+ausearch </pre>--start
+<p class="Pp">09/01/2009 02:30 -a 822 -i --just-one
+Cela sélectionnera le premier événement de ce jour et de cette heure avec l'identifiant </p>d'événement
+<p class="Pp">correspondant et interprétera les valeurs numériques en valeurs lisibles par l'h</p>omme.
+L'étape la plus importante pour pouvoir effectuer ce type d'analyse est la </section>configuration des champs de clé lorsque les règles ont été initialement écrites.
+<section class="Sh">
+<h1 class="Sh" id='TROUBLESHOOTING'><a class='permalink' href='#TROUBLESHOOTING'>Il faut </a></h1>également
+<p class="Pp">souligner que vous pouvez avoir plus d'un champ de clé associé à une règle donnée.
+DÉPANNAGE
+Si vous n'obtenez pas d'événements sur les règles de syscall auxquels vous pensez devoir en obtenir, essayez d'exécuter </p>un
+<p class="Pp">programme de test sous strace afin de pouvoir voir les syscalls. Il est possible que vous ayez identifié le mauvais syscall.
+Si vous obtenez un avertissement de auditctl disant : « 32/64 bit syscall mismatch in line XX, you should specify an arch ». Cela signifie que vous avez spécifié une règle de syscall sur un système bi-arch où le syscall a un numéro de syscall différent pour les interfaces 32 et 64 bits. Cela signifie que sur l'une de ces </p>interfaces,
+<pre>vous auditez probablement </pre>le
+<p class="Pp">mauvais syscall. </p>Pour
+<pre>résoudre le problème, réécrivez la règle en deux règles en spécifiant l'arch cible pour </pre>chaque
+<p class="Pp">règle. Par exemple,
+-a always,exit -S openat -k access
+serait réécrit comme
+-a always,exit -F arch=b32 -S openat -k access
+-</p>a always,exit -F arch=b64 -S openat -k access
+Si vous obtenez un avertissement disant : « entry rules deprecated, changing </section>to exit rule ». Cela signifie que vous avez une règle destinée au filtre d'entrée, mais que ce filtre n'est plus disponible.
+<section class="Sh">
+<h1 class="Sh" id='EXAMPLES'><a class='permalink' href='#EXAMPLES'>Auditct</a></h1>l
+<p class="Pp">a déplacé votre règle vers le filtre de sortie pour qu'elle ne soit pas perdue. Mais pour résoudre cela afin que vous n'obteniez plus l'avertissement, vous devez changer la règle fautive de entry à exit.
+EXEMPLES
+La règle suivante montre </p>comment
+<pre><b>auditer l'accès échoué aux fichiers en raison de problèmes de </b>permissions.
+<b>Notez qu'il faut deux règles pour chaque arch ABI pour auditer </b>cela,
+<b>car l'accès au fichier peut échouer avec deux codes d'échec </b>différents
+<b>indiquant des problèmes</b></pre> de permissions.
+-a alw</section>ays,exit -F arch=b32 -S
+<section class="Sh">
+<h1 class="Sh" id='IO_URING_RULES'><a class='permalink' href='#IO_URING_RULES'>open,openat,</a></h1>openat2
+<p class="Pp">-F exit=-EACCES -k access
+-a always,exit -F arch=b32 -S open,openat,openat2 -F exit=-EPERM -k access
+-a always,exit -F arch=b64 -S open,openat,openat2 -F exit=-EACCES </p>-k
+<pre><b>access
+-a always</b></pre>,exit -F arch=b64</section> -S open,openat,
+<section class="Sh">
+<h1 class="Sh" id='HARD_WIRED_EVENTS'><a class='permalink' href='#HARD_WIRED_EVENTS'>openat2 -F </a></h1>exit=-EPERM
+<p class="Pp">-k access
+RÈGLES IO_URING
+Les règles io_uring ne prennent pas de champ arch. Il est implicite dans la spécification du filtre. La règle d'exemple suivante surveille les ouvertures de fichiers via le sous-système io_uring :
+-a always,io_uring -S openat,openat2 -F key=access
+ÉVÉNEMENTS INTÉGRÉS
+Si l'audit est activé, alors vous pouvez obtenir tout événement qui n'est pas causé par des règles de syscall ou de surveillance de fichier (parce que vous n'avez aucune règle chargée). Cela signifie que tout événement de 1100 à 1299, 1326, 1328, 1331 et </p>au-dessus
+<pre><b>peut être émi</b></pre>s. La raison </section>pour laquelle
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>il y a </a></h1>un
+<p class="Pp"><a href='/man/auditctl.8.en'>certain </a>nombre <a href='/man/auditd.8.en'>d'événeme</a>n</p>t</section>s
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'></a></h1>i
+<p class="Pp">nté</p>gré</section>s </div>est
+<table class="foot">
+  <tr>
+    <td class="foot-date">qu'ils </td>sont
+    <td class="foot-os">requis </td>par la </tr>confor</table>mité ré</section>glement</article>aire et
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>sont envoyés </p>automatiquement
+    <dl>
+        <dt>par </dt>commodité.
+        <dd><a href="https://www.archlinux.org/packages/core/x86_64/audit/">(Par </a></dd>exemple, la
+        <dt>connexion/</dt>déconnexion
+        <dd>est </dd>un
+        <dt>événement </dt>obligatoire
+        <dd><a href="https://github.com/linux-audit/audit-userspace">dans toutes les directives de sécurité.) Si </a></dd>vous ne
+        <dt>le </dt>souhaitez pas,
+        <dd>vous pouvez utiliser le filtre </dd>exclude
+        <dt>pour </dt>rejeter les
+        <dd><a href="/listing/core/audit/">événeme</a></dd>nts que</dl> vous ne</section> voulez
+
+<details>
+    <summary>pas.
+-a </summary>always,
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">exclude </a></li>-F msgtype=CRED_REFR
+        
+            <li><a href="#DESCRIPTION">VOIR AUSSI
+</a></li>auditctl(8),
+auditd(8)
+        
+            <li><a href="#NOTES">.
+</a></li>AUTEUR
+Steve Grubb
+Sep
+        
+            <li><a href="#TROUBLESHOOTING">2023
+Red Hat
+</a></li>Informations sur le
+        
+            <li><a href="#EXAMPLES">paquet </a></li>:
+Nom du paquet :
+        
+            <li><a href="#IO_URING_RULES">core/audit
+</a></li>Version :
+4.1.2-1
+Amont :
+        
+            <li><a href="#HARD_WIRED_EVENTS">https://github.</a></li>com/linux-audit/audit-userspace
+        
+            <li><a href="#SEE_ALSO">Licences </a></li>:
+GPL-2.
+        
+            <li><a href="#AUTHOR">0-or-lat</a></li>er, LGPL</ul>-2.0-or</nav>-later
+M</details>anuels :
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>/listing/core/audit/
+Table des
+        
+            <a href="/man/audit.rules.7.en.txt">matières
+</a>NOM
+DESCRIPTION
+NOTES 
+        
+            <a href="/man/audit.rules.7.en.raw">DÉPANNAGE
+</a>EXEMPLES
+R</p>ÈGLES IO_U</nav>RING
+ÉVÉN</aside>EMENTS INT</main>ÉGRÉS
+VOIR
+        <footer>
+            mandoc pour la
+            <p>conversion des pages de manuel.
+Le site web est <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">disponible selon les termes de l</a>a licence
+GPL-3.0
+              </p> , à l'exception du contenu des </footer>pages de manuel, qui ont leur p</body>ropre licence spécifiée dans le </html>paquet Arch Linux correspondant.

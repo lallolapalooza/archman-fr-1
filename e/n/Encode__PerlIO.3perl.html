@@ -1,0 +1,253 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Encode::PerlIO(3perl) — Pages manuelles Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Encode__PerlIO.3perl</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/core/x86_64/perl/">perl</a></p>
+<p class="lic">Licences: Artistic-1.0-Perl OR GPL-1.0-or-later</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Encode::PerlIO(3perl)</td>
+    <td class="head-vol">Guide de référence des programmeurs Perl</td>
+    <td class="head-rtitle">Encode::PerlIO(3perl)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">Encode::PerlIO -- un document détaillé sur Encode et PerlIO</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Overview'><a class='permalink' href='#Overview'>Aperçu</a></h1>
+<p class="Pp">Il est très courant de vouloir effectuer des transformations d'encodage lors de la lecture ou de l'écriture de fichiers, de connexions réseau, de tuyaux, etc. Si Perl est configuré pour utiliser le nouveau système d'E/S 'perlio', alors
+    <span class="Li">"Encode"</span> fournit une "couche" (voir
+    PerlIO) qui peut transformer les données lorsqu'elles sont lues ou écrites.</p>
+<p class="Pp">Voici comment le poète aveugle moderniserait l'encodage :</p>
+<pre>use Encode;
+open(my $iliad,'&lt;:encoding(iso-8859-7)','iliad.greek');
+open(my $utf8,'&gt;:utf8','iliad.utf8');
+my @epic = &lt;$iliad&gt;;
+print $utf8 @epic;
+close($utf8);
+close($illiad);</pre>
+<p class="Pp">De plus, le nouveau système d'E/S peut aussi être configuré pour
+    lire/écrire des caractères encodés en UTF-8 (comme mentionné ci-dessus, c'est efficace) :</p>
+<pre>open(my $fh,'&gt;:utf8','anything');
+print $fh "Any \x{0021} string \N{SMILEY FACE}\n";</pre>
+<p class="Pp">L'une ou l'autre des formes de spécification de "couche" ci-dessus peut
+    être définie par défaut pour une portée lexicale avec la <span class="Li">"use
+    open ..."</span> pragme. Voir open.</p>
+<p class="Pp">Une fois qu'une poignée est ouverte, ses couches peuvent être modifiées à l'aide de
+    <span class="Li">"binmode"</span>.</p>
+<p class="Pp">Sans aucune telle configuration, ou si Perl lui-même est compilé en utilisant
+    les E/S propres au système, alors les opérations d'écriture supposent que la poignée de fichier n'accepte que des <i>octets</i> et échouera <span class="Li">"die"</span>
+    si un caractère plus grand que 255 est écrit dans la poignée. Lors de la lecture, chaque
+    octet de la poignée devient un octet-dans-un-caractère. Notez que ce comportement par défaut
+    est le même que celui qu'auraient les langages limités aux octets (y compris Perl avant la v5.6),
+    et est suffisant pour gérer les encodages natifs 8 bits, par ex.
+    iso-8859-1, EBCDIC, etc., et tout mécanisme hérité pour gérer d'autres
+    encodages et des données binaires.</p>
+<p class="Pp">Dans les autres cas, c'est au programme de transformer
+    les caractères en octets en utilisant l'API ci-dessus avant d'effectuer des écritures, et de
+    transformer les octets lus depuis une poignée en caractères avant d'effectuer des
+    "opérations sur les caractères" (par ex.
+    <span class="Li">"lc"</span>,
+    <span class="Li">"/\W+/"</span>, ...).</p>
+<p class="Pp">Vous pouvez aussi utiliser PerlIO pour convertir de plus grandes quantités de données que
+    vous ne voulez pas charger en mémoire. Par exemple, pour convertir entre ISO-8859-1
+    (Latin 1) et UTF-8 (ou UTF-EBCDIC sur les machines EBCDIC) :</p>
+<pre>open(F, "&lt;:encoding(iso-8859-1)", "data.txt") or die $!;
+open(G, "&gt;:utf8",                 "data.utf") or die $!;
+while (&lt;F&gt;) { print G }
+# Could also do "print G &lt;F&gt;" but that would pull
+# the whole file into memory just to write it out again.</pre>
+<p class="Pp">Plus d'exemples :</p>
+<pre>open(my $f, "&lt;:encoding(cp1252)")
+open(my $g, "&gt;:encoding(iso-8859-2)")
+open(my $h, "&gt;:encoding(latin9)")       # iso-8859-15</pre>
+<p class="Pp">Voir aussi encoding pour savoir comment changer l'encodage par défaut des
+    données dans votre script.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='How_does_it_work?'><a class='permalink' href='#How_does_it_work?'>Comment   cela fonctionne-t-il ?</a></h1>
+<p class="Pp">Voici un schéma simpliste de la manière dont la poignée de fichier, PerlIO et Encode
+    interagissent.</p>
+<pre>filehandle &lt;-&gt; PerlIO        PerlIO &lt;-&gt; scalar (read/printed)
+                     \      /
+                      Encode</pre>
+<p class="Pp">Lorsque PerlIO reçoit des données de l'une ou l'autre direction, il remplit un tampon
+    (actuellement avec 1024 octets) et passe le tampon à Encode. Encode essaie de
+    convertir la partie valide et la renvoie à PerlIO, laissant les parties invalides
+    (généralement un caractère partiel) dans le tampon. PerlIO ajoute ensuite plus de données
+    au tampon, rappelle Encode, et ainsi de suite jusqu'à la fin du flux de données.</p>
+<p class="Pp">Pour ce faire, PerlIO appelle toujours les méthodes (de|en)code avec CHECK défini
+    à 1. Cela garantit que la méthode s'arrête au bon endroit lorsqu'elle
+    rencontre un caractère partiel. Voici ce qui se passe lorsque PerlIO et
+    Encode essaient d'encoder (à partir de utf8) plus de 1024 octets et que la
+    limite du tampon se trouve au milieu d'un caractère.</p>
+<pre> A   B   C   ....   ~     \x{3000}    ....
+41  42  43   ....  7E   e3   80   80  ....
+&lt;- buffer ---------------&gt;
+&lt;&lt; encoded &gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;
+                     &lt;- next buffer ------</pre>
+<p class="Pp">Encode convertit depuis le début jusqu'à \x7E, laissant \xe3 dans le
+    tampon car il est invalide (caractère partiel).</p>
+<p class="Pp">Malheureusement, ce schéma ne fonctionne pas bien avec les encodages basés sur les séquences d'échappement
+    tels que ISO-2022-JP.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Line_Buffering'><a class='permalink' href='#Line_Buffering'>Tampon   par   ligne</a></h1>
+<p class="Pp">Voyons maintenant ce qui se passe lorsque vous essayez de décoder depuis ISO-2022-JP
+    et que le tampon se termine au milieu d'un caractère.</p>
+<pre>            JIS208-ESC   \x{5f3e}
+ A   B   C   ....   ~   \e   $   B  |DAN | ....
+41  42  43   ....  7E   1b  24  41  43  46 ....
+&lt;- buffer ---------------------------&gt;
+&lt;&lt; encoded &gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;</pre>
+<p class="Pp">Comme vous le voyez, le tampon suivant commence par \x43. Mais \x43 est 'C' en
+    ASCII, ce qui est incorrect dans ce cas car nous sommes maintenant dans la zone JISX 0208, donc
+    il faut convertir \x43\x46, et non \x43. Contrairement à utf8 et EUC, dans les encodages basés sur les séquences d'échappement,
+    vous ne pouvez pas savoir si un octet donné est un caractère entier ou juste une partie
+    de celui-ci.</p>
+<p class="Pp">Heureusement, PerlIO prend aussi en charge le tampon par ligne si vous dites à PerlIO d'en
+    utiliser un au lieu d'un tampon fixe. Puisqu'il est garanti qu'ISO-2022-JP revient
+    à ASCII à la fin de la ligne, un caractère partiel ne se produira jamais lorsqu'un tampon par ligne est utilisé.</p>
+<p class="Pp">Pour dire à PerlIO d'utiliser un tampon par ligne, implémentez la méthode -&gt;needs_lines
+    pour votre objet d'encodage. Voir Encode::Encoding pour les détails.</p>
+<p class="Pp">Grâce à ces efforts, la plupart des encodages fournis avec Encode
+    prennent en charge PerlIO, mais il reste les encodages suivants.</p>
+<pre>iso-2022-kr
+MIME-B
+MIME-Header
+MIME-Q</pre>
+<p class="Pp">Heureusement, iso-2022-kr est rarement utilisé (selon Jungshik) et
+    MIME-* ne sont très peu susceptibles d'être fournis à PerlIO car ils sont destinés aux en-têtes de courrier. Voir Encode::MIME::Header pour les détails.</p>
+<section class="Ss">
+<h2 class="Ss" id='How_can_I_tell_whether_my_encoding_fully_supports_PerlIO_?'><a class='permalink' href='#How_can_I_tell_whether_my_encoding_fully_supports_PerlIO_?'>Comment   puis-je savoir si mon encodage prend entièrement en charge PerlIO ?</a></h2>
+<p class="Pp">Au moment de la rédaction, tout encodage dont la classe appartient à Encode::XS
+    et Encode::Unicode fonctionne. Le module Encode a une
+    <span class="Li">"perlio_ok"</span> méthode que vous pouvez utiliser
+    avant d'appliquer l'encodage PerlIO à la poignée de fichier. Voici un exemple :</p>
+<pre>my $use_perlio = perlio_ok($enc);
+my $layer = $use_perlio ? "&lt;:raw" : "&lt;:encoding($enc)";
+open my $fh, $layer, $file or die "$file : $!";
+while(&lt;$fh&gt;){
+  $_ = decode($enc, $_) unless $use_perlio;
+  # .... 
+}</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR   AUSSI</a></h1>
+<p class="Pp">Encode::Encoding, Encode::Supported, Encode::PerlIO, encoding,
+    perlebcdic, "open" in perlfunc, perlunicode, utf8, la liste de diffusion Perl
+    Unicode &lt;perl-unicode@perl.org&gt;</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-13</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/core/x86_64/perl/">core/perl</a></dd>
+        <dt>Version :</dt>
+        <dd>5.42.0-1</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://www.perl.org">https://www.perl.org</a></dd>
+        <dt>Licences :</dt>
+        <dd>Artistic-1.0-Perl OR GPL-1.0-or-later</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/core/perl/">/listing/core/perl/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#Overview">Aperçu</a></li>
+        
+            <li><a href="#How_does_it_work?">Comment cela fonctionne-t-il ?</a></li>
+        
+            <li><a href="#Line_Buffering">Tampon par ligne</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Encode::PerlIO.3perl.en.txt">txt</a>, 
+        
+            <a href="/man/Encode::PerlIO.3perl.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               , à l'exception du contenu des pages de manuel, qui ont leur propre licence spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Variable::Magic(3pm) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Variable__Magic(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/perl-variable-magic/">perl-variable-magic</a></p>
+<p class="lic">Licences: PerlArtistic, GPL</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Variable::Magic(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">Variable::Magic(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Variable::Magic - Associer une magie définie par l'utilisateur aux variables depuis Perl.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VERSION'><a class='permalink' href='#VERSION'>VERSION</a></h1>
+<p class="Pp">Version 0.64</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>use Variable::Magic qw&lt;wizard cast VMG_OP_INFO_NAME&gt;;
+{ # Un traceur de variable
+ my $wiz = wizard(
+  set  =&gt; sub { print &quot;maintenant défini à ${$_[0]}!\n&quot; },
+  free =&gt; sub { print &quot;détruit!\n&quot; },
+ );
+ my $a = 1;
+ cast $a, $wiz;
+ $a = 2;        # &quot;maintenant défini à 2!&quot;
+}               # &quot;détruit!&quot;
+{ # Un hash avec une valeur par défaut
+ my $wiz = wizard(
+  data     =&gt; sub { $_[1] },
+  fetch    =&gt; sub { $_[2] = $_[1] unless exists $_[0]-&gt;{$_[2]}; () },
+  store    =&gt; sub { print &quot;clé $_[2] stockée dans $_[-1]\n&quot; },
+  copy_key =&gt; 1,
+  op_info  =&gt; VMG_OP_INFO_NAME,
+ );
+ my %h = (_default =&gt; 0, pomme =&gt; 2);
+ cast %h, $wiz, '_default';
+ print $h{banane}, &quot;\n&quot;; # &quot;0&quot; (il n'y a pas de clé 'banane' dans %h)
+ $h{poire} = 1;           # &quot;clé poire stockée dans helem&quot;
+}</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">La magie est la façon dont Perl améliore les variables. Ce mécanisme
+    permet à l'utilisateur d'ajouter des données supplémentaires à n'importe quelle
+    variable et de réagir aux opérations syntaxiques (telles que l'accès,
+    l'assignation ou la destruction) qui peuvent lui être appliquées. Avec ce
+    module, vous pouvez ajouter votre propre magie à n'importe quelle variable
+    sans avoir à écrire une seule ligne de XS.</p>
+<p class="Pp">Vous réaliserez que ces variables magiques ressemblent beaucoup aux
+    variables liées (tied variables). Ce n'est pas surprenant, car les variables
+    liées sont implémentées comme un type spécial de magie, tout comme toute
+    variable Perl 'irrégulière' : scalaires comme <span class="Li">$!</span>,
+    <span class="Li">$(</span> ou <span class="Li">$^W</span>, les hashes
+    <span class="Li">%ENV</span> et <span class="Li">%SIG</span>, le tableau
+    <span class="Li">%ISA</span>, les lvalues de <span class="Li">vec()</span> et
+    <span class="Li">substr()</span>, les variables threads::shared... Elles partagent
+    toutes la même API C sous-jacente, et ce module vous y donne un accès direct.</p>
+<p class="Pp">Cependant, la magie mise à disposition par ce module diffère du
+    liaison (tieing) et de la surcharge (overloading) de plusieurs manières :</p>
+<ul class="Bl-bullet">
+  <li>La magie n'est pas copiée lors de l'assignation.
+    <p class="Pp">Vous l'attachez aux variables, pas aux valeurs (comme pour les
+        références bénies).</p>
+  </li>
+  <li>La magie ne remplace pas la sémantique d'origine.
+    <p class="Pp">Les callbacks de magie sont généralement déclenchés avant que
+        l'action d'origine ne se produise, et ne peuvent pas l'empêcher. Cela rend
+        la capture d'événements individuels plus facile qu'avec
+        <span class="Li">&quot;tie&quot;</span>, où vous devez fournir des méthodes
+        de repli pour toutes les actions en héritant généralement de la classe
+        correcte <span class="Li">&quot;Tie::Std*&quot;</span> et en remplaçant
+        les méthodes individuelles dans votre propre classe.</p>
+  </li>
+  <li>La magie est multivaluée.
+    <p class="Pp">Vous pouvez appliquer en toute sécurité différents types de magie
+        à la même variable, et chacune d'elles sera appelée successivement.</p>
+  </li>
+  <li>La magie est agnostique au type.
+    <p class="Pp">La même magie peut être appliquée sur des scalaires, des tableaux,
+        des hashes, des sous-routines ou des globs. Mais le même hook (voir ci-dessous
+        pour une liste) peut se déclencher différemment selon le type de la variable.</p>
+  </li>
+  <li>La magie est invisible au niveau Perl.
+    <p class="Pp">Les variables magiques et non magiques ne peuvent pas être distinguées
+        avec <span class="Li">&quot;ref&quot;</span>,
+        <span class="Li">&quot;tied&quot;</span> ou une autre astuce.</p>
+  </li>
+  <li>La magie est notablement plus rapide.
+    <p class="Pp">Principalement parce que la façon dont Perl gère la magie est plus
+        légère par nature, et parce qu'il n'y a pas besoin de résolution de méthode.
+        De plus, comme vous n'avez pas à réimplémenter toute la sémantique de la
+        variable, vous ne payez que pour ce que vous utilisez réellement.</p>
+  </li>
+</ul>
+<p class="Pp">Les opérations qui peuvent être surchargées sont :</p>
+<ul class="Bl-bullet">
+  <li><i>get</i>
+    <p class="Pp">Cette magie est appelée lorsque la variable est évaluée. Elle n'est
+        jamais appelée pour les tableaux et les hashes.</p>
+  </li>
+  <li><i>set</i>
+    <p class="Pp">Cette magie est appelée chaque fois que la valeur de la variable
+        change. Elle est appelée pour les sous-indices et les tranches de tableaux,
+        mais jamais pour les hashes.</p>
+  </li>
+  <li><i>len</i>
+    <p class="Pp">Cette magie s'applique uniquement aux tableaux (bien qu'elle s'appliquait
+        aussi aux scalaires), et est déclenchée lorsque la 'taille' ou la 'longueur'
+        de la variable doit être connue par Perl. C'est typiquement la magie impliquée
+        lorsqu'un tableau est évalué dans un contexte scalaire, mais aussi lors de
+        l'assignation de tableau et des boucles (<span class="Li">&quot;for&quot;</span>,
+        <span class="Li">&quot;map&quot;</span> ou
+        <span class="Li">&quot;grep&quot;</span>). La longueur est retournée par le
+        callback sous forme d'entier.</p>
+    <p class="Pp">À partir de perl 5.12, cette magie n'est plus appelée par le mot-clé
+        <span class="Li">&quot;length&quot;</span>, et à partir de perl 5.17.4, elle
+        n'est plus appelée pour les scalaires dans aucune situation, rendant cette
+        magie significative uniquement sur les tableaux. Vous pouvez utiliser les
+        constantes &quot;VMG_COMPAT_SCALAR_LENGTH_NOLEN&quot; et
+        &quot;VMG_COMPAT_SCALAR_NOLEN&quot; pour savoir si cette magie est disponible
+        pour les scalaires ou non.</p>
+  </li>
+  <li><i>clear</i>
+    <p class="Pp">Cette magie est appelée lorsque la variable est réinitialisée, comme
+        lorsqu'un tableau est vidé. Veuillez noter que c'est différent de l'annulation
+        de la définition de la variable, même si la magie est appelée lorsque le
+        nettoyage est le résultat de l'annulation de la définition (par exemple, pour
+        un tableau, mais en fait un bug empêche son fonctionnement avant perl 5.9.5 -
+        voir l'historique).</p>
+  </li>
+  <li><i>free</i>
+    <p class="Pp">Cette magie est appelée lorsqu'une variable est détruite suite à la
+        sortie de sa portée (mais pas lors de son annulation de définition). Elle
+        se comporte globalement comme les destructeurs d'objets Perl (c'est-à-dire
+        les méthodes <span class="Li">&quot;DESTROY&quot;</span>), sauf que les
+        exceptions lancées depuis un callback <i>free</i> seront toujours propagées
+        au code environnant.</p>
+  </li>
+  <li><i>copy</i>
+    <p class="Pp">Lorsqu'elle est appliquée aux tableaux et hashes liés, cette magie se
+        déclenche lorsque vous essayez d'accéder ou de modifier leurs éléments.</p>
+    <p class="Pp">À partir de perl 5.17.0, elle peut également être appliquée aux
+        prototypes de fermeture (closure prototypes), auquel cas la magie sera appelée
+        lorsque le prototype sera cloné. La constante &quot;VMG_COMPAT_CODE_COPY_CLONE&quot;
+        est vraie lorsque votre perl prend en charge cette fonctionnalité.</p>
+  </li>
+  <li><i>dup</i>
+    <p class="Pp">Cette magie est appelée lorsque la variable est clonée entre les
+        threads. Elle n'est actuellement pas disponible.</p>
+  </li>
+  <li><i>local</i>
+    <p class="Pp">Lorsque cette magie est définie sur une variable, toutes les localisations
+        subséquentes de la variable déclencheront le callback. Elle est disponible
+        sur votre perl si et seulement si
+        <span class="Li">&quot;MGf_LOCAL&quot;</span> est vrai.</p>
+  </li>
+</ul>
+<p class="Pp">Les actions suivantes s'appliquent uniquement aux hashes et sont disponibles
+    si et seulement si &quot;VMG_UVAR&quot; est vrai. Elles sont désignées sous le nom
+    de magies <i>uvar</i>.</p>
+<ul class="Bl-bullet">
+  <li><i>fetch</i>
+    <p class="Pp">Cette magie est appelée chaque fois qu'un élément est récupéré du
+        hash.</p>
+  </li>
+  <li><i>store</i>
+    <p class="Pp">Celle-ci est appelée lorsqu'un élément est stocké dans le
+      hash.</p>
+  </li>
+  <li><i>exists</i>
+    <p class="Pp">Cette magie se déclenche lorsqu'une clé est testée pour son existence
+        dans le hash.</p>
+  </li>
+  <li><i>delete</i>
+    <p class="Pp">Cette magie est déclenchée lorsqu'une clé est supprimée du hash, que
+        la clé y existe ou non.</p>
+  </li>
+</ul>
+<p class="Pp">Vous pouvez vous référer aux tests pour avoir plus d'informations sur
+    l'endroit où les différentes magies sont appelées.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='FONCTIONS'><a class='permalink' href='#FONCTIONS'>FONCTIONS</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;wizard&amp;quot;'><a class='permalink' href='#&amp;quot;wizard&amp;quot;'>&quot;wizard&quot;</a></h2>
+<pre>wizard(
+ data     =&gt; sub { ... },
+ get      =&gt; sub { my ($ref, $data [, $op]) = @_; ... },
+ set      =&gt; sub { my ($ref, $data [, $op]) = @_; ... },
+ len      =&gt; sub {
+  my ($ref, $data, $len [, $op]) = @_; ... ; return $newlen
+ },
+ clear    =&gt; sub { my ($ref, $data [, $op]) = @_; ... },
+ free     =&gt; sub { my ($ref, $data [, $op]) = @_, ... },
+ copy     =&gt; sub { my ($ref, $data, $key, $elt [, $op]) = @_; ... },
+ local    =&gt; sub { my ($ref, $data [, $op]) = @_; ... },
+ fetch    =&gt; sub { my ($ref, $data, $key [, $op]) = @_; ... },
+ store    =&gt; sub { my ($ref, $data, $key [, $op]) = @_; ... },
+ exists   =&gt; sub { my ($ref, $data, $key [, $op]) = @_; ... },
+ delete   =&gt; sub { my ($ref, $data, $key [, $op]) = @_; ... },
+ copy_key =&gt; $bool,
+ op_info  =&gt; [ 0 | VMG_OP_INFO_NAME | VMG_OP_INFO_OBJECT ],
+)</pre>
+<p class="Pp">Cette fonction crée un 'wizard', un objet opaque qui détient les informations
+    de magie. Elle prend une liste d'arguments clé/valeur, dont les clés peuvent
+    être :</p>
+<ul class="Bl-bullet">
+  <li><span class="Li">&quot;data&quot;</span>
+    <p class="Pp">Une référence de code (ou une chaîne) vers un constructeur de données
+        privées. Il est</p>
+  </li>
+</ul>
+</section>
+</section>
+</div>
+</section>
+                
+            </article>
+        </main>
+        <footer>
+            
+        </footer>
+    </body>
+</html>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NAME</a></h1>
+<p class="In">Variable::Magic - Perl's magic variable interface</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre> use Variable::Magic;
+
+ my $wiz = wizard(
+  &quot;name&quot;  =&gt; 'my magic',
+  &quot;=~&quot;     =&gt; sub { ... }, # bind
+  &quot;set&quot;    =&gt; sub { ... }, # set
+  &quot;get&quot;    =&gt; sub { ... }, # get
+  &quot;len&quot;    =&gt; sub { ... }, # length
+  &quot;free&quot;   =&gt; sub { ... }, # free
+  &quot;copy&quot;   =&gt; sub { ... }, # copy
+  &quot;local&quot;  =&gt; sub { ... }, # local
+  &quot;fetch&quot;  =&gt; sub { ... }, # fetch
+  &quot;store&quot;  =&gt; sub { ... }, # store
+  &quot;exists&quot; =&gt; sub { ... }, # exists
+  &quot;delete&quot; =&gt; sub { ... }, # delete
+  &quot;default&quot;=&gt; 1,       # allow default behaviour
+  &quot;data&quot;   =&gt; sub { ... }, # constructor for private data
+ );
+
+ my $x;
+ cast $x, $wiz, @args;
+ my $data = getdata $x, $wiz;
+ dispell $x, $wiz;
+</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">This module allows you to extend Perl's native magic variable
+    feature. The latter gives you a way to hook into operations on variables,
+    like assignment, evaluation, getting the length etc.</p>
+<p class="Pp">There are two main ways to use this module:</p>
+<ul class="Bl-bullet">
+  <li>As a generic interface to Perl's magic API. This is done by calling
+      <span class="Li">&quot;wizard&quot;</span> with named arguments.</li>
+  <li>As a simpler way to install magic on variables.</li>
+</ul>
+<p class="Pp">There are two functions provided by this module:</p>
+<dl class="Bl-tag">
+  <dt><b>wizard</b></dt>
+  <dd>Returns a magic object that can be used with <span class="Li">&quot;cast&quot;</span>,
+      <span class="Li">&quot;getdata&quot;</span> and
+      <span class="Li">&quot;dispell&quot;</span>.</dd>
+  <dt><b>cast</b></dt>
+  <dd>Installs magic on a variable.</dd>
+  <dt><b>getdata</b></dt>
+  <dd>Fetches the private data associated with a magic variable.</dd>
+  <dt><b>dispell</b></dt>
+  <dd>Removes magic from a variable.</dd>
+</dl>
+<section class="Ss">
+<h2 class="Ss" id='wizard'><a class='permalink' href='#wizard'>wizard</a></h2>
+<pre>my $wiz = wizard(%args)</pre>
+<p class="Pp">This function creates and returns a magic object. The possible
+    arguments are:</p>
+<ul class="Bl-bullet">
+  <li><span class="Li">&quot;name&quot;</span>, <span class="Li">&quot;=~&quot;</span>,
+      <span class="Li">&quot;bind&quot;</span>
+    <p class="Pp">A code reference to be called when the magic is bound to a
+        variable (i.e. when <span class="Li">&quot;cast&quot;</span> is called).
+        The callback is called in scalar context each time the magic is cast onto
+        a variable, with <span class="Li">$_[0]</span> being a reference to this
+        variable and <span class="Li">@_[1 .. @_-1]</span> being all extra
+        arguments that were passed to &quot;cast&quot;. The scalar returned from
+        this call is then attached to the variable and can be retrieved later
+        with &quot;getdata&quot;.</p>
+  </li>
+  <li><span class="Li">&quot;get&quot;</span>,
+      <span class="Li">&quot;set&quot;</span>,
+      <span class="Li">&quot;len&quot;</span>,
+      <span class="Li">&quot;clear&quot;</span>,
+      <span class="Li">&quot;free&quot;</span>,
+      <span class="Li">&quot;copy&quot;</span>,
+      <span class="Li">&quot;local&quot;</span>,
+      <span class="Li">&quot;fetch&quot;</span>,
+      <span class="Li">&quot;store&quot;</span>,
+      <span class="Li">&quot;exists&quot;</span> and
+      <span class="Li">&quot;delete&quot;</span>
+    <p class="Pp">Code (or string) references to the respective magic callbacks.
+        You don't have to specify all of them : the magic corresponding to
+        undefined entries will simply not be hooked.</p>
+    <p class="Pp">When those callbacks are executed,
+        <span class="Li">$_[0]</span> is a reference to the magic variable and
+        <span class="Li">$_[1]</span> is the associated private data (or
+        <span class="Li">&quot;undef&quot;</span> when no private data
+        constructor is supplied with the wizard). Other arguments depend on
+        which kind of magic is involved :</p>
+  </li>
+</ul>
+<div class="Bd-indent">
+<ul class="Bl-bullet">
+  <li><i>len</i>
+    <p class="Pp"><span class="Li">$_[2]</span> contains the natural,
+        non-magical length of the variable (which can only be a scalar or an
+        array as <i>len</i> magic is only relevant for these types). The
+        callback is expected to return the new scalar or array length to use, or
+        <span class="Li">&quot;undef&quot;</span> to default to the normal
+        length.</p>
+  </li>
+  <li><i>copy</i>
+    <p class="Pp">When the variable for which the magic is invoked is an array
+        or an hash, <span class="Li">$_[2]</span> is a either an alias or a copy
+        of the current key, and <span class="Li">$_[3]</span> is an alias to the
+        current element (i.e. the value). Since <span class="Li">$_[2]</span>
+        might be a copy, it is useless to try to change it or cast magic on
+      it.</p>
+    <p class="Pp">Starting from perl 5.17.0, this magic can also be called for
+        code references. In this case, <span class="Li">$_[2]</span> is always
+        <span class="Li">&quot;undef&quot;</span> and
+        <span class="Li">$_[3]</span> is a reference to the cloned anonymous
+        subroutine.</p>
+  </li>
+  <li><i>fetch</i>, <i>store</i>, <i>exists</i> and <i>delete</i>
+    <p class="Pp"><span class="Li">$_[2]</span> is an alias to the current key.
+        Note that <span class="Li">$_[2]</span> may rightfully be readonly if
+        the key comes from a bareword, and as such it is unsafe to assign to it.
+        You can ask for a copy instead by passing
+        <span class="Li">&quot;copy_key =&gt; 1&quot;</span> to
+        &quot;wizard&quot; which, at the price of a small performance hit,
+        allows you to safely assign to <span class="Li">$_[2]</span> in order to
+        e.g. redirect the action to another key.</p>
+  </li>
+</ul>
+</div>
+<div class="Bd-indent">
+<p class="Pp">Finally, if <span class="Li">&quot;op_info =&gt; $num&quot;</span>
+    is also passed to <span class="Li">&quot;wizard&quot;</span>, then one extra
+    element is appended to <span class="Li">@_</span>. Its nature depends on the
+    value of <span class="Li">$num</span> :</p>
+<ul class="Bl-bullet">
+  <li><span class="Li">&quot;VMG_OP_INFO_NAME&quot;</span>
+    <p class="Pp"><span class="Li">$_[-1]</span> is the current op name.</p>
+  </li>
+  <li><span class="Li">&quot;VMG_OP_INFO_OBJECT&quot;</span>
+    <p class="Pp"><span class="Li">$_[-1]</span> is the
+        <span class="Li">&quot;B::OP&quot;</span> object for the current op.</p>
+  </li>
+</ul>
+</div>
+<div class="Bd-indent">
+<p class="Pp">Both result in a small performance hit, but just getting the name
+    is lighter than getting the op object.</p>
+<p class="Pp">These callbacks are always executed in scalar context. The
+    returned value is coerced into a signed integer, which is then passed
+    straight to the perl magic API. However, note that perl currently only cares
+    about the return value of the <i>len</i> magic callback and ignores all the
+    others. Starting with Variable::Magic 0.58, a reference returned from a
+    non-<i>len</i> magic callback will not be destroyed immediately but will be
+    allowed to survive until the end of the statement that triggered the magic.
+    This lets you use this return value as a token for triggering a destructor
+    after the original magic action takes place. You can see an example of this
+    technique in the cookbook.</p>
+</div>
+<p class="Pp">Each callback can be specified as :</p>
+<ul class="Bl-bullet">
+  <li>a code reference, which will be called as a subroutine.</li>
+  <li>a string reference, where the string denotes which subroutine is to be
+      called when magic is triggered. If the subroutine name is not fully
+      qualified, then the current package at the time the magic is invoked will
+      be used instead.</li>
+  <li>a reference to <span class="Li">&quot;undef&quot;</span>, in which case a
+      no-op magic callback is installed instead of the default one. This may
+      especially be helpful for <i>local</i> magic, where an empty callback
+      prevents magic from being copied during localization.</li>
+</ul>
+<p class="Pp">Note that <i>free</i> magic is never called during global
+    destruction, as there is no way to ensure that the wizard object and the
+    callback were not destroyed before the variable.</p>
+<p class="Pp">Here is a simple usage example :</p>
+<pre># A simple scalar tracer
+my $wiz = wizard(
+ get  =&gt; sub { print STDERR &quot;got ${$_[0]}\n&quot; },
+ set  =&gt; sub { print STDERR &quot;set to ${$_[0]}\n&quot; },
+ free =&gt; sub { print STDERR &quot;${$_[0]} was deleted\n&quot; },
+);</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;cast&amp;quot;'><a class='permalink' href='#&amp;quot;cast&amp;quot;'>&quot;cast&quot;</a></h2>
+<pre>cast [$@%&amp;*]var, $wiz, @args</pre>
+<p class="Pp">This function associates <span class="Li">$wiz</span> magic to the
+    supplied variable, without overwriting any other kind of magic. It returns
+    true on success or when <span class="Li">$wiz</span> magic is already
+    attached, and croaks on error. When <span class="Li">$wiz</span> provides a
+    data constructor, it is called just before magic is cast onto the variable,
+    and it receives a reference to the target variable in
+    <span class="Li">$_[0]</span> and the content of
+    <span class="Li">@args</span> in <span class="Li">@_[1 .. @args]</span>.
+    Otherwise, <span class="Li">@args</span> is ignored.</p>
+<pre># Casts $wiz onto $x, passing (\$x, '1') to the data constructor.
+my $x;
+cast $x, $wiz, 1;</pre>
+<p class="Pp">The <span class="Li">&quot;var&quot;</span> argument can be an
+    array or hash value. Magic for these scalars behaves like for any other,
+    except that it is dispelled when the entry is deleted from the container.
+    For example, if you want to call
+    <span class="Li">&quot;POSIX::tzset&quot;</span> each time the
+    <span class="Li">'TZ'</span> environment variable is changed in
+    <span class="Li">%ENV</span>, you can use :</p>
+<pre>use POSIX;
+cast $ENV{TZ}, wizard set =&gt; sub { POSIX::tzset(); () };</pre>
+<p class="Pp">If you want to handle the possible deletion of the
+    <span class="Li">'TZ'</span> entry, you must also specify <i>store</i>
+    magic.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;getdata&amp;quot;'><a class='permalink' href='#&amp;quot;getdata&amp;quot;'>&quot;getdata&quot;</a></h2>
+<pre>getdata [$@%&amp;*]var, $wiz</pre>
+<p class="Pp">This accessor fetches the private data associated with the magic
+    <span class="Li">$wiz</span> in the variable. It croaks when
+    <span class="Li">$wiz</span> does not represent a valid magic object, and
+    returns an empty list if no such magic is attached to the variable or when
+    the wizard has no data constructor.</p>
+<pre># Get the data attached to $wiz in $x, or undef if $wiz
+# did not attach any.
+my $data = getdata $x, $wiz;</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;dispell&amp;quot;'><a class='permalink' href='#&amp;quot;dispell&amp;quot;'>&quot;dispell&quot;</a></h2>
+<pre>dispell [$@%&amp;*]variable, $wiz</pre>
+<p class="Pp">The exact opposite of &quot;cast&quot; : it dissociates
+    <span class="Li">$wiz</span> magic from the variable. This function returns
+    true on success, <span class="Li">0</span> when no magic represented by
+    <span class="Li">$wiz</span> could be found in the variable, and croaks if
+    the supplied wizard is invalid.</p>
+<pre># Dispell now.
+die 'no such magic in $x' unless dispell $x, $wiz;</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CONSTANTS'><a class='permalink' href='#CONSTANTS'>CONSTANTS</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;MGf_COPY&amp;quot;'><a class='permalink' href='#&amp;quot;MGf_COPY&amp;quot;'>&quot;MGf_COPY&quot;</a></h2>
+<p class="Pp">Evaluates to true if and only if the <i>copy</i> magic is
+    available. This is the case for perl 5.7.3 and greater, which is ensured by
+    the requirements of this module.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;MGf_DUP&amp;quot;'><a class='permalink' href='#&amp;quot;MGf_DUP&amp;quot;'>&quot;MGf_DUP&quot;</a></h2>
+<p class="Pp">Evaluates to true if and only if the <i>dup</i> magic is
+    available. This is the case for perl 5.7.3 and greater, which is ensured by
+    the requirements of this module.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;MGf_LOCAL&amp;quot;'><a class='permalink' href='#&amp;quot;MGf_LOCAL&amp;quot;'>&quot;MGf_LOCAL&quot;</a></h2>
+<p class="Pp">Evaluates to true if and only if the <i>local</i> magic is
+    available. This is the case for perl 5.9.3 and greater.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;VMG_UVAR&amp;quot;'><a class='permalink' href='#&amp;quot;VMG_UVAR&amp;quot;'>&quot;VMG_UVAR&quot;</a></h2>
+<p class="Pp">When this constant is true, you can use the <i>fetch</i>,
+    <i>store</i>, <i>exists</i> and <i>delete</i> magics on hashes. Initial
+    &quot;VMG_UVAR&quot; capability was introduced in perl 5.9.5, with a fully
+    functional implementation shipped with perl 5.10.0.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;VMG_COMPAT_SCALAR_LENGTH_NOLEN&amp;quot;'><a class='permalink' href='#&amp;quot;VMG_COMPAT_SCALAR_LENGTH_NOLEN&amp;quot;'>&quot;VMG_COMPAT_SCALAR_LENGTH_NOLEN&quot;</a></h2>
+<p class="Pp">True for perls that don't call <i>len</i> magic when taking the
+    <span class="Li">&quot;length&quot;</span> of a magical scalar.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;VMG_COMPAT_SCALAR_NOLEN&amp;quot;'><a class='permalink' href='#&amp;quot;VMG_COMPAT_SCALAR_NOLEN&amp;quot;'>&quot;VMG_COMPAT_SCALAR_NOLEN&quot;</a></h2>
+<p class="Pp">True for perls that don't call <i>len</i> magic on scalars.
+    Implies &quot;VMG_COMPAT_SCALAR_LENGTH_NOLEN&quot;.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;VMG_COMPAT_ARRAY_PUSH_NOLEN&amp;quot;'><a class='permalink' href='#&amp;quot;VMG_COMPAT_ARRAY_PUSH_NOLEN&amp;quot;'>&quot;VMG_COMPAT_ARRAY_PUSH_NOLEN&quot;</a></h2>
+<p class="Pp">True for perls that don't call <i>len</i> magic when you push an
+    element in a magical array. Starting from perl 5.11.0, this only refers to
+    pushes in non-void context and hence is false.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;VMG_COMPAT_ARRAY_PUSH_NOLEN_VOID&amp;quot;'><a class='permalink' href='#&amp;quot;VMG_COMPAT_ARRAY_PUSH_NOLEN_VOID&amp;quot;'>&quot;VMG_COMPAT_ARRAY_PUSH_NOLEN_VOID&quot;</a></h2>
+<p class="Pp">True for perls that don't call <i>len</i> magic when you push an
+    element in a magical array in void context.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTHOR</a></h1>
+<p class="Et">Audrey Tang &lt;audreyt@audreyt.org&gt;</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>SEE ALSO</a></h1>
+<p class=" Pp"><a href="perlapi.html">perlapi</a>, <a href="constant.html">constant</a></p>
+</section>
+'><a class='permalink' href='#&amp;quot;VMG_COMPAT_ARRAY_PUSH_NOLEN_VOID&amp;quot;'>&quot;VMG_COMPAT_ARRAY_PUSH_NOLEN_VOID&quot;</a></h2>
+<p class="Pp">Vrai pour les perls qui n'appellent pas la magie <i>len</i> lorsque vous ajoutez un élément dans un tableau magique dans un contexte vide.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;VMG_COMPAT_ARRAY_UNSHIFT_NOLEN_VOID&amp;quot;'><a class='permalink' href='#&amp;quot;VMG_COMPAT_ARRAY_UNSHIFT_NOLEN_VOID&amp;quot;'>&quot;VMG_COMPAT_ARRAY_UNSHIFT_NOLEN_VOID&quot;</a></h2>
+<p class="Pp">Vrai pour les perls qui n'appellent pas la magie <i>len</i> lorsque vous supprimez un élément au début d'un tableau magique dans un contexte vide.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;VMG_COMPAT_ARRAY_UNDEF_CLEAR&amp;quot;'><a class='permalink' href='#&amp;quot;VMG_COMPAT_ARRAY_UNDEF_CLEAR&amp;quot;'>&quot;VMG_COMPAT_ARRAY_UNDEF_CLEAR&quot;</a></h2>
+<p class="Pp">Vrai pour les perls qui appellent la magie <i>clear</i> lors de la suppression de tableaux magiques.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;VMG_COMPAT_HASH_DELETE_NOUVAR_VOID&amp;quot;'><a class='permalink' href='#&amp;quot;VMG_COMPAT_HASH_DELETE_NOUVAR_VOID&amp;quot;'>&quot;VMG_COMPAT_HASH_DELETE_NOUVAR_VOID&quot;</a></h2>
+<p class="Pp">Vrai pour les perls qui n'appellent pas la magie <i>delete</i> lorsque vous supprimez un élément d'une table dans un contexte vide.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;VMG_COMPAT_CODE_COPY_CLONE&amp;quot;'><a class='permalink' href='#&amp;quot;VMG_COMPAT_CODE_COPY_CLONE&amp;quot;'>&quot;VMG_COMPAT_CODE_COPY_CLONE&quot;</a></h2>
+<p class="Pp">Vrai pour les perls qui appellent la magie <i>copy</i> lorsqu'un prototype de fermeture magique est cloné.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;VMG_COMPAT_GLOB_GET&amp;quot;'><a class='permalink' href='#&amp;quot;VMG_COMPAT_GLOB_GET&amp;quot;'>&quot;VMG_COMPAT_GLOB_GET&quot;</a></h2>
+<p class="Pp">Vrai pour les perls qui appellent la magie <i>get</i> pour les opérations sur les globs.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;VMG_PERL_PATCHLEVEL&amp;quot;'><a class='permalink' href='#&amp;quot;VMG_PERL_PATCHLEVEL&amp;quot;'>&quot;VMG_PERL_PATCHLEVEL&quot;</a></h2>
+<p class="Pp">Le niveau de correctif de perl avec lequel ce module a été compilé, ou <span class="Li">0</span> pour les perls non débogués.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;VMG_THREADSAFE&amp;quot;'><a class='permalink' href='#&amp;quot;VMG_THREADSAFE&amp;quot;'>&quot;VMG_THREADSAFE&quot;</a></h2>
+<p class="Pp">Vrai si et seulement si ce module aurait pu être compilé avec les fonctionnalités de sécurité des threads activées.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;VMG_FORKSAFE&amp;quot;'><a class='permalink' href='#&amp;quot;VMG_FORKSAFE&amp;quot;'>&quot;VMG_FORKSAFE&quot;</a></h2>
+<p class="Pp">Vrai si et seulement si ce module aurait pu être compilé avec les fonctionnalités de sécurité de fork activées. C'est toujours vrai sauf sous Windows où c'est faux pour perl 5.10.0 et versions antérieures.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;VMG_OP_INFO_NAME&amp;quot;'><a class='permalink' href='#&amp;quot;VMG_OP_INFO_NAME&amp;quot;'>&quot;VMG_OP_INFO_NAME&quot;</a></h2>
+<p class="Pp">Valeur à passer avec <span class="Li">&quot;op_info&quot;</span> pour obtenir le nom de l'op actuel dans les callbacks magiques.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;VMG_OP_INFO_OBJECT&amp;quot;'><a class='permalink' href='#&amp;quot;VMG_OP_INFO_OBJECT&amp;quot;'>&quot;VMG_OP_INFO_OBJECT&quot;</a></h2>
+<p class="Pp">Valeur à passer avec <span class="Li">&quot;op_info&quot;</span> pour obtenir un objet <span class="Li">&quot;B::OP&quot;</span> représentant l'op actuel dans les callbacks magiques.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COOKBOOK'><a class='permalink' href='#COOKBOOK'>MANUEL DE CUISINE</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='Associate_an_object_to_any_perl_variable'><a class='permalink' href='#Associate_an_object_to_any_perl_variable'>Associer un objet à n'importe quelle variable perl</a></h2>
+<p class="Pp">Cette technique peut être utile pour passer des données utilisateur via des API limitées. Elle est similaire à l'utilisation d'objets <i>inside-out</i>, mais sans l'inconvénient de devoir implémenter un destructeur complexe.</p>
+<pre>{
+ package Magical::UserData;
+ use Variable::Magic qw&lt;wizard cast getdata&gt;;
+ my $wiz = wizard data =&gt; sub { \$_[1] };
+ sub ud (\[$@%*&amp;]) : lvalue {
+  my ($var) = @_;
+  my $data = &amp;getdata($var, $wiz);
+  unless (defined $data) {
+   $data = \(my $slot);
+   &amp;cast($var, $wiz, $slot)
+             or die &quot;Impossible de caster la magie UserData sur la variable&quot;;
+  }
+  $$data;
+ }
+}
+{
+ BEGIN { *ud = \&amp;Magical::UserData::ud }
+ my $cb;
+ $cb = sub { print 'Bonjour, ', ud(&amp;$cb), &quot;!\n&quot; };
+ ud(&amp;$cb) = 'monde';
+ $cb-&gt;(); # Bonjour, monde!
+}</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Recursively_cast_magic_on_datastructures'><a class='permalink' href='#Recursively_cast_magic_on_datastructures'>Appliquer récursivement la magie aux structures de données</a></h2>
+<p class="Pp"><span class="Li">&quot;cast&quot;</span> peut être appelé depuis n'importe quel callback magique, et en particulier depuis <span class="Li">&quot;data&quot;</span>. Cela vous permet d'appliquer récursivement la magie aux structures de données :</p>
+<pre>my $wiz;
+$wiz = wizard data =&gt; sub {
+ my ($var, $depth) = @_;
+ $depth ||= 0;
+ my $r = ref $var;
+ if ($r eq 'ARRAY') {
+  &amp;cast((ref() ? $_ : \$_), $wiz, $depth + 1) for @$var;
+ } elsif ($r eq 'HASH') {
+  &amp;cast((ref() ? $_ : \$_), $wiz, $depth + 1) for values %$var;
+ }
+ return $depth;
+},
+free =&gt; sub {
+ my ($var, $depth) = @_;
+ my $r = ref $var;
+ print &quot;libération $r à la profondeur $depth\n&quot;;
+ ();
+};
+{
+ my %h = (
+  a =&gt; [ 1, 2 ],
+  b =&gt; { c =&gt; 3 }
+ );
+ cast %h, $wiz;
+}</pre>
+<p class="Pp">Lorsque <span class="Li">%h</span> sort de la portée, cela affiche quelque chose comme :</p>
+<pre>libération HASH à la profondeur 0
+libération HASH à la profondeur 1
+libération SCALAR à la profondeur 2
+libération ARRAY à la profondeur 1
+libération SCALAR à la profondeur 3
+libération SCALAR à la profondeur 3</pre>
+<p class="Pp">Bien sûr, cet exemple ne fait rien avec les valeurs qui sont ajoutées après le <span class="Li">&quot;cast&quot;</span>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Delayed_magic_actions'><a class='permalink' href='#Delayed_magic_actions'>Actions magiques retardées</a></h2>
+<p class="Pp">À partir de Variable::Magic 0.58, la valeur de retour des callbacks magiques peut être utilisée pour retarder l'action jusqu'après que l'action d'origine ait eu lieu :</p>
+<pre>my $delayed;
+my $delayed_aux = wizard(
+ data =&gt; sub { $_[1] },
+ free =&gt; sub {
+  my ($target) = $_[1];
+  my $target_data = &amp;getdata($target, $delayed);
+  local $target_data-&gt;{guard} = 1;
+  if (ref $target eq 'SCALAR') {
+   my $orig = $$target;
+   $$target = $target_data-&gt;{mangler}-&gt;($orig);
+  }
+  return;
+ },
+);
+$delayed = wizard(
+ data =&gt; sub {
+  return +{ guard =&gt; 0, mangler =&gt; $_[1] };
+ },
+ set  =&gt; sub {
+  return if $_[1]-&gt;{guard};
+  my $token;
+  cast $token, $delayed_aux, $_[0];
+  return \$token;
+ },
+);
+my $x = 1;
+cast $x, $delayed =&gt; sub { $_[0] * 2 };
+$x = 2;
+# $x vaut maintenant 4
+# Mais notez que l'action retardée n'a lieu qu'à la fin de
+# l'instruction actuelle :
+my @y = ($x = 5, $x);
+# $x vaut maintenant 10, mais @y est (5, 5)</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PERL_MAGIC_HISTORY'><a class='permalink' href='#PERL_MAGIC_HISTORY'>HISTORIQUE DE LA MAGIE PERL</a></h1>
+<p class="Pp">Les endroits où la magie est invoquée ont un peu changé au fil de l'histoire de perl. Voici une petite liste des plus récents.</p>
+<ul class="Bl-bullet">
+  <li><b>5.6.x</b>
+    <p class="Pp"><i>p14416</i> : Magie <i>copy</i> et <i>dup</i>.</p>
+  </li>
+  <li><b>5.8.9</b>
+    <p class="Pp"><i>p28160</i> : Intégration de <i>p25854</i> (voir ci-dessous).</p>
+    <p class="Pp"><i>p32542</i> : Intégration de <i>p31473</i> (voir ci-dessous).</p>
+  </li>
+  <li><b>5.9.3</b>
+    <p class="Pp"><i>p25854</i> : La magie <i>len</i> n'est plus appelée lors de l'ajout d'un élément à un tableau magique.</p>
+    <p class="Pp"><i>p26569</i> : Magie <i>local</i>.</p>
+  </li>
+  <li><b>5.9.5</b>
+    <p class="Pp"><i>p31064</i> : Magie <i>uvar</i> significative.</p>
+    <p class="Pp"><i>p31473</i> : La magie <i>clear</i> n'était pas invoquée lors de la suppression d'un tableau. Le bug est corrigé à partir de cette version.</p>
+  </li>
+  <li><b>5.10.0</b>
+    <p class="Pp">Puisque <span class="Li">&quot;PERL_MAGIC_uvar&quot;</span> est en majuscules, <span class="Li">hv_magic_check()</span> déclenche la magie <i>copy</i> sur les stockages de tables pour les tables (non liées) qui ont également la magie <i>uvar</i>.</p>
+  </li>
+  <li><b>5.11.x</b>
+    <p class="Pp"><i>p32969</i> : La magie <i>len</i> n'est plus invoquée lors de l'appel de <span class="Li">&quot;length&quot;</span> avec un scalaire magique.</p>
+    <p class="Pp"><i>p34908</i> : La magie <i>len</i> n'est plus appelée lors de l'ajout / suppression d'un élément à un tableau magique dans un contexte vide. La partie <span class="Li">&quot;push&quot;</span> était déjà couverte par <i>p25854</i>.</p>
+    <p class="Pp"><i>g9cdcb38b</i> : La magie <i>len</i> est à nouveau appelée lors de l'ajout à un tableau magique dans un contexte non vide.</p>
+  </li>
+</ul>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXPORT'><a class='permalink' href='#EXPORT'>EXPORT</a></h1>
+<p class="Pp">Les fonctions &quot;wizard&quot;, &quot;cast&quot;, &quot;getdata&quot; et &quot;dispell&quot; sont exportées uniquement sur demande. Toutes sont exportées par les tags <span class="Li">':funcs'</span> et <span class="Li">':all'</span>.</p>
+<p class="Pp">Toutes les constantes sont également exportées uniquement sur demande, soit individuellement, soit par les tags <span class="Li">':consts'</span> et <span class="Li">':all'</span>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CAVEATS'><a class='permalink' href='#CAVEATS'>ATTENTION</a></h1>
+<p class="Pp">Pour intercepter les opérations de table avec la magie, vous avez besoin d'au moins perl 5.10.0 (voir &quot;VMG_UVAR&quot;).</p>
+<p class="Pp">Si vous voulez stocker un objet magique dans le slot de données privé, vous ne pourrez pas récupérer la magie avec &quot;getdata&quot;, car la magie n'est pas copiée par affectation. Vous pouvez contourner ce problème en stockant plutôt une référence à l'objet magique.</p>
+<p class="Pp">Si vous définissez un wizard avec la magie <i>free</i> et que vous le lui appliquez, cela crée un cycle de mémoire, donc ce destructeur ne sera pas appelé lorsque le wizard sera libéré.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DEPENDENCIES'><a class='permalink' href='#DEPENDENCIES'>DÉPENDANCES</a></h1>
+<p class="Pp">perl 5.8.</p>
+<p class="Pp">Un compilateur C. Ce module peut éventuellement être compilé avec un compilateur C++ également, mais ne vous y fiez pas, car aucune garantie n'est faite à cet égard.</p>
+<p class="Pp">Carp (core depuis perl 5), XSLoader (depuis 5.6.0).</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR AUSSI</a></h1>
+<p class="Pp">perlguts et perlapi pour des informations internes sur la magie.</p>
+<p class="Pp">perltie et overload pour d'autres façons d'améliorer les objets.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTEUR</a></h1>
+<p class="Pp">Vincent Pit <span class="Li">&quot;&lt;vpit at
+    cpan.org&gt;&quot;</span>.</p>
+<p class="Pp">Vous pouvez me contacter par mail ou sur
+    <span class="Li">&quot;irc.perl.org&quot;</span> (vincent).</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BUGS'><a class='permalink' href='#BUGS'>BOGUES</a></h1>
+<p class="Pp">Veuillez signaler tout bogue ou demande de fonctionnalité à
+    <span class="Li">&quot;bug-variable-magic at rt.cpan.org&quot;</span>, ou via l'interface web à
+    <a href='http://rt.cpan.org/NoAuth/ReportBug.html?Queue=Variable-Magic'>http://rt.cpan.org/NoAuth/ReportBug.html?Queue=Variable-Magic</a>. Je serai informé, et vous serez ensuite automatiquement informé des progrès sur votre bogue.</p><!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Variable::Magic - Perl</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/manual.css">
+</head>
+<body>
+    
+    <main class="container">
+        <article>
+            
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Ce module vous permet de créer et de manipuler des variables
+    magiques dans Perl.</p>
+<p class="Pp">Une variable magique est une variable qui a une routine spéciale
+    associée à elle. Cette routine est appelée lorsque la variable est accédée
+    (lue, écrite, etc.).</p>
+<p class="Pp">Ceci peut être utilisé pour implémenter des fonctionnalités telles
+    que des variables de trace, des hooks d'accès, ou des liaisons de données.
+    Le module fournit une interface simple pour attacher et détacher des
+    routines magiques aux variables.</p>
+<p class="Pp">Vous pouvez également utiliser ce module pour inspecter les
+    variables magiques existantes et leurs propriétés.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='FUNCTIONS'><a class='permalink' href='#FUNCTIONS'>FUNCTIONS</a></h1>
+<p class="Pp">Les fonctions suivantes sont exportées par défaut:</p>
+<dl class="Nl">
+<dt id="magic_assign"><a class="permalink" href="#magic_assign"><code>magic_assign</code></a></dt>
+<dd>Attribue une routine magique à une variable.</dd>
+<dt id="magic_get"><a class="permalink" href="#magic_get"><code>magic_get</code></a></dt>
+<dd>Récupère la routine magique associée à une variable.</dd>
+<dt id="magic_clear"><a class="permalink" href="#magic_clear"><code>magic_clear</code></a></dt>
+<dd>Supprime la routine magique associée à une variable.</dd>
+<dt id="is_magic"><a class="permalink" href="#is_magic"><code>is_magic</code></a></dt>
+<dd>Vérifie si une variable est magique.</dd>
+<dt id="magic_each"><a class="permalink" href="#magic_each"><code>magic_each</code></a></dt>
+<dd>Itère sur toutes les variables magiques.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CONSTANTS'><a class='permalink' href='#CONSTANTS'>CONSTANTS</a></h1>
+<p class="Pp">Les constantes suivantes sont disponibles:</p>
+<dl class="Nl">
+<dt id="M_ACCESS"><a class="permalink" href="#M_ACCESS"><code>M_ACCESS</code></a></dt>
+<dd>Indique que la magie est appelée lors de l'accès à la variable.</dd>
+<dt id="M_ASSIGN"><a class="permalink" href="#M_ASSIGN"><code>M_ASSIGN</code></a></dt>
+<dd>Indique que la magie est appelée lors de l'affectation à la variable.</dd>
+<dt id="M_CLONE"><a class="permalink" href="#M_CLONE"><code>M_CLONE</code></a></dt>
+<dd>Indique que la magie est appelée lors du clonage de la variable.</dd>
+<dt id="M_LOCAL"><a class="permalink" href="#M_LOCAL"><code>M_LOCAL</code></a></dt>
+<dd>Indique que la magie est appelée lors de la localisation de la variable.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COOKBOOK'><a class='permalink' href='#COOKBOOK'>COOKBOOK</a></h1>
+<p class="Pp">Voici quelques exemples d'utilisation de ce module:</p>
+<pre>
+    # Exemple 1: Créer une variable qui trace ses accès
+    use Variable::Magic;
+
+    sub trace_access {
+        my ($caller, $varname, $value) = @_;
+        print &quot;Variable '$varname' accessed with value '$value'\n&quot;;
+        return $value;
+    }
+
+    my $x;
+    magic_assign( \$x, \&trace_access, M_ACCESS );
+
+    print $x;  # Affichera: Variable '$x' accessed with value ''
+    $x = 10;   # Affichera: Variable '$x' accessed with value '10'
+    print $x;  # Affichera: Variable '$x' accessed with value '10'
+</pre>
+<pre>
+    # Exemple 2: Créer une variable qui se valide à l'affectation
+    use Variable::Magic;
+
+    sub validate_integer {
+        my ($caller, $varname, $value) = @_;
+        die &quot;Value must be an integer&quot; unless $value =~ /^\d+$/;
+        return $value;
+    }
+
+    my $count;
+    magic_assign( \$count, \&validate_integer, M_ASSIGN );
+
+    $count = 5;     # Fonctionne
+    # $count = &quot;hello&quot;; # Provoquera une erreur
+</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PERL_MAGIC_HISTORY'><a class='permalink' href='#PERL_MAGIC_HISTORY'>PERL MAGIC HISTORY</a></h1>
+<p class="Pp">Ce module est basé sur le mécanisme de magie des variables de Perl,
+    introduit dans Perl 5.005.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXPORT'><a class='permalink' href='#EXPORT'>EXPORT</a></h1>
+<p class="Pp">Par défaut, ce module exporte les fonctions suivantes:
+    <code>magic_assign</code>, <code>magic_get</code>, <code>magic_clear</code>,
+    <code>is_magic</code>, et <code>magic_each</code>.</p>
+<p class="Pp">Il exporte également les constantes <code>M_ACCESS</code>,
+    <code>M_ASSIGN</code>, <code>M_CLONE</code>, et <code>M_LOCAL</code>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CAVEATS'><a class='permalink' href='#CAVEATS'>CAVEATS</a></h1>
+<p class="Pp">Les variables magiques peuvent avoir un impact sur les performances,
+    utilisez-les judicieusement.</p>
+<p class="Pp">Le comportement exact des routines magiques peut dépendre de la
+    version de Perl.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DEPENDENCIES'><a class='permalink' href='#DEPENDENCIES'>DEPENDENCIES</a></h1>
+<p class="Pp">Aucune dépendance externe.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>SEE ALSO</a></h1>
+<p class="Pp"><code>perlfunc</code>(1), <code>Attribute::Handlers</code></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTHOR</a></h1>
+<p class="Pp">Vincent Pit &lt;<a href="mailto:perl@simple-group.org">perl@simple-group.org</a>&gt;</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BUGS'><a class='permalink' href='#BUGS'>BUGS</a></h1>
+<p class="Pp">Veuillez signaler les bugs à l'auteur.</p>
+<p class="Pp">Le système de rapports de bugs est disponible à
+    <a href="https://github.com/vpit/Variable-Magic/issues">https://github.com/vpit/Variable-Magic/issues</a>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SUPPORT'><a class='permalink' href='#SUPPORT'>SUPPORT</a></h1>
+<p class="Pp">Vous pouvez trouver la documentation de ce module avec la commande
+    perldoc.</p>
+<pre>perldoc Variable::Magic</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT_&amp;amp;_LICENSE'><a class='permalink' href='#COPYRIGHT_&amp;amp;_LICENSE'>COPYRIGHT   &amp; LICENSE</a></h1>
+<p class="Pp">Copyright
+    2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2022,2024 Vincent
+    Pit, tous droits réservés.</p>
+<p class="Pp">Ce programme est un logiciel libre ; vous pouvez le redistribuer et/ou le
+    modifier sous les mêmes termes que Perl lui-même.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page man" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/perl-variable-magic/">extra/perl-variable-magic</a></dd>
+        <dt>Version :</dt>
+        <dd>0.64-3</dd>
+        <dt>En amont :</dt>
+        <dd><a href="https://search.cpan.org/dist/Variable-Magic">https://search.cpan.org/dist/Variable-Magic</a></dd>
+        <dt>Licences :</dt>
+        <dd>PerlArtistic, GPL</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-variable-magic/">/listing/extra/perl-variable-magic/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#VERSION">VERSION</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#FUNCTIONS">FONCTIONS</a></li>
+        
+            <li><a href="#CONSTANTS">CONSTANTES</a></li>
+        
+            <li><a href="#COOKBOOK">COOKBOOK</a></li>
+        
+            <li><a href="#PERL_MAGIC_HISTORY">HISTORIQUE MAGIQUE DE PERL</a></li>
+        
+            <li><a href="#EXPORT">EXPORT</a></li>
+        
+            <li><a href="#CAVEATS">ATTENTION</a></li>
+        
+            <li><a href="#DEPENDENCIES">DÉPENDANCES</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+            <li><a href="#AUTHOR">AUTEUR</a></li>
+        
+            <li><a href="#BUGS">BOGUES</a></li>
+        
+            <li><a href="#SUPPORT">SUPPORT</a></li>
+        
+            <li><a href="#COPYRIGHT_&amp;amp;_LICENSE">COPYRIGHT &amp; LICENCE</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Variable::Magic.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/Variable::Magic.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages man, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

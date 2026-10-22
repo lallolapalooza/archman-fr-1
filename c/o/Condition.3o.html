@@ -1,0 +1,264 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Condition(3o) — Pages manuelles de l'archive</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Condition(3o)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/ocaml/">ocaml</a></p>
+<p class="lic">Licences: LGPL2.1, personnalisée : QPL-1.0</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Condition(3)</td>
+    <td class="head-vol">Bibliothèque OCaml</td>
+    <td class="head-rtitle">Condition(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">Condition - Variables de condition.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Module'><a class='permalink' href='#Module'>Module</a></h1>
+<p class="Pp">Module Condition</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Documentation'><a class='permalink' href='#Documentation'>Documentation</a></h1>
+<p class="Pp">Module <b>Condition</b>
+  <br/>
+   : <b>sig end</b></p>
+<p class="Pp">Variables de condition.</p>
+<p class="Pp">Les variables de condition sont utiles lorsque plusieurs threads souhaitent accéder
+    à une structure de données partagée qui est protégée par un mutex (un verrou
+    d'exclusion mutuelle).</p>
+<p class="Pp">Une variable de condition est un canal de communication. Du côté du
+    récepteur, un ou plusieurs threads peuvent indiquer qu'ils souhaitent attendre
+    qu'une certaine propriété devienne vraie. Du côté de l'émetteur, un thread peut
+    signaler que cette propriété est devenue vraie, ce qui provoque le réveil d'un
+    (ou de plusieurs) threads en attente.</p>
+<p class="Pp">Par exemple, dans l'implémentation d'une structure de données de type file
+    d'attente, si un thread qui souhaite extraire un élément constate que la file est
+    actuellement vide, alors ce thread attend que la file devienne non vide. Un thread
+    qui insère un élément dans la file signale que la file est devenue non vide. Une
+    variable de condition est utilisée à cette fin. Ce canal de communication transmet
+    l'information selon laquelle la propriété « la file est non vide » est vraie, ou
+    plus précisément, peut être vraie. (Nous expliquons ci-dessous pourquoi le
+    récepteur d'un signal ne peut pas être certain que la propriété est satisfaite.)</p>
+<p class="Pp">Pour continuer l'exemple de la file d'attente, en supposant que la file a
+    une capacité maximale fixe, un thread qui souhaite insérer un élément peut constater
+    que la file est pleine. Alors, ce thread doit attendre que la file ne soit plus
+    pleine, et un thread qui extrait un élément de la file signale que la file n'est
+    plus pleine. Une autre variable de condition est utilisée à cette fin.</p>
+<p class="Pp">En bref, une variable de condition <b>c</b> est utilisée pour transmettre
+    l'information selon laquelle une certaine propriété P concernant une structure de
+    données partagée D, protégée par un mutex <b>m</b> , peut être vraie.</p>
+<p class="Pp">Les variables de condition offrent une alternative efficace à
+    l'attente active (busy-waiting). Lorsqu'on souhaite attendre que la propriété P soit
+    vraie, au lieu d'écrire une boucle d'attente active :</p>
+<pre>     Mutex.lock m;
+     while not P do
+       Mutex.unlock m; Mutex.lock m
+     done;
+     &lt;mettre à jour la structure de données&gt;;
+     Mutex.unlock m
+</pre>
+on utilise <b>Condition.wait</b> dans le corps de la boucle, comme suit :
+<pre>     Mutex.lock m;
+     while not P do
+       Condition.wait c m
+     done;
+     &lt;mettre à jour la structure de données&gt;;
+     Mutex.unlock m
+</pre>
+La boucle d'attente active est inefficace car le thread en attente consomme
+  du temps de traitement et crée une contention du mutex <b>m</b> . Appeler
+  <b>Condition.wait</b> permet au thread en attente de être suspendu, de sorte qu'il ne
+  consomme aucune ressource de calcul pendant l'attente.
+<p class="Pp">Avec une variable de condition <b>c</b> , exactement un mutex <b>m</b> est
+    associé. Cette association est implicite : le mutex <b>m</b> n'est pas
+    explicitement passé en argument à <b>Condition.create</b> . Il appartient au
+    programmeur de savoir, pour chaque variable de condition <b>c</b> , quel est le
+    mutex associé <b>m</b> .</p>
+<p class="Pp">Avec un mutex <b>m</b> , plusieurs variables de condition peuvent être
+    associées. Dans l'exemple de la file d'attente à capacité bornée, une variable de
+    condition est utilisée pour indiquer que la file est non vide, et une autre variable
+    de condition est utilisée pour indiquer que la file n'est pas pleine.</p>
+<p class="Pp">Avec une variable de condition <b>c</b> , exactement une propriété logique
+    P devrait être associée. Des exemples de telles propriétés incluent « la file est
+    non vide » et « la file n'est pas pleine ». Il appartient au programmeur de garder
+    la trace, pour chaque variable de condition, de la propriété P correspondante. Un
+    signal est envoyé sur la variable de condition <b>c</b> comme
+    indication que la propriété P est vraie, ou peut être vraie. Cependant, du côté du
+    récepteur, un thread qui est réveillé ne peut pas supposer que P est vraie ; après
+    qu'un appel à <b>Condition.wait</b> se termine, on doit explicitement tester si
+    P est vraie. Il y a plusieurs raisons à cela. Une raison est qu'entre le moment où
+    le signal est envoyé et le moment où un thread en attente reçoit le signal et est
+    planifié, la propriété P peut être falsifiée par un autre thread qui est capable
+    d'acquérir le mutex <b>m</b> et d'altérer
+    la structure de données D. Une autre raison est que des réveils spuriux peuvent
+    survenir : un thread en attente peut être réveillé même si aucun signal n'a été
+    envoyé.</p>
+<p class="Pp">Voici un exemple complet, où un mutex protège une file d'attente non bornée
+    séquentielle, et où une variable de condition est utilisée pour signaler que la
+    file est non vide.</p>
+<pre>     type 'a safe_queue =
+       { queue : 'a Queue.t; mutex : Mutex.t; nonempty : Condition.t }
+     let create () =
+       { queue = Queue.create(); mutex = Mutex.create();
+         nonempty = Condition.create() }
+     let add v q =
+       Mutex.lock q.mutex;
+       let was_empty = Queue.is_empty q.queue in
+       Queue.add v q.queue;
+       if was_empty then Condition.broadcast q.nonempty;
+       Mutex.unlock q.mutex
+     let take q =
+       Mutex.lock q.mutex;
+       while Queue.is_empty q.queue do Condition.wait q.nonempty q.mutex done;
+       let v = Queue.take q.queue in (* ne peut pas échouer car la file est non vide *)
+       Mutex.unlock q.mutex;
+       v
+</pre>
+Parce que l'appel à <b>Condition.broadcast</b> a lieu à l'intérieur de la section
+  critique, la propriété suivante est vérifiée chaque fois que le mutex est déverrouillé : si
+  la file est non vide, alors aucun thread n'est en attente, ou, en d'autres termes, si
+  un certain thread est en attente, alors la file doit être vide. C'est une propriété
+  souhaitable : si un thread qui tente d'exécuter une opération <b>take</b> pouvait rester
+  suspendu même si la file est non vide, ce serait une situation problématique,
+  connue sous le nom d'interblocage (deadlock).
+<p class="Pp"><i>type t</i></p>
+<p class="Pp">Le type des variables de condition.</p>
+<p class="Pp"><i>val create</i> : <b>unit -&gt; t</b></p>
+<p class="Pp"><b>create()</b> crée et retourne une nouvelle variable de condition. Cette
+    variable de condition devrait être associée (dans l'esprit du programmeur) à
+    un certain mutex <b>m</b> et à une certaine propriété P de la structure de
+    données qui est protégée par le mutex <b>m</b> .</p>
+<p class="Pp"><i>val wait</i> : <b>t -&gt; Mutex.t -&gt; unit</b></p>
+<p class="Pp">L'appel <b>wait c m</b> n'est autorisé que si <b>m</b> est le
+    mutex associé à la variable de condition <b>c</b> , et seulement si <b>m</b>
+    est actuellement verrouillé. Cet appel déverrouille atomiquement le mutex <b>m</b> et
+    suspend le thread courant sur la variable de condition <b>c</b> . Ce thread
+    peut ensuite être réveillé après que la variable de condition <b>c</b> a été
+    signalée via <b>Condition.signal</b> ou <b>Condition.broadcast</b> ;
+    cependant, il peut aussi être réveillé sans raison. Le mutex <b>m</b> est verrouillé
+    à nouveau avant que <b>wait</b> ne retourne. On ne peut pas supposer que la propriété P
+    associée à la variable de condition <b>c</b> est satisfaite quand <b>wait</b>
+    retourne ; on doit explicitement tester si P est satisfaite après avoir appelé <b>wait</b>
+    .</p>
+<p class="Pp"><i>val signal</i> : <b>t -&gt; unit</b></p>
+<p class="Pp"><b>signal c</b> réveille un des threads en attente sur la
+    variable de condition <b>c</b> , s'il y en a un. S'il n'y en a aucun, cet appel
+    n'a aucun effet.</p>
+<p class="Pp">Il est recommandé d'appeler <b>signal c</b> à l'intérieur d'une section
+    critique, c'est-à-dire pendant que le mutex <b>m</b> associé à <b>c</b> est
+    verrouillé.</p>
+<p class="Pp"><i>val broadcast</i> : <b>t -&gt; unit</b></p>
+<p class="Pp"><b>broadcast c</b> réveille tous les threads en attente sur la variable de
+    condition <b>c</b> . S'il n'y en a aucun, cet appel n'a aucun effet.</p>
+<p class="Pp">Il est recommandé d'appeler <b>broadcast c</b> à l'intérieur d'une section
+    critique, c'est-à-dire pendant que le mutex <b>m</b> associé à <b>c</b> est
+    verrouillé.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-11-01</td>
+    <td class="foot-os">OCamldoc</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/ocaml/">extra/ocaml</a></dd>
+        <dt>Version :</dt>
+        <dd>5.4.0-1</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://caml.inria.fr/">https://caml.inria.fr/</a></dd>
+        <dt>Licences :</dt>
+        <dd>LGPL2.1, personnalisée : QPL-1.0</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/ocaml/">/listing/extra/ocaml/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#Module">Module</a></li>
+        
+            <li><a href="#Documentation">Documentation</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Condition.3o.en.txt">txt</a>, 
+        
+            <a href="/man/Condition.3o.en.raw">brut</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site est disponible selon les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               , à l'exception du contenu des pages de manuel, qui possède sa propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

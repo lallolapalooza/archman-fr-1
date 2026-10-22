@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Guard(3pm) — Pages man Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Guard(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/perl-guard/">perl-guard</a></p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Guard(3pm)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">Guard(3pm)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Guard - blocs de nettoyage sécurisés</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<pre>use Guard;
+
+# changer temporairement de répertoire pour "/etc", mais s'assurer
+# de revenir à "/" quelle que soit la manière dont myfun se termine :
+sub myfun {
+   scope_guard { chdir "/" };
+   chdir "/etc";
+
+   code_that_might_die_or_does_other_fun_stuff;
+}
+# créer un objet qui, lorsque la dernière référence à celui-ci disparaît,
+# exécute le bloc de code donné :
+my $guard = guard { print "détruit !\n" };
+undef $guard; # probablement détruit ici</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Ce module implémente les soi-disant &quot;garde&quot; (guards). Une garde est
+    quelque chose (généralement un objet) qui &quot;garde&quot; une ressource, garantissant
+    qu'elle sera nettoyée comme prévu.</p>
+<p class="Pp">Plus précisément, ce module prend en charge deux types de gardes différents :
+    les objets garde, qui exécutent un bloc de code donné lorsqu'ils sont détruits, et les gardes de portée (scoped guards), qui sont liées à la sortie de portée.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='FONCTIONS'><a class='permalink' href='#FONCTIONS'>FONCTIONS</a></h1>
+<p class="Pp">Ce module exporte actuellement les
+    fonctions <span class="Li">&quot;scope_guard&quot;</span> et
+    <span class="Li">&quot;guard&quot;</span> par défaut.</p>
+<dl class="Bl-tag">
+  <dt id="scope_guard"><a class="permalink" href="#scope_guard">scope_guard
+    BLOC</a></dt>
+  <dd></dd>
+  <dt id="scope_guard~2"><a class="permalink" href="#scope_guard~2">scope_guard
+    ($coderef)</a></dt>
+  <dd>Enregistre un bloc qui est exécuté lorsque la portée actuelle (bloc,
+      fonction, méthode, eval, etc.) est quittée.
+    <p class="Pp">Voir la section EXCEPTIONS pour une explication sur la manière dont les exceptions
+        (c'est-à-dire <span class="Li">&quot;die&quot;</span>) sont gérées
+        dans les blocs de garde.</p>
+    <p class="Pp">La description ci-dessous peut sembler un peu compliquée, mais c'est
+        juste parce que <span class="Li">&quot;scope_guard&quot;</span> essaie
+        d'obtenir même les cas limites &quot;justes&quot; : l'objectif est de vous fournir
+        un outil de nettoyage solide comme le roc.</p>
+    <p class="Pp">Le comportement est similaire à ce fragment de code :</p>
+        <pre>eval ... code suivant scope_guard ...
+{
+   local $@;
+   eval BLOCK;
+   eval { $Guard::DIED-&gt;() } if $@;
+}
+die if $@;
+</pre>
+    <p class="Pp">Sauf que c'est beaucoup plus rapide, et l'ensemble est exécuté
+        même lorsque le BLOC appelle <span class="Li">&quot;exit&quot;</span>,
+        <span class="Li">&quot;goto&quot;</span>,
+        <span class="Li">&quot;last&quot;</span> ou s'échappe par d'autres moyens.</p>
+    <p class="Pp">Si plusieurs BLOCs sont enregistrés pour la même portée, ils seront
+        exécutés dans l'ordre inverse. D'autres choses liées à la portée telles que
+        <span class="Li">&quot;local&quot;</span> sont gérées via le même
+        mécanisme, donc les variables <span class="Li">&quot;local&quot;</span>isées
+        <i>après</i> avoir appelé <span class="Li">&quot;scope_guard&quot;</span>
+        seront restaurées lorsque la garde s'exécutera.</p>
+    <p class="Pp">Exemple : changer temporairement le fuseau horaire du processus actuel,
+        en s'assurant qu'il sera réinitialisé à la sortie de la portée
+        <span class="Li">&quot;if&quot;</span> :</p>
+        <pre>use Guard;
+use POSIX ();
+if ($need_to_switch_tz) {
+   # s'assurer que tzset est appelé après que $ENV{TZ} a été restauré
+   scope_guard { POSIX::tzset };
+   # localiser après le scope_guard, de sorte qu'il soit annulé à temps
+   local $ENV{TZ} = "Europe/London";
+   POSIX::tzset;
+   # faire quelque chose avec le nouveau fuseau horaire
+}
+</pre>
+  </dd>
+  <dt id="mon"><a class="permalink" href="#mon">my $guard = guard BLOC</a></dt>
+  <dd></dd>
+  <dt id="mon~2"><a class="permalink" href="#mon~2">my $guard = guard
+    ($coderef)</a></dt>
+  <dd>Se comporte de la même manière que <span class="Li">&quot;scope_guard&quot;</span>,
+      sauf qu'au lieu d'exécuter le bloc à la sortie de la portée, il renvoie un
+      objet dont la durée de vie détermine quand le BLOC est exécuté : lorsque la dernière référence à l'objet disparaît, le BLOC est exécuté comme avec
+      <span class="Li">&quot;scope_guard&quot;</span>.
+    <p class="Pp">Voir la section EXCEPTIONS pour une explication sur la manière dont les exceptions
+        (c'est-à-dire <span class="Li">&quot;die&quot;</span>) sont gérées
+        dans les blocs de garde.</p>
+    <p class="Pp">Exemple : acquérir un sémaphore Coro::Semaphore pour une seconde en enregistrant
+        un minuteur. Le rappel du minuteur référence la garde utilisée pour le déverrouiller
+        à nouveau. (Veuillez ignorer le fait que
+        <span class="Li">&quot;Coro::Semaphore&quot;</span> possède une méthode
+        <span class="Li">&quot;guard&quot;</span> qui fait déjà cela) :</p>
+        <pre>use Guard;
+use Coro::AnyEvent;
+use Coro::Semaphore;
+my $sem = new Coro::Semaphore;
+sub lock_for_a_second {
+   $sem-&gt;down;
+   my $guard = guard { $sem-&gt;up };
+   Coro::AnyEvent::sleep 1;
+   # $sem-&gt;up est exécuté au retour
+}
+</pre>
+    <p class="Pp">L'avantage de faire cela avec une garde au lieu d'appeler simplement
+        <span class="Li">&quot;$sem-&gt;down&quot;</span> dans le rappel
+        est que vous pouvez choisir de ne pas créer le minuteur, ou votre code peut
+        lancer une exception avant qu'il ne puisse créer le minuteur (ou que le thread ne soit annulé), ou vous pouvez créer plusieurs minuteurs ou d'autres watchers d'événements et ce n'est que lorsque le dernier est exécuté que le verrou sera déverrouillé. En utilisant
+        <span class="Li">&quot;guard&quot;</span>, vous n'avez pas à vous soucier de rattraper tous les endroits où vous devez déverrouiller le
+      semaphore.</p>
+  </dd>
+  <dt>$guard-&gt;cancel</dt>
+  <dd>Appeler cette fonction va &quot;désactiver&quot; l'objet garde retourné
+      par la fonction <span class="Li">&quot;guard&quot;</span>, c'est-à-dire qu'elle va libérer
+      le BLOC passé initialement à <span class="Li">&quot;guard
+      &quot;</span> et organisera pour que le BLOC ne soit pas exécuté.
+    <p class="Pp">Cela peut être utile lorsque vous utilisez
+        <span class="Li">&quot;guard&quot;</span> pour créer un gestionnaire de nettoyage à appeler
+        en cas de conditions fatales et que vous décidez plus tard qu'il n'est plus nécessaire.</p>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXCEPTIONS'><a class='permalink' href='#EXCEPTIONS'>EXCEPTIONS</a></h1>
+<p class="Pp">Les blocs de garde ne devraient normalement pas lancer d'exceptions (c'est-à-dire
+    <span class="Li">&quot;die&quot;</span>). Après tout, ils sont généralement utilisés
+    pour nettoyer après de telles exceptions. Cependant, si quelque chose de vraiment exceptionnel
+    se produit, un bloc de garde devrait bien sûr être autorisé à mourir. De plus,
+    les erreurs de programmation sont une source majeure d'exceptions, et le programmeur
+    veut certainement en être informé.</p>
+<p class="Pp">Comme dans la plupart des cas, le bloc exécuté lorsque la garde est exécutée
+    ne connaît pas ou ne se soucie pas des blocs de garde, il est peu logique de laisser
+    le code contenant gérer l'exception.</p>
+<p class="Pp">Par conséquent, chaque fois qu'un bloc de garde lance une exception, il sera
+    capturé par Guard, suivi de l'appel du bloc de code stocké dans
+    <span class="Li">$Guard::DIED</span> (avec <span class="Li">$@</span> défini sur
+    l'exception réelle), ce qui est similaire à la façon dont la plupart des boucles d'événements gèrent ce
+    cas.</p>
+<p class="Pp">La valeur par défaut pour <span class="Li">$Guard::DIED</span> est d'appeler
+    <span class="Li">&quot;warn &quot;$@&quot;&quot;</span>, c'est-à-dire que l'erreur est
+    imprimée sous forme d'avertissement et le programme continue.</p>
+<p class="Pp">La variable <span class="Li">$@</span> sera restaurée à sa valeur avant l'appel de garde dans tous les cas, donc les gardes ne perturberont pas
+    <span class="Li">$@</span> d'une quelconque manière.</p>
+<p class="Pp">Le bloc de code stocké dans <span class="Li">$Guard::DIED</span> ne devrait pas mourir (le comportement n'est pas garanti, mais pour l'instant, l'exception sera simplement ignorée).</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<pre>Marc Lehmann &lt;schmorp@schmorp.de&gt;
+http://home.schmorp.de/</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='REMERCIEMENTS'><a class='permalink' href='#REMERCIEMENTS'>REMERCIEMENTS</a></h1>
+<p class="Pp">Merci à Marco Maisenhelder, qui m'a rappelé la solution
+    <span class="Li">$Guard::DIED</span> au problème des exceptions.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR AUSSI</a></h1>
+<p class="Pp">Scope::Guard et Sub::ScopeFinalizer, qui implémentent réellement
+    uniquement des gardes à portée dynamique, pas les gardes à portée lexicale que leur documentation promet, et ont un surcoût CPU, mémoire et de frappe beaucoup plus élevé.</p>
+<p class="Pp">Hook::Scope, qui apparemment n'a jamais été terminé et peut corrompre la mémoire lors de son utilisation.</p>
+<p class="Pp">Scope::Guard semble avoir une grande section VOIR AUSSI pour encore plus de modules comme celui-ci.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-13</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page man" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/perl-guard/">extra/perl-guard</a></dd>
+        <dt>Version :</dt>
+    </dl>
+</section>
+
+            </aside>
+        </main>
+    </body>
+</html>
+    <dd>1.023-18</dd>
+        <dt>En amont :</dt>
+        <dd><a href="https://metacpan.org/release/Guard">https://metacpan.org/release/Guard</a></dd>
+        <dt>Licences :</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-guard/">/listing/extra/perl-guard/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNTAXE</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#FUNCTIONS">FONCTIONS</a></li>
+        
+            <li><a href="#EXCEPTIONS">EXCEPTIONS</a></li>
+        
+            <li><a href="#AUTHOR">AUTEUR</a></li>
+        
+            <li><a href="#THANKS">REMERCIEMENTS</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Guard.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/Guard.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>, à l'exception du contenu des pages de manuel, qui ont leur propre licence spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

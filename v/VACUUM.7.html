@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>VACUUM(7) — Pages du manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">VACUUM(7)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/postgresql/">postgresql</a></p>
+<p class="lic">Licences: PostgreSQL</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">VACUUM(7)</td>
+    <td class="head-vol">Documentation PostgreSQL 18.1</td>
+    <td class="head-rtitle">VACUUM(7)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">VACUUM - récupérer de l'espace et/ou analyser une base de données</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<pre>VACUUM [ ( <i>option</i> [, ...] ) ] [ <i>table_et_colonnes</i> [, ...] ]
+où <i>option</i> peut être l'une des suivantes :
+    FULL [ <i>booléen</i> ]
+    FREEZE [ <i>booléen</i> ]
+    VERBOSE [ <i>booléen</i> ]
+    ANALYZE [ <i>booléen</i> ]
+    DISABLE_PAGE_SKIPPING [ <i>booléen</i> ]
+    SKIP_LOCKED [ <i>booléen</i> ]
+    INDEX_CLEANUP { AUTO | ON | OFF }
+    PROCESS_MAIN [ <i>booléen</i> ]
+    PROCESS_TOAST [ <i>booléen</i> ]
+    TRUNCATE [ <i>booléen</i> ]
+    PARALLEL <i>entier</i>
+    SKIP_DATABASE_STATS [ <i>booléen</i> ]
+    ONLY_DATABASE_STATS [ <i>booléen</i> ]
+    BUFFER_USAGE_LIMIT <i>taille</i>
+et <i>table_et_colonnes</i> est :
+    [ ONLY ] <i>nom_table</i> [ * ] [ ( <i>nom_colonne</i> [, ...] ) ]</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp"><b>VACUUM</b> récupère l'espace occupé par les tuples morts. Dans le
+    fonctionnement normal de PostgreSQL, les tuples supprimés ou obsolètes par une
+    mise à jour ne sont pas physiquement retirés de leur table ; ils restent présents
+    jusqu'à ce qu'un <b>VACUUM</b> soit effectué. Il est donc nécessaire d'effectuer
+    périodiquement un <b>VACUUM</b>, en particulier sur les tables fréquemment mises
+    à jour.</p>
+<p class="Pp">Sans liste de <i>table_et_colonnes</i>, <b>VACUUM</b> traite toutes les
+    tables et vues matérialisées de la base de données actuelle que l'utilisateur
+    actuel a la permission de vacuumiser. Avec une liste, <b>VACUUM</b> traite seulement
+    cette ou ces tables.</p>
+<p class="Pp"><b>VACUUM ANALYZE</b> effectue un <b>VACUUM</b> puis un <b>ANALYZE</b>
+    pour chaque table sélectionnée. C'est une combinaison pratique pour les scripts de
+    maintenance de routine. Voir <a href='/man/ANALYZE.7.fr'>ANALYZE(7)</a> pour plus de détails sur son
+    traitement.</p>
+<p class="Pp">Un simple <b>VACUUM</b> (sans FULL) récupère simplement de l'espace et le rend
+    disponible pour une réutilisation. Cette forme de la commande peut fonctionner en
+    parallèle avec les lectures et écritures normales de la table, car un verrou exclusif
+    n'est pas obtenu. Cependant, l'espace supplémentaire n'est pas retourné au système
+    d'exploitation (dans la plupart des cas) ; il est simplement conservé pour être réutilisé
+    au sein de la même table. Il permet également de tirer parti de plusieurs CPUs pour traiter
+    les index. Cette fonctionnalité est connue sous le nom de vacuum parallèle. Pour désactiver
+    cette fonctionnalité, on peut utiliser l'option PARALLEL et spécifier zéro workers parallèles.
+    <b>VACUUM FULL</b> réécrit tout le contenu de la table dans un nouveau fichier disque sans espace
+    supplémentaire, permettant de retourner l'espace inutilisé au système d'exploitation. Cette
+    forme est beaucoup plus lente et nécessite un verrou ACCESS EXCLUSIVE sur chaque table pendant
+    son traitement.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PARAMETRES'><a class='permalink' href='#PARAMETRES'>PARAMETRES</a></h1>
+<p class="Pp">FULL</p>
+<div class="Bd-indent">Sélectionne un vacuum « full », qui peut récupérer plus d'espace, mais prend
+    beaucoup plus de temps et verrouille la table exclusivement. Cette méthode nécessite
+    également de l'espace disque supplémentaire, car elle écrit une nouvelle copie de la
+    table et ne libère l'ancienne copie qu'une fois l'opération terminée. Habituellement,
+    elle ne devrait être utilisée que lorsqu'une quantité significative d'espace doit être
+    récupérée depuis l'intérieur de la table.</div>
+<p class="Pp">FREEZE</p>
+<div class="Bd-indent">Sélectionne un « gel » agressif des tuples. Spécifier FREEZE équivaut
+    à effectuer un <b>VACUUM</b> avec les paramètres vacuum_freeze_min_age et
+    vacuum_freeze_table_age définis à zéro. Le gel agressif est toujours effectué lors de la
+    réécriture de la table, donc cette option est redondante lorsque FULL est spécifié.</div>
+<p class="Pp">VERBOSE</p>
+<div class="Bd-indent">Affiche un rapport détaillé de l'activité du vacuum pour chaque table
+    au niveau INFO.</div>
+<p class="Pp">ANALYZE</p>
+<div class="Bd-indent">Met à jour les statistiques utilisées par le planificateur pour déterminer
+    la manière la plus efficace d'exécuter une requête.</div>
+<p class="Pp">DISABLE_PAGE_SKIPPING</p>
+<div class="Bd-indent">Normalement, <b>VACUUM</b> ignorera les pages en se basant sur la carte de
+    visibilité. Les pages où tous les tuples sont connus pour être gelés peuvent toujours être
+    ignorées, et celles où tous les tuples sont connus pour être visibles par toutes les
+    transactions peuvent être ignorées sauf lors d'un vacuum agressif. De plus, sauf lors d'un
+    vacuum agressif, certaines pages peuvent être ignorées afin d'éviter d'attendre que d'autres
+    sessions aient fini de les utiliser. Cette option désactive tout comportement d'ignorance de
+    page, et est destinée à être utilisée uniquement lorsque le contenu de la carte de visibilité
+    est suspect, ce qui ne devrait arriver qu'en cas de problème matériel ou logiciel entraînant
+    une corruption de la base de données.</div>
+<p class="Pp">SKIP_LOCKED</p>
+<div class="Bd-indent">Spécifie que <b>VACUUM</b> n'attend pas la libération des verrous conflictuels
+    lorsqu'il commence à travailler sur une relation : si une relation ne peut pas être verrouillée
+    immédiatement sans attendre, la relation est ignorée. Notez que même avec cette option,
+    <b>VACUUM</b> peut toujours bloquer lors de l'ouverture des index de la relation. De plus,
+    <b>VACUUM ANALYZE</b> peut toujours bloquer lors de l'acquisition d'échantillons de lignes
+    des partitions, des enfants d'héritage de table et de certains types de tables externes.
+    Également, bien que <b>VACUUM</b> traite normalement toutes les partitions des tables partitionnées
+    spécifiées, cette option entraînera l'ignorance de toutes les partitions par <b>VACUUM</b> s'il y
+    a un verrouillage conflictuel sur la table partitionnée.</div>
+<p class="Pp">INDEX_CLEANUP</p>
+<div class="Bd-indent">Normalement, <b>VACUUM</b> ignorera le vacuum d'index lorsqu'il y a très peu de
+    tuples morts dans la table. Le coût de traitement de tous les index de la table devrait
+    largement dépasser le bénéfice de la suppression des tuples d'index morts lorsque cela se
+    produit. Cette option peut être utilisée pour forcer <b>VACUUM</b> à traiter les index lorsqu'il y
+    a plus que zéro tuples morts. La valeur par défaut est AUTO, ce qui permet à <b>VACUUM</b>
+    d'ignorer le vacuum d'index si nécessaire. Si INDEX_CLEANUP est réglé sur ON, <b>VACUUM</b>
+    supprimera de manière conservatrice tous les tuples morts des index. Cela peut être utile pour la
+    compatibilité descendante avec les versions antérieures de PostgreSQL où c'était le
+    comportement standard.
+<p class="Pp">INDEX_CLEANUP peut également être réglé sur OFF pour forcer <b>VACUUM</b> à
+    ignorer <i>toujours</i> le vacuum d'index, même lorsqu'il y a beaucoup de tuples morts dans la
+    table. Cela peut être utile lorsqu'il est nécessaire de faire exécuter <b>VACUUM</b> aussi
+    rapidement que possible pour éviter un dépassement imminent des ID de transaction (voir la
+    Section 24.1.5). Cependant, le mécanisme de sécurité anti-dépassement contrôlé par
+    vacuum_failsafe_age se déclenchera généralement automatiquement pour éviter l'échec de dépassement
+    des ID de transaction, et devrait être préféré. Si le nettoyage des index n'est pas effectué
+    régulièrement, les performances peuvent en pâtir, car au fur et à mesure que la table est modifiée,
+    les index accumuleront des tuples morts et la table elle-même accumulera des pointeurs de ligne
+    morts qui ne pourront pas être supprimés tant que le nettoyage des index ne sera pas terminé.
+<p class="Pp">Cette option n'a aucun effet sur les tables qui n'ont pas d'index et est ignorée si
+    l'option FULL est utilisée. Elle n'a pas non plus d'effet sur le mécanisme de sécurité anti-dépassement
+    des ID de transaction. Lorsqu'il est déclenché, il ignorera le vacuum d'index, même lorsque
+    INDEX_CLEANUP est réglé sur ON.</p>
+</div>
+<p class="Pp">PROCESS_MAIN</p>
+<div class="Bd-indent">Spécifie que <b>VACUUM</b> doit tenter de traiter la relation principale. C'est
+    généralement le comportement souhaité et c'est le défaut. Définir cette option à false peut
+    être utile lorsqu'il est seulement nécessaire de vacuumiser la table TOAST correspondante
+    d'une relation.</div>
+<p class="Pp">PROCESS_TOAST</p>
+<div class="Bd-indent">Spécifie que <b>VACUUM</b> doit tenter de traiter la table TOAST correspondante
+    pour chaque relation, si elle existe. C'est généralement le comportement souhaité et c'est le
+    défaut. Définir cette option à false peut être utile lorsqu'il est seulement nécessaire de
+    vacuumiser la relation principale. Cette option est requise lorsque l'option FULL est
+    utilisée.</div>
+<p class="Pp">TRUNCATE</p>
+<div class="Bd-indent">Spécifie que <b>VACUUM</b> doit tenter de tronquer toutes les pages vides à la
+    fin de la table et de retourner l'espace disque pour les pages tronquées au système
+    d'exploitation. C'est généralement le comportement souhaité et c'est le défaut à moins que
+    vacuum_truncate ne soit réglé sur false ou que l'option vacuum_truncate n'ait été réglée sur
+    false pour la table à vacuumiser. Définir cette option à false peut être utile pour éviter le
+    verrou ACCESS EXCLUSIVE sur la table qu'exige la troncature. Cette option est ignorée si l'option
+    FULL est utilisée.</div>
+<p class="Pp">PARALLEL</p>
+<div class="Bd-indent">Effectue les phases de vacuum d'index et de nettoyage d'index de <b>VACUUM</b>
+    en parallèle en utilisant <i>entier</i> workers en arrière-plan (pour les détails de chaque phase
+    de vacuum, veuillez vous référer à la Table 27.46). Le nombre de workers utilisés pour effectuer
+    l'opération est égal au nombre d'index sur la relation qui prennent en charge le vacuum parallèle,
+    ce qui est limité par le nombre de workers spécifiés avec l'option PARALLEL le cas échéant, qui est
+    à son tour limité par max_parallel_maintenance_workers. Un index peut participer au vacuum parallèle
+    si et seulement si la taille de l'index est supérieure à min_parallel_index_scan_size. Veuillez noter
+    qu'il n'est pas garanti que le nombre de workers parallèles spécifiés dans <i>entier</i> sera utilisé
+    pendant l'exécution. Il est possible qu'un vacuum s'exécute avec moins de workers que spécifié, voire sans
+    aucun worker. Un seul worker peut être utilisé par index. Les workers parallèles ne sont donc lancés
+    que lorsqu'il y a au moins 2 index dans la table. Les workers pour le vacuum sont lancés avant le début
+    de chaque phase et se terminent à la</div>
+</section>
+</div>
+</section>
+                
+            </article>
+        </main>
+    </body>
+</html>
+t la fin de la phase. Ces comportements peuvent changer dans une future
+  version. Cette option ne peut pas être utilisée avec l'option FULL.</div>
+<p class="Pp">SKIP_DATABASE_STATS</p>
+<div class="Bd-indent">Spécifie que <b>VACUUM</b> doit ignorer la mise à jour des
+  statistiques globales de la base de données concernant les XID non gelés les
+  plus anciens. Normalement, <b>VACUUM</b> met à jour ces statistiques une fois
+  à la fin de la commande. Cependant, cela peut prendre du temps dans une base de
+  données avec un très grand nombre de tables, et cela n'aboutira à rien à moins
+  que la table contenant le XID non gelé le plus ancien ne fasse partie de celles
+  qui ont été vacuumées. De plus, si plusieurs commandes <b>VACUUM</b> sont émises
+  en parallèle, une seule d'entre elles peut mettre à jour les statistiques
+  globales de la base de données à la fois. Par conséquent, si une application
+  a l'intention d'émettre une série de nombreuses commandes <b>VACUUM</b>, il peut
+  être utile de définir cette option dans toutes ces commandes sauf la dernière;
+  ou de la définir dans toutes les commandes et d'émettre séparément un
+  VACUUM (ONLY_DATABASE_STATS) par la suite.</div>
+<p class="Pp">ONLY_DATABASE_STATS</p>
+<div class="Bd-indent">Spécifie que <b>VACUUM</b> ne doit rien faire d'autre que de
+  mettre à jour les statistiques globales de la base de données concernant les
+  XID non gelés les plus anciens. Lorsque cette option est spécifiée, la liste
+  <i>table_and_columns</i> doit être vide, et aucune autre option ne peut être
+  activée à l'exception de VERBOSE.</div>
+<p class="Pp">BUFFER_USAGE_LIMIT</p>
+<div class="Bd-indent">Spécifie la taille du tampon circulaire de la stratégie
+  d'accès aux tampons pour <b>VACUUM</b>. Cette taille est utilisée pour calculer
+  le nombre de tampons partagés qui seront réutilisés dans le cadre de cette
+  stratégie. 0 désactive l'utilisation d'une stratégie d'accès aux tampons. Si
+  <b>ANALYZE</b> est également spécifié, la valeur de
+  <b>BUFFER_USAGE_LIMIT</b> est utilisée pour les étapes de vacuum et d'analyse.
+  Cette option ne peut pas être utilisée avec l'option <b>FULL</b> sauf si
+  <b>ANALYZE</b> est également spécifié. Lorsque cette option n'est pas
+  spécifiée, <b>VACUUM</b> utilise la valeur de vacuum_buffer_usage_limit. Des
+  paramètres plus élevés peuvent permettre à <b>VACUUM</b> de s'exécuter plus
+  rapidement, mais un paramètre trop élevé peut entraîner l'éviction de trop
+  d'autres pages utiles des tampons partagés. La valeur minimale est de 128 Ko et
+  la valeur maximale est de 16 Go.</div>
+<p class="Pp"><i>boolean</i></p>
+<div class="Bd-indent">Spécifie si l'option sélectionnée doit être activée ou
+  désactivée. Vous pouvez écrire TRUE, ON ou 1 pour activer l'option, et
+  FALSE, OFF ou 0 pour la désactiver. La valeur <i>boolean</i> peut également
+  être omise, auquel cas TRUE est supposé.</div>
+<p class="Pp"><i>integer</i></p>
+<div class="Bd-indent">Spécifie une valeur entière non négative passée à l'option
+  sélectionnée.</div>
+<p class="Pp"><i>size</i></p>
+<div class="Bd-indent">Spécifie une quantité de mémoire en kilo-octets. Les tailles
+  peuvent également être spécifiées sous forme de chaîne contenant la taille
+  numérique suivie de l'une des unités de mémoire suivantes : B (octets), kB
+  (kilo-octets), MB (méga-octets), GB (giga-octets) ou TB (téra-octets).</div>
+<p class="Pp"><i>table_name</i></p>
+<div class="Bd-indent">Le nom (éventuellement qualifié par un schéma) d'une table ou
+  d'une vue matérialisée spécifique à vacuumer. Si ONLY est spécifié avant le nom
+  de la table, seule cette table est vacuumée. Si ONLY n'est pas spécifié, la
+  table et toutes ses tables filles d'héritage ou partitions (le cas échéant)
+  sont également vacuumées. Optionnellement, * peut être spécifié après le nom
+  de la table pour indiquer explicitement que les tables filles d'héritage (ou
+  partitions) doivent être vacuumées.</div>
+<p class="Pp"><i>column_name</i></p>
+<div class="Bd-indent">Le nom d'une colonne spécifique à analyser. Par défaut, toutes
+  les colonnes. Si une liste de colonnes est spécifiée, ANALYZE doit également
+  être spécifié.</div>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SORTIES'><a class='permalink' href='#SORTIES'>SORTIES</a></h1>
+<p class="Pp">Lorsque VERBOSE est spécifié, <b>VACUUM</b> émet des messages de
+    progression pour indiquer quelle table est en cours de traitement. Diverses
+    statistiques sur les tables sont également imprimées.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='NOTES'><a class='permalink' href='#NOTES'>NOTES</a></h1>
+<p class="Pp">Pour vacuumer une table, il faut normalement avoir le privilège MAINTAIN
+    sur la table. Cependant, les propriétaires de bases de données sont autorisés à
+    vacuumer toutes les tables de leurs bases de données, à l'exception des catalogues
+    partagés. <b>VACUUM</b> ignorera les tables pour lesquelles l'utilisateur
+    appelant n'a pas la permission de vacuumer.</p>
+<p class="Pp">Pendant que <b>VACUUM</b> s'exécute, search_path est temporairement
+    modifié en pg_catalog, pg_temp.</p>
+<p class="Pp"><b>VACUUM</b> ne peut pas être exécuté à l'intérieur d'un bloc de
+    transaction.</p>
+<p class="Pp">Pour les tables avec des index GIN, <b>VACUUM</b> (sous quelque forme
+    que ce soit) complète également toute insertion d'index en attente, en déplaçant
+    les entrées d'index en attente vers les emplacements appropriés dans la structure
+    principale de l'index GIN. Voir la section 65.4.4.1 pour plus de détails.</p>
+<p class="Pp">Nous recommandons que toutes les bases de données soient vacuumées
+    régulièrement afin de supprimer les lignes mortes. PostgreSQL inclut une
+    fonctionnalité "autovacuum" qui peut automatiser la maintenance de vacuum
+    régulière. Pour plus d'informations sur le vacuum automatique et manuel, voir
+    la section 24.1.</p>
+<p class="Pp">L'option <b>FULL</b> n'est pas recommandée pour une utilisation
+    régulière, mais peut être utile dans des cas spéciaux. Un exemple est lorsque
+    vous avez supprimé ou mis à jour la plupart des lignes d'une table et que vous
+    souhaitez que la table rétrécisse physiquement pour occuper moins d'espace
+    disque et permettre des scans de table plus rapides. <b>VACUUM FULL</b>
+    rétrécira généralement la table plus qu'un simple <b>VACUUM</b>.</p>
+<p class="Pp">L'option <b>PARALLEL</b> est utilisée uniquement à des fins de
+    vacuum. Si cette option est spécifiée avec l'option <b>ANALYZE</b>, elle n'a
+    aucun effet sur <b>ANALYZE</b>.</p>
+<p class="Pp"><b>VACUUM</b> provoque une augmentation substantielle du trafic
+    d'E/S, ce qui peut entraîner de mauvaises performances pour les autres sessions
+    actives. Il est donc parfois conseillé d'utiliser la fonctionnalité de délai
+    de vacuum basé sur le coût. Pour le vacuum parallèle, chaque travailleur dort
+    proportionnellement au travail effectué par ce travailleur. Voir la section
+    19.10.2 pour plus de détails.</p>
+<p class="Pp">Chaque backend exécutant <b>VACUUM</b> sans l'option FULL signalera
+    sa progression dans la vue pg_stat_progress_vacuum. Les backends exécutant
+    <b>VACUUM FULL</b> signaleront leur progression dans la vue
+    pg_stat_progress_cluster. Voir les sections 27.4.5 et 27.4.2 pour plus de
+    détails.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXEMPLES'><a class='permalink' href='#EXEMPLES'>EXEMPLES</a></h1>
+<p class="Pp">Pour nettoyer une seule table onek, l'analyser pour l'optimiseur et
+    imprimer un rapport détaillé de l'activité de vacuum :</p>
+<div class="Bd-indent">
+<pre>VACUUM (VERBOSE, ANALYZE) onek;</pre>
+</div>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COMPATIBILITE'><a class='permalink' href='#COMPATIBILITE'>COMPATIBILITÉ</a></h1>
+<p class="Pp">Il n'y a pas d'instruction <b>VACUUM</b> dans la norme SQL.</p>
+<p class="Pp">La syntaxe suivante était utilisée avant la version 9.0 de PostgreSQL
+    et est toujours prise en charge :</p>
+<div class="Bd-indent">
+<pre>VACUUM [ FULL ] [ FREEZE ] [ VERBOSE ] [ ANALYZE ] [ <i>table_and_columns</i> [, ...] ]</pre>
+</div>
+<p class="Pp">Notez que dans cette syntaxe, les options doivent être spécifiées
+    exactement dans l'ordre indiqué.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR AUSSI</a></h1>
+<p class="Pp"><a href='/man/vacuumdb.1.fr'>vacuumdb(1)</a>, section 19.10.2, section
+    24.1.6, section 27.4.5, section 27.4.2</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025</td>
+    <td class="foot-os">PostgreSQL 18.1</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page man" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/postgresql/">extra/postgresql</a></dd>
+        <dt>Version :</dt>
+        <dd>18.1-1</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://www.postgresql.org/">https://www.postgresql.org/</a></dd>
+        <dt>Licences :</dt>
+        <dd>PostgreSQL</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/postgresql/">/listing/extra/postgresql/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#SYNTAXE">SYNTAXE</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#PARAMETRES">PARAMÈTRES</a></li>
+        
+            <li><a href="#SORTIES">SORTIES</a></li>
+        
+            <li><a href="#NOTES">NOTES</a></li>
+        
+            <li><a href="#EXEMPLES">EXEMPLES</a></li>
+        
+            <li><a href="#COMPATIBILITE">COMPATIBILITÉ</a></li>
+        
+            <li><a href="#VOIR_AUSSI">VOIR AUSSI</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/VACUUM.7.fr.txt">txt</a>, 
+        
+            <a href="/man/VACUUM.7.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages man, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>SPI_execute(3) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">SPI_execute(3)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/postgresql/">postgresql</a></p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">SPI_EXECUTE(3)</td>
+    <td class="head-vol">Documentation PostgreSQL 18.1</td>
+    <td class="head-rtitle">SPI_EXECUTE(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">SPI_execute - exécute une commande</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPIS</a></h1>
+<pre>int SPI_execute(const char * <i>command</i>, bool <i>read_only</i>, long <i>count</i>)</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp"><b>SPI_execute</b> exécute la commande SQL spécifiée pour <i>count</i>
+    lignes. Si <i>read_only</i> est vrai, la commande doit être en lecture seule et
+    les frais généraux d'exécution sont légèrement réduits.</p>
+<p class="Pp">Cette fonction ne peut être appelée que depuis une fonction C connectée.</p>
+<p class="Pp">Si <i>count</i> est zéro, la commande est exécutée pour toutes les
+    lignes auxquelles elle s'applique. Si <i>count</i> est supérieur à zéro, pas
+    plus de <i>count</i> lignes ne seront récupérées ; l'exécution s'arrête lorsque
+    le compte est atteint, un peu comme l'ajout d'une clause LIMIT à la requête.
+    Par exemple,</p>
+<div class="Bd-indent">
+<pre>SPI_execute(&quot;SELECT * FROM foo&quot;, true, 5);</pre>
+</div>
+<p class="Pp">récupérera au plus 5 lignes de la table. Notez qu'une telle limite
+    n'est effective que lorsque la commande retourne effectivement des lignes.
+    Par exemple,</p>
+<div class="Bd-indent">
+<pre>SPI_execute(&quot;INSERT INTO foo SELECT * FROM bar&quot;, false, 5);</pre>
+</div>
+<p class="Pp">insère toutes les lignes de bar, ignorant le paramètre <i>count</i>.
+    Cependant, avec</p>
+<div class="Bd-indent">
+<pre>SPI_execute(&quot;INSERT INTO foo SELECT * FROM bar RETURNING *&quot;, false, 5);</pre>
+</div>
+<p class="Pp">au plus 5 lignes seraient insérées, car l'exécution s'arrêterait
+    après la récupération de la cinquième ligne de résultat RETURNING.</p>
+<p class="Pp">Vous pouvez passer plusieurs commandes dans une seule chaîne ;
+    <b>SPI_execute</b> renvoie le résultat de la commande exécutée en dernier. La
+    limite <i>count</i> s'applique séparément à chaque commande (même si seul le
+    dernier résultat sera effectivement retourné). La limite n'est pas appliquée
+    aux commandes cachées générées par les règles.</p>
+<p class="Pp">Lorsque <i>read_only</i> est faux, <b>SPI_execute</b> incrémente le
+    compteur de commandes et calcule un nouveau "snapshot" avant d'exécuter chaque
+    commande de la chaîne. Le "snapshot" ne change pas réellement si le niveau
+    d'isolation de la transaction actuelle est SERIALIZABLE ou REPEATABLE READ,
+    mais en mode READ COMMITTED, la mise à jour du "snapshot" permet à chaque
+    commande de voir les résultats des transactions nouvellement validées des autres
+    sessions. Ceci est essentiel pour un comportement cohérent lorsque les
+    commandes modifient la base de données.</p>
+<p class="Pp">Lorsque <i>read_only</i> est vrai, <b>SPI_execute</b> ne met pas à
+    jour le "snapshot" ni le compteur de commandes, et n'autorise que les commandes
+    <b>SELECT</b> simples dans la chaîne de commandes. Les commandes sont exécutées
+    en utilisant le "snapshot" préalablement établi pour la requête environnante.
+    Ce mode d'exécution est quelque peu plus rapide que le mode lecture/écriture en
+    raison de l'élimination des frais généraux par commande. Il permet également de
+    créer des fonctions véritablement stables : puisque les exécutions successives
+    utiliseront toutes le même "snapshot", il n'y aura aucun changement dans les
+    résultats.</p>
+<p class="Pp">Il est généralement déconseillé de mélanger des commandes en lecture
+    seule et en lecture/écriture au sein d'une même fonction utilisant SPI ; cela
+    pourrait entraîner un comportement très déroutant, car les requêtes en lecture
+    seule ne verraient pas les résultats des mises à jour de la base de données
+    effectuées par les requêtes en lecture/écriture.</p>
+<p class="Pp">Le nombre réel de lignes pour lesquelles la (dernière) commande a été
+    exécutée est retourné dans la variable globale <i>SPI_processed</i>. Si la
+    valeur de retour de la fonction est SPI_OK_SELECT, SPI_OK_INSERT_RETURNING,
+    SPI_OK_DELETE_RETURNING, SPI_OK_UPDATE_RETURNING, ou SPI_OK_MERGE_RETURNING,
+    alors vous pouvez utiliser le pointeur global SPITupleTable *SPI_tuptable pour
+    accéder aux lignes de résultat. Certaines commandes utilitaires (comme
+    <b>EXPLAIN</b>) retournent également des ensembles de lignes, et SPI_tuptable
+    conterra le résultat dans ces cas aussi. Certaines commandes utilitaires
+    (<b>COPY</b>, <b>CREATE TABLE AS</b>) ne retournent pas d'ensemble de lignes,
+    donc SPI_tuptable est NULL, mais elles retournent toujours le nombre de lignes
+    traitées dans <i>SPI_processed</i>.</p>
+<p class="Pp">La structure SPITupleTable est définie comme suit :</p>
+<div class="Bd-indent">
+<pre>typedef struct SPITupleTable
+{
+    /* Membres publics */
+    TupleDesc   tupdesc;        /* descripteur de tuple */
+    HeapTuple  *vals;           /* tableau de tuples */
+    uint64      numvals;        /* nombre de tuples valides */
+    /* Membres privés, non destinés aux appelants externes */
+    uint64      alloced;        /* longueur allouée du tableau vals */
+    MemoryContext tuptabcxt;    /* contexte mémoire de la table de résultats */
+    slist_node  next;           /* lien pour la gestion interne */
+    SubTransactionId subid;     /* sous-transaction dans laquelle tuptable a été créée */
+} SPITupleTable;</pre>
+</div>
+<p class="Pp">Les champs tupdesc, vals et numvals peuvent être utilisés par les
+    appelants SPI ; les autres champs sont internes. vals est un tableau de
+    pointeurs vers les lignes. Le nombre de lignes est donné par numvals (pour des
+    raisons historiques, ce compte est également retourné dans <i>SPI_processed</i>).
+    tupdesc est un descripteur de ligne que vous pouvez passer aux fonctions SPI
+    traitant les lignes.</p>
+<p class="Pp"><b>SPI_finish</b> libère toutes les SPITupleTables allouées pendant
+    la fonction C actuelle. Vous pouvez libérer une table de résultats particulière
+    plus tôt, si vous n'en avez plus besoin, en appelant <b>SPI_freetuptable</b>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ARGUMENTS'><a class='permalink' href='#ARGUMENTS'>ARGUMENTS</a></h1>
+<p class="Pp">const char * <i>command</i></p>
+<div class="Bd-indent">chaîne contenant la commande à exécuter</div>
+<p class="Pp">bool <i>read_only</i></p>
+<div class="Bd-indent">vrai pour exécution en lecture seule</div>
+<p class="Pp">long <i>count</i></p>
+<div class="Bd-indent">nombre maximum de lignes à retourner, ou 0 pour aucune limite</div>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='RETURN_VALUE'><a class='permalink' href='#RETURN_VALUE'>VALEUR RENVOYÉE</a></h1>
+<p class="Pp">Si l'exécution de la commande a réussi, l'une des valeurs (non
+    négatives) suivantes sera retournée :</p>
+<p class="Pp">SPI_OK_SELECT</p>
+<div class="Bd-indent">si un <b>SELECT</b> (mais pas <b>SELECT INTO</b>) a été
+  exécuté</div>
+<p class="Pp">SPI_OK_SELINTO</p>
+<div class="Bd-indent">si un <b>SELECT INTO</b> a été exécuté</div>
+<p class="Pp">SPI_OK_INSERT</p>
+<div class="Bd-indent">si un <b>INSERT</b> a été exécuté</div>
+<p class="Pp">SPI_OK_DELETE</p>
+<div class="Bd-indent">si un <b>DELETE</b> a été exécuté</div>
+<p class="Pp">SPI_OK_UPDATE</p>
+<div class="Bd-indent">si un <b>UPDATE</b> a été exécuté</div>
+<p class="Pp">SPI_OK_MERGE</p>
+<div class="Bd-indent">si un <b>MERGE</b> a été exécuté</div>
+<p class="Pp">SPI_OK_INSERT_RETURNING</p>
+<div class="Bd-indent">si un <b>INSERT RETURNING</b> a été exécuté</div>
+<p class="Pp">SPI_OK_DELETE_RETURNING</p>
+<div class="Bd-indent">si un <b>DELETE RETURNING</b> a été exécuté</div>
+<p class="Pp">SPI_OK_UPDATE_RETURNING</p>
+<div class="Bd-indent">si un <b>UPDATE RETURNING</b> a été exécuté</div>
+<p class="Pp">SPI_OK_MERGE_RETURNING</p>
+<div class="Bd-indent">si un <b>MERGE RETURNING</b> a été exécuté</div>
+<p class="Pp">SPI_OK_UTILITY</p>
+<div class="Bd-indent">si une commande utilitaire (par exemple, <b>CREATE TABLE</b>)
+  a été exécutée</div>
+<p class="Pp">SPI_OK_REWRITTEN</p>
+<div class="Bd-indent">si la commande a été réécrite en un autre type de commande
+  (par exemple, <b>UPDATE</b> est devenu <b>INSERT</b>) par une règle.</div>
+<p class="Pp">En cas d'erreur, l'une des valeurs négatives suivantes est retournée
+    :</p>
+<p class="Pp">SPI_ERROR_ARGUMENT</p>
+<div class="Bd-indent">si <i>command</i> est NULL ou si <i>count</i> est inférieur
+    à 0</div>
+<p class="Pp">SPI_ERROR_COPY</p>
+<div class="Bd-indent">si <b>COPY TO stdout</b> ou <b>COPY FROM stdin</b> a
+  été tenté</div>
+<p class="Pp">SPI_ERROR_TRANSACTION</p>
+<div class="Bd-indent">si une commande de manipulation de transaction a été tentée
+  (<b>BEGIN</b>, <b>COMMIT</b>, <b>ROLLBACK</b>, <b>SAVEPOINT</b>, <b>PREPARE
+  TRANSACTION</b>, <b>COMMIT PREPARED</b>, <b>ROLLBACK PREPARED</b>, ou toute
+  variante de ceux-ci)</div>
+<p class="Pp">SPI_ERROR_OPUNKNOWN</p>
+<div class="Bd-indent">si le type de commande est inconnu (ne devrait pas arriver)</div>
+<p class="Pp">SPI_ERROR_UNCONNECTED</p>
+<div class="Bd-indent">si appelée depuis une fonction C non connectée</div>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='NOTES'><a class='permalink' href='#NOTES'>NOTES</a></h1>
+<p class="Pp">Toutes les fonctions d'exécution de requêtes SPI définissent à la fois
+    <i>SPI_processed</i> et <i>SPI_tuptable</i> (juste le pointeur, pas le
+    contenu de la structure). Sauvegardez ces deux variables globales dans des
+    variables locales de fonction C si vous avez besoin d'accéder à la table de
+    résultat de <b>SPI_execute</b> ou d'une autre fonction d'exécution de requête
+    lors d'appels ultérieurs.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025</td>
+    <td class="foot-os">PostgreSQL 18.1</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher une page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/postgresql/">extra/postgresql</a></dd>
+        <dt>Version :</dt>
+        <dd>18.1-1</dd>
+        <dt>En amont :</dt>
+        <dd><a href="https://www.postgresql.org/">https://www.postgresql.org/</a></dd>
+        <dt>Licens</dt>
+</section>
+<dt>PostgreSQL</dt>
+    <dd>PostgreSQL</dd>
+    <dt>Manuels :</dt>
+    <dd><a href="/listing/extra/postgresql/">/listing/extra/postgresql/</a></dd>
+</dl>
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+            
+            <li><a href="#NAME">NOM</a></li>
+            
+            <li><a href="#SYNOPSIS">SYNTAXE</a></li>
+            
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+            
+            <li><a href="#ARGUMENTS">ARGUMENTS</a></li>
+            
+            <li><a href="#RETURN_VALUE">VALEUR DE RETOUR</a></li>
+            
+            <li><a href="#NOTES">NOTES</a></li>
+            
+        </ul>
+    </nav>
+</details>
+<nav class="other-formats">
+    <p>Autres formats :
+        
+        <a href="/man/SPI_execute.3.en.txt">txt</a>, 
+        
+        <a href="/man/SPI_execute.3.en.raw">raw</a>
+        
+    </p>
+</nav>
+    
+    <aside>
+        <main>
+            <section>
+                <h2>Informations système</h2>
+                
+                <p>Le site Web est disponible sous la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>, à l'exception du contenu des pages de manuel, qui ont leur propre licence spécifiée dans le paquet Arch Linux correspondant.</p>
+            </section>
+        </main>
+        <footer>
+            
+            <p>Le site Web est disponible sous la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>, à l'exception du contenu des pages de manuel, qui ont leur propre licence spécifiée dans le paquet Arch Linux correspondant.</p>
+        </footer>
+    </aside>

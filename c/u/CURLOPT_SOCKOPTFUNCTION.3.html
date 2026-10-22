@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>CURLOPT_SOCKOPTFUNCTION(3) — Pages man Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">CURLOPT_SOCKOPTFUNCTION(3)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/core/x86_64/curl/">curl</a></p>
+<p class="lic">Licences: MIT</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">CURLOPT_SOCKOPTFUNCTION(3)</td>
+    <td class="head-vol">Manuel des fonctions de bibliothèque</td>
+    <td class="head-rtitle">CURLOPT_SOCKOPTFUNCTION(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">CURLOPT_SOCKOPTFUNCTION - fonction de rappel pour définir les options de socket</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>#include &lt;curl/curl.h&gt;
+typedef enum  {
+  CURLSOCKTYPE_IPCXN,  /* socket créé pour une connexion IP spécifique */
+  CURLSOCKTYPE_ACCEPT, /* socket créé par un appel accept() */
+  CURLSOCKTYPE_LAST    /* ne jamais utiliser */
+} curlsocktype;
+#define CURL_SOCKOPT_OK 0
+#define CURL_SOCKOPT_ERROR 1 /* provoque l'abandon de libcurl et le retour de
+                                CURLE_ABORTED_BY_CALLBACK */
+#define CURL_SOCKOPT_ALREADY_CONNECTED 2
+int sockopt_callback(void *clientp,
+                     curl_socket_t curlfd,
+                     curlsocktype purpose);
+CURLcode curl_easy_setopt(CURL *handle, CURLOPT_SOCKOPTFUNCTION, sockopt_callback);</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Passez un pointeur vers votre fonction de rappel, qui doit correspondre au
+    prototype indiqué ci-dessus.</p>
+<p class="Pp">Lorsqu'elle est définie, cette fonction de rappel est appelée par libcurl
+    lorsque le socket a été créé, mais avant l'appel de connexion, afin de permettre aux
+    applications de modifier des options spécifiques du socket. L'argument
+    <i>purpose</i> du rappel identifie le but exact de ce socket particulier :</p>
+<p class="Pp"><i>CURLSOCKTYPE_IPCXN</i> pour les connexions créées activement ou,
+    depuis la version 7.28.0, <i>CURLSOCKTYPE_ACCEPT</i> pour FTP lorsque la connexion a été
+    établie avec PORT/EPSV (dans les versions antérieures, ces sockets n'étaient pas
+    transmis à cette fonction de rappel).</p>
+<p class="Pp">Les futures versions de libcurl pourront supporter plus de buts. libcurl
+    transmet le descripteur de socket nouvellement créé au rappel dans le paramètre
+    <i>curlfd</i> afin que des appels setsockopt() supplémentaires puissent être effectués
+    à la discrétion de l'utilisateur.</p>
+<p class="Pp">Le pointeur <i>clientp</i> contient toute valeur définie par l'utilisateur
+    à l'aide de la fonction <a href='/man/CURLOPT_SOCKOPTDATA.3.en'>CURLOPT_SOCKOPTDATA(3)</a>.</p>
+<p class="Pp">Retournez <i>CURL_SOCKOPT_OK</i> depuis la fonction de rappel en cas de succès. Retournez
+    <i>CURL_SOCKOPT_ERROR</i> depuis la fonction de rappel pour signaler une erreur
+    irrécupérable à la bibliothèque, qui fermera le socket et retournera
+    <i>CURLE_COULDNT_CONNECT</i> pour <i>CURLSOCKTYPE_IPCXN</i> et
+    <i>CURLE_ABORTED_BY_CALLBACK</i> pour <i>CURLSOCKTYPE_ACCEPT</i>.</p>
+<p class="Pp">La fonction de rappel peut retourner
+    <i>CURL_SOCKOPT_ALREADY_CONNECTED</i> pour <i>CURLSOCKTYPE_IPCXN</i>, afin d'indiquer à
+    libcurl que le socket est déjà connecté, et libcurl n'essaiera donc pas de se connecter.
+    Cela permet à une application de passer un socket déjà connecté avec
+    <a href='/man/CURLOPT_OPENSOCKETFUNCTION.3.en'>CURLOPT_OPENSOCKETFUNCTION(3)</a> et ensuite de faire en sorte que cette
+    fonction empêche libcurl de tenter de se connecter (à nouveau).</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DEFAUT'><a class='permalink' href='#DEFAUT'>DÉFAUT</a></h1>
+<p class="Pp">NULL</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PROTOCOLES'><a class='permalink' href='#PROTOCOLES'>PROTOCOLES</a></h1>
+<p class="Pp">Cette fonctionnalité affecte tous les protocoles pris en charge</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXEMPLE'><a class='permalink' href='#EXEMPLE'>EXEMPLE</a></h1>
+<pre>/* faire utiliser à libcurl le socket déjà établi 'sockfd' */
+static curl_socket_t opensocket(void *clientp,
+                                curlsocktype purpose,
+                                struct curl_sockaddr *address)
+{
+  curl_socket_t sockfd;
+  sockfd = *(curl_socket_t *)clientp;
+  /* le socket réellement défini extérieurement est passé via l'option OPENSOCKETDATA
+     */
+  return sockfd;
+}
+static int sockopt_callback(void *clientp, curl_socket_t curlfd,
+                            curlsocktype purpose)
+{
+  return CURL_SOCKOPT_ALREADY_CONNECTED;
+}
+int main(void)
+{
+  CURL *curl = curl_easy_init();
+  if(curl) {
+    CURLcode res;
+    int sockfd; /* notre descripteur de fichier personnalisé */
+    /* libcurl pense que vous vous connectez à l'hôte
+     * et au port que vous spécifiez dans l'option URL. */
+    curl_easy_setopt(curl, CURLOPT_URL, &quot;http://99.99.99.99:9999&quot;);
+    /* appeler cette fonction pour obtenir un socket */
+    curl_easy_setopt(curl, CURLOPT_OPENSOCKETFUNCTION, opensocket);
+    curl_easy_setopt(curl, CURLOPT_OPENSOCKETDATA, &amp;sockfd);
+    /* appeler cette fonction pour définir les options du socket */
+    curl_easy_setopt(curl, CURLOPT_SOCKOPTFUNCTION, sockopt_callback);
+    res = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
+  }
+}</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DISPONIBILITE'><a class='permalink' href='#DISPONIBILITE'>DISPONIBILITÉ</a></h1>
+<p class="Pp">Ajouté dans curl 7.16.0</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VALEUR_DE_RETOUR'><a class='permalink' href='#VALEUR_DE_RETOUR'>VALEUR DE RETOUR</a></h1>
+<p class="Pp"><a href='/man/curl_easy_setopt.3.en'>curl_easy_setopt(3)</a> retourne un CURLcode indiquant le succès
+    ou une erreur.</p>
+<p class="Pp">CURLE_OK (0) signifie que tout était correct, une valeur non nulle indique une
+    erreur ; voir <a href='/man/libcurl-errors.3.en'>libcurl-errors(3)</a>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR AUSSI</a></h1>
+<p class="Pp"><a href='/man/CURLOPT_OPENSOCKETFUNCTION.3.en'>CURLOPT_OPENSOCKETFUNCTION(3)</a>,
+    <a href='/man/CURLOPT_SEEKFUNCTION.3.en'>CURLOPT_SEEKFUNCTION(3)</a>, <a href='/man/CURLOPT_SOCKOPTDATA.3.en'>CURLOPT_SOCKOPTDATA(3)</a></p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-11-13</td>
+    <td class="foot-os">libcurl</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page man" name="q" value=""
+         />
+    <input type="submit" name="go" value="Aller" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/core/x86_64/curl/">core/curl</a></dd>
+        <dt>Version :</dt>
+        <dd>8.17.0-2</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://curl.se/">https://curl.se/</a></dd>
+        <dt>Licences :</dt>
+        <dd>MIT</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/core/curl/">/listing/core/curl/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#DEFAUT">DÉFAUT</a></li>
+        
+            <li><a href="#PROTOCOLES">PROTOCOLES</a></li>
+        
+            <li><a href="#EXEMPLE">EXEMPLE</a></li>
+        
+            <li><a href="#DISPONIBILITE">DISPONIBILITÉ</a></li>
+        
+            <li><a href="#VALEUR_DE_RETOUR">VALEUR DE RETOUR</a></li>
+        
+            <li><a href="#VOIR_AUSSI">VOIR AUSSI</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/CURLOPT_SOCKOPTFUNCTION.3.en.txt">txt</a>, 
+        
+            <a href="/man/CURLOPT_SOCKOPTFUNCTION.3.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages man, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

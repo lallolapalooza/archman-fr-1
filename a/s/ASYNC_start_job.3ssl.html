@@ -1,0 +1,362 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>ASYNC_start_job(3ssl) — Pages manuelles </title>de l'arche
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">ASYNC_start_job(3ssl)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/core/x86_64/openssl/">openssl</a></p>
+
+        nt
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">ASYNC_START_JOB(3</td>ssl)
+    <td class="head-vol">Open</td>SSL
+    <td class="head-rtitle">ASYNC_START_JOB(3</td>ss</tr>l</table>)
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NO</a></h1>M
+<p class="Pp">ASYNC_get_wait_ctx, ASYNC_init_thread, ASYNC_cleanup_thread,
+    ASYNC_start_job, ASYNC_pause_job, ASYNC_get_c</p>urrent_job, ASYNC_block_pause,
+    ASYNC_unblock_pause, ASYNC_is_capable, ASYNC_stack_alloc_fn,
+    ASYNC_sta</section>ck_free_fn, ASYNC_set_mem_functions, ASYNC_get_mem_functions -
+    fonctions de gestion des tâches asynchrones
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSISS</a></h1>E
+<pre>#include &lt;openssl/async.h&gt;
+int ASYNC_init_thread(size_t max_size, size_t init_size);
+void ASYNC_cleanup_thread(void);
+int ASYNC_start_job(ASYNC_JOB **job, ASYNC_WAIT_CTX *ctx, int *ret,
+                    int (*func)(void *), void *args, size_t size);
+int ASYNC_paus</pre>e_job(void);
+ASYNC_JOB *ASYNC_get_current_job(void);
+ASYNC_WAIT_CTX *ASYNC_get_wait_ctx(ASYNC_JOB *job);
+void ASYNC_block_pause(void);
+void ASYNC_unblock_pause(void);
+int ASYNC_is_capable(void);
+typedef void *(*ASYNC_stack_alloc_fn)(size_t *num);
+typedef void (*ASYN</section>C_stack_free_fn)(void *addr);
+int ASYNC_set_mem_functions(ASYNC_stack_alloc_fn alloc_fn,
+                            ASYNC_stack_free_fn free_fn);
+void ASYNC_get_mem_functions(ASYNC_stack_alloc_fn *alloc_fn,
+                             ASYNC_stack_free_fn *free_fn);
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTIO</a></h1>N
+<p class="Pp">OpenSSL implémente les capacités asynchrones à travers un
+    <b>ASYNC_JOB. </b>Cela représente du code qui peut être démarré et qui s'exécute jusqu'à ce qu'un certain événement se produise. À ce moment-là, le code peut être mis en pause et le contrôle est rendu au code utilisateur jusqu'à ce qu'un événement ultérieur indique que la tâche peut être reprise. C'est une implémentation spécifique à OpenSSL du multitâche </p>coopératif.
+<p class="Pp">La création d'un <b>ASYNC_JOB </b>est une opération relativement coûteuse. Par conséquent, pour des raisons d'efficacité, les tâches peuvent être créées à l'avance et réutilisées de nombreuses fois. Elles sont conservées dans un pool jusqu'à ce qu'elles soient nécessaires, auquel cas elles sont retirées du pool, utilisées, puis retournées au pool lorsque la tâche est terminée. Si l'application utilisateur est multi-thread, alors
+    <b>ASYNC_init_thread() </b>peut être appelé pour chaque thread qui initiéra des tâches asynchrones. Avant que le code utilisateur ne se termine, les ressources par thread doivent être nettoyées. Cela se produira normalement automatiquement (voir
+    <a href='/man/OPENSSL_init_crypto.3.en'>OPENSSL_init_crypto(3))</a> mais peut être explicitement initié en utilisant
+    <b>ASYNC_cleanup_thread().</b> Aucune tâche asynchrone ne doit être en attente pour le thread lorsque <b>ASYNC_cleanup_thread() </b>est appelé. Ne pas s'assurer de cela entraînera des fuites de </p>mémoire.
+<p class="Pp">L'argument <i>max_size </i>limite le nombre de
+    <b>ASYNC_JOBs </b>qui seront conservés dans le pool. Si <i>max_size </i>est défini à 0, alors aucune limite supérieure n'est définie. Lorsqu'un <b>ASYNC_JOB </b>est nécessaire mais qu'il n'y en a aucun de disponible dans le pool, un sera automatiquement créé, tant que le total des <b>ASYNC_JOBs </b>gérés par le pool ne dépasse pas <i>max_size. </i>Lorsque le pool est initialisé pour la première fois,
+    <i>init_siz</i>e <b>ASYNC_JOBs </b>seront créés immédiatement. Si
+    <b>ASYNC_init_thread() </b>n'est pas appelé avant que le pool ne soit utilisé pour la première fois, alors il sera automatiquement appelé avec un <i>max_size </i>de 0 (pas de limite supérieure) et un <i>init_size </i>de 0 (aucun <b>ASYNC_JOBs </b>créé à l'avance)</p>.
+<p class="Pp">Une tâche asynchrone est démarrée en appelant la fonction
+    <b>ASYNC_start_job()</b>. Initialement <i>*job </i>devrait être NULL.
+    <i>ctx </i>devrait pointer vers un objet <b>ASYNC_WAIT_CTX </b>créé à travers la fonction <a href='/man/ASYNC_WAIT_CTX_new.3.en'>ASYNC_WAIT_CTX_new(3)</a>. <i>ret </i>devrait pointer vers un emplacement où la valeur de retour de la fonction asynchrone devrait être stockée à la fin de la tâche. <i>func </i>représente la fonction qui devrait être démarrée de manière asynchrone. Les données pointées par <i>args </i>et de taille <i>size </i>seront copiées puis passées comme argument à
+    <i>func </i>lorsque la tâche démarre. ASYNC_start_job retournera l'une des valeurs suivantes </p>:
+<dl class="Bl-tag">
+  <dt id="ASYNC_ERR"><a class="permalink" href="#ASYNC_ERR"><b>ASYNC_E</b></a></dt>RR
+  <dd>Une erreur s'est produite en essayant de démarrer la tâche. Vérifiez la file d'erreurs OpenSSL (par exemple, voir <a href='/man/ERR_print_errors.3.en'>ERR_print_errors(3)</a>) pour plus de </dd>détails.
+  <dt id="ASYNC_NO_JOBS"><a class="permalink" href="#ASYNC_NO_JOBS"><b>ASYNC_NO_JO</b></a></dt>BS
+  <dd>Il n'y a actuellement aucune tâche disponible dans le pool. Cet appel peut être réessayé plus </dd>tard.
+  <dt id="ASYNC_PAUSE"><a class="permalink" href="#ASYNC_PAUSE"><b>ASYNC_PAU</b></a></dt>SE
+  <dd>La tâche a été démarrée avec succès mais a été « mise en pause » avant de se terminer (voir <b>ASYNC_pause_job() </b>ci-dessous). Un descripteur de la tâche est placé dans <i>*job.</i> D'autres travaux peuvent être effectués (si désiré) et la tâche redémarrée plus tard. Pour redémarrer une tâche, appelez
+      <b>ASYNC_start_job() à </b>nouveau en passant le descripteur de tâche dans <i>*job.</i> Les paramètres
+      <i>fun</i>c, <i>args </i>et <i>size </i>seront ignorés lors du redémarrage d'une tâche. Lors du redémarrage d'une tâche, <b>ASYNC_start_</b>job()
+      <b>doit </b>être appelé depuis le même thread que celui depuis lequel la tâche a été initialement démarrée. <b>ASYNC_WAIT_CTX </b>est utilisé pour savoir quand une tâche est prête à être </dd>redémarrée.
+  <dt id="ASYNC_FINISH"><a class="permalink" href="#ASYNC_FINISH"><b>ASYNC_FINI</b></a></dt>SH
+  <dd>La tâche est terminée. <i>*job </i>sera NULL et la valeur de retour de
+      <i>func </i>sera placée dans <i>*</i>r</dd>et</dl>.
+<p class="Pp">À un moment donné, il peut y avoir au maximum une tâche activement en cours d'exécution par thread (vous pouvez en avoir beaucoup en pause).
+    <b>ASYNC_get_current_job()</b> peut être utilisé pour obtenir un pointeur vers l' <b>ASYNC_JOB </b>actuellement en cours d'exécution. Si aucune tâche n'est actuellement en cours d'exécution, alors cela retournera </p>NULL.
+<p class="Pp">Si vous exécutez dans le contexte d'une tâche (c'est-à-dire que vous avez été appelé directement ou indirectement par la fonction « func » passée comme argument à <b>ASYNC_start_job()</b>) alors <b>ASYNC_pause_job()</b> retournera immédiatement le contrôle à l'application appelante avec
+    <b>ASYNC_PAUSE </b>retourné de l'appel <b>ASYNC_start_job()</b>. Un appel ultérieur à ASYNC_start_job en passant le <b>ASYNC_JOB pertinent </b>dans le paramètre <i>*job </i>reprendra l'exécution à partir de l'appel
+    <b>ASYNC_pause_job()</b>. Si <b>ASYNC_pause_job() </b>est appelé alors que vous n'êtes pas dans le contexte d'une tâche, aucune action n'est entreprise et
+    <b>ASYNC_pause_job() </b>retourne </p>immédiatement.
+<p class="Pp"><b>ASYNC_get_wait_ctx() </b>peut être utilisé pour obtenir un pointeur vers le
+    <b>ASYNC_WAIT_CTX </b>pour la <i>tâche </i>(voir <a href='/man/ASYNC_WAIT_CTX_new.3.en'>ASYNC_WAIT_CTX_new(3)</a>).
+    <b>Les ASYNC_WAIT_CTXs </b>contiennent deux façons différentes de notifier aux applications qu'une tâche est prête à être reprise. L'une est un descripteur de fichier « wait » (attente), et l'autre est un mécanisme de « callback »</p>.
+<p class="Pp">Le descripteur de fichier « wait » associé à
+    <b>ASYNC_WAIT_CTX </b>est utilisé par les applications pour attendre que le descripteur de fichier soit prêt pour la « lecture » en utilisant un appel de fonction système tel que <a href='/man/select.2.en'>select(2)</a> ou <a href='/man/poll.2.en'>poll(2) </a>(être prêt pour la « lecture » indique que la tâche devrait être reprise). Si aucun descripteur de fichier n'est mis à disposition, une application devra périodiquement « interroger » la tâche en essayant de la redémarrer pour voir si elle est prête à </p>continuer.
+<p class="Pp"><b>Les ASYNC_WAIT_CTXs </b>ont aussi un mécanisme de « callback » pour notifier les applications. Le callback est défini par une application, et il sera automatiquement appelé lorsque le moteur termine une opération de cryptographie, afin que l'application puisse reprendre le flux de travail mis en pause sans interroger. Un moteur pourrait être écrit pour vérifier si le callback a été défini. Si c'est le cas, il utiliserait le mécanisme de callback de préférence aux notifications par descripteur de fichier. Si un callback n'est pas défini, le moteur peut utiliser des notifications basées sur le descripteur de fichier. Veuillez noter que tous les moteurs ne peuvent pas prendre en charge le mécanisme de callback, donc le callback peut ne pas être utilisé même s'il a été défini. Voir <b>ASYNC_WAIT_CTX_new() </b>pour plus de </p>détails.
+<p class="Pp">La fonction <b>ASYNC_block_pause()</b> empêchera la tâche actuellement active de se mettre en pause. Le blocage restera en place jusqu'à un appel ultérieur à <b>ASYNC_unblock_pause(). </b>Ces fonctions peuvent être imbriquées, par exemple si vous appelez <b>ASYNC_block_pause() </b>deux fois, alors vous devez appeler
+    <b>ASYNC_unblock_pause() </b>deux fois afin de réactiver la mise en pause. Si ces fonctions sont appelées alors qu'il n'y a pas de tâche actuellement active, elles n'ont aucun effet. Cette fonctionnalité peut être utile pour éviter des scénarios d'interblocage. Par exemple, pendant l'exécution d'un <b>ASYNC_JOB,</b> une application acquiert un verrou. Elle appelle ensuite une fonction cryptographique qui invoque
+    <b>ASYNC_pause_job()</b>. Cela retourne le contrôle au code qui a créé le <b>ASYNC_JOB.</b> Si ce code tente ensuite d'acquérir le même verrou avant de reprendre la tâche originale, un interblocage peut se produire. En appelant
+    <b>ASYNC_block_pause()</b> immédiatement après avoir acquis le verrou et
+    <b>ASYNC_unblock_pause() </b>immédiatement avant de le relâcher, cette situation ne peut pas se </p>produire.
+<p class="Pp">Certaines plateformes ne peuvent pas prendre en charge les opérations asynchrones. La fonction
+    <b>ASYNC_is_capable() peut </b>être utilisée pour détecter si la plateforme actuelle est capable de gérer les opérations asynchrones.ou </p>non.
+<p class="Pp">Des fonctions d'allocation mémoire personnalisées sont prises en charge pour la
+    plateforme POSIX. Les fonctions d'allocation mémoire personnalisées permettent des méthodes alternatives
+    pour allouer la mémoire de pile, telles que mmap, ou l'utilisation de la mémoire de pile du
+    fil d'exécution courant. L'utilisation d'un rappel ASYNC_stack_alloc_fn permet également la manipulation de
+    la taille de la pile, qui vaut par défaut 32k. La taille de la pile peut être modifiée en
+    allouant une pile d'une taille différente de la taille demandée, et en
+    renvoyant la nouvelle taille de la pile dans le <i>*num</i> du </p>rap</section>pel.
+<section class="Sh">
+<h1 class="Sh" id='RETURN_VALUES'><a class='permalink' href='#RETURN_VALUES'>VALEURS   DE   </a></h1>RETOUR
+<p class="Pp">ASYNC_init_thread renvoie 1 en cas de succès, sinon </p>0.
+<p class="Pp">ASYNC_start_job renvoie l'une des valeurs suivantes : <b>ASYNC_</b>ERR,
+    <b>ASYNC_NO_JOB</b>S, <b>ASYNC_PAUSE </b>ou <b>ASYNC_FINISH </b>comme décrit
+    </p>ci-dessus.
+<p class="Pp">ASYNC_pause_job renvoie 0 si une erreur s'est produite, sinon 1 en cas de succès. Si
+    elle est appelée alors que l'on n'est pas dans le contexte d'un <b>ASYNC_JOB,</b> cela est
+    considéré comme un succès et 1 est </p>renvoyé.
+<p class="Pp">ASYNC_get_current_job renvoie un pointeur vers le
+    <b>ASYNC_JOB en </b>cours d'exécution, ou NULL si l'on n'est pas dans le contexte d'un </p>job.
+<p class="Pp"><b>ASYNC_get_wait_ctx()</b> renvoie un pointeur vers le
+    <b>ASYNC_WAIT_CTX </b>du </p>job.
+<p class="Pp"><b>ASYNC_is_capable() </b>renvoie 1 si la plateforme courante est
+    capable d'asynchrone, sinon </p>0.
+<p class="Pp">ASYNC_set_mem_functions renvoie 1 si les allocateurs de pile </p>personnalisés sont
+    pris en charge par la plateforme cour</section>ante et qu'aucune allocation n'a encore eu lieu,
+    sinon 0.
+<section class="Sh">
+<h1 class="Sh" id='NOTES'><a class='permalink' href='#NOTES'>NOTE</a></h1>S
+<p class="Pp">Sur les plateformes Windows, l'en-tête <i>&lt;openssl/async.</i>h&gt; dépend
+    de certains types habituellement rendus disponibles en incluant
+    <i>&lt;windows.h&gt;.</i> Le développeur de l'application souhaitera probablement
+    contrôler le moment où ce dernier est inclus, généralement comme l'un des premiers
+    en-têtes inclus. Par conséquent, il est de la responsabilité du développeur de l'application d'inclure <i>&lt;windows.</i>h&gt; avant
+    <i>&lt;ope</i>nssl/</p>async</section>.h&gt;.
+<section class="Sh">
+<h1 class="Sh" id='EXAMPLES'><a class='permalink' href='#EXAMPLES'>EXEMPLE</a></h1>S
+<p class="Pp">L'exemple suivant montre comment utiliser la plupart des API
+    asynchrones principales </p>:
+<pre>#ifdef _WIN32
+# include &lt;windows.h&gt;
+#endif
+#include &lt;stdio.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;openssl/async.h&gt;
+#include &lt;openssl/crypto.h&gt;
+int unique = 0;
+void cleanup(ASYNC_WAIT_CTX *ctx, const void *key, OSSL_ASYNC_FD r, void *vw)
+{
+    OSSL_ASYNC_FD *w = (OSSL_ASYNC_FD *)vw;
+    close(r);
+    close(*w);
+    OPENSSL_free(w);
+}
+int jobfunc(void *arg)
+{
+    ASYNC_JOB *currjob;
+    unsigned char *msg;
+    int pipefds[2] = {0, 0};
+    OSSL_ASYNC_FD *wptr;
+    char buf = 'X';
+    currjob = ASYNC_get_current_job();
+    if (currjob != NULL) {
+        printf("Executing within a job\n");
+    } else {
+        printf("Not executing within a job - should not happen\n");
+        return 0;
+    }
+    msg = (unsigned char *)arg;
+    printf("Passed in message is: %s\n", msg);
+    /*
+     * Create a way to inform the calling thread when this job is ready
+     * to resume, in this example we're using file descriptors.
+     * For offloading the task to an asynchronous ENGINE it's not necessary,
+     * the ENGINE should handle that internally.
+     */
+    if (pipe(pipefds) != 0) {
+        printf("Failed to create pipe\n");
+        return 0;
+    }
+    wptr = OPENSSL_malloc(sizeof(OSSL_ASYNC_FD));
+    if (wptr == NULL) {
+        printf("Failed to malloc\n");
+        return 0;
+    }
+    *wptr = pipefds[1];
+    ASYNC_WAIT_CTX_set_wait_fd(ASYNC_get_wait_ctx(currjob), &amp;unique,
+                               pipefds[0], wptr, cleanup);
+    /*
+     * Normally some external event (like a network read being ready,
+     * disk access being finished, or some hardware offload operation
+     * completing) would cause this to happen at some
+     * later point - but we do it here for demo purposes, i.e.
+     * immediately signalling that the job is ready to be woken up after
+     * we return to main via ASYNC_pause_job().
+     */
+    write(pipefds[1], &amp;buf, 1);
+    /*
+     * Return control back to main just before calling a blocking
+     * method. The main thread will wait until pipefds[0] is ready
+     * for reading before returning control to this thread.
+     */
+    ASYNC_pause_job();
+    /* Perform the blocking call (it won't block with this example code) */
+    read(pipefds[0], &amp;buf, 1);
+    printf ("Resumed the job after a pause\n");
+    return 1;
+}
+int main(void)
+{
+    ASYNC_JOB *job = NULL;
+    ASYNC_WAIT_CTX *ctx = NULL;
+    int ret;
+    OSSL_ASYNC_FD waitfd;
+    fd_set waitfdset;
+    size_t numfds;
+    unsigned char msg[13] = "Hello world!";
+    printf("Starting...\n");
+    ctx = ASYNC_WAIT_CTX_new();
+    if (ctx == NULL) {
+        printf("Failed to create ASYNC_WAIT_CTX\n");
+        abort();
+    }
+    for (;;) {
+        switch (ASYNC_start_job(&amp;job, ctx, &amp;ret, jobfunc, msg, sizeof(msg))) {
+        case ASYNC_ERR:
+        case ASYNC_NO_JOBS:
+            printf("An error occurred\n");
+            goto end;
+        case ASYNC_PAUSE:
+            printf("Job was paused\n");
+            break;
+        case ASYNC_FINISH:
+            printf("Job finished with return value %d\n", ret);
+            goto end;
+        }
+        /* Get the file descriptor we can use to wait for the job
+         * to be ready to be woken up
+         */
+        printf("Waiting for the job to be woken up\n");
+        if (!ASYNC_WAIT_CTX_get_all_fds(ctx, NULL, &amp;numfds)
+                || numfds &gt; 1) {
+            printf("Unexpected number of fds\n");
+            abort();
+        }
+        ASYNC_WAIT_CTX_get_all_fds(ctx, &amp;waitfd, &amp;numfds);
+        FD_ZERO(&amp;waitfdset);
+        FD_SET(waitfd, &amp;waitfdset);
+        /* Wait for the job to be ready for wakeup */
+        select(waitfd + 1, &amp;waitfdset, NULL, NULL, NULL);
+    }
+end:
+    ASYNC_WAIT_CTX_free(ctx);
+    printf("Finishing\n");
+    return 0;
+</pre>}
+<p class="Pp">La sortie attendue de l'exécution du programme d'exemple ci-dessus
+  est </p>:
+<pre>Starting...
+Executing within a job
+Passed in message is: Hello w</pre>orld!
+Job was paused
+Waiting for the job to be woken up
+Resumed </section>the job after a pause
+Job finished with return value 1
+Finishing
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR   </a></h1>AUSSI
+<p class="Pp"><a href='/man/crypto.7.en'>crypto(7)</a>, <a href='/man/ERR_print_errors.3.en'>ERR_print_errors(</a></p>3</section>)
+<section class="Sh">
+<h1 class="Sh" id='HISTORY'><a class='permalink' href='#HISTORY'>HISTORIQU</a></h1>E
+<p class="Pp">ASYNC_init_thread, ASYNC_cleanup_thread, ASYNC_start_job,
+    ASYNC_pause_job, ASYNC_get_current_job, <b>ASYNC_get_wait_ctx()</b>,
+    <b>ASYNC_block_pause()</b>, <b>ASYNC_unblock_pause()</b> et
+    <b>ASYNC_is_capable() ont </b>été ajoutés pour la première fois dans OpenSSL 1.1.0.
+    <b>ASYNC_set_mem_functions()</b>, <b>ASYNC_get_mem_fu</b>nctions() ont ét</p>é
+    ajoutés d</section>ans OpenSSL 3.2.
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT'><a class='permalink' href='#COPYRIGHT'>DROITS   </a></h1>D'AUTEUR
+<p class="Pp">Copyright 2015-2024 The OpenSSL Project Authors. Tous droits
+    </p>réservés.
+<p class="Pp">Sous licence Apache License 2.0 (la « License »).
+    Vous ne pouvez pas utiliser ce fichier sauf en conformité avec la Licence. Vous pouvez
+    obtenir une copie du fichier LICENSE dans la distribution source ou à l'adresse
+    <a href='https://www.openssl.org/source/license.html'>https://w</a>ww.openss</p>l.org/so</section>urce/lice</div>nse.html.
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-10</td>-01
+    <td class="foot-os">3</td>.</tr></table>6</section>.</article>0
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le </p>paquet :
+    <dl>
+        <dt>Nom du </dt>paquet :
+        <dd><a href="https://www.archlinux.org/packages/core/x86_64/openssl/">core/op</a></dd>enssl
+        <dt>Version </dt>:
+        <dd>3.</dd>6.0-1
+        <dt>Amont </dt>:
+        <dd><a href="https://www.openssl.org">https://www.openssl.</a></dd>org
+        <dt>Licences </dt>:
+        <dd>Apache-2.</dd>0
+        <dt>Manuels </dt>:
+        <dd><a href="/listing/core/openssl/">/listing/core/op</a></dd>enss</dl>l</section>/
+
+<details>
+    <summary>Table des </summary>matières
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">N</a></li>OM
+        
+            <li><a href="#SYNOPSIS">SY</a></li>NOPSIS
+        
+            <li><a href="#DESCRIPTION">DESC</a></li>RIPTION
+        
+            <li><a href="#RETURN_VALUES">VALEURS </a></li>DE RETOUR
+        
+            <li><a href="#NOTES">N</a></li>OTES
+        
+            <li><a href="#EXAMPLES">EX</a></li>EMPLES
+        
+            <li><a href="#SEE_ALSO">VOIR </a></li>AUSSI
+        
+            <li><a href="#HISTORY">HI</a></li>STORIQUE
+        
+            <li><a href="#COPYRIGHT">DRO</a></li>ITS</ul> D'</nav>AUT</details>EUR
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/ASYNC_start_job.3ssl.en.txt">t</a>xt, 
+        
+            <a href="/man/ASYNC_start_job.3ssl.en.raw">b</a></p>r</nav>u</aside></main>t
+        <footer>
+            de manuel.
+            <p>Le site web est disponible selon les termes de la <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0
+               licen</a>ce, à l'exception du contenu </p>des pages de manuel, qui ont </footer>leur propre licence
+        </body>       spécifiée dans le paq</html>uet Arch Linux correspondant.

@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>POE::Roue::ReadWrite(3) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">POE__Wheel__ReadWrite(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-poe/">perl-poe</a></p>
+<p class="lic">Licences: GPL, PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">POE::Roue::ReadWrite(3)</td>
+    <td class="head-vol">Documentation contribuée par Perl</td>
+    <td class="head-rtitle">POE::Roue::ReadWrite(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NAME</a></h1>
+<p class="Pp">POE::Roue::ReadWrite - module de lecture/écriture non bloquant pour POE::Session</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>#!perl
+use warnings;
+use strict;
+use IO::Socket::INET;
+use POE qw(Wheel::ReadWrite);
+POE::Session-&gt;create(
+  inline_states =&gt; {
+    _start =&gt; sub {
+      # Note : IO::Socket::INET bloquera. POE::Wheel::SocketFactory ou POE::Component::Client::TCP sont recommandés si le blocage est indésirable.
+      $_[HEAP]{client} = POE::Wheel::ReadWrite-&gt;new(
+        Handle =&gt; IO::Socket::INET-&gt;new(
+          PeerHost =&gt; 'www.yahoo.com',
+          PeerPort =&gt; 80,
+        ),
+        InputEvent =&gt; 'on_remote_data',
+        ErrorEvent =&gt; 'on_remote_error',
+      );
+      print "Connecté. Envoi de la requête...\n";
+      $_[HEAP]{client}-&gt;put(
+        "GET / HTTP/0.9",
+        "Host: www.yahoo.com",
+        "",
+      );
+    },
+    on_remote_data =&gt; sub {
+      print "Reçu : $_[ARG0]\n";
+    },
+    on_remote_error =&gt; sub {
+      print "La connexion a échoué ou a été terminée. Fermeture...\n";
+      delete $_[HEAP]{client};
+    },
+  },
+);
+POE::Kernel-&gt;run();
+exit;</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">POE::Roue::ReadWrite encapsule un modèle de conception commun : la gestion des E/S bufferisées et événementielles non bloquantes.</p>
+<p class="Pp">Le modèle se déroule comme suit :</p>
+<p class="Pp">Étant donné un descripteur de fichier, il observe les données entrantes. Lorsqu'il est notifié de données entrantes, il lit, bufferise et analyse selon un protocole de bas niveau (comme ligne par ligne). Il déclenche des événements de plus haut niveau « voici les lignes », un pour chaque ligne traitée.</p>
+<p class="Pp">Dans l'autre sens, il accepte des blocs de données entiers (comme des lignes) pour la sortie. Il les re-formate selon un protocole de bas niveau (comme l'ajout de retours à la ligne), et bufferise les données pour la sortie. Il vide le tampon lorsque le descripteur est prêt pour la transmission.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_PUBLIQUES'><a class='permalink' href='#MÉTHODES_PUBLIQUES'>MÉTHODES PUBLIQUES</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='Constructeur'><a class='permalink' href='#Constructeur'>Constructeur</a></h2>
+<p class="Pp">Les sous-classes de POE::Wheel effectuent généralement une grande quantité de configuration pour les rendre plus légères et plus rapides. Le constructeur de POE::Roue::ReadWrite ne fait pas exception.</p>
+<p class="Pp"><i>new</i></p>
+<p class="Pp"><b>new()</b> crée et retourne un nouvel objet POE::Roue::ReadWrite. Dans la plupart des cas, la roue continuera à lire/écrire sur un ou plusieurs descripteurs jusqu'à ce qu'elle soit détruite.</p>
+<p class="Pp">Handle</p>
+<p class="Pp">Handle spécifie le descripteur de fichier que l'objet POE::Roue::ReadWrite lira et écrira. L'exemple SYNOPSIS inclut une utilisation de Handle.</p>
+<p class="Pp">Un objet POE::Roue::ReadWrite peut lire depuis et écrire sur différents descripteurs. Voir « InputHandle » pour plus d'informations et un exemple.</p>
+<p class="Pp">InputHandle</p>
+<p class="Pp">InputHandle et OutputHandle peuvent être utilisés pour spécifier différents descripteurs pour l'entrée et la sortie. Par exemple, l'entrée peut provenir de STDIN et la sortie peut aller à STDOUT :</p>
+<pre>$_[HEAP]{console} = POE::Wheel::ReadWrite-&gt;new(
+  InputHandle =&gt; \*STDIN,
+  OutputHandle =&gt; \*STDOUT,
+  InputEvent =&gt; "console_input",
+);</pre>
+<p class="Pp">InputHandle et OutputHandle ne peuvent pas être utilisés avec Handle.</p>
+<p class="Pp">OutputHandle</p>
+<p class="Pp">InputHandle et OutputHandle peuvent être utilisés pour spécifier différents descripteurs pour l'entrée et la sortie. Voir « InputHandle » pour plus d'informations et un exemple.</p>
+<p class="Pp">Driver</p>
+<p class="Pp">Driver spécifie comment POE::Roue::ReadWrite lira et écrira sur son/ses descripteur(s). Driver doit être un objet qui hérite de POE::Driver.</p>
+<p class="Pp">POE::Driver::SysRW, qui implémente <b>sysread()</b> et <b>syswrite()</b>, est la valeur par défaut. Il est utilisé dans presque tous les cas, il n'est donc pas nécessaire de le spécifier.</p>
+<p class="Pp">Filter</p>
+<p class="Pp">Filter est l'analyseur que POE::Roue::ReadWrite utilisera pour reconnaître les données entrantes et le sérialiseur qu'il utilise pour préparer les données à écrire. Par défaut, il s'agit d'une nouvelle instance de POE::Filter::Line, car de nombreux protocoles réseau sont basés sur des lignes.</p>
+<p class="Pp">InputFilter</p>
+<p class="Pp">InputFilter et OutputFilter peuvent être utilisés pour spécifier différents filtres pour l'entrée et la sortie.</p>
+<p class="Pp">OutputFilter</p>
+<p class="Pp">InputFilter et OutputFilter peuvent être utilisés pour spécifier différents filtres pour l'entrée et la sortie. Voir « InputFilter » pour plus d'informations et un exemple.</p>
+<p class="Pp">InputEvent</p>
+<p class="Pp">InputEvent spécifie le nom de l'événement qui sera envoyé pour chaque unité d'entrée complète (telle qu'analysée par InputFilter ou Filter).</p>
+<p class="Pp">Chaque événement d'entrée inclut deux paramètres :</p>
+<p class="Pp">"ARG0" contient l'unité d'entrée analysée, et "ARG1" contient l'identifiant unique de l'objet POE::Roue::ReadWrite qui a généré l'événement.</p>
+<p class="Pp">InputEvent est facultatif. S'il est omis, l'objet POE::Roue::ReadWrite n'observera pas son Handle ou InputHandle pour l'entrée, et aucun événement d'entrée ne sera généré.</p>
+<p class="Pp">Un exemple de gestionnaire d'InputEvent :</p>
+<pre>sub handle_input {
+  my ($heap, $input, $wheel_id) = @_[HEAP, ARG0, ARG1];
+  print "Écho de l'entrée du wheel $wheel_id : $input\n";
+  $heap-&gt;{wheel}-&gt;put($input); # Remettre... l'entrée... !
+}</pre>
+<p class="Pp">FlushedEvent</p>
+<p class="Pp">FlushedEvent spécifie l'événement qui sera déclenché par un objet POE::Roue::ReadWrite lorsque son tampon de sortie passe d'un état contenant des données à un état vide.</p>
+<p class="Pp">FlushedEvent est livré avec un seul paramètre : "ARG0" contient l'identifiant unique de l'objet POE::Roue::ReadWrite qui a généré l'événement. Ceci peut être utilisé pour associer l'événement à un wheel particulier.</p>
+<p class="Pp">Les événements "Flushed" sont courants pour fermer les E/S après qu'un message d'« au revoir » a été envoyé. Par exemple, le <b>input_handler()</b> suivant répond à "quit" en demandant au wheel de dire "Goodbye." puis de déclencher un événement "shutdown" lorsque cela a été envoyé à la connexion.</p>
+<pre>sub handle_input {
+  my ($input, $wheel_id) = @_[ARG0, ARG1];
+  my $wheel = $_[HEAP]{wheel}{$wheel_id};
+  if ($input eq "quit") {
+    $wheel-&gt;event( FlushedEvent =&gt; "shutdown" );
+    $wheel-&gt;put("Goodbye.");
+  }
+  else {
+    $wheel-&gt;put("Echo: $input");
+  }
+}</pre>
+<p class="Pp">Voici le gestionnaire de fermeture. Il détruit simplement le wheel pour terminer la connexion :</p>
+<pre>sub handle_flushed {
+  my $wheel_id = $_[ARG0];
+  delete $_[HEAP]{wheel}{$wheel_id};
+}</pre>
+<p class="Pp">ErrorEvent</p>
+<p class="Pp">ErrorEvent nomme l'événement qu'un objet POE::Roue::ReadWrite déclenchera lorsqu'une erreur se produit. Chaque ErrorEvent inclut quatre paramètres :</p>
+<p class="Pp">"ARG0" décrit ce qui a échoué, soit "read" ou "write". Il ne nomme pas une fonction spécifique car POE::Roue::ReadWrite délègue la lecture et l'écriture à un objet POE::Driver.</p>
+<p class="Pp">"ARG1" et "ARG2" contiennent les valeurs numériques et textuelles de $! au moment de l'échec. Le code de l'application ne peut pas tester $! directement car sa valeur peut avoir changé entre le moment de l'échec et le moment où l'événement d'erreur est déclenché.</p>
+<p class="Pp">"ARG3" contient l'identifiant unique du wheel. L'identifiant du wheel est utilisé pour différencier plusieurs wheels gérés par une seule session.</p>
+<p class="Pp">ErrorEvent peut également indiquer une fin de fichier d'entrée en renvoyant l'opération "read" avec une erreur de 0. Pour les sockets, cela signifie que le côté distant a fermé la connexion.</p>
+<p class="Pp">Un exemple de gestionnaire d'ErrorEvent :</p>
+<pre>sub error_state {
+  my ($operation, $errnum, $errstr, $id) = @_[ARG0..ARG3];
+  if ($operation eq "read" and $errnum == 0) {
+    print "EOF depuis le wheel $id\n";
+  }
+  else {
+    warn "Le wheel $id a eu une erreur $operation $errnum : $errstr\n";
+  }
+  delete $_[HEAP]{wheels}{$id}; # ferme ce wheel
+}</pre>
+<p class="Pp">HighEvent</p>
+<p class="Pp">HighEvent et LowEvent sont utilisés conjointement avec HighMark et LowMark pour contrôler le débit de données sortantes en mode streaming.</p>
+<p class="Pp">Un HighEvent est déclenché lorsqu'un tampon de sortie d'un objet POE::Roue::ReadWrite dépasse une taille donnée (le "niveau maximum" ou HighMark). Cela signale à une application d'arrêter d'envoyer des données. POE et Perl ne se soucient pas vraiment si l'application continue, mais le processus risque de manquer de mémoire si le tampon grossit sans limite.</p>
+<p class="Pp">Un objet POE::Roue::ReadWrite continuera à remplir son tampon même après qu'une application ait cessé d'envoyer des données, jusqu'à ce que le tampon soit vide. Certaines applications de streaming pourraient nécessiter que le tampon soit toujours rempli de données. Par exemple, un serveur multimédia rencontrerait un problème.</p>
+</section>
+</article>
+</main>
+</body>
+</html>
+<section class="Ss">
+<h2 class="Ss" id='put_RECORDS'><a class='permalink' href='#put_RECORDS'>put   RECORDS</a></h2>
+<p class="Pp"><b>put()</b> accepte une liste de RECORDS, qui seront sérialisés par le filtre de la roue et stockés et écrits par son driver.</p>
+<p class="Pp"><b>put()</b> retourne true si un HighMark a été défini et que le buffer de sortie du driver a atteint ou dépassé la limite. False est retourné si le HighMark n'a pas été défini, ou si le buffer du driver est inférieur à cette limite.</p>
+<p class="Pp"><b>put()</b> retourne sa valeur à titre indicatif ; une application peut continuer à stocker des données après le HighMark, mais cela peut entraîner le dépassement des limites de mémoire du processus. N'utilisez pas la syntaxe <span class="Li">&quot;&lt;1 while not $wheel-&quot;</span><b>put()</b>&lt;&lt;&quot; si le HighMark n'a pas été défini : l'application échouera de manière spectaculaire !</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='event_EVENT_TYPE_=&amp;gt;_EVENT_NAME,_...'><a class='permalink' href='#event_EVENT_TYPE_=&amp;gt;_EVENT_NAME,_...'>event   EVENT_TYPE =&gt; EVENT_NAME, ...</a></h2>
+<p class="Pp"><b>event()</b> permet à une application de modifier les événements émis par un objet POE::Wheel::ReadWrite. Tous les paramètres du constructeur qui se terminent par "Event" peuvent être modifiés à l'exécution : "InputEvent", "FlushedEvent", "ErrorEvent", "HighEvent", et "LowEvent".</p>
+<p class="Pp">Définir un événement à undef désactive le code à l'intérieur de la roue qui génère l'événement. Par exemple, désactiver InputEvent arrêtera également la lecture à partir du filehandle. "pause_input" et "resume_input" peuvent être une méthode plus appropriée pour gérer les événements d'entrée, bien que moins explicite.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='set_filter_POE_FILTER'><a class='permalink' href='#set_filter_POE_FILTER'>set_filter   POE_FILTER</a></h2>
+<p class="Pp"><b>set_filter()</b> modifie la façon dont un objet POE::Wheel::ReadWrite analyse l'entrée et sérialise la sortie. Toutes les données en attente qui n'ont pas encore été envoyées à l'application seront analysées avec le nouveau POE_FILTER. Les données qui ont été mises en put() mais pas encore en flush() ne seront pas resérialisées.</p>
+<p class="Pp"><b>set_filter()</b> effectue la même action que l'appel à <b>set_input_filter()</b> et <b>set_output_filter()</b> avec le même POE::Filter.</p>
+<p class="Pp">La modification des filtres peut être délicate. Veuillez consulter la discussion sur <b>get_pending()</b> dans POE::Filter. Certains filtres peuvent ne pas pouvoir être chargés ou désactivés dynamiquement.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='set_input_filter_POE_FILTER'><a class='permalink' href='#set_input_filter_POE_FILTER'>set_input_filter   POE_FILTER</a></h2>
+<p class="Pp"><b>set_input_filter()</b> modifie le filtre d'entrée d'un objet POE::Wheel::ReadWrite tout en laissant le filtre de sortie inchangé. Cela modifie la façon dont les données d'entrée sont analysées sans affecter la façon dont elles sont sérialisées pour la sortie.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='set_output_filter_POE_FILTER'><a class='permalink' href='#set_output_filter_POE_FILTER'>set_output_filter   POE_FILTER</a></h2>
+<p class="Pp"><b>set_output_filter()</b> modifie la façon dont la sortie d'un objet POE::Wheel::ReadWrite est sérialisée, mais n'affecte pas la façon dont les données sont analysées.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='get_input_filter'><a class='permalink' href='#get_input_filter'>get_input_filter</a></h2>
+<p class="Pp"><b>get_input_filter()</b> retourne l'objet POE::Filter actuellement utilisé par un objet POE::Wheel::ReadWrite pour analyser les données d'entrée. L'objet retourné peut être inspecté ou modifié via ses propres méthodes.</p>
+<p class="Pp">Il n'y a pas de méthode <b>get_filter()</b> car il n'y a pas de valeur de retour sensée lorsque les filtres d'entrée et de sortie sont différents.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='get_output_filter'><a class='permalink' href='#get_output_filter'>get_output_filter</a></h2>
+<p class="Pp"><b>get_output_filter()</b> retourne l'objet POE::Filter actuellement utilisé par un objet POE::Wheel::ReadWrite pour sérialiser les données de sortie. L'objet retourné peut être inspecté ou modifié via ses propres méthodes.</p>
+<p class="Pp">Il n'y a pas de méthode <b>get_filter()</b> car il n'y a pas de valeur de retour sensée lorsque les filtres d'entrée et de sortie sont différents.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='set_high_mark_HIGH_MARK_OCTETS'><a class='permalink' href='#set_high_mark_HIGH_MARK_OCTETS'>set_high_mark   HIGH_MARK_OCTETS</a></h2>
+<p class="Pp">Définit le seuil haut --- le nombre d'octets qui désigne un "buffer suffisamment plein". Un objet POE::Wheel::ReadWrite émettra un HighEvent lorsque son buffer de sortie se développera pour atteindre ce point. Tous les appels à <b>put()</b> retourneront true lorsque le buffer de sortie sera égal ou supérieur à HIGH_MARK_OCTETS.</p>
+<p class="Pp">Les deux, HighEvent et <b>put()</b>, indiquent qu'il est dangereux de continuer à écrire lorsque le buffer de sortie atteint au moins HIGH_MARK_OCTETS.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='set_low_mark_LOW_MARK_OCTETS'><a class='permalink' href='#set_low_mark_LOW_MARK_OCTETS'>set_low_mark   LOW_MARK_OCTETS</a></h2>
+<p class="Pp">Définit le seuil bas --- le nombre d'octets qui désigne un "buffer suffisamment vide". Cet événement permet à une application de savoir qu'il est sûr de recommencer à écrire.</p>
+<p class="Pp">Les objets POE::Wheel::ReadWrite émettront un LowEvent lorsque leur buffer de sortie se contractera à LOW_MARK_OCTETS après avoir atteint HIGH_MARK_OCTETS.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='ID'><a class='permalink' href='#ID'>ID</a></h2>
+<p class="Pp"><b>ID()</b> retourne l'identifiant unique d'un objet POE::Wheel::ReadWrite. <b>ID()</b> est généralement appelé après la création de l'objet, afin que l'objet puisse être stocké par son ID. Les événements générés par l'objet POE::Wheel::ReadWrite incluront l'ID de l'objet, permettant ainsi de les associer à leurs sources.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='pause_input'><a class='permalink' href='#pause_input'>pause_input</a></h2>
+<p class="Pp"><b>pause_input()</b> demande à un objet POE::Wheel::ReadWrite d'arrêter de surveiller les entrées et donc d'arrêter les événements InputEvent. C'est plus efficace que de détruire l'objet directement, surtout si l'application a l'intention d'utiliser <b>resume_input()</b> plus tard.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='resume_input'><a class='permalink' href='#resume_input'>resume_input</a></h2>
+<p class="Pp"><b>resume_input()</b> réactive la surveillance des entrées d'un objet POE::Wheel::ReadWrite. Elle est utilisée pour reprendre la surveillance des entrées et donc reprendre les événements InputEvent. <b>pause_input()</b> et <b>resume_input()</b> implémentent une sorte de contrôle de flux d'entrée, piloté par l'application elle-même.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='get_input_handle'><a class='permalink' href='#get_input_handle'>get_input_handle</a></h2>
+<p class="Pp"><b>get_input_handle()</b> retourne le filehandle surveillé pour les entrées.</p>
+<p class="Pp">La manipulation de filehandles gérés par POE peut causer des effets secondaires indésirables, qui peuvent varier d'une version de POE à l'autre. Veuillez faire preuve de prudence.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='get_output_handle'><a class='permalink' href='#get_output_handle'>get_output_handle</a></h2>
+<p class="Pp"><b>get_output_handle()</b> retourne le filehandle surveillé pour les sorties.</p>
+<p class="Pp">La manipulation de filehandles gérés par POE peut causer des effets secondaires indésirables, qui peuvent varier d'une version de POE à l'autre. Veuillez faire preuve de prudence.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='shutdown_input'><a class='permalink' href='#shutdown_input'>shutdown_input</a></h2>
+<p class="Pp">Appelle shutdown($fh,0) sur le filehandle d'entrée d'un objet POE::Wheel::ReadWrite. Cela ne fonctionne que pour les sockets ; rien ne sera fait pour les autres types de filehandles.</p>
+<p class="Pp">Parfois, l'objet POE::Wheel::ReadWrite cessera de surveiller son filehandle d'entrée pour de nouvelles données. Cela se produit quel que soit le type de filehandle.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='shutdown_output'><a class='permalink' href='#shutdown_output'>shutdown_output</a></h2>
+<p class="Pp">Appelle shutdown($fh,1) sur le filehandle de sortie d'un objet POE::Wheel::ReadWrite. Cela ne fonctionne que pour les sockets ; rien ne sera fait pour les autres types de filehandles.</p>
+<p class="Pp">Parfois, l'objet POE::Wheel::ReadWrite cessera de surveiller son filehandle de sortie pour de nouvelles données. Cela se produit quel que soit le type de filehandle.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='get_driver_out_octets'><a class='permalink' href='#get_driver_out_octets'>get_driver_out_octets</a></h2>
+<p class="Pp">Les objets POE::Driver contiennent des buffers de sortie qui sont vidés de manière asynchrone. <b>get_driver_out_octets()</b> retourne le nombre d'octets restants dans le buffer de sortie du driver de la roue.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='get_driver_out_messages'><a class='permalink' href='#get_driver_out_messages'>get_driver_out_messages</a></h2>
+<p class="Pp">Les buffers de sortie des objets POE::Driver peuvent être basés sur des messages. Chaque appel à <b>put()</b> peut être stocké individuellement. <b>get_driver_out_messages()</b> retournera le nombre de messages <b>put()</b> en attente qui n'ont pas encore été envoyés.</p>
+<p class="Pp">Les drivers basés sur des messages retourneront 1 s'il y a des données en attente d'envoi. C'est parce qu'ils fonctionnent avec un message potentiellement volumineux.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='flush'><a class='permalink' href='#flush'>flush</a></h2>
+<p class="Pp"><b>flush()</b> tente de vider manuellement le buffer de sortie d'une roue de manière synchrone. Ceci peut être utilisé pour vider de petits messages. Cependant, un vidage complet n'est pas garanti ; pour ce faire, on pourrait utiliser une boucle de <b>flush()</b> :</p>
+<pre>$wheel-&gt;flush() while $wheel-&gt;get_driver_out_octets();</pre>
+<p class="Pp">Cependant, il serait prudent de vérifier également les erreurs. Un <b>flush()</b> échoué peut être permanent, et une boucle infinie serait probablement inappropriée.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">POE::Wheel décrit l'utilisation générale des roues.</p>
+<p class="Pp">La section "SEE ALSO" dans POE contient un index qui couvre toute la distribution de POE.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BUGS'><a class='permalink' href='#BUGS'>BOGUES</a></h1>
+<p class="Pp">Aucun problème connu.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHORS_&amp;amp;_COPYRIGHTS'><a class='permalink' href='#AUTHORS_&amp;amp;_COPYRIGHTS'>AUTEURS ET COPYRIGHTS</a></h1>
+<p class="Pp">Veuillez consulter POE pour plus d'informations sur les auteurs et les contributeurs.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2024-07-13</td>
+    <td class="foot-os">perl v5.38.2</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher une page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Aller" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-poe/">extra/perl-poe</a></dd>
+        <dt>version :</dt>
+        <dd>1.370-2</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://search.cpan.org/dist/POE">https://search.cpan.org/dist/POE</a></dd>
+        <dt>Licences :</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-poe/">/listing/extra/perl-poe/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#PUBLIC_METHODS">MÉTHODES PUBLIQUES</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+            <li><a href="#BUGS">BOGUES</a></li>
+        
+            <li><a href="#AUTHORS_&amp;amp;_COPYRIGHTS">AUTEURS ET COPYRIGHTS</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Formats alternatifs :
+        
+            <a href="/man/POE::Wheel::ReadWrite.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/POE::Wheel::ReadWrite.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les conditions de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>, à l'exception du contenu des pages de manuel, qui ont leur propre licence spécifiée dans le paquet Arch Linux correspondant.</p>
+        </footer>
+    </body>
+</html>

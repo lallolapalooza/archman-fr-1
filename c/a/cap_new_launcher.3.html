@@ -1,0 +1,193 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>cap_new_launcher(3) — Pages manuelles </title>d'Arch
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">cap_new_launcher(3)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/core/x86_64/libcap/">libcap</a></p>
+
+        nt
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">CAP_LAUNC</td>H(3)
+    <td class="head-vol">Manuel du programmeur </td>Linux
+    <td class="head-rtitle">CAP</td>_LA</tr>UNCH</table>(3)
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NO</a></h1>M
+<p class="Pp">cap_new_launcher, cap_func_launcher, cap_launcher_callback,
+    cap_launcher_se</p>t_mode, cap_launcher_set_iab, cap_launcher_set_chroot,
+    cap_launch, cap_laun</section>cher_setuid, cap_launcher_setgroups - fonctionnalité
+    de lancement de libcap
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSYS'><a class='permalink' href='#SYNOPSYS'>SYNOPSI</a></h1>S
+<pre>#include &lt;sys/capability.h&gt;
+cap_launch_t cap_new_launcher(const char *arg0, const char *const *argv,
+    const char *const *envp);
+cap_launch_t cap_func_launcher(int (callback_fn)(void *detail));
+int cap_launcher_callback(cap_launch_t attr,
+    int (callback_fn)(void *detail));
+int cap_launcher_set_mode(cap_launch_t attr, cap_mode_t flavor);
+cap_iab_t cap_launcher_set_iab(cap_launch_t attr, cap_iab_t iab);
+int cap_launcher_set_chroot(cap_launch_t attr, const char *chroot);
+#include &lt;sys/types.h&gt;
+pid_t cap_launch(cap_launch_t attr, void *detail);
+int cap_launcher_setuid(cap_launch_t attr, uid_t uid);
+int cap_launcher_setgroups(cap_launch_t attr, gid_t gid,
+    int ngroups, const gid_t *groups)</pre>;
+<p class="Pp">Lier avec <i>-l</i>c</p>a</section>p.
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTIO</a></h1>N
+<p class="Pp">Un lanceur fournit un mécanisme permettant à du code d'exécuter une
+    fonction de rappel et/ou un exécutable de programme dans un environnement
+    avec un contexte de sécurité modifié. Essentiellement, il fournit un
+    mécanisme permettant à un programme de
+    <a href='/man/fork.2.en'>fork(2) </a>un nouveau contexte à partir de celui du programme principal, de manipuler les capacités et d'autres états privilégiés dans ce <a href='/man/fork.2.en'>processus </a>fork(2) avant
+    (éventuellement) <a href='/man/execve.2.en'>execve(2)</a> un nouveau programme. Lorsque l'application est liée à <i>-lpsx,</i> ce support est nécessaire pour exécuter de manière robuste le code lancé sans modifier le privilège de l'ensemble de l'application principale (respectant la sémantique POSIX)</p>.
+<p class="Pp">Un lanceur est défini par l'une de ces deux fonctions :
+    <b>cap_new_launcher()</b> ou <b>cap_func_launcher()</b>. La valeur de retour étant de type opaque <b>cap_launch_t,</b> une valeur de retour NULL implique qu'une erreur s'est </p>produite.
+<p class="Pp">Une fois défini, une <b>valeur </b>cap_launch_t peut être utilisée avec
+    <b>cap_launch()</b> pour exécuter ce <i>lanceur. </i>Dans de tels cas, une valeur de retour non négative indique la réussite : zéro signifiant le succès sans qu'un programme ait été invoqué ; non nulle étant égale à l'identifiant de processus (<b>pid_t)</b>
+    du programme nouvellement </p>lancé.
+<p class="Pp">Un <b>cap_launch_t </b>occupe de la mémoire allouée et doit être libéré avec <a href='/man/cap_free.3.en'>cap_free(3)</a>. Avant d'être <a href='/man/cap_free.3.en'>libéré par </a>cap_free(3), une
+    <b>valeur </b>cap_value_t peut être réutilisée pour plusieurs lancements indépendants. Le <i>argument </i>detail de <b>cap_launch()</b>, en conjonction avec la fonction de rappel du
+    lanceur, peut être utilisé pour personnaliser l'invocation du
+    lancement. Il faut faire attention à utiliser de la mémoire partagée personnalisée (voir
+    <a href='/man/mmap.2.en'>mmap(2)</a>) ou un autre IPC pour renvoyer des valeurs au programme principal via
+    <i>detail,</i> car le rappel et toute exécution ultérieure de programme se produiront en dehors du processus principal de l'application appelante. Un exemple serait d'allouer detail comme suit </p>:
+<pre>   const char *args[] = { "echo", "hello", NULL };
+   cap_launch_t cmd = cap_new_launcher("/usr/bin/echo", args, NULL);
+   int *detail = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE,
+                      MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+   cap_launcher_callback(cmd, &amp;answer_detail_fn);
+   *detail = 41;
+   pid_t pid = cap_launch(cmd, detail);
+   printf("launcher callback set detail to %d\n", *detail);
+   munmap(detail, sizeof(int))</pre>;
+<p class="Pp">Sauf si modifié par la fonction de rappel, le code lancé s'exécutera avec les capacités et le contexte de sécurité de </p>l'application.
+<p class="Pp">Si la fonction de rappel renvoie autre chose que zéro, un
+    <b>cap_launch()</b> sera interrompu. Si le détail de l'échec est important pour l'appelant, il doit être communiqué via l' <i>argum</i>ent de</p>tail.
+<p class="Pp">Les fonctions suivantes peuvent être utilisées pour indiquer au lanceur de modifier l'état de sécurité du programme invoqué sans altérer l'état du programme appelant. De telles modifications doivent être effectuées avant d'appeler <b>cap_launch()</b> si elles doivent avoir l'effet désiré. De plus, elles ne sont invoquées qu'après la fin de tout rappel installé. Par exemple, on peut abandonner ou modifier des capacités, <i>uniquement </i>pour l'exécution d'un
+    </p>fichier.
+<p class="Pp">Les fonctions suivantes indiquent au lanceur d'effectuer certaines tâches courantes de ce type (notez que certaines nécessitent des bits de capacité permise pour réussir) </p>:
+<p class="Pp"><b>cap_launcher_callback()</b> peut être utilisé pour installer ou remplacer la fonction de rappel actuellement installée du </p>lanceur.
+<p class="Pp"><b>cap_launcher_set_mode()</b> peut être utilisé pour s'assurer que le mode libcap du programme lancé est celui </p>souhaité.
+<p class="Pp"><b>cap_launcher_set_iab()</b> Cette fonction renvoie le
+    <b>cap_iab_t </b>précédemment associé au lanceur. Appeler cette fonction avec une valeur IAB de NULL configurera le lanceur pour ne pas définir de valeur IAB (le comportement par défaut). Voir <a href='/man/cap_iab.3.en'>cap_iab(3)</a> pour des détails sur l'ensemble IAB. Notez que le lanceur est directement associé à la valeur <i>iab
+</i>    fournie et n'en fait pas de copie. Cette valeur iab est verrouillée pour le
+    lanceur et ne peut pas être modifiée tant qu'elle est associée au lanceur. Définissez-la avec
+    NULL pour reprendre le contrôle de la mémoire associée à cette valeur IAB, sinon la valeur IAB sera <b>libérée par cap_free</b><i>()</i><b>lorsque </b>le
+    <b>lanceur le </b></p>sera.
+<p class="Pp"><b>cap_launcher_set_chroot() Cette </b>fonction fait en sorte que l'exécutable du programme lancé soit invoqué à l'intérieur d'un répertoire racine chroot <i></i>.</p>
+<p class="Pp"><b>cap_launcher_setuid()</b> Cette fonction fait en sorte que l'exécutable du programme lancé soit invoqué avec l'identifiant utilisateur spécifié (<i>ui</i>d_t</p>).
+<p class="Pp"><b>cap_launcher_setgroups()</b> Cette fonction fait en sorte que l'exécutable du programme lancé soit invoqué avec les identifiants de groupe primaire et supplémentaires </p>spécifiés.
+<p class="Pp">Notez que si l'une des améliorations du lanceur effectuées par les f</p>onctions ci-dessus devait échouer à prendre effet (généralement par m</section>anque de privilège suffisant), le lancement échouera et renverra -1.
+<section class="Sh">
+<h1 class="Sh" id='ERRORS'><a class='permalink' href='#ERRORS'>ERREUR</a></h1>S
+<p class="Pp">Un retour de NULL pour un <b>cap_launch_t </b>doit être considéré comme une
+    </p>erreur.
+<p class="Pp"><b>cap_launch()</b> renvoie -1 en cas </p>d'erreur.
+<p class="Pp">Dans tous ces cas, une valeur de retour de 0 implique le succès. Dans les autres cas, consultez <a href='/man/errno.3.en'>errno(3)</a> pour p</p>lus de </section>détails.
+<section class="Sh">
+<h1 class="Sh" id='HISTORY'><a class='permalink' href='#HISTORY'>HISTORIQU</a></h1>E
+<p class="Pp">La <b>famille de </b>fonctions cap_launch() a été introduite dans
+    libcap 2.33. Elle traite principalement d'une complexité avec les
+    applications pthreads(7) liées à <i>-lpsx </i>qui utilisent des capacités mais respectent aussi la sémantique </p>POSIX.
+<p class="Pp">L'utilisation de <i>-lcap </i>et <i>-lpthread </i>ensemble sans le support de la sémantique POSIX de <i>-lpsx </i>introduit une classe subtile d'exposition à
+    l'élévation de privilèges. (Voir
+    <a href='https://sites.google.com/site/fullycapable/who-ordered-libpsx'>https://sites.google.</a>com/site/fullycapable</p>/who-ordered-libpsx p</section>our une explication.)
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR </a></h1>AUSSI
+<p class="Pp"><a href='/man/libpsx.3.en'>libpsx(3)</a>, <a href='/man/psx_syscall.3.en'>psx_syscall(3)</a>, <a href='/man/libcap.3.en'>libcap(3)</a>,
+    <a href='/man/cap_mode.3.en'>cap_mode(3)</a>, <a href='/man/cap_iab.3.en'>cap_iab(3)</a>, <a href='/man/capabilities.7.en'>capabilities(7)</a>,
+    <a href='/man/errno.3.en'>errno(3)</a>, <a href='/man/fork.2.en'>fork(2)</a>, <a href='/man/mmap.2.en'>mmap(2)</a>, <a href='/man/chroot.2.en'>chroot(2)</a> et
+    <a href='/man/munmap.2.en'>mu</a>nm</p>ap</section>(2</div>).
+<table class="foot">
+  <tr>
+    <td class="foot-date">2021-08</td>-01
+    <td class="foot-os"></td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le </p>paquet :
+    <dl>
+        <dt>Nom du </dt>paquet :
+        <dd><a href="https://www.archlinux.org/packages/core/x86_64/libcap/">core/l</a></dd>ibcap
+        <dt>Version </dt>:
+        <dd>2.</dd>77-1
+        <dt>Amont </dt>:
+        <dd><a href="https://sites.google.com/site/fullycapable/">https://sites.google.com/site/fullyc</a></dd>apable/
+        <dt>Licences </dt>:
+        <dd>BSD-3-Clause OR GPL-2.</dd>0-only
+        <dt>Manuels </dt>:
+        <dd><a href="/listing/core/libcap/">/listing/core/l</a></dd>ibca</dl>p</section>/
+
+<details>
+    <summary>Table des </summary>matières
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">N</a></li>OM
+        
+            <li><a href="#SYNOPSYS">SY</a></li>NOPSIS
+        
+            <li><a href="#DESCRIPTION"&gt;</a></li>DESCRIPTION
+        
+            <li><a href="#ERRORS">ER</a></li>REURS
+        
+            <li><a href="#HISTORY">HI</a></li>STORIQUE
+        
+            <li><a href="#SEE_ALSO">VO</a></li>IR</ul> A</nav>US</details>SI
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/cap_new_launcher.3.en.txt">t</a>xt, 
+        
+            <a href="/man/cap_new_launcher.3.en.raw"></a>r</p>a</nav></aside></main>w
+        <footer>
+            de manuel.
+            <p>Le site est disponible selon les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0
+               , à l</a>'exception du contenu des p</p>ages de manuel, qui possède </footer>sa propre licence
+          </body>     spécifiée dans le paqu</html>et Arch Linux correspondant.

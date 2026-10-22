@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Filter::Simple(3perl) — Pages du manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Filter__Simple.3perl</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/core/x86_64/perl/">perl</a></p>
+<p class="lic">Licences: Artistic-1.0-Perl OR GPL-1.0-or-later</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Filter::Simple(3perl)</td>
+    <td class="head-vol">Guide du programmeur Perl</td>
+    <td class="head-rtitle">Filter::Simple(3perl)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">Filter::Simple - Filtrage de source simplifié</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNTAXE</a></h1>
+<pre># dans MyFilter.pm :
+    package MyFilter;
+    use Filter::Simple;
+    FILTER { ... };
+    # ou simplement :
+    #
+    # use Filter::Simple sub { ... };
+# dans le code de l'utilisateur :
+    use MyFilter;
+    # ce code est filtré
+    no MyFilter;
+    # ce code ne l'est pas</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='Le_problème'><a class='permalink' href='#Le_problème'>Le problème</a></h2>
+<p class="Pp">Le filtrage de source est une fonctionnalité extrêmement puissante
+    des versions récentes de Perl. Il permet d'étendre le langage lui-même (par
+    exemple, le module Switch), de simplifier le langage (par exemple,
+    Language::Pythonesque), ou de refondre complètement le langage (par
+    exemple, Lingua::Romana::Perligata). Effectivement, il permet d'utiliser
+    toute la puissance de Perl comme son propre langage de macros, appliqué
+    récursivement.</p>
+<p class="Pp">L'excellent module Filter::Util::Call (par Paul Marquess) fournit
+    une interface Perl utilisable pour le filtrage de source, mais il est souvent
+    trop puissant et pas assez simple comme il pourrait l'être.</p>
+<p class="Pp">Pour utiliser le module, il est nécessaire de faire ce qui suit :</p>
+<dl class="Bl-tag">
+  <dt>1.</dt>
+  <dd>Télécharger, construire et installer le module Filter::Util::Call. (Si vous
+      avez Perl 5.7.1 ou plus récent, c'est déjà fait pour vous.)</dd>
+  <dt>2.</dt>
+  <dd>Configurer un module qui fait un <span class="Li">&quot;use
+      Filter::Util::Call&quot;</span>.</dd>
+  <dt>3.</dt>
+  <dd>Dans ce module, créer une sous-routine <span class="Li">&quot;import&quot;</span>.</dd>
+  <dt>4.</dt>
+  <dd>Dans la sous-routine <span class="Li">&quot;import&quot;</span>, appeler
+      <span class="Li">&quot;filter_add&quot;</span>, en lui passant soit une
+      référence de sous-routine.</dd>
+  <dt>5.</dt>
+  <dd>Dans la référence de sous-routine, appeler
+      <span class="Li">&quot;filter_read&quot;</span> ou
+      <span class="Li">&quot;filter_read_exact&quot;</span> pour "amorcer"
+      <span class="Li">$_</span> avec les données du code source du fichier qui
+      "utilisera" votre module. Vérifier la valeur de statut retournée pour voir
+      si du code source a réellement été lu.</dd>
+  <dt>6.</dt>
+  <dd>Traiter le contenu de <span class="Li">$_</span> pour modifier le code
+      source de la manière souhaitée.</dd>
+  <dt>7.</dt>
+  <dd>Retourner la valeur de statut.</dd>
+  <dt>8.</dt>
+  <dd>Si l'acte de désimportation de votre module (via un
+      <span class="Li">&quot;no&quot;</span>) doit entraîner la cessation du
+      filtrage du code source, créer une sous-routine
+      <span class="Li">&quot;unimport&quot;</span> et lui faire appeler
+      <span class="Li">&quot;filter_del&quot;</span>. S'assurer que l'appel à
+      <span class="Li">&quot;filter_read&quot;</span> ou
+      <span class="Li">&quot;filter_read_exact&quot;</span> à l'étape 5 ne
+      lira pas accidentellement après le <span class="Li">&quot;no&quot;</span>.
+      Ceci limite effectivement les filtres de code source à une opération ligne
+      par ligne, sauf si la sous-routine <span class="Li">&quot;import&quot;</span>
+      effectue un pré-pré-parsing sophistiqué du code source qu'elle filtre.</dd>
+</dl>
+<p class="Pp">Par exemple, voici un filtre de code source minimal dans un module
+    nommé BANG.pm. Il convertit simplement chaque occurrence de la séquence
+    <span class="Li">&quot;BANG\s+BANG&quot;</span> en la séquence
+    <span class="Li">&quot;die 'BANG' if $BANG&quot;</span> dans tout morceau de
+    code suivant une instruction <span class="Li">&quot;use BANG;&quot;</span>
+    (jusqu'à la prochaine instruction <span class="Li">&quot;no BANG;&quot;</span>,
+    le cas échéant) :</p>
+<pre>package BANG;
+use Filter::Util::Call ;
+sub import {
+    filter_add( sub {
+    my $caller = caller;
+    my ($status, $no_seen, $data);
+    while ($status = filter_read()) {
+        if (/^\s*no\s+$caller\s*;\s*?$/) {
+            $no_seen=1;
+            last;
+        }
+        $data .= $_;
+        $_ = &quot;&quot;;
+    }
+    $_ = $data;
+    s/BANG\s+BANG/die 'BANG' if \$BANG/g
+        unless $status &lt; 0;
+    $_ .= &quot;no $class;\n&quot; if $no_seen;
+    return 1;
+    })
+}
+sub unimport {
+    filter_del();
+}
+1 ;</pre>
+<p class="Pp">Ce niveau de sophistication met le filtrage hors de portée de
+    nombreux programmeurs.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Une_solution'><a class='permalink' href='#Une_solution'>Une solution</a></h2>
+<p class="Pp">Le module Filter::Simple fournit une interface simplifiée à
+    Filter::Util::Call ; une interface suffisante pour la plupart des cas
+    courants.</p>
+<p class="Pp">Au lieu du processus ci-dessus, avec Filter::Simple, la tâche de
+    configuration d'un filtre de code source est réduite à :</p>
+<dl class="Bl-tag">
+  <dt>1.</dt>
+  <dd>Télécharger et installer le module Filter::Simple. (Si vous avez Perl 5.7.1
+      ou plus récent, c'est déjà fait pour vous.)</dd>
+  <dt>2.</dt>
+  <dd>Configurer un module qui fait un <span class="Li">&quot;use
+      Filter::Simple&quot;</span> puis appelle <span class="Li">&quot;FILTER {
+      ... }&quot;</span>.</dd>
+  <dt>3.</dt>
+  <dd>Dans la sous-routine anonyme ou le bloc passé à
+      <span class="Li">&quot;FILTER&quot;</span>, traiter le contenu de
+      <span class="Li">$_</span> pour modifier le code source de la manière
+      souhaitée.</dd>
+</dl>
+<p class="Pp">En d'autres termes, l'exemple précédent deviendrait :</p>
+<pre>package BANG;
+use Filter::Simple;
+FILTER {
+    s/BANG\s+BANG/die 'BANG' if \$BANG/g;
+};
+1 ;</pre>
+<p class="Pp">Notez que le code source est passé comme une seule chaîne, donc
+    toute expression régulière utilisant <span class="Li">&quot;^&quot;</span>
+    ou <span class="Li">&quot;$&quot;</span> pour détecter les limites de ligne
+    nécessitera le drapeau <span class="Li">&quot;/m&quot;</span>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Désactivation_ou_modification_du_comportement_&amp;lt;no&amp;gt;'><a class='permalink' href='#Désactivation_ou_modification_du_comportement_&amp;lt;no&amp;gt;'>Désactivation ou modification du comportement &lt;no&gt;</a></h2>
+<p class="Pp">Par défaut, le filtre installé ne filtre que jusqu'à une ligne
+    constituée de l'un des trois "terminateurs" de source standards :</p>
+<pre>no NomDuModule;  # commentaire facultatif</pre>
+<p class="Pp">ou :</p>
+<pre>__END__</pre>
+<p class="Pp">ou :</p>
+<pre>__DATA__</pre>
+<p class="Pp">mais cela peut être modifié en passant un deuxième argument à
+    <span class="Li">&quot;use Filter::Simple&quot;</span> ou
+    <span class="Li">&quot;FILTER&quot;</span> (rappelez-vous simplement : il n'y a
+    *pas* de virgule après le bloc initial lorsque vous utilisez
+    <span class="Li">&quot;FILTER&quot;</span>).</p>
+<p class="Pp">Ce deuxième argument peut être soit une expression régulière
+    "qr" (qui est alors utilisée pour correspondre à la ligne de terminaison),
+    soit une valeur fausse définie (qui indique qu'aucune ligne de terminaison
+    ne doit être recherchée), soit une référence à un hash (auquel cas la
+    terminaison est la valeur associée à la clé
+    <span class="Li">'terminator'</span>).</p>
+<p class="Pp">Par exemple, pour que le filtre précédent ne filtre que jusqu'à une
+    ligne de la forme :</p>
+<pre>GNAB esu;</pre>
+<p class="Pp">vous écririez :</p>
+<pre>package BANG;
+use Filter::Simple;
+FILTER {
+    s/BANG\s+BANG/die 'BANG' if \$BANG/g;
+}
+qr/^\s*GNAB\s+esu\s*;\s*?$/;</pre>
+<p class="Pp">ou :</p>
+<pre>FILTER {
+    s/BANG\s+BANG/die 'BANG' if \$BANG/g;
+}
+{ terminator =&gt; qr/^\s*GNAB\s+esu\s*;\s*?$/ };</pre>
+<p class="Pp">et pour empêcher le filtre d'être désactivé de quelque manière que
+    ce soit :</p>
+<pre>package BANG;
+use Filter::Simple;
+FILTER {
+    s/BANG\s+BANG/die 'BANG' if \$BANG/g;
+}
+&quot;&quot;;    # ou : 0</pre>
+<p class="Pp">ou :</p>
+<pre>FILTER {
+    s/BANG\s+BANG/die 'BANG' if \$BANG/g;
+}
+{ terminator =&gt; &quot;&quot; };</pre>
+<p class="Pp"><b>Notez que, quelle que soit la valeur que vous définissez pour le
+    modèle de terminaison, </b><b>la terminaison elle-même
+    </b><b><i>doit</i></b><b> être contenue sur une seule ligne source.</b></p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Interface_tout-en-un'><a class='permalink' href='#Interface_tout-en-un'>Interface tout-en-un</a></h2>
+<p class="Pp">La séparation du chargement de Filter::Simple :</p>
+<pre>use Filter::Simple;</pre>
+<p class="Pp">de la configuration du filtrage :</p>
+<pre>FILTER { ... };</pre>
+<p class="Pp">est utile car elle permet à d'autres codes (typiquement du code de
+    support de parser ou des variables de cache) d'être définis avant l'invocation
+    du filtre. Cependant, il n'y a souvent pas besoin d'une telle séparation.</p>
+<p class="Pp">Dans ces cas, il est plus facile d'ajouter la sous-routine de
+    filtrage et toute spécification de terminaison directement à l'instruction
+    <span class="Li">&quot;use&quot;</span> qui charge Filter::Simple, comme ceci :</p>
+<pre>use Filter::Simple sub {
+    s/BANG\s+BANG/die 'BANG' if \$BANG/g;
+};</pre>
+<p class="Pp">Ceci est exactement équivalent à :</p>
+<pre>use Filter::Simple;
+BEGIN {
+    Filter::Simple::FILTER {
+        s/BANG\s+BANG/die 'BANG' if \$BANG/g;
+    };
+}</pre>
+<p class="Pp">sauf que la sous-routine <span class="Li">&quot;FILTER&quot;</span>
+    n'est pas exportée par Filter::Simple.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Filtrage_de_composants_spécifiques_uniquement_du_code_source'><a class='permalink' href='#Filtrage_de_composants_spécifiques_uniquement_du_code_source'>Filtrage de composants spécifiques uniquement du code source</a></h2>
+<p class="Pp">Un des problèmes avec un filtre comme :</p>
+<pre>use Filter::Simple;
+FILTER { s/BANG\s+BANG/die 'BANG' if \$BANG/g };</pre>
+<p class="Pp">est qu'il applique indistinctement la spécifi</p>
+</section>
+</div>
+</section>
+
+            </article>
+            <aside id="content-right">
+                <nav>
+                    <p><a href="/docs/man/3perl/Filter::Util::Call/">Previous</a></p>
+                    <p><a href="/docs/man/3perl/File::Glob/">Next</a></p>
+                </nav>
+            </aside>
+        </main>
+        <footer>
+            <p>
+                Page générée par ArchWiki. Les contenus sont sous licence <a href="https://www.gnu.org/copyleft/fdl.html">GFDL</a> sauf mention contraire.
+            </p>
+        </footer>
+    </body>
+</html>
+d transformation
+    to the entire text of your source program. So something </p>like:
+<pre>warn 'BANG BANG, YOU'RE DEAD';
+BANG </pre>BANG;
+<p class="Pp">will </p>become:
+<pre>warn 'die 'BANG' if $BANG, YOU'RE DEAD';
+die 'BANG' if </pre>$BANG;
+<p class="Pp">It is very common when filtering source to only want to apply the
+    filter to the non-character-string parts of the code, or alternatively to
+    <i>only </i>the character </p>strings.
+<p class="Pp">Filter::Simple supports this type of filtering by automatically
+    exporting the <span class="Li">"FILTER_ONLY"
+</span>  </p>subroutine.
+<p class="Pp"><span class="Li">"FILTER_ONLY" </span>takes a sequence
+    of specifiers that install separate (and possibly multiple) filters that act
+    on only parts of the source code. For </p>example:
+<pre>use Filter::Simple;
+FILTER_ONLY
+    code      =&gt; sub { s/BANG\s+BANG/die 'BANG' if \$BANG/g },
+    quotelike =&gt; sub { s/BANG\s+BANG/CHITTY CHITTY/g }</pre>;
+<p class="Pp">The <span class="Li">"code" </span>subroutine will only
+    be used to filter parts of the source code that are not quotelikes, POD, or
+    <span class="Li">"__DATA__".</span> The
+    <span class="Li">"quotelike" </span>subroutine only filters Perl
+    quotelikes (including here documents)</p>.
+<p class="Pp">The full list of alternatives </p>is:
+<dl class="Bl-tag">
+  <dt>"cod</dt>e"
+  <dd>Filters only those sections of the source code that are not quotelikes,
+      POD, or <span class="Li">"__DATA_</span>_</dd>".
+  <dt>"code_no_commen</dt>ts"
+  <dd>Filters only those sections of the source code that are not quotelikes,
+      POD, comments, or <span class="Li">"__DATA_</span>_</dd>".
+  <dt>"executabl</dt>e"
+  <dd>Filters only those sections of the source code that are not POD or
+      <span class="Li">"__DATA_</span>_</dd>".
+  <dt>"executable_no_commen</dt>ts"
+  <dd>Filters only those sections of the source code that are not POD, comments,
+      or <span class="Li">"__DATA_</span>_</dd>".
+  <dt>"quotelik</dt>e"
+  <dd>Filters only Perl quotelikes (as interpreted by
+      <span class="Li">&amp;Text::Balan</span>ced::extract</dd>_quotelike).
+  <dt>"strin</dt>g"
+  <dd>Filters only the string literal parts of a Perl quotelike (i.e. the
+      contents of a string literal, either half of a
+      <span class="Li">"tr///",</span> the second half of an
+      <span class="Li">"s/</span>//</dd>").
+  <dt>"rege</dt>x"
+  <dd>Filters only the pattern literal parts of a Perl quotelike (i.e. the
+      contents of a <span class="Li">"qr//" </span>or an
+      <span class="Li">"m//",</span> the first half of an
+      <span class="Li">"s/</span>//</dd>").
+  <dt>"al</dt>l"
+  <dd>Filters everything. Identical in effect to
+      <span class="Li">"F</span>IL</dd>TER</dl>".
+<p class="Pp">Except for <span class="Li">"FILTER_ONLY code =&gt; sub
+    {...}</span>", each of the component filters is called repeatedly, once
+    for each component found in the source </p>code.
+<p class="Pp">Note that you can also apply two or more of the same type of
+    filter in a single <span class="Li">"FILTER_ONLY".</span> For
+    example, here's a simple macro-preprocessor that is only applied within
+    regexes, with a final debugging pass that prints the resulting source
+  </p>code:
+<pre>use Regexp::Common;
+FILTER_ONLY
+    regex =&gt; sub { s/!\[/[^/g },
+    regex =&gt; sub { s/%d/$RE{num}{int}/g },
+    regex =&gt; sub { s/%f/$RE{num}{real}/g },
+    all   =&gt; sub { print if $::DEBUG </pre>}</section>;
+<section class="Ss">
+<h2 class="Ss" id='Filtering_only_the_code_parts_of_source_code'><a class='permalink' href='#Filtering_only_the_code_parts_of_source_code'>Filtrage   uniquement des parties de code du code </a></h2>source
+<p class="Pp">Most source code ceases to be grammatically correct when it is
+    broken up into the pieces between string literals and regexes. So the
+    <span class="Li">'code' </span>and
+    <span class="Li">'code_no_comments' </span>component filter behave slightly
+    differently from the other partial filters described in the previous
+    </p>section.
+<p class="Pp">Rather than calling the specified processor on each individual
+    piece of code (i.e. on the bits between quotelikes), the
+    <span class="Li">'code...</span>' partial filters operate on the entire
+    source code, but with the quotelike bits (and, in the case of
+    <span class="Li">'code_no_comments',</span> the comments) "blanked
+    </p>out".
+<p class="Pp">That is, a <span class="Li">'code..</span>.' filter
+    <i>replaces </i>each quoted string, quotelike, regex, POD, and __DATA__
+    section with a placeholder. The delimiters of this placeholder are the
+    contents of the <span class="Li">$;</span> variable at the time the filter
+    is applied (normally <span class="Li">"\034")</span>. The
+    remaining four bytes are a unique identifier for the component being
+    </p>replaced.
+<p class="Pp">This approach makes it comparatively easy to write code
+    preprocessors without worrying about the form or contents of strings,
+    regexes, </p>etc.
+<p class="Pp">For convenience, during a <span class="Li">'code...</span>'
+    filtering operation, Filter::Simple provides a package variable
+    (<span class="Li">$Filter::Simple::placeholder)</span> that contains a
+    pre-compiled regex that matches any placeholder...and captures the
+    identifier within the placeholder. Placeholders can be moved and re-ordered
+    within the source code as </p>needed.
+<p class="Pp">In addition, a second package variable
+    (<span class="Li">@Filter::Simple::components)</span> contains a list of the
+    various pieces of <span class="Li">$_,</span> as they were originally split
+    up to allow placeholders to be </p>inserted.
+<p class="Pp">Once the filtering has been applied, the original strings,
+    regexes, POD, etc. are re-inserted into the code, by replacing each
+    placeholder with the corresponding original component (from
+    <span class="Li">@components)</span>. Note that this means that the
+    <span class="Li">@components </span>variable must be treated with extreme
+    care within the filter. The <span class="Li">@components </span>array stores
+    the "back- translations" of each placeholder inserted into
+    <span class="Li">$_,</span> as well as the interstitial source code between
+    placeholders. If the placeholder backtranslations are altered in
+    <span class="Li">@components,</span> they will be similarly changed when the
+    placeholders are removed from <span class="Li">$_ </span>after the filter is
+    </p>complete.
+<p class="Pp">For example, the following filter detects concatenated pairs of
+    strings/quotelikes and reverses the order in which they are
+  </p>concatenated:
+<pre>package DemoRevCat;
+use Filter::Simple;
+FILTER_ONLY code =&gt; sub {
+    my $ph = $Filter::Simple::placeholder;
+    s{ ($ph) \s* [.] \s* ($ph) }{ $2.$1 }gx
+}</pre>;
+<p class="Pp">Thus, the following </p>code:
+<pre>use DemoRevCat;
+my $str = "abc" . q(def);
+print </pre>"$str\n";
+<p class="Pp">would </p>become:
+<pre>my $str = q(def)."abc";
+print </pre>"$str\n";
+<p class="Pp">and hence </p>print:
+<pre>defa</pre>b</section>c
+<section class="Ss">
+<h2 class="Ss" id='Using_Filter::Simple_with_an_explicit_&amp;quot;import&amp;quot;_subroutine'><a class='permalink' href='#Using_Filter::Simple_with_an_explicit_&amp;quot;import&amp;quot;_subroutine'>Utilisation   de Filter::Simple avec une sous-routine "import" </a></h2>explicite
+<p class="Pp">Filter::Simple generates a special
+    <span class="Li">"import" </span>subroutine for your module (see
+    "How it works") which would normally replace any
+    <span class="Li">"import" </span>subroutine you might have
+    explicitly </p>declared.
+<p class="Pp">However, Filter::Simple is smart enough to notice your existing
+    <span class="Li">"import" </span>and Do The Right Thing with it.
+    That is, if you explicitly define an
+    <span class="Li">"import" </span>subroutine in a package that's
+    using Filter::Simple, that <span class="Li">"import"
+</span>    subroutine will still be invoked immediately after any filter you
+  </p>install.
+<p class="Pp">The only thing you have to remember is that the
+    <span class="Li">"import" </span>subroutine <i>must </i>be
+    declared <i>before </i>the filter is installed. If you use
+    <span class="Li">"FILTER" </span>to install the </p>filter:
+<pre>package Filter::TurnItUpTo11;
+use Filter::Simple;
+FILTER { s/(\w+)/\U$1/ }</pre>;
+<p class="Pp">that will almost never be a problem, but if you install a
+    filtering subroutine by passing it directly to the
+    <span class="Li">"use Filte</span>r::Simple" </p>statement:
+<pre>package Filter::TurnItUpTo11;
+use Filter::Simple sub{ s/(\w+)/\U$1/ }</pre>;
+<p class="Pp">then you must make sure that your
+    <span class="Li">"import" </span>subroutine appears before that
+    <span class="Li">"use</span>" st</p>atem</section>ent.
+<section class="Ss">
+<h2 class="Ss" id='Using_Filter::Simple_and_Exporter_together'><a class='permalink' href='#Using_Filter::Simple_and_Exporter_together'>Utilisation   conjointe de Filter::Simple et </a></h2>d'Exporter
+<p class="Pp">Likewise, Filter::Simple is also smart enough to Do The Right
+    Thing if you use </p>Exporter:
+<pre>package Switch;
+use base Exporter;
+use Filter::Simple;
+@EXPORT    = qw(switch case);
+@EXPORT_OK = qw(given  when);
+FILTER { $_ = magic_Perl_filter($_) </pre>}
+<p class="Pp">Immediately after the filter has been applied to the source,
+    Filter::Simple will pass control to Exporter, so it can do its magic
+  </p>too.
+<p class="Pp">Of course, here too, Filter::Simple has to know you're using
+    Exporter before it applies the filter. That's almost never a problem, but if
+    you're nervous about it, you can guarantee that things will work correctly
+    by ensuring that your <span class="Li">"use base Exporter"
+</span>    always precedes your <span class="Li">"use
+ </span> Filte</p>r::Si</section>mple".
+<section class="Ss">
+<h2 class="Ss" id='How_it_works'><a class='permalink' href='#How_it_works'>Fonctionnemen</a></h2>t
+<p class="Pp">The Filter::Simple module exports into the package that calls
+    <span class="Li">"FILTER" </span>(or
+    <span class="Li">"use"s </span>it directly) -- such as package
+    "BANG" in the above example -- two automagically constructed
+    subroutines -- <span class="Li">"import" </span>and
+    <span class="Li">"unimport" </span>-- which take care of all the
+    nasty </p>details.
+<p class="Pp">In addition, the generated
+    <span class="Li">"import" </span>subroutine passes its own
+    argument list to the filtering subroutine, so the BANG.pm filter could
+    easily be made </p>parametric:
+<pre>package BANG;
+use Filter::Simple;
+FILTER {
+    my ($die_msg, $var_name) = @_;
+    s/BANG\s+BANG/die '$die_msg' if \${$var_name}/g;
+};
+# and in some user code:
+use BANG "BOOM", "BAM";  # "BANG BANG" becomes: die 'BOOM' if </pre>$BAM
+<p class="Pp">The specified filtering subroutine is called every time a
+    <span class="Li">"use BANG" </span>is encountered, and passed all
+    the source code following that call, up to either the next
+    <span class="Li">"no BANG;</span>" (or whatever terminator you've
+    set) or the end of the source file, whichever occurs first. By default, any
+    <span class="Li">"n</span>o <span class="Li">BANG;" call
+   </span> must appear by</p> itself on a se</section>parate line, or</section> it is ignored.
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'<h1><a id="AUTHOR" href="#AUTHOR">AUTEUR</a></h1>
+<p class="Pp">Damian Conway</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CONTACT'><a class='permalink' href='#CONTACT'>CONTACT</a></h1>
+<p class="Pp">Filter::Simple est maintenant maintenu par les Perl5-Porters. Veuillez
+    soumettre les bugs via l'outil <span class="Li">&quot;perlbug&quot;</span>
+    qui est fourni avec votre perl. Pour des instructions d'utilisation, lisez
+    <span class="Li">&quot;perldoc perlbug&quot;</span> ou éventuellement
+    <span class="Li">&quot;man perlbug&quot;</span>. Pour presque tout le reste,
+    veuillez contacter &lt;perl5-porters@perl.org&gt;.</p>
+<p class="Pp">Le mainteneur de la version CPAN est Steffen Mueller
+    &lt;smueller@cpan.org&gt;. Contactez-le en cas de difficultés techniques
+    concernant l'empaquetage du module CPAN.</p>
+<p class="Pp">Les éloges du module, les fleurs et les cadeaux vont toujours à
+    l'auteur, Damian Conway &lt;damian@conway.org&gt;.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT_AND_LICENSE'><a class='permalink' href='#COPYRIGHT_AND_LICENSE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<pre>Copyright (c) 2000-2014, Damian Conway. Tous droits réservés.
+Ce module est un logiciel libre. Il peut être utilisé, redistribué
+et/ou modifié sous les mêmes termes que Perl lui-même.</pre>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-13</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher une page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Aller" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/core/x86_64/perl/">core/perl</a></dd>
+        <dt>Version :</dt>
+        <dd>5.42.0-1</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://www.perl.org">https://www.perl.org</a></dd>
+        <dt>Licences :</dt>
+        <dd>Artistic-1.0-Perl OR GPL-1.0-or-later</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/core/perl/">/listing/core/perl/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNTAXE</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#AUTHOR">AUTEUR</a></li>
+        
+            <li><a href="#CONTACT">CONTACT</a></li>
+        
+            <li><a href="#COPYRIGHT_AND_LICENSE">DROITS D'AUTEUR ET LICENCE</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Filter::Simple.3perl.fr.txt">txt</a>, 
+        
+            <a href="/man/Filter::Simple.3perl.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

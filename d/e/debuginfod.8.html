@@ -1,0 +1,600 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>debuginfod(8) — Pages manuelles d'Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">debuginfod(8)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/core/x86_64/debuginfod/">debuginfod</a></p>
+<p class="lic">Licences: GPL-3.0-or-later</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">DEBUGINFOD(8)</td>
+    <td class="head-vol">Manuel de l'administrateur système</td>
+    <td class="head-rtitle">DEBUGINFOD(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">debuginfod - démon de serveur de fichiers HTTP lié aux informations de débogage</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<p class="Pp"><b>debuginfod</b> [<i>OPTION</i>]... [<i>CHEMIN</i>]...</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp"><b>debuginfod</b> sert des artefacts liés aux informations de débogage via HTTP. Il
+    scanne périodiquement un ensemble de répertoires à la recherche de fichiers ELF/DWARF et de leur
+    code source associé, ainsi que des fichiers d'archive contenant les éléments ci-dessus, pour
+    construire un index par leur buildid. Cet index est utilisé lorsque des clients distants utilisent
+    l'API web HTTP, pour récupérer ces fichiers par le même buildid.</p>
+<p class="Pp">Si un debuginfod ne peut pas traiter lui-même une requête d'artefact pour un buildid donné,
+    et qu'il est configuré avec des informations sur des serveurs debuginfod amont, il les interroge pour la même information, tout comme
+    <b>debuginfod-find</b> le ferait. En cas de succès, il met le contenu en cache localement puis relaie
+    le fichier vers le demandeur original.</p>
+<p class="Pp">L'indexation des CHEMINs donnés se fait à l'aide de plusieurs threads. Un
+    thread parcourt périodiquement tous les CHEMINs donnés logiquement ou physiquement
+    (voir l'option <b>-L</b> ). Les CHEMINs en double sont ignorés. Vous pouvez utiliser un nom de
+    fichier pour un CHEMIN, mais l'indexation du code source peut être incomplète ; préférez utiliser un
+    répertoire contenant les binaires. Le thread de parcours énumère tous les
+    fichiers correspondants (voir les options <b>-I</b> et <b>-X</b> ) dans une file de travail.
+    Une collection de threads de scan (voir l'option <b>-c</b> ) attend dans la file de travail pour analyser les fichiers en parallèle.</p>
+<p class="Pp">Si l'option <b>-F</b> est donnée, chaque fichier est analysé comme un
+    fichier ELF/DWARF. Les fichiers source sont associés aux fichiers DWARF sur la base des attributs AT_comp_dir (répertoire de compilation) qu'ils contiennent. Attention : les fichiers
+    source listés dans le DWARF peuvent être un chemin <i>n'importe où</i> dans le système de fichiers,
+    et debuginfod servira volontiers leur contenu à la demande. (Imaginez un
+    fichier DWARF falsifié qui liste <i>/etc/passwd</i> comme fichier source.) Si cela
+    vous préoccupe, examinez vos binaires :</p>
+<div class="Bd-indent">
+<pre>% eu-srcfiles -e BINAIRE</pre>
+</div>
+<p class="Pp">Si l'une des options <b>-R</b>, <b>-U</b>ou <b>-Z</b> est donnée,
+    chaque fichier est analysé comme un fichier d'archive pouvant contenir des fichiers ELF/DWARF/source.
+    Les fichiers d'archive sont reconnus par leur extension. Si -R est donné,
+    les fichiers ".rpm" sont analysés ; si -U est donné, les fichiers ".deb" et
+    ".ddeb" sont analysés ; si -Z est donné, les extensions listées
+    sont analysées.</p>
+<p class="Pp">En raison de complications telles que les informations de débogage compressées par DWZ, il peut
+    être nécessaire <i>deux</i> passes de parcours pour identifier tout le code source. Les fichiers
+    source pour les binaires dans les archives ne sont servis que depuis les archives, donc la mise en garde
+    pour -F ne s'applique pas. Si le même fichier source peut être trouvé dans plusieurs archives différentes,
+    une heuristique choisit celle la plus proche de l'archive
+    contenant les informations de débogage. (« la plus proche » signifie « le plus long préfixe commun
+    de nom d'archive »). Notez qu'en raison des politiques et mécanismes d'empaquetage de Debian/Ubuntu,
+    debuginfod ne peut pas résoudre les fichiers source pour
+    DEB/DDEB du tout. Envisagez d'utiliser l'option --disable-source-scan.</p>
+<p class="Pp">Si aucun CHEMIN n'est listé, ou si aucune option de scan n'est donnée,
+    alors <b>debuginfod</b> servira simplement le contenu qu'il a accumulé dans
+    son index lors des exécutions précédentes, entretiendra périodiquement la base de données, et
+    se fédérera avec tous les serveurs debuginfod amont. En mode <i>passif</i> ,
+    <b>debuginfod</b> ne servira que le contenu d'un index en lecture seule et
+    des serveurs amont fédérés, mais ne scannera ni n'entretiendra.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='OPTIONS'><a class='permalink' href='#OPTIONS'>OPTIONS</a></h1>
+<dl class="Bl-tag">
+  <dt id="F"><a class="permalink" href="#F"><b>-F</b></a></dt>
+  <dd>Active l'analyse des fichiers ELF/DWARF. Par défaut, désactivé.
+      </dd>
+  <dt id="Z"><a class="permalink" href="#Z"><b>-Z EXT -Z EXT=CMD</b></a></dt>
+  <dd>Active un motif supplémentaire dans l'analyse des archives. Les fichiers avec l'extension de nom
+      EXT (incluez le point) seront traités. Si CMD est donné, il est
+      invoqué avec le nom de fichier ajouté à sa liste d'arguments, et doit produire une archive commune sur sa sortie standard. Sinon, le fichier est lu comme si
+      CMD était "cat". Comme debuginfod utilise internement
+      <b>libarchive</b> pour lire les fichiers d'archive, il peut accepter une large gamme de
+      formats d'archive et de modes de compression. Par défaut, aucun motif supplémentaire. Cette option peut être répétée.
+      </dd>
+  <dt id="R"><a class="permalink" href="#R"><b>-R</b></a></dt>
+  <dd>Active les motifs RPM dans l'analyse des archives. Par défaut, désactivé. Équivalent à <b>-Z .rpm=cat</b>, car libarchive peut traiter nativement les archives RPM.
+      Si votre version de libarchive est beaucoup plus ancienne que 2020, sachez que certaines distributions ont adopté une compression zstd incompatible pour leur charge utile. Vous pouvez essayer
+      <b>-Z .rpm='(rpm2cpio|zstdcat)&lt;'</b> au lieu de <b>-R</b>.
+      </dd>
+  <dt id="U"><a class="permalink" href="#U"><b>-U</b></a></dt>
+  <dd>Active les motifs DEB/DDEB dans l'analyse des archives. Par défaut, désactivé.
+      Équivalent à
+      <b>-Z .deb='(bsdtar -O -x -f - data.tar\*)&lt;</b>'
+      et de même pour <b>.ddeb</b> et <b>.ipk</b>.
+      </dd>
+  <dt id="d"><a class="permalink" href="#d"><b>-d FICHIER
+    --database=FICHIER</b></a></dt>
+  <dd>Définit le chemin de la base de données sqlite utilisée pour stocker l'index. Ce fichier est
+      jetable dans le sens où un nouveau scan le remplira à nouveau. Il contiendra des chemins de fichiers absolus, il peut donc ne pas être portable entre
+      machines. Il peut être fréquemment lu/écrit, il devrait donc être sur un système de fichiers rapide.
+      Il ne devrait pas être partagé entre machines ou utilisateurs, pour maximiser les performances de verrouillage de sqlite.
+      Pour des tests rapides, la chaîne magique
+      ":memory:" peut être utilisée pour utiliser une base de données temporaire uniquement en mémoire.
+      Le fichier de base de données par défaut est $HOME/.debuginfod.sqlite.
+      </dd>
+  <dt id="passive"><a class="permalink" href="#passive"><b>--passive</b></a></dt>
+  <dd>Met le serveur en mode passif, où il ne traite que les requêtes de l'API web,
+      y compris la participation à la fédération. Il n'effectue aucun scan ni entretien, et n'ouvre donc la base de données sqlite qu'en lecture seule. De cette façon, une
+      base de données peut être partagée en toute sécurité entre un serveur actif de scan/d'entretien et
+      plusieurs serveurs passifs, partageant ainsi la charge de service. Les options de motif d'archive
+      doivent toujours être données, pour que debuginfod puisse reconnaître les extensions de nom de
+      fichier pour le dépaquetage.
+      </dd>
+  <dt id="metadata"><a class="permalink" href="#metadata"><b>--metadata-maxtime=SECONDES</b></a></dt>
+  <dd>Impose une limite sur la durée d'exécution des requêtes de métadonnées de l'API web. Ces requêtes,
+      en particulier les jokers "glob" larges, peuvent prendre beaucoup de
+      temps et produire de grands résultats. Les serveurs publics peuvent avoir besoin de les limiter.
+      La limite par défaut est de 5 secondes. Définissez 0 pour désactiver cette limite.
+      </dd>
+  <dt id="D"><a class="permalink" href="#D"><b>-D SQL --ddl=SQL</b></a></dt>
+  <dd>Exécute l'instruction sqlite donnée après l'ouverture et
+      l'initialisation de la base de données en tant que DDL supplémentaire (langage de définition de données SQL). Cela peut être
+      utile pour régler les pragmas ou index liés aux performances. Peut être répété.
+      Par défaut, rien de supplémentaire.
+      </dd>
+  <dt id="p"><a class="permalink" href="#p"><b>-p NUM --port=NUM</b></a></dt>
+  <dd>Définit le numéro de port TCP (0 &lt; NUM &lt; 65536) sur lequel debuginfod doit
+      écouter, pour traiter les requêtes HTTP. Les sockets IPv4 et IPv6 sont ouvertes,
+      si possible. L'API web est documentée ci-dessous. Le numéro de port par défaut est
+      8002.
+      </dd>
+  <dt id="listen"><a class="permalink" href="#listen"><b>--listen-address=ADDR</b></a></dt>
+  <dd>Définit l'adresse IP (adresse IPv4/IPv6 du système) sur laquelle debuginfod
+      doit écouter, pour traiter les requêtes HTTP.
+      </dd>
+  <dt id="cors"><a class="permalink" href="#cors"><b>--cors</b></a></dt>
+  <dd>Ajoute des en-têtes de réponse liés à CORS et le traitement de la méthode OPTIONS.
+      Cela permet aux applications web tierces d'interroger les données de debuginfod, ce qui peut être souhaitable ou non.
+      Par défaut, non.
+      </dd>
+  <dt id="I"><a class="permalink" href="#I"><b>-I REGEX --include=REGEX -X REGEX
+    --exclude=REGEX</b></a></dt>
+  <dd>Régissent l'inclusion et l'exclusion des noms de fichiers sous les chemins de recherche.
+      Les expressions régulières sont interprétées comme des RE POSIX étendues non ancrées,
+      elles peuvent donc inclure l'alternance. Elles sont évaluées par rapport au chemin complet de
+      chaque fichier, sur la base de sa <a href='/man/realpath.3.en'>canonicalisation par realpath(3)</a> . Par défaut,
+      tous les fichiers sont inclus et aucun n'est exclu. Un fichier qui correspond à la fois aux REGEX d'inclusion et d'exclusion est exclu. (Les <i>contenus</i> des fichiers d'archive
+      ne sont pas soumis au filtrage d'inclusion ou d'exclusion : ils sont tous
+      traités.) Seule la dernière expression régulière de chaque type donnée est
+      utilisée.
+      </dd>
+  <dt id="t"><a class="permalink" href="#t"><b>-t SECONDES
+    --rescan-time=SECONDES</b></a></dt>
+  <dd>Définit le temps de rescannage pour les répertoires de fichiers et d'archives. C'est le
+      temps que le thread de parcours attendra après avoir terminé un scan,
+      avant de le refaire. Un rescannement de fichiers inchangés est rapide (car l'index stocke également les mtimes des fichiers).
+      Un temps de zéro est acceptable, et
+      signifie qu'un seul scan initial doit être effectué. Le temps de rescannement par défaut
+      est de 300 secondes. La réception d'un signal SIGUSR1 déclenchelance un nouveau scan,
+      indépendant du temps de rescan (même s'il est nul), interrompant une
+      passe de groom (si en cours).
+      </dd>
+  <dt id="r"><a class="permalink" href="#r"><b>-r</b></a></dt>
+  <dd>Applique les options -I et -X pendant les cycles de groom, de sorte que la plupart du contenu lié aux fichiers exclus par les expressions régulières soit retiré de l'index. Tout le contenu ne peut pas être retiré pratiquement, donc éventuellement une opération "-G"
+      "maximal-groom" peut être nécessaire.
+      </dd>
+  <dt id="g"><a class="permalink" href="#g"><b>-g SECONDES
+    --groom-time=SECONDES</b></a></dt>
+  <dd>Définit le temps de groom pour la base de données d'index. C'est le temps d'attente du thread de groom après avoir terminé une passe de groom avant de la refaire. Une opération de groom rescanne rapidement tous les fichiers précédemment scannés, uniquement pour voir s'ils sont toujours présents et à jour, afin de pouvoir désindexer les fichiers obsolètes. Voir aussi la <i>GESTION DES DONNÉES</i> section. Le temps de groom par défaut est de 86400 secondes (1 jour). Un temps de zéro est acceptable, et signifie qu'un seul groom initial doit être effectué. La réception d'un signal SIGUSR2 déclenche une nouvelle passe de groom, indépendante du temps de groom (même s'il est nul), interrompant une passe de rescan (si en cours).
+      </dd>
+  <dt id="G"><a class="permalink" href="#G"><b>-G</b></a></dt>
+  <dd>Exécute une passe extraordinaire de maximal-groom au démarrage de debuginfod. Cette passe peut prendre un temps considérable, car elle essaie de retirer tout contenu sans rapport avec les debuginfo des parties de l'index liées aux archives. Elle ne devrait pas être exécutée si des opérations d'indexation liées aux archives récentes ont été interrompues prématurément. Elle peut prendre un espace considérable, car elle se termine par une opération "vacuum" d'sqlite, qui repaquette le fichier de base de données en le triplant temporairement. Par défaut, le maximal-groom n'est pas effectué. Voir aussi la <i>GESTION DES DONNÉES</i> section.
+      </dd>
+  <dt id="c"><a class="permalink" href="#c"><b>-c NUM
+    --concurrency=NUM</b></a></dt>
+  <dd>Définit la limite de concurrence pour les threads de la file d'attente de scan, qui travaillent ensemble pour traiter les archives et fichiers localisés par le thread de parcours. C'est important pour contrôler les opérations gourmandes en CPU comme l'analyse d'un fichier ELF et surtout la décompression des archives. La valeur par défaut est liée au nombre de processeurs du système et à d'autres contraintes ; le minimum est 1.
+      </dd>
+  <dt id="C"><a class="permalink" href="#C"><b>-C -C=NUM --connection-pool
+    --connection-pool=NUM</b></a></dt>
+  <dd>Définit la taille du pool de threads servant les requêtes webapi. Le tableau suivant résume l'interprétation de cette option et de son paramètre NUM optionnel.
+    <table class="tbl">
+      <tr>
+        <td>pas d'option, -C</td>
+        <td>utiliser un pool de threads fixe dimensionné automatiquement</td>
+      </tr>
+      <tr>
+        <td>-C=NUM</td>
+        <td>utiliser un pool de threads fixe dimensionné à NUM, minimum 2</td>
+      </tr>
+    </table>
+    <p class="Pp">Le premier mode est une configuration simple et sûre liée au nombre de processeurs et à d'autres contraintes. Le deuxième mode est
+        adapté aux configurations de limitation de charge réglées face à un trafic
+      indiscipliné.</p>
+      </dd>
+  <dt id="L"><a class="permalink" href="#L"><b>-L</b></a></dt>
+  <dd>Parcourt les liens symboliques rencontrés lors du parcours des CHEMINs, y compris à travers les périphériques - comme dans <i>find -L</i>. Par défaut, on parcourt uniquement la structure physique des répertoires, on reste sur le même périphérique et on ignore les liens symboliques - comme dans <i>find -P -xdev</i>. Attention : une
+      boucle dans l'arbre des répertoires symboliques peut conduire à un <i>parcours</i>
+      <i>infini</i>.
+      </dd>
+  <dt id="fdcache"><a class="permalink" href="#fdcache"><b>--fdcache-mbs=MB</b></a></dt>
+  <dd>Configure les limites d'un cache qui conserve les fichiers récemment extraits des archives. Jusqu'à un total de MB mégaoctets seront conservés extraits, afin d'éviter d'avoir à décompresser leurs archives encore et encore. Les valeurs MB par défaut dépendent de la concurrence du système et de l'espace disque disponible sur le système de fichiers $TMPDIR ou <b>/tmp</b> . (C'est
+      parce que c'est là que sont conservés les fichiers extraits les plus récemment utilisés.)
+      Alors que les versions précédentes utilisaient un simple LRU, le cache essaie maintenant de préserver les fichiers plus fréquemment et récemment accédés, et en particulier ceux qui ont pris du temps à extraire (ex. : vdso.debug !), et pénalise les fichiers volumineux / anciens.
+      </dd>
+  <dt id="fdcache~2"><a class="permalink" href="#fdcache~2"><b>--fdcache-prefetch=NUM</b></a></dt>
+  <dd>Jusqu'à NUM autres fichiers d'une archive peuvent être préchargés dans le cache avant même qu'ils ne soient demandés. Si non spécifiées, ces valeurs dépendent de la concurrence du système et de l'espace disque disponible sur le $TMPDIR. En allouer plus améliorera les performances dans les environnements où plusieurs parties différentes de plusieurs grandes archives sont accédées.
+      </dd>
+  <dt id="fdcache~3"><a class="permalink" href="#fdcache~3"><b>--fdcache-mintmp=NUM</b></a></dt>
+  <dd>Configure un seuil d'espace disque pour le vidage d'urgence des caches. Le système de fichiers contenant les caches est vérifié périodiquement. Si l'espace disponible descend en dessous du pourcentage donné, les caches sont vidés, et les fdcaches resteront désactivés jusqu'au prochain cycle de groom. Ce mécanisme, avec quelques /metrics associés sur le webapi, est destiné à donner à un opérateur un avertissement sur la rareté du stockage - ce qui peut se traduire par une rareté de RAM si le disque se trouve être sur un disque virtuel RAM. Le seuil par défaut est de 25%.
+      </dd>
+  <dt id="forwarded"><a class="permalink" href="#forwarded"><b>--forwarded-ttl-limit=NUM</b></a></dt>
+  <dd>Configure les limites de sauts X-Forwarded-For. Si X-Forwarded-For dépasse N sauts, il ne déléguera pas une recherche locale manquante aux debuginfods amont. La limite par défaut est 8.
+      </dd>
+  <dt id="disable"><a class="permalink" href="#disable"><b>--disable-source-scan</b></a></dt>
+  <dd>Désactive le scan des informations de source dwarf des sections debuginfo. Si une configuration n'a pas accès au code source, les informations de source ne sont pas nécessaires.
+      </dd>
+  <dt id="scan"><a class="permalink" href="#scan"><b>--scan-checkpoint=NUM</b></a></dt>
+  <dd>Exécute une opération de checkpoint SQLITE WAL synchronisée après chaque NUM scans d'archives ou de fichiers terminés. Cela peut ralentir quelque peu la phase de scan parallèle, mais génère des fichiers temporaires "-wal" beaucoup plus petits sur les serveurs chargés. La valeur par défaut est 256. Désactivé si 0.
+      </dd>
+  <dt id="koji"><a class="permalink" href="#koji"><b>--koji-sigcache</b></a></dt>
+  <dd>Active une étape supplémentaire de mappage de chemin RPM lors de l'extraction des signatures pour une utilisation dans la vérification IMA par fichier RPM sur les dépôts koji. Les signatures sont récupérées à partir des fichiers rpm.sig du sigcache Fedora koji plutôt qu'à partir de l'en-tête RPM original. Si une signature ne peut pas être trouvée dans le fichier rpm.sig du sigcache, le RPM sera essayé en solution de repli.
+      </dd>
+  <dt id="v"><a class="permalink" href="#v"><b>-v</b></a></dt>
+  <dd>Augmente la verbosité du journalisation vers le descripteur de fichier d'erreur standard. Peut être répété pour augmenter les détails. La verbosité par défaut est 0.
+      </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='WEBAPI'><a class='permalink' href='#WEBAPI'>WEBAPI</a></h1>
+<p class="Pp">Le webapi de debuginfod ressemble à un service de fichiers ordinaire, où une requête GET avec un chemin contenant un buildid connu résulte en un fichier. Les combinaisons buildid / requête inconnues résultent en codes d'erreur HTTP. Cette ressemblance avec un service de fichiers est intentionnelle, afin qu'une installation puisse tirer parti de l'infrastructure de gestion HTTP standard.</p>
+<p class="Pp">Lors de la découverte d'un fichier dans une archive ou simplement dans la base de données, certains en-têtes http personnalisés sont ajoutés à la réponse. Pour les fichiers dans la base de données, X-DEBUGINFOD-FILE et X-DEBUGINFOD-SIZE sont ajoutés. X-DEBUGINFOD-FILE est simplement le nom de fichier non échappé et X-DEBUGINFOD-SIZE est la taille du fichier. Pour les fichiers trouvés dans les archives, en plus de X-DEBUGINFOD-FILE et X-DEBUGINFOD-SIZE, X-DEBUGINFOD-ARCHIVE est ajouté. X-DEBUGINFOD-ARCHIVE est le nom de l'archive dans laquelle le fichier a été trouvé. X-DEBUGINFOD-IMA-SIGNATURE contient la signature IMA par fichier sous forme d'un blob hexadécimal.</p>
+<div class="Bd-indent">
+<pre>% debuginfod-find -v debuginfo /bin/ls |&amp; grep -i x-debuginfo
+x-debuginfod-size: 502024
+x-debuginfod-archive: /mnt/fedora_koji_prod/koji/packages/coreutils/9.3/4.fc39/x86_64/coreutils-debuginfo-9.3-4.fc39.x86_64.rpm
+x-debuginfod-file: /usr/lib/debug/usr/bin/ls-9.3-4.fc39.x86_64.debug</pre>
+</div>
+<dl class="Bl-tag">
+  <dt id="X_DEBUGINFOD_SIZE"><a class="permalink" href="#X_DEBUGINFOD_SIZE">X-DEBUGINFOD-SIZE</a></dt>
+  <dd>La taille du fichier, en octets. Cela peut différer du champ http
+      Content-Length: (s'il est présent), en raison de la compression en transit.
+      </dd>
+  <dt id="X_DEBUGINFOD_FILE"><a class="permalink" href="#X_DEBUGINFOD_FILE">X-DEBUGINFOD-FILE</a></dt>
+  <dd>Le chemin complet du fichier lié au buildid donné.
+      </dd>
+  <dt id="X_DEBUGINFOD_ARCHIVE"><a class="permalink" href="#X_DEBUGINFOD_ARCHIVE">X-DEBUGINFOD-ARCHIVE</a></dt>
+  <dd>Le chemin complet de l'archive qui contenait le fichier ci-dessus, le cas échéant.
+                <p class="Pp">Il y a une poignée de requêtes liées au buildid. Dans chaque cas,
+        le buildid est encodé sous forme de chaîne hexadécimale en minuscules. Par exemple,
+        pour un programme <i>/bin/ls</i>, regardez la note ELF GNU_BUILD_ID :</p>
+      </dd>
+</dl>
+<div class="Bd-indent">
+<pre>% readelf -n /bin/ls | grep -A4 build.id
+Note section [ 4] '.note.gnu.buildid' of 36 bytes at offset 0x340:
+Owner          Data size  Type
+GNU                   20  GNU_BUILD_ID
+Build ID: 8713b9c3fb8a720137a4a08b325905c7aaf8429d</pre>
+</div>
+<p class="Pp">Ensuite, le BUILDID hexadécimal est simplement :</p>
+<div class="Bd-indent">
+<pre>8713b9c3fb8a720137a4a08b325905c7aaf8429d</pre>
+</div>
+<section class="Ss">
+<h2 class="Ss" id='/buildid/&lt;i&gt;BUILDID&lt;/i&gt;/debuginfo'><a class='permalink' href='#/buildid/&lt;i&gt;BUILDID&lt;/i&gt;/debuginfo'>/buildid/<i>BUILDID</i>/debuginfo</a></h2>
+<p class="Pp">Si le buildid donné est connu du serveur, cette requête
+    résultera en un objet binaire qui contient les sections habituelles <b>.*debug_*</b>
+    . Cela peut être un fichier debuginfo scindé créé par <b>strip</b>, ou
+    cela peut être un exécutable original non strippé.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='/buildid/&lt;i&gt;BUILDID&lt;/i&gt;/executable'><a class='permalink' href='#/buildid/&lt;i&gt;BUILDID&lt;/i&gt;/executable'>/buildid/<i>BUILDID</i>/executable</a></h2>
+<p class="Pp">Si le buildid donné est connu du serveur, cette requête
+    résultera en un objet binaire qui contient les segments d'exécution normaux. Cela
+    peut être un exécutable strippé par <b>strip</b>, ou cela peut être un exécutable
+    original non strippé. <b>ET_DYN</b> les bibliothèques partagées sont considérées comme un
+    type d'exécutable.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='/buildid/&lt;i&gt;BUILDID&lt;/i&gt;/source&lt;i&gt;/SOURCE/FILE&lt;/i&gt;'><a class='permalink' href='#/buildid/&lt;i&gt;BUILDID&lt;/i&gt;/source&lt;i&gt;/SOURCE/FILE&lt;/i&gt;'>/buildid/<i>BUILDID</i>/source<i>/SOURCE/FILE</i></a></h2>
+<p class="Pp">Si le buildid donné est connu du serveur, cette requête
+    résultera en un objet binaire qui contient le fichier source mentionné. Le chemin
+    doit être absolu. Les chemins relatifs apparaissent couramment dans le répertoire source du fichier DWARF, mais ces chemins sont relatifs aux chemins AT_comp_dir des unités de compilation individuelles, et pourtant un exécutable est composé de plusieurs UCs.
+    Par conséquent, pour lever l'ambiguïté, debuginfod attend que les requêtes de source préfixent les chemins relatifs par le répertoire de compilation de l'UC, suivi d'un "/" obligatoire.</p>
+<p class="Pp">Remarque : l'appelant peut ou non omettre <b>../</b> ou <b>/./</b> ou
+    composants de chemin <b>///</b> superflus dans les noms de répertoire.
+    debuginfod accepte les deux formes. Spécifiquement, debuginfod canonicalise les noms
+    de chemin conformément à la section 5.2.4 de la RFC3986 (Supprimer les segments point), plus
+    la réduction de tout <b>//</b> à <b>/</b> dans le chemin.</p>
+<p class="Pp">Par exemple :</p>
+<table class="tbl">
+  <tr>
+    <td>#include &lt;stdio.h&gt;</td>
+    <td>/buildid/BUILDID/source/usr/include/stdio.h</td>
+  </tr>
+  <tr>
+    <td>/path/to/foo.c</td>
+    <td>/buildid/BUILDID/source/path/to/foo.c</td>
+  </tr>
+  <tr>
+    <td>AT_comp_dir=/zoo/</td>
+    <td>/buildid/BUILDID/source/zoo//../bar/foo.c</td>
+  </tr>
+</table>
+<p class="Pp">Remarque : le client doit échapper (%-escape) les caractères dans /SOURCE/FILE qui ne sont
+    pas affichés comme « non réservés » dans la section 2.3 de la RFC3986. Certains
+    caractères qui seront échappés incluent « + », « \ », « $ », « ! », le caractère espace, et « ; ».
+    La RFC3986 inclut une liste plus complète de ces caractères.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='/buildid/&lt;i&gt;BUILDID&lt;/i&gt;/section&lt;i&gt;/SECTION&lt;/i&gt;'><a class='permalink' href='#/buildid/&lt;i&gt;BUILDID&lt;/i&gt;/section&lt;i&gt;/SECTION&lt;/i&gt;'>/buildid/<i>BUILDID</i>/section<i>/SECTION</i></a></h2>
+<p class="Pp">Si le buildid donné est connu du serveur, le serveur tentera d'extraire le contenu d'une section ELF/DWARF nommée SECTION du fichier de débogage correspondant à BUILDID. Si le fichier de débogage ne peut être trouvé ou si la section est de type SHT_NOBITS, alors le serveur tentera d'extraire la section de l'exécutable correspondant à BUILDID. Si la section est extraite avec succès, cette requête résulte en un objet binaire du contenu de la section. Notez qu'il s'agit du contenu binaire brut de la section, pas d'un fichier ELF.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='/metrics'><a class='permalink' href='#/metrics'>/metrics</a></h2>
+<p class="Pp">Cet endpoint renvoie une sortie texte/plain au format Prometheus d'une variété de statistiques sur le fonctionnement du serveur debuginfod. L'ensemble exact des métriques et leur signification peuvent changer dans les versions futures.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='/metadata?key=&lt;i&gt;KEY&lt;/i&gt;&amp;amp;value=&lt;i&gt;VALUE&lt;/i&gt;'><a class='permalink' href='#/metadata?key=&lt;i&gt;KEY&lt;/i&gt;&amp;amp;value=&lt;i&gt;VALUE&lt;/i&gt;'>/metadata?key=<i>KEY</i>&amp;value=<i>VALUE</i></a></h2>
+<p class="Pp">Cet endpoint déclenche une recherche dans les fichiers de l'index plus les serveurs fédérés en amont, basée sur la clé et la valeur données. En cas de succès, le résultat est un tableau textuel application/json, listant les métadonnées des fichiers correspondants. Voir <a href='/man/debuginfod-find.1.en'>debuginfod-find(1)</a> pour la documentation des paramètres de recherche courants clé/valeur, et le schéma de données résultant.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='GESTION_DES_DONNÉES'><a class='permalink' href='#GESTION_DES_DONNÉES'>GESTION DES DONNÉES</a></h1>
+<p class="Pp">debuginfod stocke son index dans une base de données sqlite dans un ensemble dense de tables interconnectées. Bien que la représentation soit aussi efficace que nous avons pu la rendre, elle nécessite encore une quantité considérable de données pour enregistrer toutes les données relatives au débogage d'un grand nombre de fichiers potentiels. Cette section offre quelques conseils sur les implications.</p>
+<p class="Pp">Pour une explication générale de la taille, considérez que debuginfod indexe les fichiers ELF/DWARF, stocke leurs noms et les noms des fichiers sources référencés, et les buildids seront stockés. Lors de l'indexation d'archives, il stocke chaque nom de fichier *d'ou dans* une archive, chaque buildid, plus chaque nom de fichier source référencé depuis un fichier DWARF. (L'indexation d'archives prend plus de place car les fichiers sources résident souvent dans des sous-packages séparés qui peuvent ne pas être indexés lors de la même passe, donc des métadonnées supplémentaires doivent être conservées.)</p>
+<p class="Pp">Pour donner des chiffres, dans le cas des RPM Fedora (essentiellement, des fichiers cpio compressés par gzip), la base de données d'index sqlite représente généralement de 0,5 % à 3 % de leur taille. Elle est plus grande pour les binaires qui sont assemblés à partir d'un grand nombre de fichiers sources, ou les packages qui contiennent beaucoup de contenu non lié au débogage. Elle peut être encore plus grande pendant la phase d'indexation en raison des fichiers temporaires de journalisation d'écriture anticipée de sqlite ; ceux-ci sont validés (nettoyés et supprimés) à l'arrêt. Il peut être utile d'appliquer des contraintes d'expression régulière serrées -I ou -X pour exclure du scan les fichiers dont vous savez qu'ils n'ont pas de contenu pertinent pour le débogage.</p>
+<p class="Pp">Lorsque debuginfod s'exécute en mode *actif* normal, il analyse périodiquement ses répertoires cibles, et tout nouveau contenu trouvé est ajouté à la base de données. Le contenu ancien, tel que les données de fichiers disparus ou remplacés par des versions plus récentes, est supprimé lors d'une passe de *nettoyage* périodique. Cela signifie que les fichiers sqlite grossissent rapidement lors de l'indexation initiale, lentement lors des réanalyses d'index, et rétrécissent périodiquement lors du nettoyage. Il existe également une passe facultative de *nettoyage maximal* en un seul passage. Elle supprime les informations de contenu d'archive non pertinentes pour le débogage, telles que les noms de fichiers trouvés dans les archives (enregistrements « archive sdef ») qui ne sont pas référencés comme fichiers sources par des binaires trouvés dans les archives (enregistrements « archive sref »). Cela peut économiser un espace disque considérable. Cependant, c'est lent et nécessite temporairement jusqu'à deux fois la taille de la base de données comme espace libre. Pire encore : cela peut entraîner la perte d'informations sur le code source si les traversées d'archives ont été interrompues, de sorte que toutes les références de fichiers sources n'étaient pas connues. Utilisez-le rarement pour peaufiner un index complet.</p>
+<p class="Pp">Vous devez vous assurer qu'il reste suffisamment d'espace disque disponible. (Le déluge de messages d'erreur sur -ENOSPC est laid et agaçant. Mais, comme pour la plupart des autres erreurs, debuginfod reprendra lorsque les ressources le permettront.) Si nécessaire, debuginfod peut être arrêté, le fichier de base de données déplacé ou supprimé, et debuginfod redémarré.</p>
+<p class="Pp">sqlite offre plusieurs options liées aux performances sous forme de pragmas. Certains peuvent être utiles pour affiner les valeurs par défaut plus les extras de debuginfod. L'option -D peut être utile pour indiquer à debuginfod d'exécuter les bits SQL donnés après les commandes de création de schéma de base. Par exemple, les pragmas « synchronous », « cache_size », « auto_vacuum », « threads », « journal_mode » peuvent être amusants à ajuster via -D, si vous recherchez les performances maximales. Les pragmas « optimize », « wal_checkpoint » peuvent être utiles à exécuter périodiquement, en dehors de debuginfod. Les paramètres par défaut sont axés sur la performance plutôt que sur la fiabilité, donc un crash matériel pourrait corrompre la base de données. Dans ces cas, il peut être nécessaire de supprimer manuellement la base de données sqlite et de recommencer.</p>
+<p class="Pp">Au fur et à mesure que debuginfod évolue, nous n'aurons peut-être pas d'autre choix que de modifier le schéma de la base de données d'une manière incompatible. Si cela se produit, les nouvelles versions de debuginfod émettront des instructions SQL pour *supprimer* tous les schémas et données précédents, et recommencer. Ainsi, l'espace disque ne sera pas gaspillé pour conserver un jeu de données inutilisable.</p>
+<p class="Pp">En résumé, si votre système peut supporter un ratio taille d'index/taille d'archive de 0,5 % à 3 %, et une croissance lente ensuite, vous ne devriez pas vous soucier de l'espace disque. Si un crash système corrompt la base de données, ou si vous souhaitez forcer debuginfod à réinitialiser et recommencer, effacez simplement le fichier sqlite avant de redémarrer debuginfod.</p>
+<p class="Pp">En revanche, en mode *passif*, toute analyse et nettoyage est désactivé, et la base de données d'index reste en lecture seule. Cela rend la base de données plus adaptée au partage entre serveurs ou sites avec une réplication unidirectionnelle simple, et les considérations de gestion des données sont généralement sans objet.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SÉCURITÉ'><a class='permalink' href='#SÉCURITÉ'>SÉCURITÉ</a></h1>
+<p class="Pp">debuginfod **ne comprend pas** de fonctionnalités de sécurité particulières. Bien qu'il soit robuste face aux entrées, certains abus sont possibles. Il crée un nouveau thread pour chaque requête HTTP entrante, ce qui pourrait entraîner un déni de service en termes de RAM, CPU, I/O disque ou I/O réseau. Si cela pose problème, il est conseillé aux utilisateurs d'installer debuginfod avec un proxy inverse HTTPS qui applique les politiques du site pour le pare-feu, l'authentification, l'intégrité, l'autorisation et le contrôle de charge.</p>
+<p class="Pp">Les proxys frontaux peuvent omettre des composants de noms de chemin sensibles dans les en-têtes de réponse X-DEBUGINFOD-FILE/ARCHIVE. Par exemple, en utilisant <b>mod_headers</b> d'Apache httpd, vous pouvez supprimer le préfixe du nom de répertoire entier :</p>
+<div class="Bd-indent">
+<pre>Header edit x-debuginfod-archive &quot;.*/&quot; &quot;&quot;</pre>
+</div>
+<p class="Pp">Lors de la transmission de requêtes à des debuginfod en amont, debuginfod **ne comprend pas** de fonctionnalités de sécurité particulières. Il fait confiance à l'exactitude des binaires retournés par les debuginfod. Par conséquent, la liste des serveurs ne devrait inclure que des serveurs fiables. Si l'accès se fait via HTTP plutôt que HTTPS, le réseau doit être fiable. Les informations d'authentification via la bibliothèque interne <i>libcurl</i> ne sont actuellement pas activées.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VARIABLES_D_ENVIRONNEMENT'><a class='permalink' href='#VARIABLES_D_ENVIRONNEMENT'>VARIABLES D'ENVIRONNEMENT</a></h1>
+<dl class="Bl-tag">
+  <dt><b>$TMPDIR</b></dt>
+  <dd>Cette variable d'environnement pointe vers un système de fichiers à utiliser pour les fichiers temporaires. La valeur par défaut est /tmp.
+      </dd>
+  <dt><b>$DEBUGINFOD_URLS</b></dt>
+  <dd>Cette variable d'environnement contient une liste de préfixes d'URL pour les instances debuginfod fiables. Les préfixes d'URL alternatifs sont séparés par un espace. Cette variable d'environnement peut être définie par des scripts /etc/profile.d lisant des fichiers /etc/debuginfod/*.urls.
+    <p class="Pp">Cette variable d'environnement peut également contenir des balises définissant la politique de réponse pour la vérification des signatures IMA par fichier dans les RPM. Comme la liste séparée par des espaces est lue de gauche à droite, lors de la rencontre d'une balise, les URL suivantes jusqu'à la prochaine balise seront traitées en utilisant cette politique spécifiée. Toutes les URL avant la première balise utiliseront la politique par défaut, <i>ima:ignore</i>. Par exemple :</p>
+    <p class="Pp">
+      <br/>
+    </p>
+    <pre>DEBUGINFOD_URLS=&quot;https://foo.com ima:enforcing https://bar.ca http://localhost:8002/ ima:ignore https://baz.org&quot;
+</pre>
+    <br/>
+    <p class="Pp">Où foo.com et baz.org utilisent la politique par défaut <i>ignore</i> et bar.ca et localhost utilisent une politique <i>enforcing</i>. La balise de politique peut être l'une des suivantes :</p>
+  </dd>
+</dl>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd><i>ima:enforcing</i> Chaque fichier téléchargé nécessite une signature valide, protégeant entièrement l'intégrité.</dd>
+  <dt></dt>
+  <dd><i>ima:ignore</i> Ignore complètement la vérification, n'offrant aucune protection.</dd>
+  <dt></dt>
+  <dd>
+    <p class="Pp">Les alertes en cas d'échec de validation seront dirigées comme spécifié dans $DEBUGINFOD_VERBOSE.</p>
+      </dd>
+</dl>
+<dl class="Bl-tag">
+  <dt><b>$DEBUGINFOD_CACHE_PATH</b></dt>
+  <dd>Cette variable d'environnement régit l'emplacement du cache où sont conservés les fichiers téléchargés et les fichiers de contrôle de cache. Le répertoire par défaut est choisi en fonction d'autres variables d'environnement, voir ci-dessous.
+      </dd>
+  <dt><b>$DEBUGINFOD_PROGRESS</b></dt>
+  <dd>Cette variable d'environnement régit la fonction de progression par défaut. Si elle est définie, et si une fonction de progression n'est pas explicitement définie, la bibliothèque configurera une fonction de progression par défaut. Cette fonction ajoutera périodiquement un message de progression simple à stderr. La valeur par défaut est aucune sortie de fonction de progression.
+      </dd>
+</dl>dd&gt;
+  <dt><b>$DEBUGINFOD_VERBOSE</b></dt>
+  <dd>Cette variable d'environnement contrôle le descripteur de fichier par défaut pour la sortie verbeuse. Si elle est définie, et si un descripteur de sortie verbeuse n'est pas explicitement défini, alors la sortie verbeuse sera produite sur STDERR_FILENO.
+      </dd>
+  <dt><b>$DEBUGINFOD_RETRY_LIMIT</b></dt>
+  <dd>Cette variable d'environnement contrôle la limite par défaut du nombre de tentatives de réessai. Si une requête échoue avec un errno autre que ENOENT, plusieurs tentatives seront initiées dans la limite.
+      </dd>
+  <dt><b>$DEBUGINFOD_TIMEOUT</b></dt>
+  <dd>Cette variable d'environnement contrôle le téléchargement <i>débutant</i> le délai d'attente
+      pour chaque connexion HTTP de debuginfod. Un serveur qui ne parvient pas à fournir au moins 100K de données dans ce nombre de secondes est ignoré. La valeur par défaut est de 90 secondes. (Zéro ou négatif signifie « pas de délai d'attente ».)
+      </dd>
+  <dt><b>$DEBUGINFOD_MAXTIME</b></dt>
+  <dd>Cette variable d'environnement dicte combien de temps le client attendra pour
+      <i>terminer</i> le téléchargement d'un fichier trouvé sur un serveur, en secondes. Elle est
+      mieux utilisée pour s'assurer qu'un fichier est téléchargé rapidement ou être rejeté. La
+      valeur par défaut est 0 (temps infini).
+      </dd>
+  <dt><b>$DEBUGINFOD_MAXSIZE</b></dt>
+  <dd>Cette variable d'environnement dicte la taille maximale d'un fichier à télécharger
+      en octets. Elle est mieux utilisée si l'utilisateur souhaite s'assurer que seuls de petits
+      fichiers sont téléchargés. Une valeur de 0 signifie aucune considération pour la taille, et
+      le client peut tenter de télécharger un fichier de n'importe quelle taille. La valeur par défaut est 0
+      (taille infinie).
+      </dd>
+  <dt><b>$DEBUGINFOD_HEADERS_FILE</b></dt>
+  <dd>Cette variable d'environnement pointe vers un fichier qui fournit des en-têtes aux
+      requêtes HTTP sortantes, un par ligne. Les lignes d'en-tête ne doivent pas se terminer par
+      CRLF, sauf si c'est la convention de nouvelle ligne du système. Les lignes contenant uniquement des espaces
+      sont ignorées.
+      </dd>
+  <dt><b>$DEBUGINFOD_IMA_CERT_PATH</b></dt>
+  <dd>Cette variable d'environnement contient une liste de chemins de répertoires absolus
+      contenant des certificats X.509 pour la vérification IMA par fichier RPM. Les chemins alternatifs
+      sont séparés par des deux-points.
+      </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CACHE'><a class='permalink' href='#CACHE'>CACHE</a></h1>
+<p class="Pp">Avant chaque requête, la bibliothèque client debuginfod vérifie la nécessité
+    de nettoyer le cache. S'il est temps de nettoyer, la bibliothèque parcourt le répertoire
+    de cache et supprime les artefacts liés au debuginfo téléchargés et les répertoires devenus vides,
+    s'ils n'ont pas été accédés récemment.</p>
+<p class="Pp">Les fichiers de contrôle sont situés directement sous le répertoire de cache. Ils
+      contiennent des nombres décimaux simples pour définir les paramètres de configuration
+      liés au cache. Si les fichiers n'existent pas, la bibliothèque client crée les fichiers
+      avec les valeurs de paramètres par défaut comme contenu.</p>
+<p class="Pp">Après chaque requête, la bibliothèque client debuginfod dépose les fichiers nouvellement
+      reçus dans un répertoire et un fichier nommés en fonction du
+      build-id. Une requête échouée est également mise en cache par un fichier spécial. La
+      convention de nommage utilisée pour ces artefacts est délibérément <b>non documentée</b>.</p>
+<dl class="Bl-tag">
+  <dt><b>$XDG_CACHE_HOME/debuginfod_client/</b></dt>
+  <dd>Répertoire de cache par défaut, si $XDG_CACHE_HOME est défini.
+      </dd>
+  <dt><b>$HOME/.cache/debuginfod_client/</b></dt>
+  <dd>Répertoire de cache par défaut, si $XDG_CACHE_HOME n'est pas défini.
+      </dd>
+  <dt><b>$HOME/.debuginfod_client_cache/</b></dt>
+  <dd>Répertoire de cache obsolète, utilisé uniquement s'il existe déjà.
+      </dd>
+  <dt id="cache_clean_interval_s"><a class="permalink" href="#cache_clean_interval_s"><b>cache_clean_interval_s</b></a></dt>
+  <dd>Ce fichier de contrôle donne l'intervalle entre les cycles de nettoyage du cache, en
+      secondes. La valeur par défaut est 86400, un jour. 0 signifie « immédiatement ».
+      </dd>
+  <dt id="max_unused_age_s"><a class="permalink" href="#max_unused_age_s"><b>max_unused_age_s</b></a></dt>
+  <dd>Ce fichier de contrôle définit combien de temps les fichiers liés au debuginfo non accédés sont
+      conservés, en secondes. La valeur par défaut est 604800, une semaine. 0 signifie
+      « immédiatement ».
+      </dd>
+  <dt id="cache_miss_s"><a class="permalink" href="#cache_miss_s"><b>cache_miss_s</b></a></dt>
+  <dd>Ce fichier de contrôle définit combien de temps se souvenir d'un échec de requête, en secondes.
+      Les nouvelles requêtes pour les mêmes artefacts dans cette fenêtre temporelle sont
+      court-circuitées (retournant un échec immédiat au lieu d'envoyer une nouvelle
+      requête aux serveurs). Cela accélère les requêtes qui échoueraient probablement encore. La valeur par défaut est 600, 10 minutes. 0 signifie « oublier
+      immédiatement ».
+      </dd>
+  <dt id="metadata_retention_s"><a class="permalink" href="#metadata_retention_s"><b>metadata_retention_s</b></a></dt>
+  <dd>Ce fichier de contrôle définit combien de temps se souvenir des résultats d'une requête de métadonnées.
+      Les nouvelles requêtes pour les mêmes artefacts dans cette fenêtre temporelle sont
+      court-circuitées (répétant les mêmes résultats). Cela accélère les requêtes
+      qui auraient probablement les mêmes résultats. La valeur par défaut est 3600, 1
+      heure. 0 signifie « ne pas conserver ».
+      </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ADDITIONAL_FILES'><a class='permalink' href='#ADDITIONAL_FILES'>FICHIERS   SUPPLÉMENTAIRES</a></h1>
+<dl class="Bl-tag">
+  <dt><b>$HOME/.debuginfod.sqlite</b></dt>
+  <dd>Fichier de base de données par défaut.
+          </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR   AUSSI</a></h1>
+<p class="Pp"><a href='/man/debuginfod-find.1.en'>debuginfod-find(1)</a> <a href='/man/sqlite3.1.en'>sqlite3(1)</a>
+    <a href='https://prometheus.io/docs/instrumenting/exporters/'>https://prometheus.io/docs/instrumenting/exporters/</a>
+    <a href='https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS'>https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS</a></p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date"></td>
+    <td class="foot-os"></td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/core/x86_64/debuginfod/">core/debuginfod</a></dd>
+        <dt>Version :</dt>
+        <dd>0.194-1</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://sourceware.org/elfutils/">https://sourceware.org/elfutils/</a></dd>
+        <dt>Licences :</dt>
+        <dd>GPL-3.0-or-later</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/core/debuginfod/">/listing/core/debuginfod/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSISSE</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#OPTIONS">OPTIONS</a></li>
+        
+            <li><a href="#WEBAPI">WEBAPI</a></li>
+        
+            <li><a href="#DATA_MANAGEMENT">GESTION DES DONNÉES</a></li>
+        
+            <li><a href="#SECURITY">SÉCURITÉ</a></li>
+        
+            <li><a href="#ENVIRONMENT_VARIABLES">VARIABLES D'ENVIRONNEMENT</a></li>
+        
+            <li><a href="#CACHE">CACHE</a></li>
+        
+            <li><a href="#ADDITIONAL_FILES">FICHIERS SUPPLÉMENTAIRES</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/debuginfod.8.en.txt">txt</a>, 
+        
+            <a href="/man/debuginfod.8.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible selon les termes de la <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               licence, à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Test2::Tools::Process(3pm) — Pages man Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Test2__Tools__Process(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-test2-tools-process/">perl-test2-tools-process</a></p>
+<p class="lic">Licences: PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Test2::Tools::Process(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">Test2::Tools::Process(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Test2::Tools::Process - Tests unitaires pour le code qui appelle exit, exec, system ou qx()</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VERSION'><a class='permalink' href='#VERSION'>VERSION</a></h1>
+<p class="Pp">version 0.07</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPIS'><a class='permalink' href='#SYNOPIS'>SYNOPIS</a></h1>
+<pre>use Test2::V0 -no_srand =&gt; 1;
+use Test2::Tools::Process;
+
+process {
+  system 'foo', 'bar';
+} [
+  # vérifier que le premier appel système est à
+  # une commande foo avec n'importe quels arguments
+  proc_event(system =&gt; array {
+    item 'foo';
+    etc;
+  }, sub {
+    # simuler la commande foo
+    my($proc, @args) = @_;
+    note &quot;commande faux bar : @args&quot;;
+    # simuler une sortie normale
+    $proc-&gt;exit(0);
+  }),
+];
+
+process {
+  exit 2;
+  note 'pas exécuté';
+} [
+  # peut utiliser n'importe quels contrôles Test2 sur le statut de sortie
+  proc_event(exit =&gt; match qr/^[2-3]$/),
+];
+
+process {
+  exit 4;
+} [
+  # ou vous pouvez simplement vérifier que le statut de sortie correspond numériquement
+  proc_event(exit =&gt; 4),
+];
+
+process {
+  exit 5;
+} [
+  # ou simplement vérifier que nous avons appelé exit.
+  proc_event('exit'),
+];
+
+process {
+  exec 'foo bar';
+  exec 'baz';
+  note 'pas exécuté';
+} [
+  # émuler le premier exec comme échoué
+  proc_event(exec =&gt; match qr/^foo\b/, sub {
+    my($return, @command) = @_;
+    $! = 2;
+    return 0;
+  }),
+  # le second exec sera émuler comme réussi
+  proc_event('exec'),
+];
+
+# intercepter simplement `exit`
+is intercept_exit { exit 10 }, 10;
+
+# intercepter simplement `exec`
+is intercept_exec { exec 'foo', 'bar', 'baz' }, ['foo','bar','baz'];
+
+done_testing;</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Cet ensemble d'outils de test est destiné à écrire des tests unitaires pour du code qui interagit avec d'autres processus sans utiliser de vrais processus qui pourraient avoir des effets secondaires indésirables. Il vous permet également de tester du code qui interrompt le flux du programme sans réellement terminer votre test. Jusqu'à présent, il vous permet de tester et/ou de simuler <span class="Li">&quot;exit&quot;</span>, <span class="Li">&quot;exec&quot;</span>, <span class="Li">&quot;system&quot;</span>, <span class="Li">&quot;readpipe&quot;</span> et <span class="Li">&quot;qx//&quot;</span>. D'autres tests liés aux processus seront ajoutés à l'avenir.</p>
+<p class="Pp">Ce module emprunte quelques idées à Test::Exit. En particulier, il n'utilise pas d'exceptions pour simuler <span class="Li">&quot;exit&quot;</span> ou <span class="Li">&quot;exec&quot;</span>, vous pouvez donc tester librement du code qui les appelle dans un <span class="Li">&quot;eval&quot;</span>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='FONCTIONS'><a class='permalink' href='#FONCTIONS'>FONCTIONS</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='process'><a class='permalink' href='#process'>process</a></h2>
+<pre>my $ok = process { ... } \@events, $test_name;
+my $ok = process { ... } \@events;
+my $ok = process { ... } $test_name;
+my $ok = process { ... };</pre>
+<p class="Pp">Exécute le bloc, interceptant les appels <span class="Li">&quot;exit&quot;</span>, <span class="Li">&quot;exec&quot;</span>, <span class="Li">&quot;system&quot;</span>, <span class="Li">&quot;readpipe&quot;</span> et <span class="Li">&quot;qx//&quot;</span>. Les appels sont ensuite comparés à <span class="Li">&quot;\@events&quot;</span> en tant qu'événements de processus attendus. Voir <span class="Li">&quot;proc_event&quot;</span> ci-dessous pour définir des événements individuels, et le synopsis ci-dessus pour des exemples.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='named_signal'><a class='permalink' href='#named_signal'>named_signal</a></h2>
+<pre>my $signame = named_signal $name;</pre>
+<p class="Pp">Étant donné un nom de signal sous forme de chaîne comme <span class="Li">&quot;KILL&quot;</span>, cela renverra le numéro de signal entier. Cela lancera une exception si <span class="Li">$name</span> est invalide.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='intercept_exit'><a class='permalink' href='#intercept_exit'>intercept_exit</a></h2>
+<pre>my $status = intercept_exit { ... };</pre>
+<p class="Pp">Intercepte tous les appels <span class="Li">c&lt;exit&gt;</span> à l'intérieur du bloc et renvoie le statut de sortie. Renvoie <span class="Li">&quot;undef&quot;</span> s'il n'y a pas eu d'appels <span class="Li">&quot;exec&quot;</span>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='intercept_exec'><a class='permalink' href='#intercept_exec'>intercept_exec</a></h2>
+<pre>my $arrayref = intercept_exec { ... };</pre>
+<p class="Pp">Intercepte tous les appels <span class="Li">&quot;exec&quot;</span> à l'intérieur du bloc et renvoie la ligne de commande qui lui a été passée. Renvoie <span class="Li">&quot;undef&quot;</span> s'il n'y a pas eu d'appels <span class="Li">&quot;exec&quot;</span>.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VERIFICATIONS'><a class='permalink' href='#VERIFICATIONS'>VERIFICATIONS</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='proc_event'><a class='permalink' href='#proc_event'>proc_event</a></h2>
+<pre>process { ... } [
+  proc_event($type =&gt; $check, $callback),
+  proc_event($type =&gt; $check),
+  proc_event($type =&gt; $callback),
+  proc_event($type),
+
+  # vérifications de résultats supplémentaires pour les événements `system`
+  proc_event('system' =&gt; $check, \%result_check, $callback),
+  proc_event('system' =&gt; \%result_check, $callback),
+  proc_event('system' =&gt; $check, \%result_check),
+  proc_event('system' =&gt; \%result_check),
+];</pre>
+<p class="Pp">La fonction <span class="Li">&quot;proc_event&quot;</span> crée un événement de processus, avec une vérification et un rappel optionnels. La façon dont <span class="Li">$check</span> fonctionne dépend du <span class="Li">$type</span>. Si aucun <span class="Li">$check</span> n'est fourni, il vérifiera seulement que le <span class="Li">$type</span> correspond. En raison de leur nature, les événements <span class="Li">&quot;exit&quot;</span> et <span class="Li">&quot;exec&quot;</span> sont émules. Les événements <span class="Li">&quot;system&quot;</span> effectueront réellement un appel système, à moins qu'un <span class="Li">$callback</span> ne soit fourni.</p>
+<dl class="Bl-tag">
+  <dt id="exit"><a class="permalink" href="#exit">exit</a></dt>
+  <dd>Un événement de processus pour un appel <span class="Li">&quot;exit&quot;</span>. La vérification porte sur la valeur de statut passée à <span class="Li">&quot;exit&quot;</span>. Cette valeur sera toujours un entier. Si aucune valeur de statut n'a été passée à <span class="Li">&quot;exit&quot;</span>, <span class="Li">0</span> sera utilisée comme valeur de statut.
+    <p class="Pp">Si aucun rappel n'est fourni, un <span class="Li">&quot;exit&quot;</span> sera émule en terminant le bloc de processus sans exécuter plus de code. Le reste du test se poursuivra.</p>
+        <pre>proc_event( exit =&gt; sub {
+  my($proc, $status) = @_;
+  $proc-&gt;terminate;
+});
+</pre>
+    <p class="Pp">Le rappel prend un objet <span class="Li">$proc</span> et une valeur <span class="Li">$status</span>. Normalement, <span class="Li">&quot;exit&quot;</span> ne devrait jamais retourner, donc ce que vous voulez faire est d'appeler la méthode <span class="Li">&quot;terminate&quot;</span> sur l'objet <span class="Li">$proc</span>.</p>
+  </dd>
+  <dt id="exec"><a class="permalink" href="#exec">exec</a></dt>
+  <dd>Un événement de processus pour un appel <span class="Li">&quot;exec&quot;</span>. La vérification porte sur la commande passée à <span class="Li">&quot;exec&quot;</span>. Si <span class="Li">&quot;exec&quot;</span> est appelé avec un seul argument, ce sera une chaîne, sinon ce sera une référence de tableau. De cette façon, vous pouvez différencier les modes SCALAR et LIST de <span class="Li">&quot;exec&quot;</span>.
+    <p class="Pp">Si aucun rappel n'est fourni, un appel <span class="Li">&quot;exec&quot;</span> (réussi) sera émule en terminant le bloc de processus sans exécuter plus de code. Le reste du test se poursuivra.</p>
+        <pre>proc_event( exec =&gt; sub {
+  my($proc, @command) = @_;
+  ...;
+});
+</pre>
+    <p class="Pp">Le rappel prend un objet <span class="Li">$proc</span> et les arguments passés à <span class="Li">&quot;exec&quot;</span> sous forme de <span class="Li">@command</span>. Vous pouvez émuler un appel <span class="Li">&quot;exec&quot;</span> échoué en utilisant la méthode <span class="Li">&quot;errno&quot;</span> sur l'objet <span class="Li">$proc</span> :</p>
+        <pre>proc_event( exec =&gt; sub {
+  my($proc, @command) = @_;
+  $proc-&gt;errno(2); # c'est la valeur errno
+});
+</pre>
+    <p class="Pp">Pour émuler un appel <span class="Li">&quot;exec&quot;</span> réussi, vous voulez simplement vous souvenir d'appeler la méthode <span class="Li">&quot;terminate&quot;</span> sur l'objet <span class="Li">$proc</span>.</p>
+        <pre>proc_event( exec =&gt; sub {
+  my($proc, @command) = @_;
+  $proc-&gt;terminate;
+});
+</pre>
+  </dd>
+  <dt id="system"><a class="permalink" href="#system">system</a></dt>
+  <dd>Un événement de processus pour <span class="Li">&quot;system&quot;</span>, <span class="Li">&quot;piperead&quot;</span> et <span class="Li">&quot;qx//&quot;</span>. La première vérification (comme avec <span class="Li">&quot;exec&quot;</span>) porte sur la chaîne de commande passée à <span class="Li">&quot;system&quot;</span>. La seconde est une référence de hachage avec des vérifications de résultats.</dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="status"><a class="permalink" href="#status">status</a></dt>
+</dl>
+</div>
+</section>
+</section>
+</div>
+</section>
+
+            </article>
+            
+        </main>
+        <footer>
+            
+        </footer>
+    </body>
+</html>
+</a></dt>
+  <dd>
+    <pre>proc_event( system =&gt; { status =&gt; $check } );
+</pre>
+    <p class="Pp">Le statut de terminaison normal. C'est généralement la valeur
+        passée à <span class="Li">&quot;exit&quot;</span> dans le programme
+        appelé. Typiquement, un programme qui a réussi retournera zéro
+        (<span class="Li">0</span>) et un programme qui a échoué retournera une valeur
+        non nulle.</p>
+  </dd>
+  <dt id="errno"><a class="permalink" href="#errno">errno</a></dt>
+  <dd>
+    <pre>proc_event( system =&gt; { errno =&gt; $check } );
+</pre>
+    <p class="Pp">La valeur <span class="Li">&quot;errno&quot;</span> ou
+        <span class="Li">$!</span> si l'appel système a échoué. Le plus souvent,
+        cela concerne des noms de commandes incorrects, mais cela pourrait être
+        autre chose comme un manque de mémoire ou d'autres ressources système.</p>
+  </dd>
+  <dt id="signal"><a class="permalink" href="#signal">signal</a></dt>
+  <dd>
+    <pre>proc_event( system =&gt; { signal =&gt; $check } );
+</pre>
+    <p class="Pp">Défini si le processus a été tué par un signal.</p>
+  </dd>
+</dl>
+</div>
+<div class="Bd-indent">
+<p class="Pp">Une seule vérification devrait être incluse car une seule de ces
+    options est généralement valide. Si vous ne fournissez pas cette vérification,
+    elle vérifiera que le code de statut est zéro uniquement.</p>
+<p class="Pp">Par défaut, l'appel système réel sera effectué, mais si vous
+    fournissez une fonction de rappel, vous pouvez simuler des commandes, ce qui
+    est utile dans les tests unitaires de votre script sans avoir à appeler des
+    programmes externes qui pourraient avoir des effets secondaires indésirables.</p>
+<pre>proc_event( system =&gt; sub {
+  my($proc, @command) = @_;
+  ...
+});</pre>
+<p class="Pp">Comme l'événement <span class="Li">&quot;exec&quot;</span>,
+    <span class="Li">@command</span> contient la commande complète passée à
+    l'appel <span class="Li">&quot;system&quot;</span>. Vous pouvez utiliser
+    l'objet <span class="Li">$proc</span> pour simuler l'un des trois résultats
+    différents :</p>
+<dl class="Bl-tag">
+  <dt id="exit~2"><a class="permalink" href="#exit~2">exit</a></dt>
+  <dd>
+    <pre>$proc-&gt;exit($status);
+$proc-&gt;exit;
+</pre>
+    <p class="Pp">Sortir avec le statut donné. Un statut de zéro (0) sera utilisé
+        s'il n'est pas fourni. Si aucun résultat n'est spécifié dans la fonction
+        de rappel, un statut de zéro (0) sera également utilisé.</p>
+  </dd>
+  <dt id="signal~2"><a class="permalink" href="#signal~2">signal</a></dt>
+  <dd>
+    <pre>$proc-&gt;signal($signal);
+</pre>
+    <p class="Pp">Terminer avec le signal donné.
+        <span class="Li">$signal</span> peut être soit une valeur entière (auquel
+        cas aucune validation qu'il s'agisse d'un signal réel n'est effectuée),
+        soit un nom de signal sous forme de chaîne comme
+        <span class="Li">&quot;KILL&quot;</span>,
+        <span class="Li">&quot;HUP&quot;</span> ou tout signal pris en charge par
+        votre système d'exploitation. Si vous fournissez un nom de signal invalide,
+        une exception sera levée.</p>
+        <pre>proc_event( system =&gt; { signal =&gt; 9 } =&gt; sub {
+  my($proc, @args) = @_;
+  $proc-&gt;signal('KILL');
+});
+</pre>
+    <p class="Pp">Notez que lorsque vous tuez l'un de ces faux processus avec un
+        signal, vous voudrez mettre à jour la vérification du signal attendu,
+        comme dans l'exemple ci-dessus.</p>
+  </dd>
+  <dt id="errno~2"><a class="permalink" href="#errno~2">errno</a></dt>
+  <dd>
+    <pre>$proc-&gt;errno($errno);
+</pre>
+    <p class="Pp">Simuler un appel <span class="Li">&quot;system&quot;</span>
+        échoué. Le plus souvent, <span class="Li">&quot;system&quot;</span>
+        échoue si la commande n'est pas trouvée. Le <span class="Li">$errno</span>
+        passé doit être une valeur <span class="Li">&quot;errno&quot;</span> valide.
+        Sur mon système, <span class="Li">2</span> est le code d'erreur pour
+        « commande introuvable ». Exemple :</p>
+        <pre>proc_event( system =&gt; { errno =&gt; number(2) } =&gt; sub {
+  my($proc, @args) = @_;
+  $proc-&gt;errno(2);
+});
+</pre>
+  </dd>
+  <dt id="type"><a class="permalink" href="#type">type</a></dt>
+  <dd>
+    <pre>my $type = $proc-&gt;type;
+</pre>
+    <p class="Pp">Retourne <span class="Li">&quot;system&quot;</span> ou
+        <span class="Li">&quot;readpipe&quot;</span> en fonction de la fonction Perl
+        qui a déclenché l'appel système.</p>
+  </dd>
+</dl>
+</div>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CAVEATS'><a class='permalink' href='#CAVEATS'>CAVEATS</a></h1>
+<p class="Pp">L'émulation de <span class="Li">&quot;exit&quot;</span> n'appelle
+    pas les rappels <span class="Li">&quot;END&quot;</span> ni d'autres destructeurs,
+    car vous ne terminez pas réellement le processus.</p>
+<p class="Pp">Ce module installe des gestionnaires pour
+    <span class="Li">&quot;exec&quot;</span>,
+    <span class="Li">&quot;exit&quot;</span>,
+    <span class="Li">&quot;system&quot;</span> et
+    <span class="Li">&quot;readpipe&quot;</span>, dans l'espace de noms
+    <span class="Li">&quot;CORE::GLOBAL&quot;</span>, donc si votre code installe
+    également des gestionnaires là-bas, les choses pourraient ne pas fonctionner.</p>
+<p class="Pp">Ce module n'est apparemment pas compatible avec IPC::Run3.
+    Utilisez plutôt Capture::Tiny, qui est mieux maintenu à mon avis.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR   AUSSI</a></h1>
+<dl class="Bl-tag">
+  <dt id="Test::Exit"><a class="permalink" href="#Test::Exit">Test::Exit</a></dt>
+  <dd>Émulation simple de <span class="Li">&quot;exit&quot;</span> pour les tests.
+      La version la plus récente ne repose pas sur des exceptions.</dd>
+  <dt id="Test::Exec"><a class="permalink" href="#Test::Exec">Test::Exec</a></dt>
+  <dd>Comme Test::Exit, mais pour <span class="Li">&quot;exec&quot;</span></dd>
+  <dt id="Test::Mock::Cmd"><a class="permalink" href="#Test::Mock::Cmd">Test::Mock::Cmd</a></dt>
+  <dd>Fournit une interface pour simuler
+      <span class="Li">&quot;system&quot;</span>,
+      <span class="Li">&quot;qx&quot;</span> et
+      <span class="Li">&quot;exec&quot;</span>.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTEUR</a></h1>
+<p class="Pp">Auteur : Graham Ollis &lt;plicease@cpan.org&gt;</p>
+<p class="Pp">Contributeurs :</p>
+<p class="Pp">Jeremy Mates (THRIG)</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT_AND_LICENSE'><a class='permalink' href='#COPYRIGHT_AND_LICENSE'>DROIT D'AUTEUR   ET LICENCE</a></h1>
+<p class="Pp">Ce logiciel est sous copyright (c) 2015-2022 par Graham Ollis.</p>
+<p class="Pp">C'est un logiciel libre ; vous pouvez le redistribuer et/ou le
+    modifier sous les mêmes termes que le système de langage de programmation
+    Perl 5 lui-même.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page man" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-test2-tools-process/">extra/perl-test2-tools-process</a></dd>
+        <dt>Version :</dt>
+        <dd>0.07-6</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://metacpan.org/release/Test2-Tools-Process">https://metacpan.org/release/Test2-Tools-Process</a></dd>
+        <dt>Licences :</dt>
+        <dd>PerlArtistic</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-test2-tools-process/">/listing/extra/perl-test2-tools-process/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#VERSION">VERSION</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#FUNCTIONS">FONCTIONS</a></li>
+        
+            <li><a href="#CHECKS">VÉRIFICATIONS</a></li>
+        
+            <li><a href="#CAVEATS">CAVEATS</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+            <li><a href="#AUTHOR">AUTEUR</a></li>
+        
+            <li><a href="#COPYRIGHT_AND_LICENSE">DROIT D'AUTEUR ET LICENCE</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Test2::Tools::Process.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/Test2::Tools::Process.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages man, qui ont leur propre licence spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

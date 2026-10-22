@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>ck_epoch_synchronize(3) — Pages man Arch Linux</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">ck_epoch_synchronize(3)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/libck/">libck</a></p>
+<p class="lic">Licences: BSD, Apache, Personnalisé</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">CK_EPOCH_SYNCHRONIZE(3)</td>
+    <td class="head-vol">Manuel des fonctions de bibliothèque</td>
+    <td class="head-rtitle">CK_EPOCH_SYNCHRONIZE(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp"><code class="Nm">ck_epoch_synchronize</code> &#x2014;
+    <span class="Nd">bloquer jusqu'à ce qu'une période de grâce soit détectée</span></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BIBLIOTHQUE'><a class='permalink' href='#BIBLIOTHQUE'>BIBLIOTHÈQUE</a></h1>
+<p class="Pp">Concurrency Kit (libck, -lck)</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp"><code class="In">#include
+    &lt;<a class="In">ck_epoch.h</a>&gt;</code></p>
+<p class="Pp"><var class="Ft">void</var>
+  <br/>
+  <code class="Fn">ck_epoch_synchronize</code>(<var class="Fa" style="white-space: nowrap;">ck_epoch_record_t
+    *record</var>);</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">La fonction
+    <a class="permalink" href="#ck_epoch_synchronize"><code class="Fn" id="ck_epoch_synchronize">ck_epoch_synchronize</code></a>(3)
+    bloquera l'appelant jusqu'à ce qu'une période de grâce soit détectée,
+    selon la sémantique de la récupération d'époque. Il n'est pas sûr d'appeler cette
+    fonction sur un enregistrement qui se trouve dans une section active. Tous les objets nécessitant
+    une récupération de mémoire sûre qui sont logiquement supprimés sont sûrs pour une suppression physique
+    suite à un appel à
+    <code class="Fn">ck_epoch_synchronize</code>(3). Si
+    vous avez besoin que tous les rappels soient distribués, il est suggéré d'utiliser
+    <a class="permalink" href="#ck_epoch_barrier"><code class="Fn" id="ck_epoch_barrier">ck_epoch_barrier</code></a>(3)
+    à la place ou de suivre un appel à
+    <code class="Fn">ck_epoch_synchronize</code>(3) avec
+    <a class="permalink" href="#ck_epoch_reclaim"><code class="Fn" id="ck_epoch_reclaim">ck_epoch_reclaim</code></a>(3).</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXEMPLE'><a class='permalink' href='#EXEMPLE'>EXEMPLE</a></h1>
+<div class="Bd Bd-indent Li">
+<pre>#include &lt;ck_epoch.h&gt;
+#include &lt;ck_stack.h&gt;
+#include &lt;stdlib.h&gt;
+
+/*
+ * epoch a été préalablement initialisé avec ck_epoch_init.
+ * stack a été préalablement initialisé avec ck_stack_init.
+ */
+ck_epoch_t *epoch;
+ck_stack_t *stack;
+
+void
+function(void)
+{
+	ck_epoch_record_t *record;
+	ck_stack_entry_t *s;
+
+	record = malloc(sizeof *record);
+	ck_epoch_register(&amp;epoch, record, NULL);
+
+	/*
+	 * Nous utilisons une section d'époque ici pour garantir qu'aucun
+	 * nœud dans la pile ne soit supprimé pendant que nous y accédons.
+	 * Ceci est nécessaire ici car il y a plusieurs écrivains.
+	 * S'il n'y avait qu'un seul thread dépilant cette pile,
+	 * il n'y aurait pas besoin de ck_epoch_begin/ck_epoch_end.
+	 */
+	ck_epoch_begin(record);
+
+	/* Supprimer logiquement un objet. */
+	s = ck_stack_pop_upmc(stack);
+
+	ck_epoch_end(record);
+
+	/*
+	 * Attendre jusqu'à ce qu'aucun thread ne puisse potentiellement avoir une référence à
+	 * l'objet que nous venons de dépiler (supposer que tous les threads exécutent simplement
+	 * ck_stack_pop_upmc).
+	 */
+	ck_epoch_synchronize(record);
+
+	/* Il est maintenant sûr de supprimer physiquement l'objet. */
+	free(s);
+	return;
+}</pre>
+</div>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VALEURS_DE_RETOUR'><a class='permalink' href='#VALEURS_DE_RETOUR'>VALEURS DE RETOUR</a></h1>
+<p class="Pp">Cette fonction n'a pas de valeur de retour.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ERREURS'><a class='permalink' href='#ERREURS'>ERREURS</a></h1>
+<p class="Pp">L'objet pointé par .Fa record doit avoir été préalablement
+    enregistré via
+    <code class="Fn">ck_epoch_register</code>(3).</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR AUSSI</a></h1>
+<p class="Pp"><a class="Xr" href="/man/ck_epoch_init.3.en">ck_epoch_init(3)</a>,
+    <a class="Xr" href="/man/ck_epoch_register.3.en">ck_epoch_register(3)</a>,
+    <a class="Xr" href="/man/ck_epoch_unregister.3.en">ck_epoch_unregister(3)</a>,
+    <a class="Xr" href="/man/ck_epoch_recycle.3.en">ck_epoch_recycle(3)</a>,
+    <a class="Xr" href="/man/ck_epoch_poll.3.en">ck_epoch_poll(3)</a>,
+    <a class="Xr" href="/man/ck_epoch_reclaim.3.en">ck_epoch_reclaim(3)</a>,
+    <a class="Xr" href="/man/ck_epoch_barrier.3.en">ck_epoch_barrier(3)</a>,
+    <a class="Xr" href="/man/ck_epoch_call.3.en">ck_epoch_call(3)</a>,
+    <a class="Xr" href="/man/ck_epoch_begin.3.en">ck_epoch_begin(3)</a>,
+    <a class="Xr" href="/man/ck_epoch_end.3.en">ck_epoch_end(3)</a></p>
+<p class="Pp">Informations supplémentaires disponibles sur <a href='http://concurrencykit.org/'>http://concurrencykit.org/</a></p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2 septembre 2012</td>
+    <td class="foot-os"></td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page man" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/libck/">extra/libck</a></dd>
+        <dt>Version :</dt>
+        <dd>0.7.2-1</dd>
+        <dt>Amont :</dt>
+        <dd><a href="http://concurrencykit.org">http://concurrencykit.org</a></dd>
+        <dt>Licences :</dt>
+        <dd>BSD, Apache, Personnalisé</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/libck/">/listing/extra/libck/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#BIBLIOTHQUE">BIBLIOTHÈQUE</a></li>
+        
+            <li><a href="#SYNTAXE">SYNTAXE</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#EXEMPLE">EXEMPLE</a></li>
+        
+            <li><a href="#VALEURS_DE_RETOUR">VALEURS DE RETOUR</a></li>
+        
+            <li><a href="#ERREURS">ERREURS</a></li>
+        
+            <li><a href="#VOIR_AUSSI">VOIR AUSSI</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/ck_epoch_synchronize.3.en.txt">txt</a>, 
+        
+            <a href="/man/ck_epoch_synchronize.3.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages man, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

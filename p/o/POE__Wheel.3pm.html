@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>POE::Wheel(3pm) — Pages man Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">POE__Wheel(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-poe/">perl-poe</a></p>
+<p class="lic">Licences: GPL, PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">POE::Wheel(3)</td>
+    <td class="head-vol">Documentation Perl Contribuée par l'Utilisateur</td>
+    <td class="head-rtitle">POE::Wheel(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">POE::Wheel - mixins événementiels pour POE::Session</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPIS'><a class='permalink' href='#SYNOPIS'>SYNOPIS</a></h1>
+<p class="Pp">Cette classe de base n'a pas de synopsis. Veuillez consulter l'une des
+    sous-classes à la place.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Un objet POE::Wheel encapsule un ensemble de gestionnaires d'événements
+    qui effectuent une tâche spécifique. Il gère également les observateurs
+    d'événements qui déclenchent ces gestionnaires.</p>
+<p class="Pp">La durée de vie des objets est très importante pour les roues POE. Lors
+    de la création, la plupart des roues ajouteront des gestionnaires d'événements
+    anonymes à la session active. En d'autres termes, la session qui a créé la
+    roue est modifiée pour gérer de nouveaux événements. Des observateurs d'événements
+    peuvent également être initialisés si nécessaire pour déclencher les nouveaux
+    gestionnaires. Ces observateurs d'événements sont également détenus par la
+    session qui a créé la roue.</p>
+<p class="Pp">Les sessions ne doivent pas exposer leurs roues à d'autres sessions. Le
+    faire causera probablement des problèmes car les roues sont étroitement
+    intégrées aux sessions qui les ont créées. Par exemple, appeler <b>put()</b>
+    sur une instance de POE::Wheel::ReadWrite peut activer un observateur de
+    type "écriture autorisée". Le gestionnaire de cet observateur est déjà défini
+    dans le propriétaire de la roue. Appeler <b>put()</b> en dehors de cette
+    session activera l'observateur "écriture autorisée" dans la mauvaise session,
+    et l'événement ne sera jamais géré.</p>
+<p class="Pp">De même, les roues doivent être détruites depuis les sessions qui les ont
+    créées. Sinon, des erreurs se produiront lorsque les méthodes DESTROY des roues
+    tenteront de désenregistrer les gestionnaires d'événements et les observateurs
+    des mauvaises sessions. Pour simplifier les choses, il est recommandé de stocker
+    les instances de POE::Wheel dans les tas des sessions qui les ont créées.</p>
+<p class="Pp">Par exemple, la création d'un objet POE::Wheel::FollowTail enregistrera un
+    gestionnaire d'événements qui interroge périodiquement un fichier pour de
+    nouvelles informations. Il démarrera également le minuteur qui déclenche
+    l'interrogation périodique.</p>
+<pre>use POE;
+use POE::Wheel::FollowTail;
+my @files_to_tail = qw( messages maillog security );
+foreach my $filename (@files_to_tail) {
+  POE::Session-&gt;create(
+    inline_states =&gt; {
+      _start =&gt; sub {
+        push @{$_[HEAP]{messages}}, POE::Wheel::FollowTail-&gt;new(
+          Filename   =&gt; &quot;/var/log/$filename&quot;,
+          InputEvent =&gt; &quot;got_input&quot;,
+        );
+      },
+      got_input =&gt; sub {
+        print &quot;$filename: $_[ARG0]\n&quot;;
+      },
+    }
+  );
+}
+POE::Kernel-&gt;run();
+exit;</pre>
+<p class="Pp">Comme illustré dans l'exemple précédent, il est possible (parfois
+    recommandé) de créer plus d'une POE::Wheel d'un type particulier dans la même
+    session. Une session avec plusieurs roues peut mieux évoluer que des sessions
+    séparées avec une roue chacune. En cas de doute, faites des benchmarks.</p>
+<p class="Pp">Contrairement aux composants (ou au fromage), les roues ne sont pas
+    autonomes. Chaque roue doit être créée par une session afin d'enregistrer des
+    observateurs et des gestionnaires d'événements dans cette session. Les roues sont
+    donc étroitement couplées à leurs sessions créatrices et ne peuvent pas être
+    transmises à d'autres sessions.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='FILTRES,_ET_PILOTES'><a class='permalink' href='#FILTRES,_ET_PILOTES'>FILTRES, ET PILOTES</a></h1>
+<p class="Pp">De nombreuses roues effectuent des opérations de transfert de données sur
+    des descripteurs de fichiers (qui, comme vous le savez probablement, incluent
+    les sockets, les tuyaux et à peu près tout ce qui peut stocker ou transférer
+    des données).</p>
+<p class="Pp">Pour éviter les "subclass hell", les objets POE::Wheel peuvent être
+    personnalisés lors de la création en incluant d'autres objets des espaces de
+    noms POE::Filter et POE::Driver.</p>
+<section class="Ss">
+<h2 class="Ss" id='Filtres'><a class='permalink' href='#Filtres'>Filtres</a></h2>
+<p class="Pp">Les "filtres" POE implémentent des analyseurs et des sérialiseurs de
+    données. Par exemple, POE::Filter::Line analyse les flux en enregistrements
+    séparés par une chaîne donnée (par défaut, le saut de ligne réseau
+    traditionnel). Le filtre Line ajoute également des séparateurs
+    d'enregistrement aux données en sortie.</p>
+<p class="Pp">POE::Filter::HTTPD est un exemple plus complexe. Il implémente un sous-ensemble
+    du côté serveur du protocole HTTP. Les flux d'entrée sont analysés en requêtes
+    HTTP et encapsulés dans des objets HTTP::Request. Le code serveur renvoie des
+    objets HTTP::Response au client, qui sont sérialisés afin de pouvoir être envoyés
+    à un socket.</p>
+<p class="Pp">La plupart des roues utilisent POE::Filter::Line par défaut.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Pilotes'><a class='permalink' href='#Pilotes'>Pilotes</a></h2>
+<p class="Pp">Les "pilotes" POE implémentent des stratégies pour envoyer des données à un
+    descripteur de fichier et en recevoir. Une seule classe POE::Wheel peut
+    interagir avec des fichiers, des tuyaux, des sockets ou des périphériques en
+    utilisant le pilote approprié.</p>
+<p class="Pp">POE::Driver::SysRW est le seul pilote fourni avec POE.
+    <b>sysread()</b> et <b>syswrite()</b> peuvent gérer presque tous les types
+    d'interactions de flux, donc il n'y a pas eu beaucoup de demande pour un autre
+    type de pilote.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES'><a class='permalink' href='#MÉTHODES'>MÉTHODES</a></h1>
+<p class="Pp">POE::Wheel définit une interface commune que la plupart des sous-classes
+    utilisent. Les sous-classes peuvent implémenter d'autres méthodes, notamment
+    pour aider à accomplir leurs tâches uniques. Si quelque chose d'utile n'est
+    pas documenté ici, consultez la sous-classe avant d'implémenter une
+    fonctionnalité.</p>
+<section class="Ss">
+<h2 class="Ss" id='Méthodes_requises'><a class='permalink' href='#Méthodes_requises'>Méthodes requises</a></h2>
+<p class="Pp">Ces méthodes sont requises par toutes les sous-classes.</p>
+<p class="Pp"><i>new LOTS_OF_STUFF</i></p>
+<p class="Pp"><b>new()</b> instancie et initialise un nouvel objet roue et le
+    retourne. La nouvelle roue continuera à fonctionner tant qu'elle existera,
+    bien que d'autres méthodes puissent modifier son fonctionnement.</p>
+<p class="Pp">Une partie de la construction de chaque roue est l'enregistrement de
+    gestionnaires d'événements anonymes pour effectuer des tâches spécifiques à la
+    roue. Les observateurs d'événements sont également démarrés pour déclencher les
+    gestionnaires lors d'activités pertinentes.</p>
+<p class="Pp">Chaque roue a un objectif différent et nécessite des paramètres de
+    constructeur différents, donc LOTS_OF_STUFF est documenté dans chaque sous-classe
+    particulière.</p>
+<p class="Pp"><i>DESTROY</i></p>
+<p class="Pp">DESTROY est le vieux destructeur d'objets Perl. Lorsque la dernière
+    référence forte à la roue est abandonnée, DESTROY déclenche le nettoyage de
+    la roue. L'objet se retire de la session qui l'a créé : les observateurs
+    d'événements actifs sont arrêtés et les gestionnaires d'événements anonymes
+    sont désenregistrés.</p>
+<p class="Pp"><i>event TYPE_ÉVÉNEMENT, NOM_ÉVÉNEMENT [, TYPE_ÉVÉNEMENT, NOM_ÉVÉNEMENT,
+    ....]</i></p>
+<p class="Pp"><b>event()</b> change les événements qu'une roue émettra. Ses paramètres
+    sont une ou plusieurs paires de TYPE_ÉVÉNEMENT et de NOM_ÉVÉNEMENT à émettre
+    lorsque chaque type d'événement se produit. Si un NOM_ÉVÉNEMENT est indéfini, alors
+    la roue cessera d'émettre ce type d'événement. Ou la roue peut déclencher une
+    erreur si le type d'événement est requis.</p>
+<p class="Pp">Les TYPE_ÉVÉNEMENT varient pour chaque roue et correspondent aux paramètres
+    du constructeur qui correspondent à /.*Event$/. Par exemple,
+    POE::Wheel::ReadWrite peut émettre jusqu'à cinq types d'événements différents :
+    InputEvent, ErrorEvent, FlushedEvent, HighEvent, LowEvent. Le nom de chaque
+    événement émis peut être modifié à l'exécution.</p>
+<p class="Pp">Cet exemple modifie les événements à émettre lors d'une nouvelle entrée et
+    lorsque la sortie est vidée. Il empêche la roue d'émettre des événements en cas
+    d'erreur.</p>
+<pre>$wheel-&gt;event(
+  InputEvent   =&gt; 'new_input_event',
+  ErrorEvent   =&gt; undef,
+  FlushedEvent =&gt; 'new_flushed_event',
+);</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Méthodes_E/S'><a class='permalink' href='#Méthodes_E/S'>Méthodes E/S</a></h2>
+<p class="Pp">Les roues qui effectuent des entrées et sorties peuvent implémenter une partie
+    ou la totalité de ces méthodes. La méthode <b>put()</b> est souvent omise. Les roues
+    qui n'effectuent pas de sortie n'ont pas de méthodes <b>put()</b>.</p>
+<p class="Pp"><i>put ENREGISTREMENT [, ENREGISTREMENT [, ....]]</i></p>
+<p class="Pp"><b>put()</b> envoie un ou plusieurs ENREGISTREMENTS à la roue pour transmission.
+    Chaque ENREGISTREMENT est sérialisé par le POE::Filter associé à la roue afin
+    qu'il soit prêt à être transmis. Le flux sérialisé peut être transmis
+    immédiatement par l'objet POE::Driver de la roue, ou il peut être mis en
+    tampon dans le POE::Driver jusqu'à ce qu'il puisse être vidé vers le descripteur
+    de fichier de sortie.</p>
+<p class="Pp">La plupart des roues utilisent POE::Filter::Line et POE::Driver::SysRW par
+    défaut, il n'est donc pas nécessaire de les spécifier dans la plupart des
+    cas.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Fonctions_statiques_de_classe'><a class='permalink' href='#Fonctions_statiques_de_classe'>Fonctions statiques de classe</a></h2>
+<p class="Pp">Ces fonctions exposent des informations communes à toutes les roues. Ce ne sont
+    pas des méthodes, elles ne doivent donc <b>pas</b> être appelées comme des
+    méthodes.</p>
+<pre>my $new_wheel_id = POE::Wheel::allocate_wheel_id();
+POE::Wheel::free_wheel_id($new_wheel_id);</pre>
+<p class="Pp"><i>allocate_wheel_id</i></p>
+<p class="Pp"><b>Ce n'est pas une méthode de classe.</b></p>
+<p class="Pp">Chaque roue a un identifiant unique. <b>allocate_wheel_id()</b> renvoie le
+    prochain identifiant de roue unique disponible. Les constructeurs de roues
+    l'utilisent pour définir leurs identifiants en interne.</p>
+<pre>package POE::Wheel::Example;
+use base qw(POE::Wheel);
+sub new {
+  # ... entre autres choses ...
+  $self-&gt;[MY_WHEEL_ID] = POE::Wheel::allocate_wheel_id();
+  return $self;
+}</pre>
+<p class="Pp">Les identifiants de roue sont utilisés pour distinguer les événements
+    de</p>
+</section>
+</section>
+</div>
+</section>
+
+            </article>
+            <aside id="content-right">
+                
+            </aside>
+        </main>
+        <footer>
+            
+        </footer>
+    </body>
+</html>
+m similairement typés
+    roues. Par exemple, un utilitaire de surveillance de fichiers multi-fichiers peut gérer toute l'entrée de fichier avec la même fonction. Les identifiants de roue peuvent être utilisés pour savoir quelle roue a généré l'événement d'entrée en cours de traitement.</p>
+<p class="Pp">Les identifiants de roue sont souvent utilisés pour stocker un état local à la roue dans le tas d'une session.</p>
+<pre>sub handle_error {
+  my $wheel_id = $_[ARG3];
+  print &quot;La roue $wheel_id a attrapé une erreur. Fermeture.&quot;;
+  delete $_[HEAP]{wheels}{$wheel_id};
+}</pre>
+<p class="Pp">Il est essentiel que les roues libèrent leurs identifiants alloués lorsqu'elles sont détruites. La classe POE::Wheel suit les identifiants de roue alloués pour éviter les collisions, et ils resteront en mémoire jusqu'à leur libération. Voir <b>free_wheel_id()</b>.</p>
+<p class="Pp"><i>free_wheel_id WHEEL_ID</i></p>
+<p class="Pp"><b>Ce n'est pas une méthode de classe.</b></p>
+<p class="Pp"><b>free_wheel_id()</b> désalloue un identifiant de roue afin qu'il cesse de consommer de la mémoire et puisse être réutilisé ultérieurement. Ceci est souvent appelé depuis le destructeur d'une roue.</p>
+<pre>package POE::Wheel::Example;
+use base qw(POE::Wheel);
+sub DESTROY {
+  my $self = shift;
+  # ... entre autres choses ...
+  POE::Wheel::free_wheel_id($self-&gt;[MY_WHEEL_ID]);
+}</pre>
+<p class="Pp">Les identifiants de roue peuvent être réutilisés, bien que cela n'ait jamais été signalé. Cependant, deux roues actives ne partageront jamais le même identifiant.</p>
+<p class="Pp"><i>ID</i></p>
+<p class="Pp"><b>Ceci est généralement implémenté dans la sous-classe !</b></p>
+<p class="Pp">La méthode <b>ID()</b> renvoie l'identifiant unique d'une roue. Elle est couramment utilisée pour faire correspondre les événements avec les roues qui les ont générés.</p>
+<p class="Pp">Encore une fois, cette méthode n'est pas implémentée dans cette classe ! Si elle est manquante dans la sous-classe, veuillez aller importuner cet auteur de module - merci !</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR   AUSSI</a></h1>
+<p class="Pp">La section VOIR AUSSI de POE contient une table des matières couvrant toute la distribution POE.</p>
+<p class="Pp">POE::Driver - Une classe de base pour les pilotes d'accès aux fichiers que POE::Wheel peut utiliser.</p>
+<p class="Pp">POE::Filter - Une classe de base pour les analyseurs et les sérialiseurs de données que POE::Wheel peut utiliser.</p>
+<p class="Pp">POE::Wheel::Curses - Entrée non bloquante pour Curses.</p>
+<p class="Pp">POE::Wheel::FollowTail - Surveillance non bloquante de fichiers et de FIFO.</p>
+<p class="Pp">POE::Wheel::ListenAccept - Serveur non bloquant pour les sockets existants.</p>
+<p class="Pp">POE::Wheel::ReadLine - Entrée console non bloquante, avec prise en charge complète de readline.</p>
+<p class="Pp">POE::Wheel::ReadWrite - E/S de flux non bloquantes.</p>
+<p class="Pp">POE::Wheel::Run - Création et gestion de processus non bloquantes.</p>
+<p class="Pp">POE::Wheel::SocketFactory - Création de sockets non bloquantes, prenant en charge la plupart des protocoles et des modes.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BOGUES'><a class='permalink' href='#BOGUES'>BOGUES</a></h1>
+<p class="Pp">Il serait bien que les roues soient plus semblables à de vrais flux Unix.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEURS_&amp;amp;_DROITS_D_AUTEUR'><a class='permalink' href='#AUTEURS_&amp;amp;_DROITS_D_AUTEUR'>AUTEURS   &amp; DROITS D'AUTEUR</a></h1>
+<p class="Pp">Veuillez vous référer à POE pour plus d'informations sur les auteurs, les contributeurs et la licence de POE.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2024-07-13</td>
+    <td class="foot-os">perl v5.38.2</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page man" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-poe/">extra/perl-poe</a></dd>
+        <dt>Version :</dt>
+        <dd>1.370-2</dd>
+        <dt>En amont :</dt>
+        <dd><a href="https://search.cpan.org/dist/POE">https://search.cpan.org/dist/POE</a></dd>
+        <dt>Licences :</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-poe/">/listing/extra/perl-poe/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#FILTRES,_ET_PILOTES">FILTRES, ET PILOTES</a></li>
+        
+            <li><a href="#METHODES">METHODES</a></li>
+        
+            <li><a href="#VOIR_AUSSI">VOIR AUSSI</a></li>
+        
+            <li><a href="#BOGUES">BOGUES</a></li>
+        
+            <li><a href="#AUTEURS_&amp;amp;_DROITS_D_AUTEUR">AUTEURS &amp; DROITS D'AUTEUR</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/POE::Wheel.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/POE::Wheel.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>, à l'exception du contenu des pages de manuel, qui ont leur propre licence spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

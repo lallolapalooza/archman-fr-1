@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Type::Tiny::Manual::UsingWithClassTiny(3pm) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Type__Tiny__Manual__UsingWithClassTiny(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-type-tiny/">perl-type-tiny</a></p>
+<p class="lic">Licences: PerlArtistic, GPL</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Type::Tiny::Manual::UsingWithClassTiny(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">Type::Tiny::Manual::UsingWithClassTiny(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Type::Tiny::Manual::UsingWithClassTiny - utilisation de Type::Tiny avec
+    Class::Tiny</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MANUEL'><a class='permalink' href='#MANUEL'>MANUEL</a></h1>
+<p class="Pp">Class::Tiny est un constructeur de classes encore plus petit que Moo.</p>
+<p class="Pp">Traduisons la classe Horse classique de Moo en
+    Class::Tiny.</p>
+<p class="Pp">Moo :</p>
+<pre>package Horse {
+  use Moo;
+  use Types::Standard qw( Str Num ArrayRef );
+  use namespace::autoclean;
+
+  has name       =&gt; ( is =&gt; 'ro', isa =&gt; Str, required =&gt; 1 );
+  has gender     =&gt; ( is =&gt; 'ro', isa =&gt; Str );
+  has age        =&gt; ( is =&gt; 'rw', isa =&gt; Num );
+  has children   =&gt; (
+    is       =&gt; 'ro',
+    isa      =&gt; ArrayRef,
+    default  =&gt; sub { return [] },
+  );
+}</pre>
+<p class="Pp">Class::Tiny :</p>
+<pre>package Horse {
+  use Class::Tiny qw( gender age ), {
+    name     =&gt; sub { die &quot;name is required&quot;; },
+    children =&gt; sub { return [] },
+  };
+  use Types::Standard qw( Str Num ArrayRef Dict Optional Slurpy Any Object );
+  use Type::Params qw( signature_for );
+  use namespace::autoclean;
+
+  # vérifications de type
+  signature_for BUILD =&gt; (
+    method =&gt; Object,
+    named  =&gt; [
+      name       =&gt; Str,
+      gender     =&gt; Optional[Str],
+      age        =&gt; Optional[Num],
+      children   =&gt; Optional[ArrayRef],
+      ()         =&gt; Slurpy[Any],
+    ],
+    fallback =&gt; 1,
+  );
+  signature_for [ 'name', 'gender', 'children' ] =&gt; (
+    method     =&gt; Object,
+    positional =&gt; [],
+  );
+  signature_for age =&gt; (
+    method     =&gt; Object,
+    positional =&gt; [ Optional[Num] ],
+  );
+}</pre>
+<p class="Pp">Que se passe-t-il ici ?</p>
+<p class="Pp">Eh bien, Class::Tiny, après avoir construit un nouvel objet, fait ceci :</p>
+<pre>$self-&gt;BUILD($args);</pre>
+<p class="Pp">(Techniquement, il appelle <span class="Li">&quot;BUILD&quot;</span>
+    non seulement pour la classe actuelle, mais aussi pour toutes les classes parentes.) Nous pouvons nous accrocher à cela afin de vérifier les contraintes de type pour le constructeur.</p>
+<p class="Pp">Nous utilisons <span class="Li">&quot;signature_for&quot;</span> de
+    Type::Params pour envelopper la méthode <span class="Li">&quot;BUILD&quot;</span>
+    originale (qui n'existe pas, donc <span class="Li">&quot;fallback =&gt;
+    1&quot;</span> supposera simplement une sous-routine vide) avec une vérification de type pour ses arguments. La vérification de type est simplement un <b>Dict</b> qui vérifie les attributs requis et optionnels de la classe et inclut <b>Slurpy[Any]</b> à la fin pour être flexible aux sous-classes ajoutant de nouveaux attributs.</p>
+<p class="Pp">Ensuite, nous enveloppons les méthodes <span class="Li">&quot;name&quot;</span>,
+    <span class="Li">&quot;gender&quot;</span> et
+    <span class="Li">&quot;children&quot;</span> avec des vérifications pour
+    s'assurer qu'elles ne sont appelées qu'en tant que getters, et nous enveloppons
+    <span class="Li">&quot;age&quot;</span>, lui permettant d'être appelé en tant
+    que setter avec un <b>Num</b>.</p>
+<p class="Pp">Il existe également quelques modules CPAN qui peuvent vous aider.</p>
+<section class="Ss">
+<h2 class="Ss" id='Class::Tiny::ConstrainedAccessor'><a class='permalink' href='#Class::Tiny::ConstrainedAccessor'>Class::Tiny::ConstrainedAccessor</a></h2>
+<p class="Pp">Class::Tiny::ConstrainedAccessor crée un
+    <span class="Li">&quot;BUILD&quot;</span> et des accesseurs qui appliquent
+    les contraintes de Type::Tiny. Les types d'attributs sont passés à
+    Class::Tiny::ConstrainedAccessor ; les valeurs par défaut des attributs sont
+    passées à Class::Tiny.</p>
+<pre>package Horse {
+  use Types::Standard qw( Str Num ArrayRef );
+  use Class::Tiny::ConstrainedAccessor {
+    name     =&gt; Str,
+    gender   =&gt; Str,
+    age      =&gt; Num,
+    children =&gt; ArrayRef,
+  };
+  use Class::Tiny qw( gender age ), {
+    name     =&gt; sub { die &quot;name is required&quot;; },
+    children =&gt; sub { return [] },
+  };
+}</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Class::Tiny::Antlers'><a class='permalink' href='#Class::Tiny::Antlers'>Class::Tiny::Antlers</a></h2>
+<p class="Pp">Class::Tiny::Antlers fournit une syntaxe de type Moose pour Class::Tiny,
+    y compris le support de <span class="Li">&quot;isa&quot;</span>. Vous n'avez
+    pas non plus besoin d'utiliser Class::Tiny lui-même.</p>
+<pre>package Horse {
+  use Class::Tiny::Antlers qw(has);
+  use Types::Standard qw( Str Num ArrayRef );
+  use namespace::autoclean;
+
+  has name       =&gt; (
+    is        =&gt; 'ro',
+    isa       =&gt; Str,
+    default   =&gt; sub { die &quot;name is required&quot; },
+  );
+  has gender     =&gt; ( is =&gt; 'ro',    isa =&gt; Str );
+  has age        =&gt; ( is =&gt; 'rw',    isa =&gt; Num );
+  has children   =&gt; (
+    is        =&gt; 'ro',
+    isa       =&gt; ArrayRef,
+    default   =&gt; sub { return [] },
+  );
+}</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PROCHAINES_ÉTAPES'><a class='permalink' href='#PROCHAINES_ÉTAPES'>PROCHAINES ÉTAPES</a></h1>
+<p class="Pp">Voici votre prochaine étape :</p>
+<dl class="Bl-tag">
+  <dt>&#x2022;</dt>
+  <dd>Type::Tiny::Manual::UsingWithOther
+    <p class="Pp">Utilisation de Type::Tiny avec Class::InsideOut, Params::Check
+        et Object::Accessor.</p>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Toby Inkster &lt;tobyink@cpan.org&gt;.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_DACTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_DACTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Ce logiciel est protégé par copyright (c) 2013-2014, 2017-2025 par Toby
+    Inkster.</p>
+<p class="Pp">C'est un logiciel libre ; vous pouvez le redistribuer et/ou le modifier
+    selon les mêmes termes que le système de programmation Perl 5 lui-même.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CLAUSE_DE_NON-RESPONSABILITÉ'><a class='permalink' href='#CLAUSE_DE_NON-RESPONSABILITÉ'>CLAUSE DE NON-RESPONSABILITÉ</a></h1>
+<p class="Pp">CE PAQUET EST FOURNI &quot;TEL QUEL&quot; ET SANS AUCUNE GARANTIE,
+    EXPRESSE OU IMPLICITE, Y COMPRIS, SANS LIMITATION, LES GARANTIES IMPLICITES
+    DE QUALITÉ MARCHANDE ET D'ADÉQUATION À UN USAGE PARTICULIER.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-11-02</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher une page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-type-tiny/">extra/perl-type-tiny</a></dd>
+        <dt>Version :</dt>
+        <dd>2.008004-1</dd>
+        <dt>En amont :</dt>
+        <dd><a href="https://metacpan.org/release/Type-Tiny">https://metacpan.org/release/Type-Tiny</a></dd>
+        <dt>Licences :</dt>
+        <dd>PerlArtistic, GPL</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-type-tiny/">/listing/extra/perl-type-tiny/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#MANUEL">MANUEL</a></li>
+        
+            <li><a href="#PROCHAINES_ÉTAPES">PROCHAINES ÉTAPES</a></li>
+        
+            <li><a href="#AUTEUR">AUTEUR</a></li>
+        
+            <li><a href="#DROITS_DACTEUR_ET_LICENCE">DROITS D'AUTEUR ET LICENCE</a></li>
+        
+            <li><a href="#CLAUSE_DE_NON-RESPONSABILITÉ">CLAUSE DE NON-RESPONSABILITÉ</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Type::Tiny::Manual::UsingWithClassTiny.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/Type::Tiny::Manual::UsingWithClassTiny.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

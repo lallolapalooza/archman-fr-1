@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>File::NFSLock(3pm) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">File__NFSLock(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-file-nfslock/">perl-file-nfslock</a></p>
+<p class="lic">Licences: GPL, PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">File::NFSLock(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">File::NFSLock(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">File::NFSLock - module Perl pour effectuer le verrouillage NFS (ou autre)</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>use File::NFSLock qw(uncache);
+use Fcntl qw(LOCK_EX LOCK_NB);
+my $file = &quot;somefile&quot;;
+### configurer un verrou - dure jusqu'à ce que l'objet perde sa portée
+if (my $lock = new File::NFSLock {
+  file      =&gt; $file,
+  lock_type =&gt; LOCK_EX|LOCK_NB,
+  blocking_timeout   =&gt; 10,      # 10 secondes
+  stale_lock_timeout =&gt; 30 * 60, # 30 minutes
+}) {
+  ### OU
+  ### my $lock = File::NFSLock-&gt;new($file,LOCK_EX|LOCK_NB,10,30*60);
+  ### faire des opérations protégées en écriture sur $file
+  ### à ce moment, $file est mis en cache depuis NFS (le plus récent)
+  open(FILE, &quot;+&lt;$file&quot;) || die $!;
+  ### ou ouvrez-le comme vous le souhaitez
+  ### my $fh = IO::File-&gt;open( $file, 'w' ) || die $!
+  ### mettre à jour (vider le cache) d'autres fichiers
+  uncache(&quot;someotherfile1&quot;);
+  uncache(&quot;someotherfile2&quot;);
+  # open(FILE2,&quot;someotherfile1&quot;);
+  ### déverrouiller
+  $lock-&gt;unlock();
+  ### OU
+  ### undef $lock;
+  ### OU laisser $lock sortir de la portée
+}else{
+  die &quot;Je n'ai pas pu verrouiller le fichier [$File::NFSLock::errstr]&quot;;
+}</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Programme basé sur le concept de la liaison dure des fichiers étant atomique sur NFS. Ce concept a été mentionné dans Mail::Box::Locker (qui a été initialement présenté dans Mail::Folder::Maildir). Certaines routines sont tirées de là -- en particulier l'idée de créer un fichier local aléatoire, de lier un fichier commun au fichier local, puis de vérifier le statut nlink. Certaines idéologies n'étaient pas complètes (mécanisme d'uncache, verrouillage partagé) et certains codages étaient même incorrects (mauvais index stat). File::NFSLock a été écrit pour être léger, générique et rapide.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='USAGE'><a class='permalink' href='#USAGE'>USAGE</a></h1>
+<p class="Pp">Le verrouillage s'effectue en créant un objet File::NFSLock. Si l'objet est créé avec succès, un verrou est actuellement en place et le reste jusqu'à ce que l'objet verrou quitte sa portée (ou appelle la méthode unlock).</p>
+<p class="Pp">Un objet verrou est créé en appelant la méthode new et en passant deux à quatre paramètres de la manière suivante :</p>
+<pre>my $lock = File::NFSLock-&gt;new($file,
+                              $lock_type,
+                              $blocking_timeout,
+                              $stale_lock_timeout,
+                              );</pre>
+<p class="Pp">De plus, les paramètres peuvent être passés sous forme de hashref :</p>
+<pre>my $lock = File::NFSLock-&gt;new({
+  file               =&gt; $file,
+  lock_type          =&gt; $lock_type,
+  blocking_timeout   =&gt; $blocking_timeout,
+  stale_lock_timeout =&gt; $stale_lock_timeout,
+});</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PARAMETRES'><a class='permalink' href='#PARAMETRES'>PARAMETRES</a></h1>
+<dl class="Bl-tag">
+  <dt id="Parametre"><a class="permalink" href="#Parametre">Paramètre 1 :
+    file</a></dt>
+  <dd>Nom du fichier sur lequel il est prévu d'écrire. Le verrouillage fournira la version la plus récente (sans cache) de ce fichier lors d'un verrouillage de fichier réussi. Il n'est pas nécessaire que ce fichier existe.</dd>
+  <dt id="Parametre~2"><a class="permalink" href="#Parametre~2">Paramètre 2 :
+    lock_type</a></dt>
+  <dd>Le type de verrou doit être l'un des suivants :
+        <pre>BLOCKING
+BL
+EXCLUSIVE (BLOCKING)
+EX
+NONBLOCKING
+NB
+SHARED
+SH
+</pre>
+    <p class="Pp">Ou un ou plusieurs des éléments suivants joints avec '|' :</p>
+        <pre>Fcntl::LOCK_EX() (BLOQUANT)
+Fcntl::LOCK_NB() (NON BLOQUANT)
+Fcntl::LOCK_SH() (PARTAGÉ)
+</pre>
+    <p class="Pp">Le type de verrou détermine si le verrou sera bloquant, non
+        bloquant ou partagé. Les verrous bloquants attendront que d'autres verrous soient supprimés avant que le processus ne continue. Les verrous non bloquants retourneront undef si un autre processus détient actuellement le verrou. Le partage permettra à d'autres processus d'effectuer un verrouillage partagé en même temps tant qu'aucun verrou exclusif n'a déjà été obtenu.</p>
+  </dd>
+  <dt id="Parametre~3"><a class="permalink" href="#Parametre~3">Paramètre 3 :
+    blocking_timeout (optionnel)</a></dt>
+  <dd>Le délai d'attente est utilisé en conjonction avec un délai d'attente de blocage. S'il est spécifié, File::NFSLock bloquera jusqu'au nombre de secondes spécifié dans le délai d'attente avant de retourner undef (impossible d'obtenir un verrou).</dd>
+  <dt id="Parametre~4"><a class="permalink" href="#Parametre~4">Paramètre 4 :
+    stale_lock_timeout (optionnel)</a></dt>
+  <dd>Le délai d'attente est utilisé pour voir si un fichier de verrou existant est plus ancien que le délai d'attente de verrou périmé. Si do_lock ne parvient pas à obtenir un verrou, l'heure de modification est vérifiée et do_lock est retenté. Si stale_lock_timeout est réglé trop bas, une charge de récursion pourrait exister, donc do_lock ne récurera que 10 fois (ce n'est un problème que si stale_lock_timeout est réglé trop bas - de l'ordre d'une ou deux secondes).</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='METHODES'><a class='permalink' href='#METHODES'>METHODES</a></h1>
+<p class="Pp">Après que l'objet <span class="Li">$lock</span> a été instancié
+    avec new, comme décrit ci-dessus, certaines méthodes peuvent être utilisées pour
+    des fonctionnalités supplémentaires.</p>
+<section class="Ss">
+<h2 class="Ss" id='unlock'><a class='permalink' href='#unlock'>unlock</a></h2>
+<pre>$lock-&gt;unlock;</pre>
+<p class="Pp">Cette méthode peut être utilisée pour libérer explicitement un verrou acquis. Dans la plupart des cas, il n'est pas nécessaire d'appeler unlock directement car il sera implicitement appelé lorsque l'objet quittera la portée dans laquelle il se trouve.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='uncache'><a class='permalink' href='#uncache'>uncache</a></h2>
+<pre>$lock-&gt;uncache;
+$lock-&gt;uncache(&quot;otherfile1&quot;);
+uncache(&quot;otherfile2&quot;);</pre>
+<p class="Pp">Cette méthode est utilisée pour actualiser le contenu d'un fichier sur
+    NFS, en ignorant ce qui est contenu dans le cache du client NFS. Elle est toujours appelée depuis le constructeur new sur le fichier pour lequel le verrouillage est tenté. uncache peut être utilisé comme méthode d'objet ou comme sous-routine autonome.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='fork'><a class='permalink' href='#fork'>fork</a></h2>
+<pre>my $pid = $lock-&gt;fork;
+if (!defined $pid) {
+  # Échec du fork
+} elsif ($pid) {
+  # Parent ...
+} else {
+  # Enfant ...
+}</pre>
+<p class="Pp"><b>fork()</b> est une méthode de commodité qui agit comme le
+    <b>CORE::fork()</b> normal, sauf qu'elle garantit en toute sécurité que le verrou est conservé dans les processus parent et enfant. SANS cela, lorsque le processus parent ou enfant libère le verrou, le verrou entier sera perdu, permettant aux processus externes de réacquérir un verrou sur le même fichier, même si l'autre processus a toujours l'objet verrou dans sa portée. Cela peut entraîner une corruption car les deux processus pourraient penser qu'ils ont un accès exclusif au fichier.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='newpid'><a class='permalink' href='#newpid'>newpid</a></h2>
+<pre>my $pid = fork;
+if (!defined $pid) {
+  # Échec du fork
+} elsif ($pid) {
+  $lock-&gt;newpid;
+  # Parent ...
+} else {
+  $lock-&gt;newpid;
+  # Enfant ...
+}</pre>
+<p class="Pp">La synopsis de <b>newpid()</b> montrée ci-dessus est équivalente à celle utilisée pour la méthode <b>fork()</b>, mais elle n'est pas destinée à être appelée directement. Elle est appelée en interne par la méthode <b>fork()</b>. Pour plus de sécurité, il est recommandé d'utiliser <span class="Li">$lock</span>-&gt;<b>fork()</b> à partir de maintenant.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ECHEC'><a class='permalink' href='#ECHEC'>ECHEC</a></h1>
+<p class="Pp">En cas d'échec, une variable globale,
+    <span class="Li">$File::NFSLock::errstr</span>, doit être définie et contenir la cause de l'échec de l'obtention d'un verrou. Utile principalement pour le débogage.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXTENSION_VERROU'><a class='permalink' href='#EXTENSION_VERROU'>EXTENSION_VERROU</a></h1>
+<p class="Pp">Par défaut, File::NFSLock utilisera une extension de fichier de verrou de
+    &quot;.NFSLock&quot;. Ceci est dans une variable globale
+    <span class="Li">$File::NFSLock::LOCK_EXTENSION</span> qui peut être modifiée pour convenir à d'autres usages (tels que la compatibilité dans les systèmes de messagerie).</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='REPO'><a class='permalink' href='#REPO'>REPO</a></h1>
+<p class="Pp">Le code source est maintenant sur github :</p>
+<p class="Pp">git clone <a href='https://github.com/hookbot/File-NFSLock'>https://github.com/hookbot/File-NFSLock</a></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BUGS'><a class='permalink' href='#BUGS'>BUGS</a></h1>
+<p class="Pp">Si vous repérez quelque chose, veuillez soumettre une demande d'extraction sur github et/ou soumettre un ticket à RT :
+    <a href='https://rt.cpan.org/Dist/Display.html?Queue=File-NFSLock'>https://rt.cpan.org/Dist/Display.html?Queue=File-NFSLock</a></p>
+<section class="Ss">
+<h2 class="Ss" id='FIFO'><a class='permalink' href='#FIFO'>FIFO</a></h2>
+<p class="Pp">Les verrous ne sont pas nécessairement obtenus dans un ordre chronologique strict. Non seulement cela ne semble pas juste pour les nouveaux processus qui essaient d'obtenir un verrou, mais cela peut également causer une condition de famine de processus sur des fichiers fortement verrouillés.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='DIRECTORIES'><a class='permalink' href='#DIRECTORIES'>DIRECTORIES</a></h2>
+<p class="Pp">Les verrous ne peuvent pas être obtenus sur des nœuds de répertoire, ni un nœud de répertoire ne peut être mis hors cache avec la routine uncache beca</p>
+</section>
+</section>
+</div>
+</section>
+
+            </article>
+            
+        </main>
+        <footer>
+            
+        </footer>
+    </body>
+</html>
+use hard links do not work
+    with directory nodes. Some other algorithm might be used to uncache a
+    directory, but I am unaware of the best way to do it. The biggest use I can
+    see would be to avoid NFS cache of directory modified and last accessed
+    timestamps.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INSTALL'><a class='permalink' href='#INSTALL'>INSTALLATION</a></h1>
+<p class="Pp">Download and extract the tarball before running these commands in its
+    base directory:</p>
+<pre>perl Makefile.PL
+make
+make test
+make install</pre>
+<p class="Pp">For RPM installation, download the tarball before running these
+    commands in your _topdir:</p>
+<pre>rpm -ta SOURCES/File-NFSLock-*.tar.gz
+rpm -ih RPMS/noarch/perl-File-NFSLock-*.rpm</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHORS'><a class='permalink' href='#AUTHORS'>AUTEURS</a></h1>
+<p class="Pp">Paul T Seamons (paul@seamons.com) - A effectué la majeure partie de la
+    programmation avec de nombreuses contributions de Rob Brown.</p>
+<p class="Pp">Rob B Brown (bbb@cpan.org) - En plus d'avoir aidé à la
+    programmation, Rob Brown a fourni la majeure partie des tests de base pour s'assurer que
+    l'implémentation fonctionnait correctement. Il est maintenant le mainteneur actuel.</p>
+<p class="Pp">Aussi Mark Overmeer (mark@overmeer.net) - Auteur de
+    Mail::Box::Locker, à partir duquel certains concepts clés pour File::NFSLock ont
+    été tirés.</p>
+<p class="Pp">Aussi Kevin Johnson (kjj@pobox.com) - Auteur de
+    Mail::Folder::Maildir, sur lequel Mark Overmeer a basé Mail::Box::Locker.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT'><a class='permalink' href='#COPYRIGHT'>DROITS D'AUTEUR</a></h1>
+<pre>Copyright (C) 2001
+Paul T Seamons
+paul@seamons.com
+http://seamons.com/
+Copyright (C) 2002-2018,
+Rob B Brown
+bbb@cpan.org
+Ce paquet peut être distribué selon les termes soit de la
+GNU General Public License
+  ou de la
+Perl Artistic License
+Tous droits réservés.</pre>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2024-07-13</td>
+    <td class="foot-os">perl v5.38.2</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-file-nfslock/">extra/perl-file-nfslock</a></dd>
+        <dt>Version :</dt>
+        <dd>1.29-4</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://search.cpan.org/dist/File-NFSLock">https://search.cpan.org/dist/File-NFSLock</a></dd>
+        <dt>Licences :</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-file-nfslock/">/listing/extra/perl-file-nfslock/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">RÉSUMÉ</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#USAGE">UTILISATION</a></li>
+        
+            <li><a href="#PARAMETERS">PARAMÈTRES</a></li>
+        
+            <li><a href="#METHODS">MÉTHODES</a></li>
+        
+            <li><a href="#FAILURE">ÉCHEC</a></li>
+        
+            <li><a href="#LOCK_EXTENSION">LOCK_EXTENSION</a></li>
+        
+            <li><a href="#REPO">DÉPÔT</a></li>
+        
+            <li><a href="#BUGS">BOGUES</a></li>
+        
+            <li><a href="#INSTALL">INSTALLATION</a></li>
+        
+            <li><a href="#AUTHORS">AUTEURS</a></li>
+        
+            <li><a href="#COPYRIGHT">DROITS D'AUTEUR</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/File::NFSLock.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/File::NFSLock.3pm.en.raw">brut</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible selon les termes de la <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               licence, à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

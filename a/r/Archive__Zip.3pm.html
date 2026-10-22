@@ -1,0 +1,1508 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Archive::Zip(3pm) — Pages manuelles de l'Arch manual</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Archive__Zip(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-archive-zip/">perl-archive-zip</a></p>
+<p class="lic">Licences: GPL, PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Archive::Zip(3)</td>
+    <td class="head-vol">Documentation Perl contribuée par les utilisateurs</td>
+    <td class="head-rtitle">Archive::Zip(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">Archive::Zip - Fournit une interface aux fichiers d'archive ZIP.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre># Create a Zip file
+use Archive::Zip qw( :ERROR_CODES :CONSTANTS );
+my $zip = Archive::Zip-&gt;new();
+# Add a directory
+my $dir_member = $zip-&gt;addDirectory( 'dirname/' );
+# Add a file from a string with compression
+my $string_member = $zip-&gt;addString( 'This is a test', 'stringMember.txt' );
+$string_member-&gt;desiredCompressionMethod( COMPRESSION_DEFLATED );
+# Add a file from disk
+my $file_member = $zip-&gt;addFile( 'xyz.pl', 'AnotherName.pl' );
+# Save the Zip file
+unless ( $zip-&gt;writeToFileNamed('someZip.zip') == AZ_OK ) {
+    die 'write error';
+}
+# Read a Zip file
+my $somezip = Archive::Zip-&gt;new();
+unless ( $somezip-&gt;read( 'someZip.zip' ) == AZ_OK ) {
+    die 'read error';
+}
+# Change the compression type for a file in the Zip
+my $member = $somezip-&gt;memberNamed( 'stringMember.txt' );
+$member-&gt;desiredCompressionMethod( COMPRESSION_STORED );
+unless ( $zip-&gt;writeToFileNamed( 'someOtherZip.zip' ) == AZ_OK ) {
+    die 'write error';
+}</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Le module Archive::Zip permet à un programme Perl de créer,
+    manipuler, lire et écrire des fichiers d'archive Zip.</p>
+<p class="Pp">Des archives Zip peuvent être créées, ou vous pouvez lire depuis des
+    fichiers zip existants.</p>
+<p class="Pp">Une fois créées, elles peuvent être écrites dans des fichiers, des flux
+    ou des chaînes de caractères. Des membres peuvent être ajoutés, supprimés,
+    extraits, remplacés, réorganisés et énumérés. Ils peuvent également être
+    renommés, ou leurs dates, commentaires ou autres attributs peuvent être
+    interrogés ou modifiés. Leurs données peuvent être compressées ou
+    décompressées selon les besoins.</p>
+<p class="Pp">Des membres peuvent être créés à partir de membres dans des fichiers Zip
+    existants, ou à partir de répertoires, de fichiers ou de chaînes de
+    caractères existants.</p>
+<p class="Pp">Ce module utilise la bibliothèque Compress::Raw::Zlib pour lire et
+    écrire les flux compressés à l'intérieur des fichiers.</p>
+<p class="Pp">On peut utiliser Archive::Zip::MemberRead pour lire les membres de
+    l'archive de fichier zip comme s'il s'agissait de fichiers.</p>
+<section class="Ss">
+<h2 class="Ss" id='File_Naming'><a class='permalink' href='#File_Naming'>Nommage des fichiers</a></h2>
+<p class="Pp">Quel que soit le système de fichiers local que vous utilisez pour le
+    nommage des fichiers, les noms dans un fichier Zip sont au format Unix (<i>barres obliques</i> avant (/)
+    séparant les noms de répertoires, etc.).</p>
+<p class="Pp"><span class="Li">"Archive::Zip"</span> essaie d'être
+    cohérent avec les conventions de nommage de fichiers, et traduira dans les
+    deux sens entre les noms de fichiers natifs et Zip.</p>
+<p class="Pp">Cependant, il ne peut pas deviner dans quel format se trouvent les noms.
+    Deux règles contrôlent donc le type de nom de fichier que vous devez
+    passer à diverses routines :</p>
+<dl class="Bl-tag">
+  <dt id="Names"><a class="permalink" href="#Names">Les noms de fichiers sont au format
+    local.</a></dt>
+  <dd><span class="Li">"File::Spec"</span> et
+      <span class="Li">"File::Basename"</span> sont utilisés pour diverses
+      opérations sur les fichiers. Lorsque vous faites référence à un fichier
+      sur votre système, utilisez ses conventions de nommage de fichiers.</dd>
+  <dt id="Names~2"><a class="permalink" href="#Names~2">Les noms des membres d'archive
+    sont au format Unix.</a></dt>
+  <dd>Cela s'applique à chaque méthode qui fait référence à un membre d'archive, ou qui fournit
+      un nom pour de nouveaux membres d'archive. Les méthodes <span class="Li">extract()</span>
+      qui peuvent prendre un ou deux noms convertiront du format local vers le format zip
+      si vous les appelez avec un seul nom.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Archive::Zip_Object_Model'><a class='permalink' href='#Archive::Zip_Object_Model'>Modèle d'objet Archive::Zip</a></h2>
+<p class="Pp"><i>Aperçu</i></p>
+<p class="Pp">Les objets Archive::Zip::Archive sont ceux avec lesquels vous traitez
+    habituellement. Ils maintiennent la structure d'un fichier zip, sans
+    nécessairement contenir de données. Lorsqu'un zip est lu depuis un fichier
+    sur disque, les données (éventuellement compressées) restent dans le
+    fichier, pas en mémoire. Les membres d'archive contiennent des informations
+    sur les membres individuels, mais pas (généralement) les données réelles du
+    membre. Lorsque le zip est écrit dans un fichier (différent), les données
+    du membre sont compressées ou copiées selon les besoins. Il est possible de
+    créer des membres d'archive dont les données sont conservées dans une
+    chaîne en mémoire, mais cela n'est pas fait lorsqu'un fichier zip est lu.
+    Les membres de répertoire n'ont aucune donnée.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Inheritance'><a class='permalink' href='#Inheritance'>Héritage</a></h2>
+<pre>Exporter
+ Archive::Zip                            Common base class, has defs.
+     Archive::Zip::Archive               A Zip archive.
+     Archive::Zip::Member                Abstract superclass for all members.
+         Archive::Zip::StringMember      Member made from a string
+         Archive::Zip::FileMember        Member made from an external file
+             Archive::Zip::ZipFileMember Member that lives in a zip file
+             Archive::Zip::NewFileMember Member whose data is in a file
+         Archive::Zip::DirectoryMember   Member that is a directory</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXPORTS'><a class='permalink' href='#EXPORTS'>EXPORTS</a></h1>
+<dl class="Bl-tag">
+  <dt>:CONSTANTS</dt>
+  <dd>Exporte les constantes suivantes :
+    <p class="Pp">FA_MSDOS FA_UNIX GPBF_ENCRYPTED_MASK
+        GPBF_DEFLATING_COMPRESSION_MASK GPBF_HAS_DATA_DESCRIPTOR_MASK
+        COMPRESSION_STORED COMPRESSION_DEFLATED IFA_TEXT_FILE_MASK IFA_TEXT_FILE
+        IFA_BINARY_FILE COMPRESSION_LEVEL_NONE COMPRESSION_LEVEL_DEFAULT
+        COMPRESSION_LEVEL_FASTEST COMPRESSION_LEVEL_BEST_COMPRESSION
+        ZIP64_SUPPORTED ZIP64_AS_NEEDED ZIP64_EOCD ZIP64_HEADERS</p>
+  </dd>
+  <dt>:MISC_CONSTANTS</dt>
+  <dd>Exporte les constantes suivantes (uniquement nécessaires pour étendre le module) :
+    <p class="Pp">FA_AMIGA FA_VAX_VMS FA_VM_CMS FA_ATARI_ST FA_OS2_HPFS
+        FA_MACINTOSH FA_Z_SYSTEM FA_CPM FA_WINDOWS_NTFS
+        GPBF_IMPLODING_8K_SLIDING_DICTIONARY_MASK
+        GPBF_IMPLODING_3_SHANNON_FANO_TREES_MASK
+        GPBF_IS_COMPRESSED_PATCHED_DATA_MASK COMPRESSION_SHRUNK
+        DEFLATING_COMPRESSION_NORMAL DEFLATING_COMPRESSION_MAXIMUM
+        DEFLATING_COMPRESSION_FAST DEFLATING_COMPRESSION_SUPER_FAST
+        COMPRESSION_REDUCED_1 COMPRESSION_REDUCED_2 COMPRESSION_REDUCED_3
+        COMPRESSION_REDUCED_4 COMPRESSION_IMPLODED COMPRESSION_TOKENIZED
+        COMPRESSION_DEFLATED_ENHANCED
+        COMPRESSION_PKWARE_DATA_COMPRESSION_LIBRARY_IMPLODED</p>
+  </dd>
+  <dt>:ERROR_CODES</dt>
+  <dd>Expliquées ci-dessous. Retournées par la plupart des méthodes.
+    <p class="Pp">AZ_OK AZ_STREAM_END AZ_ERROR AZ_FORMAT_ERROR AZ_IO_ERROR</p>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ERROR_CODES'><a class='permalink' href='#ERROR_CODES'>CODES   D'ERREUR</a></h1>
+<p class="Pp">Beaucoup des méthodes dans Archive::Zip retournent des codes d'erreur. Ceux-ci
+    sont implémentés comme des sous-routines en ligne, utilisant la <span class="Li">"use
+    constant"</span> pragme. Ils peuvent être importés dans votre espace de noms en utilisant
+    le marqueur <span class="Li">":ERROR_CODES"</span> :</p>
+<pre>use Archive::Zip qw( :ERROR_CODES );
+...
+unless ( $zip-&gt;read( 'myfile.zip' ) == AZ_OK ) {
+    die "whoops!";
+}</pre>
+<dl class="Bl-tag">
+  <dt id="AZ_OK"><a class="permalink" href="#AZ_OK">AZ_OK (0)</a></dt>
+  <dd>Tout va bien.</dd>
+  <dt id="AZ_STREAM_END"><a class="permalink" href="#AZ_STREAM_END">AZ_STREAM_END
+    (1)</a></dt>
+  <dd>Le flux de lecture (ou le répertoire central) s'est terminé normalement.</dd>
+  <dt id="AZ_ERROR"><a class="permalink" href="#AZ_ERROR">AZ_ERROR (2)</a></dt>
+  <dd>Il y a eu une erreur de type générique.</dd>
+  <dt id="AZ_FORMAT_ERROR"><a class="permalink" href="#AZ_FORMAT_ERROR">AZ_FORMAT_ERROR
+    (3)</a></dt>
+  <dd>Il y a une erreur de format dans un fichier ZIP en cours de lecture.</dd>
+  <dt id="AZ_IO_ERROR"><a class="permalink" href="#AZ_IO_ERROR">AZ_IO_ERROR
+    (4)</a></dt>
+  <dd>Il y a eu une erreur d'E/S.</dd>
+</dl>
+<section class="Ss">
+<h2 class="Ss" id='Compression'><a class='permalink' href='#Compression'>Compression</a></h2>
+<p class="Pp">Archive::Zip permet à chaque membre d'un fichier ZIP d'être compressé
+    (à l'aide de l'algorithme Deflate) ou non compressé.</p>
+<p class="Pp">Les autres algorithmes de compression que certaines versions de ZIP ont été
+    capables de produire ne sont pas pris en charge. Chaque membre a deux
+    méthodes de compression : celle sous laquelle il est stocké (c'est toujours
+    COMPRESSION_STORED pour les membres issus de chaînes de caractères et de
+    fichiers externes), et celle que vous désirez pour le membre dans le
+    fichier zip.</p>
+<p class="Pp">Celles-ci peuvent bien sûr différer, vous pouvez donc créer un membre zip
+    non compressé à partir d'un membre compressé, et vice versa.</p>
+<p class="Pp">Vous pouvez interroger la compression actuelle et définir la méthode de
+    compression souhaitée :</p>
+<pre>my $member = $zip-&gt;memberNamed( 'xyz.txt' );
+$member-&gt;compressionMethod();    # return current compression
+# set to read uncompressed
+$member-&gt;desiredCompressionMethod( COMPRESSION_STORED );
+# set to read compressed
+$member-&gt;desiredCompressionMethod( COMPRESSION_DEFLATED );</pre>
+<p class="Pp">Il y a deux méthodes de compression différentes :</p>
+<dl class="Bl-tag">
+  <dt id="COMPRESSION_STORED"><a class="permalink" href="#COMPRESSION_STORED">COMPRESSION_STORED</a></dt>
+  <dd>Le fichier est stocké (pas de compression)</dd>
+  <dt id="COMPRESSION_DEFLATED"><a class="permalink" href="#COMPRESSION_DEFLATED">COMPRESSION_DEFLATED</a></dt>
+  <dd>Le fichier est Deflate</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Compression_Levels'><a class='permalink' href='#Compression_Levels'>Niveau   de compressions</a></h2>
+<p class="Pp">Si la méthode de compression souhaitée d'un membre (desiredCompressionMethod) est COMPRESSION_DEFLATED, vous pouvez choisir différents niveaux de compression. Ce choix peut affecter la vitesse de compression et de décompression, ainsi que la taille des données du membre compressé.</p>
+<pre>$member-&gt;desiredCompressionLevel( 9 );</pre>
+<p class="Pp">Les niveaux possibles sont :</p>
+<ul class="Bl-bullet">
+  <li>0 ou COMPRESSION_LEVEL_NONE
+    <p class="Pp">Cela revient à dire</p>
+        <pre>$member-&gt;desiredCompressionMethod( COMPRESSION_STORED );
+</pre>
+  </li>
+  <li>1 .. 9
+    <p class="Pp">1 donne la meilleure vitesse et la pire compression, et 9 donne la meilleure compression et la pire vitesse.</p>
+  </li>
+  <li>COMPRESSION_LEVEL_FASTEST
+    <p class="Pp">C'est un synonyme pour le niveau 1.</p>
+  </li>
+  <li>COMPRESSION_LEVEL_BEST_COMPRESSION
+    <p class="Pp">C'est un synonyme pour le niveau 9.</p>
+  </li>
+  <li>COMPRESSION_LEVEL_DEFAULT
+    <p class="Pp">Cela donne un bon compromis entre vitesse et compression, et est actuellement équivalent à 6 (c'est dans le code zlib). C'est le niveau qui sera utilisé s'il n'est pas spécifié.</p>
+  </li>
+</ul>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Archive::Zip_Methods'><a class='permalink' href='#Archive::Zip_Methods'>Archive::Zip   Méthodes</a></h1>
+<p class="Pp">La classe Archive::Zip (et sa sous-classe invisible Archive::Zip::Archive) implémente les fonctionnalités génériques des fichiers zip. Créer un nouvel objet Archive::Zip crée en fait un objet Archive::Zip::Archive, mais vous n'avez pas à vous en préoccuper sauf si vous créez une sous-classe.</p>
+<section class="Ss">
+<h2 class="Ss" id='Constructor'><a class='permalink' href='#Constructor'>Constructeur</a></h2>
+<dl class="Bl-tag">
+  <dt id="new("><a class="permalink" href="#new(">new( [$fileName] )</a></dt>
+  <dd></dd>
+  <dt id="new(~2"><a class="permalink" href="#new(~2">new( { filename =&gt;
+    $fileName } )</a></dt>
+  <dd>Crée une nouvelle archive zip vide.
+        <pre>my $zip = Archive::Zip-&gt;new();
+</pre>
+    <p class="Pp">Si un argument supplémentaire est passé, <b>new()</b> appellera
+        <b>read()</b> pour lire le contenu d'une archive :</p>
+        <pre>my $zip = Archive::Zip-&gt;new( 'xyz.zip' );
+</pre>
+    <p class="Pp">Si un argument de nom de fichier est passé et que la lecture échoue pour quelque raison que ce soit, new renverra undef. Pour cette raison, il peut être préférable d'appeler read séparément.</p>
+  </dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Zip_Archive_Utility_Methods'><a class='permalink' href='#Zip_Archive_Utility_Methods'>Zip   Méthodes utilitaires de l'archive</a></h2>
+<p class="Pp">Ces méthodes d'Archive::Zip peuvent être appelées comme fonctions ou comme méthodes d'objet. Ne les appelez pas comme méthodes de classe :</p>
+<pre>$zip = Archive::Zip-&gt;new();
+$crc = Archive::Zip::computeCRC32( 'ghijkl' );    # OK
+$crc = $zip-&gt;computeCRC32( 'ghijkl' );            # also OK
+$crc = Archive::Zip-&gt;computeCRC32( 'ghijkl' );    # NOT OK</pre>
+<dl class="Bl-tag">
+  <dt id="Archive::Zip::computeCRC32("><a class="permalink" href="#Archive::Zip::computeCRC32(">Archive::Zip::computeCRC32(
+    $string [, $crc] )</a></dt>
+  <dd></dd>
+  <dt id="Archive::Zip::computeCRC32(~2"><a class="permalink" href="#Archive::Zip::computeCRC32(~2">Archive::Zip::computeCRC32(
+    { string =&gt; $string [, checksum =&gt; $crc ] } )</a></dt>
+  <dd>C'est une fonction utilitaire qui utilise la routine CRC de Compress::Raw::Zlib pour calculer un CRC-32. Vous pouvez obtenir le CRC d'une chaîne :
+        <pre>$crc = Archive::Zip::computeCRC32( $string );
+</pre>
+    <p class="Pp">Ou vous pouvez calculer le CRC courant :</p>
+        <pre>$crc = 0;
+$crc = Archive::Zip::computeCRC32( 'abcdef', $crc );
+$crc = Archive::Zip::computeCRC32( 'ghijkl', $crc );
+</pre>
+  </dd>
+  <dt id="Archive::Zip::setChunkSize("><a class="permalink" href="#Archive::Zip::setChunkSize(">Archive::Zip::setChunkSize(
+    $number )</a></dt>
+  <dd></dd>
+  <dt id="Archive::Zip::setChunkSize(~2"><a class="permalink" href="#Archive::Zip::setChunkSize(~2">Archive::Zip::setChunkSize(
+    { chunkSize =&gt; $number } )</a></dt>
+  <dd>Signale ou change la taille de bloc utilisée pour la lecture et l'écriture. Cela peut faire de grandes différences lors du traitement de fichiers volumineux. Actuellement, la valeur par défaut est de 32K. Cela change aussi la taille de bloc utilisée pour Compress::Raw::Zlib. Vous devez appeler <b>setChunkSize()</b> avant de lire ou d'écrire. Ceci n'est pas exportable, vous devez donc l'appeler comme ceci :
+        <pre>Archive::Zip::setChunkSize( 4096 );
+</pre>
+    <p class="Pp">ou comme méthode sur un zip (bien que ce soit un réglage global). Renvoie l'ancienne taille de bloc.</p>
+  </dd>
+  <dt id="Archive::Zip::chunkSize()"><a class="permalink" href="#Archive::Zip::chunkSize()"><b>Archive::Zip::chunkSize()</b></a></dt>
+  <dd>Renvoie la taille de bloc courante :
+        <pre>my $chunkSize = Archive::Zip::chunkSize();
+</pre>
+  </dd>
+  <dt id="Archive::Zip::setErrorHandler("><a class="permalink" href="#Archive::Zip::setErrorHandler(">Archive::Zip::setErrorHandler(
+    \&amp;subroutine )</a></dt>
+  <dd></dd>
+  <dt id="Archive::Zip::setErrorHandler(~2"><a class="permalink" href="#Archive::Zip::setErrorHandler(~2">Archive::Zip::setErrorHandler(
+    { subroutine =&gt; \&amp;subroutine } )</a></dt>
+  <dd>Change la sous-routine appelée avec les chaînes d'erreur. La valeur par défaut est \&amp;Carp::carp, mais vous voudrez peut-être la changer pour récupérer les chaînes d'erreur. Ceci n'est pas exportable, vous devez donc l'appeler comme ceci :
+        <pre>Archive::Zip::setErrorHandler( \&amp;myErrorHandler );
+</pre>
+    <p class="Pp">Si myErrorHandler est undef, réinitialise le gestionnaire à la valeur par défaut. Renvoie l'ancien gestionnaire d'erreur. Notez que si vous appelez Carp::carp ou une routine similaire, ou si vous déléguez au gestionnaire d'erreur par défaut depuis votre gestionnaire d'erreur, vous voudrez peut-être incrémenter le nombre de niveaux d'appelant qui sont ignorés (ne le réglez pas simplement sur un nombre) :</p>
+        <pre>$Carp::CarpLevel++;
+</pre>
+  </dd>
+  <dt id="Archive::Zip::tempFile("><a class="permalink" href="#Archive::Zip::tempFile(">Archive::Zip::tempFile(
+    [ $tmpdir ] )</a></dt>
+  <dd></dd>
+  <dt id="Archive::Zip::tempFile(~2"><a class="permalink" href="#Archive::Zip::tempFile(~2">Archive::Zip::tempFile(
+    { tempDir =&gt; $tmpdir } )</a></dt>
+  <dd>Crée un fichier temporaire avec un nom unique. Il sera renvoyé ouvert en lecture/écriture. Si <span class="Li">$tmpdir</span> est fourni, il est utilisé comme le nom du répertoire dans lequel créer le fichier. S'il n'est pas fourni, crée le fichier en utilisant <span class="Li">File::Spec::tmpdir()</span>. Généralement, vous pouvez
+      annuler ce choix en utilisant la variable d'environnement
+        <pre>$ENV{TMPDIR}
+</pre>
+    <p class="Pp">. Mais consultez la documentation de File::Spec pour votre système. Notez que sur de nombreux systèmes, si vous exécutez en mode taint, vous devez vous assurer que <span class="Li">$ENV{TMPDIR}</span> est
+        non contaminé (untainted) pour qu'il soit utilisé. Ne <i>PAS</i> créer
+        <span class="Li">$tmpdir</span> s'il n'existe pas (c'est un changement par rapport aux versions précédentes !). Renvoie le descripteur de fichier et le nom :</p>
+        <pre>my ($fh, $name) = Archive::Zip::tempFile();
+my ($fh, $name) = Archive::Zip::tempFile('myTempDir');
+my $fh = Archive::Zip::tempFile();  # if you don't need the name
+</pre>
+  </dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Zip_Archive_Accessors'><a class='permalink' href='#Zip_Archive_Accessors'>Zip   Accesseurs de l'archive</a></h2>
+<dl class="Bl-tag">
+  <dt id="members()"><a class="permalink" href="#members()"><b>members()</b></a></dt>
+  <dd>Renvoie une copie du tableau des membres
+        <pre>my @members = $zip-&gt;members();
+</pre>
+  </dd>
+  <dt id="numberOfMembers()"><a class="permalink" href="#numberOfMembers()"><b>numberOfMembers()</b></a></dt>
+  <dd>Renvoie le nombre de membres que j'ai</dd>
+  <dt id="memberNames()"><a class="permalink" href="#memberNames()"><b>memberNames()</b></a></dt>
+  <dd>Renvoie une liste des noms de fichiers (internes) des membres du zip</dd>
+  <dt id="memberNamed("><a class="permalink" href="#memberNamed(">memberNamed(
+    $string )</a></dt>
+  <dd></dd>
+  <dt id="memberNamed(~2"><a class="permalink" href="#memberNamed(~2">memberNamed(
+    { zipName =&gt; $string } )</a></dt>
+  <dd>Renvoie une référence au membre dont le nom de fichier est égal au nom de fichier donné, ou undef.
+      <span class="Li">$string</span> doit être au format de nom de fichier Zip (Unix).</dd>
+  <dt id="membersMatching("><a class="permalink" href="#membersMatching(">membersMatching(
+    $regex )</a></dt>
+  <dd></dd>
+  <dt id="membersMatching(~2"><a class="permalink" href="#membersMatching(~2">membersMatching(
+    { regex =&gt; $regex } )</a></dt>
+  <dd>Renvoie un tableau des membres dont les noms de fichiers correspondent à l'expression rationnelle donnée en contexte liste. Renvoie le nombre de membres correspondants en contexte scalaire.
+        <pre>my @textFileMembers = $zip-&gt;membersMatching( '.*\.txt' );
+# or
+my $numberOfTextFiles = $zip-&gt;membersMatching( '.*\.txt' );
+</pre>
+  </dd>
+  <dt id="zip64()"><a class="permalink" href="#zip64()"><b>zip64()</b></a></dt>
+  <dd>Indique si la lecture ou l'écriture précédente de l'archive a été faite au format zip64.</dd>
+  <dt id="desiredZip64Mode()"><a class="permalink" href="#desiredZip64Mode()"><b>desiredZip64Mode()</b></a></dt>
+  <dd>Obtient ou définit quelles parties de l'archive doivent être écrites au format zip64 : toutes les parties au besoin (ZIP64_AS_NEEDED), la valeur par défaut, force l'écriture de l'enregistrement de fin du répertoire central zip64 (ZIP64_EOCD), force l'écriture de l'enregistrement zip64 EOCD et de tous les en-têtes au format zip64 (ZIP64_HEADERS).</dd>
+  <dt id="versionMadeBy()"><a class="permalink" href="#versionMadeBy()"><b>versionMadeBy()</b></a></dt>
+  <dd></dd>
+  <dt id="versionNeededToExtract()"><a class="permalink" href="#versionNeededToExtract()"><b>versionNeededToExtract()</b></a></dt>
+  <dd>Obtient les champs de l'enregistrement de fin du répertoire central zip64. Ceux-ci sont toujours à 0 si l'archive n'est pas au format zip64.</dd>
+  <dt id="diskNumber()"><a class="permalink" href="#diskNumber()"><b>diskNumber()</b></a></dt>
+  <dd>Renvoie le disque sur lequel je commence. Non utilisé pour l'écriture des zips, mais pourrait être intéressant si vous lisez un zip. Cela devrait être 0, car Archive::Zip ne gère pas les archives multi-volumes.</dd>
+  <dt id="diskNumberWithStartOfCentralDirectory()"><a class="permalink" href="#diskNumberWithStartOfCentralDirectory()"><b>diskNumberWithStartOfCentralDirectory()</b></a></dt>
+  <dd>Renvoie le numéro de disque qui contient le début du répertoire central. Non utilisé pour l'écriture des zips, mais pourrait être intéressant si vous lisez un zip. Cela devrait être 0, car Archive::Zip ne gère pas les archives multi-volumes.</dd>
+  <dt id="numberOfCentralDirectoriesOnThisDisk()"><a class="permalink" href="#numberOfCentralDirectoriesOnThisDisk()"><b>numberOfCentralDirectoriesOnThisDisk()</b></a></dt>
+  <dd>Renvoie le nombre de structures CD dans le fichier zip lu en dernier. Non utilisé pour l'écriture des zips, mais pourrait être intéressant si vous lisez un zip.</dd>
+  <dt id="numberOfCentralDirectories()"><a class="permalink" href="#numberOfCentralDirectories()"><b>numberOfCentralDirectories()</b></a></dt>
+  <dd>Renvoie le nombre de structures CD dans le fichier zip lu en dernier. Non utilisé pour l'écriture des zips, mais pourrait être intéressant si vous lisez un zip.</dd>
+  <dt id="centralDirectorySize()"><a class="permalink" href="#centralDirectorySize()"><b>centralDirectorySize()</b></a></dt>
+  <dd>Renvoie la taille du répertoire central, telle que lue depuis un fichier zip externe. Non utilisé pour l'écriture des zips, mais pourrait être intéressant si vous lisez un zip.</dd>
+  <dt id="centralDirectoryOffsetWRTStartingDiskNumber()"><a class="permalink" href="#centralDirectoryOffsetWRTStartingDiskNumber()"><b>centralDirectoryOffsetWRTStartingDiskNumber()</b></a></dt>
+  <dd>Renvoie le décalage dans le fichier zip où commence le CD. Non utilisé pour l'écriture des zips, mais pourrait être intéressant si vous lisez un zip.</dd>
+  <dt id="zipfileComment("><a class="permalink" href="#zipfileComment(">zipfileComment(
+    [ $string ] )</a></dt>
+  <dd></dd>
+  <dt id="zipfileComment(~2"><a class="permalink" href="#zipfileComment(~2"&gt;zipfileComment(
+    [ { comment =&gt; $string } ] )</a></dt>
+  <dd>Récupère ou définit le commentaire du fichier zip. Retourne l'ancien commentaire.
+        <pre>print $zip-&gt;zipfileComment();
+$zip-&gt;zipfileComment( 'New Comment' );
+</pre>
+  </dd>
+  <dt id="eocdOffset()"><a class="permalink" href="#eocdOffset()"><b>eocdOffset()</b></a></dt>
+  <dd>Retourne le nombre (inattendu) d'octets entre l'endroit où l'EOCD a été trouvé
+      et l'endroit où il était censé se trouver. Cela vaut normalement 0, mais serait positif si
+      quelque chose (un virus, peut-être) avait ajouté des octets quelque part avant l'EOCD.
+      Non utilisé pour l'écriture des zips, mais pourrait être intéressant si vous lisez un zip.
+      Voici un exemple de la manière dont vous pouvez diagnostiquer cela :
+        <pre>my $zip = Archive::Zip-&gt;new('somefile.zip');
+if ($zip-&gt;eocdOffset())
+{
+  warn "A virus has added ", $zip-&gt;eocdOffset, " bytes of garbage\n";
+}
+</pre>
+    <p class="Pp">Le <span class="Li">eocdOffset()</span> est utilisé pour ajuster la
+        position de départ des en-têtes des membres, si nécessaire.</p>
+  </dd>
+  <dt id="fileName()"><a class="permalink" href="#fileName()"><b>fileName()</b></a></dt>
+  <dd>Retourne le nom du dernier fichier lu. Si rien n'a encore été lu,
+      retourne une chaîne vide ; si lu depuis un descripteur de fichier, retourne le descripteur sous
+      forme de chaîne.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Zip_Archive_Member_Operations'><a class='permalink' href='#Zip_Archive_Member_Operations'>Zip   Opérations sur les membres d'archive</a></h2>
+<p class="Pp">Diverses opérations sur un fichier zip modifient des membres. Lorsqu'un membre est
+    passé en argument, vous pouvez soit utiliser une référence au membre lui-même,
+    soit le nom d'un membre. Bien sûr, utiliser le nom nécessite que les noms soient
+    uniques au sein d'un zip (ce qui n'est pas imposé).</p>
+<dl class="Bl-tag">
+  <dt id="removeMember("><a class="permalink" href="#removeMember(">removeMember(
+    $memberOrName )</a></dt>
+  <dd></dd>
+  <dt id="removeMember(~2"><a class="permalink" href="#removeMember(~2">removeMember(
+    { memberOrZipName =&gt; $memberOrName } )</a></dt>
+  <dd>Supprime et retourne le membre donné, ou recherche son nom et le supprime.
+      Retourne undef si le membre ou le nom n'existe pas dans ce Zip. Ne fait rien si
+      le membre n'appartient pas à ce zip.</dd>
+  <dt id="replaceMember("><a class="permalink" href="#replaceMember(">replaceMember(
+    $memberOrName, $newMember )</a></dt>
+  <dd></dd>
+  <dt id="replaceMember(~2"><a class="permalink" href="#replaceMember(~2">replaceMember(
+    { memberOrZipName =&gt; $memberOrName, newMember =&gt; $newMember }
+    )</a></dt>
+  <dd>Supprime et retourne le membre donné, ou recherche son nom et le supprime.
+      Remplace par le nouveau membre. Retourne undef si le membre ou le nom n'existe pas dans
+      ce Zip, ou si <span class="Li">$newMember</span> est indéfini.
+    <p class="Pp">C'est une erreur (non diagnostiquée) de fournir un
+        <span class="Li">$newMember</span> qui est un membre du zip en cours de
+        modification.</p>
+        <pre>my $member1 = $zip-&gt;removeMember( 'xyz' );
+my $member2 = $zip-&gt;replaceMember( 'abc', $member1 );
+# now, $member2 (named 'abc') is not in $zip,
+# and $member1 (named 'xyz') is, having taken $member2's place.
+</pre>
+  </dd>
+  <dt id="extractMember("><a class="permalink" href="#extractMember(">extractMember(
+    $memberOrName [, $extractedName ] )</a></dt>
+  <dd></dd>
+  <dt id="extractMember(~2"><a class="permalink" href="#extractMember(~2">extractMember(
+    { memberOrZipName =&gt; $memberOrName [, name =&gt; $extractedName ] }
+    )</a></dt>
+  <dd>Extrait le membre donné, ou recherche son nom et l'extrait. Retourne undef
+      si le membre n'existe pas dans ce Zip. Si le deuxième argument optionnel est fourni, utilisez-le
+      comme nom du membre extrait. Sinon, le nom de fichier interne
+      du membre est utilisé comme nom du fichier ou du répertoire extrait. Si
+      vous passez <span class="Li">$extractedName</span>, il doit être dans le format
+      du système de fichiers local. Si vous ne passez pas
+      <span class="Li">$extractedName</span> et que le nom de fichier interne traverse
+      un répertoire parent ou un lien symbolique, l'extraction sera interrompue avec
+      <span class="Li">"AC_ERROR"</span> pour des raisons de sécurité. Tous
+      les répertoires nécessaires seront créés. Retourne
+      <span class="Li">"AZ_OK"</span> en cas de succès.</dd>
+  <dt id="extractMemberWithoutPaths("><a class="permalink" href="#extractMemberWithoutPaths(">extractMemberWithoutPaths(
+    $memberOrName [, $extractedName ] )</a></dt>
+  <dd></dd>
+  <dt id="extractMemberWithoutPaths(~2"><a class="permalink" href="#extractMemberWithoutPaths(~2">extractMemberWithoutPaths(
+    { memberOrZipName =&gt; $memberOrName [, name =&gt; $extractedName ] }
+    )</a></dt>
+  <dd>Extrait le membre donné, ou recherche son nom et l'extrait. N'utilise pas
+      les informations de chemin (extrait dans le répertoire courant). Retourne undef si
+      le membre n'existe pas dans ce Zip. Si le deuxième argument optionnel est fourni, utilisez-le
+      comme nom du membre extrait (ses chemins seront également supprimés).
+      Sinon, le nom de fichier interne du membre (sans les chemins) est utilisé comme
+      nom du fichier ou du répertoire extrait. Retourne
+      <span class="Li">"AZ_OK"</span> en cas de succès. Si vous ne passez pas
+      <span class="Li">$extractedName</span> et que le nom de fichier interne est
+      égal à un lien symbolique local, l'extraction sera interrompue avec
+      <span class="Li">"AC_ERROR"</span> pour des raisons de sécurité.</dd>
+  <dt id="addMember("><a class="permalink" href="#addMember(">addMember( $member
+    )</a></dt>
+  <dd></dd>
+  <dt id="addMember(~2"><a class="permalink" href="#addMember(~2">addMember( {
+    member =&gt; $member } )</a></dt>
+  <dd>Ajoute un membre (éventuellement provenant d'un autre fichier zip) au fichier zip. Retourne
+      le nouveau membre. En général, vous utiliserez <b>addFile()</b>,
+      <b>addDirectory()</b>, <b>addFileOrDirectory()</b>, <b>addString()</b>, ou
+      <b>read()</b> pour ajouter des membres.
+        <pre># Move member named 'abc' to end of zip:
+my $member = $zip-&gt;removeMember( 'abc' );
+$zip-&gt;addMember( $member );
+</pre>
+  </dd>
+  <dt id="updateMember("><a class="permalink" href="#updateMember(">updateMember(
+    $memberOrName, $fileName )</a></dt>
+  <dd></dd>
+  <dt id="updateMember(~2"><a class="permalink" href="#updateMember(~2">updateMember(
+    { memberOrZipName =&gt; $memberOrName, name =&gt; $fileName } )</a></dt>
+  <dd>Met à jour un seul membre à partir du fichier ou du répertoire nommé
+      <span class="Li">$fileName</span>. Retourne le membre (éventuellement ajouté ou mis à jour),
+      le cas échéant ; <span class="Li">"undef"</span> en cas d'erreur. La
+      comparaison est basée sur <span class="Li">lastModTime()</span> et (dans le
+      cas d'un non-répertoire) la taille du fichier.</dd>
+  <dt id="addFile("><a class="permalink" href="#addFile(">addFile( $fileName [,
+    $newName, $compressionLevel ] )</a></dt>
+  <dd></dd>
+  <dt id="addFile(~2"><a class="permalink" href="#addFile(~2">addFile( {
+    filename =&gt; $fileName [, zipName =&gt; $newName, compressionLevel =&gt;
+    $compressionLevel } ] )</a></dt>
+  <dd>Ajoute un membre dont les données proviennent d'un fichier externe, en retournant le
+      membre ou undef. Le membre aura son nom de fichier défini sur le nom du
+      fichier externe, et sa desiredCompressionMethod définie sur
+      COMPRESSION_DEFLATED. Les attributs du fichier et l'heure de dernière modification seront
+      définis à partir du fichier. Si le nom donné ne représente pas un fichier
+      ordinaire lisible ou un lien symbolique, undef sera retourné.
+      <span class="Li">$fileName</span> doit être dans le format requis pour le
+      système de fichiers local. L'argument optionnel <span class="Li">$newName</span> définit
+      le nom de fichier interne sur quelque chose de différent du
+      <span class="Li">$fileName</span>donné. <span class="Li">$newName</span>, s'il est
+      fourni, doit être au format de nom Zip (c'est-à-dire Unix). Le bit de mode texte sera
+      défini si le contenu semble être du texte (comme retourné par l'
+      opérateur perl
+      <span class="Li">"-T"</span> ).
+    <p class="Pp"><i>NOTE</i> : vous ne devriez pas (en général) utiliser de noms de chemin absolus
+        dans les noms des membres zip, car cela causera des problèmes avec certains outils zip
+        ainsi qu'introduire une faille de sécurité et rendre le zip plus difficile à utiliser.</p>
+  </dd>
+  <dt id="addDirectory("><a class="permalink" href="#addDirectory(">addDirectory(
+    $directoryName [, $fileName ] )</a></dt>
+  <dd></dd>
+  <dt id="addDirectory(~2"><a class="permalink" href="#addDirectory(~2">addDirectory(
+    { directoryName =&gt; $directoryName [, zipName =&gt; $fileName ] }
+    )</a></dt>
+  <dd>Ajoute un membre créé à partir du nom de répertoire donné. Le nom du répertoire
+      n'a pas besoin de désigner un répertoire existant. Si le répertoire nommé
+      existe, l'heure de modification du fichier et les permissions sont définies à partir du
+      répertoire existant, sinon elles sont définies à maintenant et à des permissions par défaut permissives. <span class="Li">$directoryName</span> doit être au format du système de
+      fichiers local. Le deuxième argument optionnel définit le nom du membre de l'archive
+      (qui vaut par défaut <span class="Li">$directoryName</span>). S'il est
+      fourni, il doit être au format Zip (Unix). Retourne le nouveau membre.</dd>
+  <dt id="addFileOrDirectory("><a class="permalink" href="#addFileOrDirectory(">addFileOrDirectory(
+    $name [, $newName, $compressionLevel ] )</a></dt>
+  <dd></dd>
+  <dt id="addFileOrDirectory(~2"><a class="permalink" href="#addFileOrDirectory(~2">addFileOrDirectory(
+    { name =&gt; $name [, zipName =&gt; $newName, compressionLevel =&gt;
+    $compressionLevel ] } )</a></dt>
+  <dd>Ajoute un membre à partir du fichier ou du répertoire nommé
+      <span class="Li">$name</span>. Si <span class="Li">$newName</span> est
+      fourni, utilisez-le comme nom du nouveau membre. Ajoutera ou supprimera les barres obliques finales de <span class="Li">$newName</span> selon les besoins.
+      <span class="Li">$name</span> doit être au format du système de fichiers local. Le
+      deuxième argument optionnel définit le nom du membre de l'archive (qui
+      vaut par défaut <span class="Li">$name</span>). S'il est fourni, il doit être au format
+      Zip (Unix).</dd>
+  <dt id="addString("><a class="permalink" href="#addString(">addString(
+    $stringOrStringRef, $name, [$compressionLevel] )</a></dt>
+  <dd></dd>
+  <dt id="addString(~2"><a class="permalink" href="#addString(~2">addString( {
+    string =&gt; $stringOrStringRef [, zipName =&gt; $name, compressionLevel
+    =&gt; $compressionLevel ] } )</a></dt>
+  <dd>Ajoute un membre créé à partir de la chaîne ou de la référence de chaîne donnée. Le
+      nom est donné par le deuxième argument. Retourne le nouveau membre. L'heure de
+      dernière modification sera définie à maintenant, et les attributs du fichier seront définis
+      à des valeurs par défaut permissives.
+        <pre>my $member = $zip-&gt;addString( 'This is a test', 'test.txt' );
+</pre>
+  </dd>
+  <dt id="contents("><a class="permalink" href="#contents(">contents(
+    $memberOrMemberName [, $newContents ] )</a></dt>
+  <dd></dd>
+  <dt id="contents(~2"><a class="permalink" href="#contents(~2">contents( {
+    memberOrZipName =&gt; $memberOrMemberName [, contents =&gt; $newContents ] }
+    )</a></dt>
+  <dd>Retourne les données non compressées d'un membre particulier, ou undef.
+        <pre>print "xyz.txt contains " . $zip-&gt;contents( 'xyz.txt' );
+</pre>
+    <p class="Pp">Peut aussi changer le contenu d'un membre :</p>
+        <pre>$zip-&gt;contents( 'xyz.txt', 'This is the new contents' );
+</pre>
+    <p class="Pp">Si l'appel attend un tableau comme valeur de retour, il
+        inclura le statut comme deuxième valeur du tableau.</p>
+        <pre>($content, $status) = $zip-&gt;contents( 'xyz.txt');
+</pre>
+  </dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Zip_Archive_I/O_operations'><a class='permalink' href='#Zip_Archive_I/O_operations'>Zip   Opérations d'E/S sur les archives</a></h2>
+<p class="Pp">Une archive Zip peut être écrite dans un fichier ou un descripteur de fichier, ou lue
+    depuis l'un d'eux.</p>
+<dl class="Bl-tag">
+  <dt id="writeToFileNamed("><a class="permalink" href="#writeToFileNamed("&gt;writeToFileNamed(
+    $fileName )</a></dt>
+  <dd></dd>
+  <dt id="writeToFileNamed(~2"><a class="permalink" href="#writeToFileNamed(~2">writeToFileNamed(
+    { fileName =&gt; $fileName } )</a></dt>
+  <dd>Écrit une archive zip dans un fichier nommé. Retourne
+      <span class="Li">"AZ_OK"</span> en cas de succès.
+        <pre>my $status = $zip-&gt;writeToFileNamed( 'xx.zip' );
+die "error somewhere" if $status != AZ_OK;
+</pre>
+    <p class="Pp">Notez que si vous utilisez le même nom qu'un fichier zip existant
+        que vous avez lu, vous écraserez les ZipFileMembers. Écrivez plutôt
+        dans un nom de fichier différent, puis supprimez l'original. Si vous utilisez les
+        <span class="Li">overwrite()</span> ou
+        <span class="Li">overwriteAs()</span> méthodes, vous pouvez réécrire le
+        zip original de cette manière. <span class="Li">$fileName</span> doit être un
+        nom de fichier valide sur votre système.</p>
+  </dd>
+  <dt id="writeToFileHandle("><a class="permalink" href="#writeToFileHandle(">writeToFileHandle(
+    $fileHandle [, $seekable] )</a></dt>
+  <dd>Écrit une archive zip dans un fichier handle. Retourne AZ_OK en cas de succès. Le
+      deuxième argument optionnel indique s'il faut ou non tenter de se déplacer en arrière pour
+      réécrire les en-têtes. S'il n'est pas fourni, il est défini si le test Perl
+      <span class="Li">"-f"</span> renvoie vrai. Cela pourrait échouer
+      sur certains systèmes d'exploitation, cependant.
+        <pre>my $fh = IO::File-&gt;new( 'someFile.zip', 'w' );
+unless ( $zip-&gt;writeToFileHandle( $fh ) == AZ_OK ) {
+    # error handling
+}
+</pre>
+    <p class="Pp">Si vous passez un fichier handle non déplaçable (comme si vous
+        écrivez dans un pipe ou un socket), passez un deuxième argument faux :</p>
+        <pre>my $fh = IO::File-&gt;new( '| cat &gt; somefile.zip', 'w' );
+$zip-&gt;writeToFileHandle( $fh, 0 );   # fh is not seekable
+</pre>
+    <p class="Pp">Si cette méthode échoue lors de l'écriture d'un membre, ce membre
+        et tous ceux qui le suivent renverront faux depuis
+        <span class="Li">wasWritten()</span>. Voir <b>writeCentralDirectory()</b>
+        pour une façon de gérer cela. Si vous le souhaitez, vous pouvez écrire des données dans le fichier
+        handle avant de le passer à <b>writeToFileHandle()</b>; cela pourrait être
+        utilisé (par exemple) pour créer des archives auto-extractibles. Cependant, cela
+        ne fonctionne de manière fiable que lors de l'écriture dans un vrai fichier (par opposition à STDOUT ou
+        à d'autres possibles non-fichiers).</p>
+    <p class="Pp">Voir examples/selfex.pl pour savoir comment écrire une archive
+        auto-extractible.</p>
+  </dd>
+  <dt id="writeCentralDirectory("><a class="permalink" href="#writeCentralDirectory(">writeCentralDirectory(
+    $fileHandle [, $offset ] )</a></dt>
+  <dd></dd>
+  <dt id="writeCentralDirectory(~2"><a class="permalink" href="#writeCentralDirectory(~2">writeCentralDirectory(
+    { fileHandle =&gt; $fileHandle [, offset =&gt; $offset ] } )</a></dt>
+  <dd>Écrit la structure du répertoire central dans le fichier handle donné.
+    <p class="Pp">Retourne AZ_OK en cas de succès. Si on lui donne un
+        <span class="Li">$offset</span>, il se déplacera à ce point avant d'écrire.
+        Cela peut être utilisé pour la récupération dans les cas où writeToFileHandle ou
+        writeToFileNamed renvoient une erreur IO due à un manque d'espace sur
+        le fichier de destination.</p>
+    <p class="Pp">Vous pouvez tronquer le zip en se déplaçant en arrière puis en écrivant
+        le répertoire :</p>
+        <pre>my $fh = IO::File-&gt;new( 'someFile.zip', 'w' );
+    my $retval = $zip-&gt;writeToFileHandle( $fh );
+if ( $retval == AZ_IO_ERROR ) {
+    my @unwritten = grep { not $_-&gt;wasWritten() } $zip-&gt;members();
+    if (@unwritten) {
+        $zip-&gt;removeMember( $member ) foreach my $member ( @unwritten );
+        $zip-&gt;writeCentralDirectory( $fh,
+        $unwritten[0]-&gt;writeLocalHeaderRelativeOffset());
+    }
+}
+</pre>
+  </dd>
+  <dt id="overwriteAs("><a class="permalink" href="#overwriteAs(">overwriteAs(
+    $newName )</a></dt>
+  <dd></dd>
+  <dt id="overwriteAs(~2"><a class="permalink" href="#overwriteAs(~2">overwriteAs(
+    { filename =&gt; $newName } )</a></dt>
+  <dd>Écrit le zip dans le fichier spécifié, aussi sûrement que possible. Cela est fait
+      en écrivant d'abord dans un fichier temporaire, puis en renommant l'original s'il existe,
+      puis en renommant le fichier temporaire, puis en supprimant l'original renommé s'il
+      existe. Retourne AZ_OK si réussi.</dd>
+  <dt id="overwrite()"><a class="permalink" href="#overwrite()"><b>overwrite()</b></a></dt>
+  <dd>Réécrit dans le fichier zip original. Voir <b>overwriteAs()</b> ci-dessus. Si
+      le zip n'a jamais été lu depuis un fichier, cela génère une erreur.</dd>
+  <dt id="read("><a class="permalink" href="#read(">read( $fileName )</a></dt>
+  <dd></dd>
+  <dt id="read(~2"><a class="permalink" href="#read(~2">read( { filename =&gt;
+    $fileName } )</a></dt>
+  <dd>Lit les en-têtes du fichier zip depuis un fichier zip, en ajoutant de nouveaux membres. Retourne
+      <span class="Li">"AZ_OK"</span> ou un code d'erreur.
+        <pre>my $zipFile = Archive::Zip-&gt;new();
+my $status = $zipFile-&gt;read( '/some/FileName.zip' );
+</pre>
+  </dd>
+  <dt id="readFromFileHandle("><a class="permalink" href="#readFromFileHandle(">readFromFileHandle(
+    $fileHandle, $filename )</a></dt>
+  <dd></dd>
+  <dt id="readFromFileHandle(~2"><a class="permalink" href="#readFromFileHandle(~2">readFromFileHandle(
+    { fileHandle =&gt; $fileHandle, filename =&gt; $filename } )</a></dt>
+  <dd>Lit les en-têtes du fichier zip depuis un fichier handle déjà ouvert, en ajoutant de
+      nouveaux membres. Ne ferme pas le fichier handle. Retourne
+      <span class="Li">"AZ_OK"</span> ou un code d'erreur. Notez que cela
+      nécessite un fichier handle déplaçable ; la lecture depuis un flux n'est pas encore
+      supportée, mais l'utilisation de données en mémoire l'est.
+        <pre>my $fh = IO::File-&gt;new( '/some/FileName.zip', 'r' );
+my $zip1 = Archive::Zip-&gt;new();
+my $status = $zip1-&gt;readFromFileHandle( $fh );
+my $zip2 = Archive::Zip-&gt;new();
+$status = $zip2-&gt;readFromFileHandle( $fh );
+</pre>
+    <p class="Pp">Lire le zip en utilisant des données en mémoire (récursable) :</p>
+        <pre>open my $fh, "&lt;", "archive.zip" or die $!;
+my $zip_data = do { local $.; &lt;$fh&gt; };
+my $zip = Archive::Zip-&gt;new;
+open my $dh, "+&lt;", \$zip_data;
+$zip-&gt;readFromFileHandle ($dh);
+</pre>
+  </dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Zip_Archive_Tree_operations'><a class='permalink' href='#Zip_Archive_Tree_operations'>Opérations sur l'arborescence Zip</a></h2>
+<p class="Pp">Elles se trouvaient autrefois dans Archive::Zip::Tree mais ont été déplacées dans
+    Archive::Zip. Elles permettent d'opérer sur une arborescence entière de membres ou de fichiers. Un
+    exemple d'utilisation :</p>
+<pre>use Archive::Zip;
+my $zip = Archive::Zip-&gt;new();
+# add all readable files and directories below . as xyz/*
+$zip-&gt;addTree( '.', 'xyz' );
+# add all readable plain files below /abc as def/*
+$zip-&gt;addTree( '/abc', 'def', sub { -f &amp;&amp; -r } );
+# add all .c files below /tmp as stuff/*
+$zip-&gt;addTreeMatching( '/tmp', 'stuff', '\.c$' );
+# add all .o files below /tmp as stuff/* if they aren't writable
+$zip-&gt;addTreeMatching( '/tmp', 'stuff', '\.o$', sub { ! -w } );
+# add all .so files below /tmp that are smaller than 200 bytes as stuff/*
+$zip-&gt;addTreeMatching( '/tmp', 'stuff', '\.o$', sub { -s &lt; 200 } );
+# and write them into a file
+$zip-&gt;writeToFileNamed('xxx.zip');
+# now extract the same files into /tmpx
+$zip-&gt;extractTree( 'stuff', '/tmpx' );</pre>
+<dl class="Bl-tag">
+  <dt>$zip-&gt;addTree( $root, $dest [, $pred, $compressionLevel ] ) -- Ajoute une
+    arborescence de fichiers à un zip</dt>
+  <dd></dd>
+  <dt>$zip-&gt;addTree( { root =&gt; $root, zipName =&gt; $dest [, select =&gt;
+    $pred, compressionLevel =&gt; $compressionLevel ] )</dt>
+  <dd><span class="Li">$root</span> est la racine de l'arborescence de fichiers et
+      de répertoires à ajouter. C'est un nom de répertoire valide sur votre système.
+      <span class="Li">$dest</span> est le nom pour la racine dans le fichier zip
+      (undef ou vide signifie utiliser les chemins relatifs). C'est un nom de répertoire ZIP
+      valide (c'est-à-dire qu'il utilise des barres obliques (/) pour séparer
+      les composants de répertoire). <span class="Li">$pred</span> est une référence de sous-programme
+      optionnelle pour sélectionner des fichiers : on lui passe le nom du
+      fichier ou du répertoire potentiel en utilisant <span class="Li">$_</span>, et s'il
+      renvoie vrai, le fichier ou le répertoire sera inclus. Par défaut, on
+      ajoute tous les fichiers et répertoires lisibles. Par exemple, utiliser
+        <pre>my $pred = sub { /\.txt/ };
+$zip-&gt;addTree( '.', '', $pred );
+</pre>
+    <p class="Pp">ajoutera tous les fichiers .txt dans et sous le répertoire
+        courant, en utilisant des noms relatifs, et en rendant les noms identiques dans le
+        fichier zip :</p>
+        <pre>nom original           nom du membre zip
+./xyz                   xyz
+./a/                    a/
+./a/b                   a/b
+</pre>
+    <p class="Pp">Pour traduire les chemins absolus en chemins relatifs, passez-les
+        simplement : <span class="Li">$zip</span>-&gt;addTree( '/c/d', 'a' );</p>
+        <pre>nom original           nom du membre zip
+/c/d/xyz                a/xyz
+/c/d/a/                 a/a/
+/c/d/a/b                a/a/b
+</pre>
+    <p class="Pp">Retourne AZ_OK en cas de succès. Notez que cela ne suivra pas
+        les liens symboliques vers des répertoires. Notez également que cela ne vérifie pas
+        la validité des noms de fichiers.</p>
+    <p class="Pp">Notez que généralement <i>vous ne voulez pas</i> rendre les noms des membres
+        d'archive zip absolus.</p>
+  </dd>
+  <dt>$zip-&gt;addTreeMatching( $root, $dest, $pattern [, $pred,
+    $compressionLevel ] )</dt>
+  <dd></dd>
+  <dt>$zip-&gt;addTreeMatching( { root =&gt; $root, zipName =&gt; $dest, pattern
+    =&gt; $pattern [, select =&gt; $pred, compressionLevel =&gt;
+    $compressionLevel ] } )</dt>
+  <dd><span class="Li">$root</span> est la racine de l'arborescence de fichiers et
+      de répertoires à ajouter <span class="Li">$dest</span> est le nom pour la
+      racine dans le fichier zip (undef signifie utiliser les chemins relatifs)
+      <span class="Li">$pattern</span> est une expression régulière (non ancrée)
+      pour les noms de fichiers à faire correspondre <span class="Li">$pred</span> est une référence de sous-programme
+      optionnelle pour sélectionner des fichiers : on lui passe le nom du
+      fichier ou du répertoire potentiel dans <span class="Li">$_</span>, et s'il
+      renvoie vrai, le fichier ou le répertoire sera inclus. Par défaut, on
+      ajoute tous les fichiers et répertoires lisibles. Pour ajouter tous les fichiers dans et sous le
+      répertoire courant dont les noms se terminent par
+      <span class="Li">".pl"</span>, et les faire extraire dans un
+      sous-répertoire nommé <span class="Li">"xyz"</span>, faites ceci :
+        <pre>$zip-&gt;addTreeMatching( '.', 'xyz', '\.pl$' )
+</pre>
+    <p class="Pp">Pour ajouter tous les fichiers <i>modifiables</i> dans et sous le répertoire
+        nommé <span class="Li">"/abc"</span> dont les noms se terminent par
+        <span class="Li">".pl"</span>, et les faire extraire dans un
+        sous-répertoire nommé <span class="Li">"xyz"</span>, faites ceci :</p>
+        <pre>$zip-&gt;addTreeMatching( '/abc', 'xyz', '\.pl$', sub { -w } )
+</pre>
+    <p class="Pp">Retourne AZ_OK en cas de succès. Notez que cela ne suivra pas
+        les liens symboliques vers des répertoires.</p>
+  </dd>
+  <dt>$zip-&gt;updateTree( $root [, $dest , $pred , $mirror, $compressionLevel ]
+    );</dt>
+  <dd></dd>
+  <dt>$zip-&gt;updateTree( { root =&gt; $root [, zipName =&gt; $dest, select
+    =&gt; $pred, mirror =&gt; $mirror, compressionLevel =&gt; $compressionLevel
+    ] } );</dt>
+  <dd>Met à jour un fichier zip à partir d'une arborescence de répertoires.
+    <p class="Pp"><span class="Li">updateTree()</span> prend les mêmes arguments
+        que <span class="Li">addTree()</span>, mais vérifie d'abord si
+        le fichier ou le répertoire existe déjà dans le fichier zip, et s'il a
+        été modifié.</p>
+    <p class="Pp">Si le quatrième argument <span class="Li">$mirror</span> est
+        vrai, alors supprimez tous mes membres si les fichiers correspondants n'ont pas
+      été trouvés.</p>
+    <p class="Pp">Retourne un code d'erreur ou AZ_OK si tout va bien.</p>
+  </dd>
+  <dt>$zip-&gt;extractTree( [ $root, $dest, $volume } ] )</dt>
+  <dd></dd>
+  <dt>$zip-&gt;extractTree( [ { root =&gt; $root, zipName =&gt; $dest, volume
+    =&gt; $volume } ] )</dt>
+  <dd>Si vous ne fournissez aucun argument, tous les fichiers du zip seront extraits avec leurs noms d'origine.
+    <p class="Pp">Si vous fournissez un argument pour <span class="Li">$root</span>,
+        <span class="Li">"extractTree"</span> extraira tous les
+        membres dont les noms commencent par <span class="Li">$root</span> dans le
+        répertoire courant, en supprimant d'abord <span class="Li">$root</span> .
+        <span class="Li">$root</span> est au format Zip (Unix). Par exemple,</p>
+        <pre>$zip-&gt;extractTree( 'a' );
+</pre>
+    <p class="Pp">appliqué à un zip contenant les fichiers : a/x a/b/c ax/d/e
+        d/e extraira :</p>
+    <p class="Pp">a/x en ./x</p>
+    <p class="Pp">a/b/c en ./b/c</p>
+    <p class="Pp">Si vous donnez deux arguments,
+        <span class="Li">"extractTree"</span> extrait tous les membres
+        dont les noms commencent par <span class="Li">$root</span>. Il traduira
+        <span class="Li">$root</span> en <span class="Li">$dest</span> pour
+        construire le nom du fichier de destination. <span class="Li">$root</span> et
+        <span class="Li">$dest</span> sont au format Zip (Unix). Par
+      exemple,</p>
+        <pre>$zip-&gt;extractTree( 'a', 'd/e' );
+</pre>
+    <p class="Pp">appliqué à un zip contenant les fichiers : a/x a/b/c ax/d/e
+        d/e extraira :</p>
+    <p class="Pp">a/x vers d/e/x</p>
+    <p class="Pp">a/b/c vers d/e/b/c et ignorera ax/d/e et d/e</p>
+    <p class="Pp">Si vous donnez trois arguments,
+        <span class="Li">"extractTree"</span> extrait tous les membres
+        dont les noms commencent par <span class="Li">$root</span>. Il traduira
+        <span class="Li">$root</span> en <span class="Li">$dest</span> pour
+        construire le nom du fichier de destination, puis convertira au format
+        du système de fichiers local, en utilisant <span class="Li">$volume</span> comme nom du volume de destination.</p>
+    <p class="Pp"><span class="Li">$root</span> et
+        <span class="Li">$dest</span> sont au format Zip (Unix).</p>
+    <p class="Pp"><span class="Li">$volume</span> est au format
+        du système de fichiers local.</p>
+    <p class="Pp">Par exemple, sous Windows,</p>
+        <pre>$zip-&gt;extractTree( 'a', 'd/e', 'f:' );
+</pre>
+    <p class="Pp">appliqué à un zip contenant les fichiers : a/x a/b/c ax/d/e
+        d/e extraira :</p>
+    <p class="Pp">a/x vers f:d/e/x</p>
+    <p class="Pp">a/b/c vers f:d/e/b/c et ignorera ax/d/e et d/e</p>
+    <p class="Pp">Si vous voulez des chemins absolus (l'exemple précédent utilisait des
+        chemins relatifs au répertoire courant sur le volume de destination), vous pouvez
+        les spécifier dans <span class="Li">$dest</span>:</p>
+        <pre>$zip-&gt;extractTree( 'a', '/d/e', 'f:' );
+</pre>
+    <p class="Pp">appliqué à un zip contenant les fichiers : a/x a/b/c ax/d/e
+        d/e extraira :</p>
+    <p class="Pp">a/x vers f:\d\e\x</p>
+    <p class="Pp">a/b/c vers f:\d\e\b\c et ignorera ax/d/e et d/e</p>
+    <p class="Pp">Si le chemin du fichier extrait traverse un répertoire parent
+        ou un lien symbolique, l'extraction sera interrompue avec
+        <span class="Li">"AC_ERROR"</span> pour des raisons de sécurité.
+        Retourne un code d'erreur ou AZ_OK si tout s'est bien passé.</p>
+  </dd>
+</dl>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Archive::Zip_Global_Variables'><a class='permalink' href='#Archive::Zip_Global_Variables'>Archive::Zip   Variables Globales</a></h1>
+<dl class="Bl-tag">
+  <dt>$Archive::Zip::UNICODE</dt>
+  <dd>Cette variable contrôle la manière dont les noms de fichiers et de répertoires Unicode sont ajoutés à ou extraits d'une archive. Si définie, les noms de fichiers et de répertoires sont considérés comme étant encodés en UTF-8. C'est <i>EXPÉRIMENTAL ET BUGUÉ (il y a certains cas limites</i> <i>sur Win32)</i>. Veuillez signaler les problèmes.
+        <pre>{
+    local $Archive::Zip::UNICODE = 1;
+    $zip-&gt;addFile('Déjà vu.txt');
+}
+</pre>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MEMBER_OPERATIONS'><a class='permalink' href='#MEMBER_OPERATIONS'>OPÉRATIONS SUR LES MEMBRES</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='Member_Class_Methods'><a class='permalink' href='#Member_Class_Methods'>Méthodes de Classe des Membres</a></h2>
+<p class="Pp">Plusieurs constructeurs vous permettent de construire des membres sans les ajouter
+    à une archive zip. Ils fonctionnent de la même manière que les <b>addFile()</b>,
+    <b>addDirectory()</b>, et <b>addString()</b> méthodes d'instance zip décrites
+    ci-dessus, mais ils n'ajoutent pas les nouveaux membres à un zip.</p>
+<dl class="Bl-tag">
+  <dt id="Archive::Zip::Member"><a class="permalink" href="#Archive::Zip::Member">Archive::Zip::Member-&gt;newFromString(
+    $stringOrStringRef [, $fileName ] )</a></dt>
+  <dd></dd>
+  <dt id="Archive::Zip::Member~2"><a class="permalink" href="#Archive::Zip::Member~2">Archive::Zip::Member-&gt;newFromString(
+    { string =&gt; $stringOrStringRef [, zipName =&gt; $fileName ] )</a></dt>
+  <dd>Construit un nouveau membre à partir de la chaîne donnée. Retourne undef en cas d'erreur.
+        <pre>my $member = Archive::Zip::Member-&gt;newFromString( 'This is a test' );
+my $member = Archive::Zip::Member-&gt;newFromString( 'This is a test', 'test.txt' );
+my $member = Archive::Zip::Member-&gt;newFromString( { string =&gt; 'This is a test', zipName =&gt; 'test.txt' } );
+</pre>
+  </dd>
+  <dt id="newFromFile("><a class="permalink" href="#newFromFile(">newFromFile(
+    $fileName [, $zipName ] )</a></dt>
+  <dd></dd>
+  <dt id="newFromFile(~2"><a class="permalink" href="#newFromFile(~2">newFromFile(
+    { filename =&gt; $fileName [, zipName =&gt; $zipName ] } )</a></dt>
+  <dd>Construit un nouveau membre à partir du fichier donné. Retourne undef en cas d'erreur.
+        <pre>my $member = Archive::Zip::Member-&gt;newFromFile( 'xyz.txt' );
+</pre>
+  </dd>
+  <dt id="newDirectoryNamed("><a class="permalink" href="#newDirectoryNamed(">newDirectoryNamed(
+    $directoryName [, $zipname ] )</a></dt>
+  <dd></dd>
+  <dt id="newDirectoryNamed(~2"><a class="permalink" href="#newDirectoryNamed(~2">newDirectoryNamed(
+    { directoryName =&gt; $directoryName [, zipName =&gt; $zipname ] }
+    )</a></dt>
+  <dd>Construit un nouveau membre à partir du répertoire donné.
+      <span class="Li">$directoryName</span> doit être un nom valide sur votre système
+      de fichiers ; il n'a pas besoin d'exister.
+    <p class="Pp">Si fourni, <span class="Li">$zipname</span> sera le nom du
+        membre zip ; il doit être un nom Zip (Unix) valide. S'il n'est pas fourni, il
+        sera converti à partir de <span class="Li">$directoryName</span>.</p>
+    <p class="Pp">Retourne undef en cas d'erreur.</p>
+        <pre>my $member = Archive::Zip::Member-&gt;newDirectoryNamed( 'CVS/' );
+</pre>
+  </dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Member_Simple_Accessors'><a class='permalink' href='#Member_Simple_Accessors'>Accesseurs Simples des Membres</a></h2>
+<p class="Pp">Ces méthodes obtiennent (et/ou définissent) les valeurs des attributs des membres.</p>
+<p class="Pp">Le format zip64 nécessite que certaines parties des données du membre soient stockées dans
+    les champs dits extraits. Vous ne pouvez ni obtenir ni définir ces données zip64 à travers
+    les accesseurs de champ extraits décrits dans cette section. En fait, les méthodes de membre de bas niveau
+    s'assurent que les données zip64 dans les champs extraits sont gérées
+    de manière complètement transparente et invisible pour l'utilisateur lorsque les membres sont lus ou
+    écrits.</p>
+<dl class="Bl-tag">
+  <dt id="zip64()~2"><a class="permalink" href="#zip64()~2"><b>zip64()</b></a></dt>
+  <dd>Indique si la lecture ou l'écriture précédente du membre a été faite en
+      format zip64.</dd>
+  <dt id="desiredZip64Mode()~2"><a class="permalink" href="#desiredZip64Mode()~2"><b>desiredZip64Mode()</b></a></dt>
+  <dd>Obtient ou définit si les en-têtes du membre doivent être écrits en
+      format zip64 : Selon les besoins (ZIP64_AS_NEEDED), par défaut, ou toujours
+      (ZIP64_HEADERS).</dd>
+  <dt id="versionMadeBy()~2"><a class="permalink" href="#versionMadeBy()~2"><b>versionMadeBy()</b></a></dt>
+  <dd>Obtient le champ de l'en-tête du membre.</dd>
+  <dt id="fileAttributeFormat("><a class="permalink" href="#fileAttributeFormat(">fileAttributeFormat(
+    [ $format ] )</a></dt>
+  <dd></dd>
+  <dt id="fileAttributeFormat(~2"><a class="permalink" href="#fileAttributeFormat(~2">fileAttributeFormat(
+    [ { format =&gt; $format ] } )</a></dt>
+  <dd>Obtient ou définit le champ de l'en-tête du membre. Ce sont des
+      <span class="Li">"FA_*"</span> valeurs.</dd>
+  <dt id="versionNeededToExtract()~2"><a class="permalink" href="#versionNeededToExtract()~2"><b>versionNeededToExtract()</b></a></dt>
+  <dd>Obtient le champ de l'en-tête du membre.</dd>
+  <dt id="bitFlag()"><a class="permalink" href="#bitFlag()"><b>bitFlag()</b></a></dt>
+  <dd>Obtient le champ de bits à usage général de l'en-tête du membre. C'est là que se trouvent les bits <span class="Li">"GPBF_*"</span> .</dd>
+  <dt id="compressionMethod()"><a class="permalink" href="#compressionMethod()"><b>compressionMethod()</b></a></dt>
+  <dd>Retourne la méthode de compression du membre. C'est la méthode actuellement
+      utilisée pour compresser les données du membre. Ce sera
+      COMPRESSION_STORED pour les membres de chaîne ou de fichier ajoutés, ou n'importe laquelle des
+      <span class="Li">"COMPRESSION_*"</span> valeurs pour les membres d'un
+      fichier zip. Cependant, ce module ne peut traiter que les membres dont les données sont au format
+      COMPRESSION_STORED ou COMPRESSION_DEFLATED.</dd>
+  <dt id="desiredCompressionMethod("><a class="permalink" href="#desiredCompressionMethod(">desiredCompressionMethod(
+    [ $method ] )</a></dt>
+  <dd></dd>
+  <dt id="desiredCompressionMethod(~2"><a class="permalink" href="#desiredCompressionMethod(~2">desiredCompressionMethod(
+    [ { compressionMethod =&gt; $method } ] )</a></dt>
+  <dd>Obtient ou définit le
+      <span class="Li">"desiredCompressionMethod"</span>du membre. C'est la
+      méthode de compression qui sera utilisée lorsque le membre sera écrit. Retourne le desiredCompressionMethod précédent. Seuls COMPRESSION_DEFLATED ou
+      COMPRESSION_STORED sont des arguments valides. Le passage à COMPRESSION_STORED
+      changera le desiredCompressionLevel du membre à 0 ; le passage à
+      COMPRESSION_DEFLATED changera le desiredCompressionLevel du membre à
+      COMPRESSION_LEVEL_DEFAULT.</dd>
+  <dt id="desiredCompressionLevel("><a class="permalink" href="#desiredCompressionLevel(">desiredCompressionLevel(
+    [ $level ] )</a></dt>
+  <dd></dd>
+  <dt id="desiredCompressionLevel(~2"><a class="permalink" href="#desiredCompressionLevel(~2">desiredCompressionLevel(
+    [ { compressionLevel =&gt; $level } ] )</a></dt>
+  <dd>Obtient ou définit le desiredCompressionLevel du membre. C'est le niveau qui
+      sera utilisé pour l'écriture. Retourne le desiredCompressionLevel précédent. Les arguments valides
+      sont 0 à 9, COMPRESSION_LEVEL_NONE,
+      COMPRESSION_LEVEL_DEFAULT, COMPRESSION_LEVEL_BEST_COMPRESSION, et
+      COMPRESSION_LEVEL_FASTEST. 0 ou COMPRESSION_LEVEL_NONE changera le
+      desiredCompressionMethod en COMPRESSION_STORED. Tous les autres arguments changeront
+      le desiredCompressionMethod en COMPRESSION_DEFLATED.</dd>
+  <dt id="externalFileName()"><a class="permalink" href="#externalFileName()"><b>externalFileName()</b></a></dt>
+  <dd>Retourne le nom de fichier externe du membre, s'il y en a un, ou undef.</dd>
+  <dt id="fileName()~2"><a class="permalink" href="#fileName()~2"><b>fileName()</b></a></dt>
+  <dd>Obtient ou définit le nom de fichier interne du membre. Retourne le nom de fichier (éventuellement nouveau). Les noms auront les barres obliques inversées converties en barres obliques, et
+      les barres obliques consécutives multiples converties en barres obliques uniques.</dd>
+  <dt id="lastModFileDateTime()"><a class="permalink" href="#lastModFileDateTime()"><b>lastModFileDateTime()</b></a></dt>
+  <dd>Retourne l'horodatage de dernière modification du membre au format
+    MS-DOS.</dd>
+  <dt id="lastModTime()"><a class="permalink" href="#lastModTime()"><b>lastModTime()</b></a></dt>
+  <dd>Retourne l'horodatage de dernière modification du membre, converti en heure locale unixe format.
+        <pre>print "Mod Time: " . scalar( localtime( $member-&gt;lastModTime() ) );
+</pre>
+  </dd>
+  <dt id="setLastModFileDateTimeFromUnix()"><a class="permalink" href="#setLastModFileDateTimeFromUnix()"><b>setLastModFileDateTimeFromUnix()</b></a></dt>
+  <dd>Définit le lastModFileDateTime du membre à partir du temps unix donné.
+        <pre>$member-&gt;setLastModFileDateTimeFromUnix( time() );
+</pre>
+  </dd>
+  <dt id="internalFileAttributes()"><a class="permalink" href="#internalFileAttributes()"><b>internalFileAttributes()</b></a></dt>
+  <dd>Retourne le champ des attributs de fichier interne de l'en-tête zip. Ceci
+      n'est défini que pour les membres lus depuis un fichier zip.</dd>
+  <dt id="externalFileAttributes()"><a class="permalink" href="#externalFileAttributes()"><b>externalFileAttributes()</b></a></dt>
+  <dd>Retourne les attributs du membre tels que lus depuis le fichier ZIP. Notez
+      que ce ne sont PAS des attributs UNIX !</dd>
+  <dt id="unixFileAttributes("><a class="permalink" href="#unixFileAttributes(">unixFileAttributes(
+    [ $newAttributes ] )</a></dt>
+  <dd></dd>
+  <dt id="unixFileAttributes(~2"><a class="permalink" href="#unixFileAttributes(~2">unixFileAttributes(
+    [ { attributes =&gt; $newAttributes } ] )</a></dt>
+  <dd>Obtient ou définit les attributs de fichier du membre en utilisant les
+      attributs de fichier UNIX. Retourne les anciens attributs.
+        <pre>my $oldAttribs = $member-&gt;unixFileAttributes( 0666 );
+</pre>
+    <p class="Pp">Notez que la valeur de retour contient plus que les simples permissions
+        de fichier, vous devrez donc masquer les bits de poids faible pour les
+        comparaisons.</p>
+  </dd>
+  <dt id="localExtraField("><a class="permalink" href="#localExtraField(">localExtraField(
+    [ $newField ] )</a></dt>
+  <dd></dd>
+  <dt id="localExtraField(~2"><a class="permalink" href="#localExtraField(~2">localExtraField(
+    [ { field =&gt; $newField } ] )</a></dt>
+  <dd>Obtient ou définit le champ supplémentaire (extra field) lu depuis
+      l'en-tête local. Le champ supplémentaire doit être dans le format
+      approprié. S'il ne l'est pas, ou si le nouveau champ contient des données
+      liées au format zip64, cette méthode ne modifie pas le champ
+      supplémentaire et retourne AZ_FORMAT_ERROR, sinon elle retourne AZ_OK.</dd>
+  <dt id="cdExtraField("><a class="permalink" href="#cdExtraField(">cdExtraField(
+    [ $newField ] )</a></dt>
+  <dd></dd>
+  <dt id="cdExtraField(~2"><a class="permalink" href="#cdExtraField(~2">cdExtraField(
+    [ { field =&gt; $newField } ] )</a></dt>
+  <dd>Obtient ou définit le champ supplémentaire lu depuis l'en-tête du
+      répertoire central. Le champ supplémentaire doit être dans le format
+      approprié. S'il ne l'est pas, ou si le nouveau champ contient des données
+      liées au format zip64, cette méthode ne modifie pas le champ
+      supplémentaire et retourne AZ_FORMAT_ERROR, sinon elle retourne AZ_OK.</dd>
+  <dt id="extraFields()"><a class="permalink" href="#extraFields()"><b>extraFields()</b></a></dt>
+  <dd>Retourne les champs supplémentaires locaux et du répertoire central,
+      concaténés.</dd>
+  <dt id="fileComment("><a class="permalink" href="#fileComment(">fileComment( [
+    $newComment ] )</a></dt>
+  <dd></dd>
+  <dt id="fileComment(~2"><a class="permalink" href="#fileComment(~2">fileComment(
+    [ { comment =&gt; $newComment } ] )</a></dt>
+  <dd>Obtient ou définit le commentaire de fichier du membre.</dd>
+  <dt id="hasDataDescriptor()"><a class="permalink" href="#hasDataDescriptor()"><b>hasDataDescriptor()</b></a></dt>
+  <dd>Obtient ou définit l'indicateur (flag) de descripteur de données. S'il
+      est défini, l'en-tête local ne contient pas nécessairement les tailles de
+      données correctes. À la place, une petite structure sera stockée à la fin
+      des données du membre contenant ces valeurs. Cela devrait être transparent
+      en fonctionnement normal.</dd>
+  <dt id="crc32()"><a class="permalink" href="#crc32()"><b>crc32()</b></a></dt>
+  <dd>Retourne la valeur CRC-32 pour ce membre. Elle ne sera pas définie pour
+      les membres construits à partir de chaînes ou de fichiers externes avant
+      que le membre ait été écrit.</dd>
+  <dt id="crc32String()"><a class="permalink" href="#crc32String()"><b>crc32String()</b></a></dt>
+  <dd>Retourne la valeur CRC-32 pour ce membre sous forme de chaîne hexadécimale
+      imprimable de 8 caractères. Elle ne sera pas définie pour les membres
+      construits à partir de chaînes ou de fichiers externes avant que le
+      membre ait été écrit.</dd>
+  <dt id="compressedSize()"><a class="permalink" href="#compressedSize()"><b>compressedSize()</b></a></dt>
+  <dd>Retourne la taille compressée pour ce membre. Elle ne sera pas définie
+      pour les membres construits à partir de chaînes ou de fichiers externes
+      avant que le membre ait été écrit.</dd>
+  <dt id="uncompressedSize()"><a class="permalink" href="#uncompressedSize()"><b>uncompressedSize()</b></a></dt>
+  <dd>Retourne la taille décompressée pour ce membre.</dd>
+  <dt id="password("><a class="permalink" href="#password(">password( [
+    $password ] )</a></dt>
+  <dd>Retourne le mot de passe pour ce membre à utiliser lors du déchiffrement. Si
+      <span class="Li">$password</span> est fourni, il définira le mot de passe pour
+      le déchiffrement.</dd>
+  <dt id="isEncrypted()"><a class="permalink" href="#isEncrypted()"><b>isEncrypted()</b></a></dt>
+  <dd>Retourne vrai si ce membre est chiffré. Le module Archive::Zip ne supporte
+      actuellement pas la création de membres chiffrés. Le déchiffrement fonctionne
+      plus ou moins ainsi :
+        <pre>my $zip = Archive::Zip-&gt;new;
+$zip-&gt;read ("encrypted.zip");
+for my $m (map { $zip-&gt;memberNamed ($_) } $zip-&gt;memberNames) {
+    $m-&gt;password ("secret");
+    $m-&gt;contents;  # est "" si le mot de passe était incorrect
+</pre>
+    <p class="Pp">Cela montre que le mot de passe doit être défini par membre, et non
+        par archive. Cela pourrait changer à l'avenir.</p>
+  </dd>
+  <dt id="isTextFile("><a class="permalink" href="#isTextFile(">isTextFile( [
+    $flag ] )</a></dt>
+  <dd></dd>
+  <dt id="isTextFile(~2"><a class="permalink" href="#isTextFile(~2">isTextFile(
+    [ { flag =&gt; $flag } ] )</a></dt>
+  <dd>Retourne vrai si je suis un fichier texte. Peut aussi définir l'état si un
+      argument est fourni (retourne alors l'ancien état). Notez que ce module ne
+      fait actuellement rien avec cet indicateur lors de l'extraction ou du stockage.
+      C'est-à-dire que les octets sont stockés au format natif qu'ils proviennent
+      ou non d'un fichier texte.</dd>
+  <dt id="isBinaryFile()"><a class="permalink" href="#isBinaryFile()"><b>isBinaryFile()</b></a></dt>
+  <dd>Retourne vrai si je suis un fichier binaire. Peut aussi définir l'état si un
+      argument est fourni (retourne alors l'ancien état). Notez que ce module ne
+      fait actuellement rien avec cet indicateur lors de l'extraction ou du stockage.
+      C'est-à-dire que les octets sont stockés au format natif qu'ils proviennent
+      ou non d'un fichier texte.</dd>
+  <dt id="extractToFileNamed("><a class="permalink" href="#extractToFileNamed(">extractToFileNamed(
+    $fileName )</a></dt>
+  <dd></dd>
+  <dt id="extractToFileNamed(~2"><a class="permalink" href="#extractToFileNamed(~2">extractToFileNamed(
+    { name =&gt; $fileName } )</a></dt>
+  <dd>Extrait vers un fichier avec le nom donné. Le fichier sera créé avec les
+      modes par défaut. Les répertoires seront créés si nécessaire. L'argument
+      <span class="Li">$fileName</span> devrait être un nom de fichier valide sur
+      votre système de fichiers. Retourne AZ_OK en cas de succès.</dd>
+  <dt id="isDirectory()"><a class="permalink" href="#isDirectory()"><b>isDirectory()</b></a></dt>
+  <dd>Retourne vrai si je suis un répertoire.</dd>
+  <dt id="isSymbolicLink()"><a class="permalink" href="#isSymbolicLink()"><b>isSymbolicLink()</b></a></dt>
+  <dd>Retourne vrai si je suis un lien symbolique.</dd>
+  <dt id="writeLocalHeaderRelativeOffset()"><a class="permalink" href="#writeLocalHeaderRelativeOffset()"><b>writeLocalHeaderRelativeOffset()</b></a></dt>
+  <dd>Retourne l'offset en octets dans le fichier la dernière fois que j'ai été écrit.</dd>
+  <dt id="wasWritten()"><a class="permalink" href="#wasWritten()"><b>wasWritten()</b></a></dt>
+  <dd>Retourne vrai si j'ai été écrit avec succès. Réinitialisé au début d'une
+      tentative d'écriture.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Low-level_member_data_reading'><a class='permalink' href='#Low-level_member_data_reading'>Lecture des données de membre de bas niveau</a></h2>
+<p class="Pp">Il est possible d'utiliser des routines de plus bas niveau pour accéder aux
+    flux de données des membres, plutôt que les méthodes extract* et <b>contents()</b>. Par
+    exemple, voici comment imprimer le contenu décompressé d'un membre par morceaux
+    en utilisant ces méthodes :</p>
+<pre>my ( $member, $status, $bufferRef );
+$member = $zip-&gt;memberNamed( 'xyz.txt' );
+$member-&gt;desiredCompressionMethod( COMPRESSION_STORED );
+$status = $member-&gt;rewindData();
+die "error $status" unless $status == AZ_OK;
+while ( ! $member-&gt;readIsDone() )
+{
+( $bufferRef, $status ) = $member-&gt;readChunk();
+die "error $status"
+            if $status != AZ_OK &amp;&amp; $status != AZ_STREAM_END;
+# faire quelque chose avec $bufferRef :
+print $$bufferRef;
+}
+$member-&gt;endRead();</pre>
+<dl class="Bl-tag">
+  <dt id="readChunk("><a class="permalink" href="#readChunk(">readChunk( [
+    $chunkSize ] )</a></dt>
+  <dd></dd>
+  <dt id="readChunk(~2"><a class="permalink" href="#readChunk(~2">readChunk( [ {
+    chunkSize =&gt; $chunkSize } ] )</a></dt>
+  <dd>Ceci lit le prochain morceau de la taille donnée depuis le flux de données du
+      membre et le compresse ou le décompresse si nécessaire, retournant une référence
+      aux octets lus et un statut. Si l'argument de taille n'est pas donné, la valeur
+      par défaut est celle définie globalement par Archive::Zip::setChunkSize. Le statut
+      est AZ_OK en cas de succès jusqu'au dernier morceau, où il retourne AZ_STREAM_END.
+      Retourne
+      <span class="Li">"(</span> <span class="Li">\$bytes,
+      $status)"</span>.
+        <pre>my ( $outRef, $status ) = $self-&gt;readChunk();
+print $$outRef if $status != AZ_OK &amp;&amp; $status != AZ_STREAM_END;
+</pre>
+  </dd>
+  <dt id="rewindData()"><a class="permalink" href="#rewindData()"><b>rewindData()</b></a></dt>
+  <dd>Rembobine les données et prépare la lecture des flux de données ou l'écriture
+      des fichiers zip. Peut prendre des options pour <span class="Li">inflateInit()</span> ou
+      <span class="Li">deflateInit()</span>, mais cela n'est probablement pas
+      nécessaire. Les redéfinitions dans les sous-classes devraient appeler cette
+      méthode. Retourne
+      <span class="Li">"AZ_OK"</span> en cas de succès.</dd>
+  <dt id="endRead()"><a class="permalink" href="#endRead()"><b>endRead()</b></a></dt>
+  <dd>Réinitialise les variables de lecture et libère le décompresseur ou le
+      compresseur. Doit être appelé pour fermer les fichiers, etc. Retourne AZ_OK
+      en cas de succès.</dd>
+  <dt id="readIsDone()"><a class="permalink" href="#readIsDone()"><b>readIsDone()</b></a></dt>
+  <dd>Retourne vrai si la lecture a épuisé les données ou a rencontré une erreur.</dd>
+  <dt id="contents()"><a class="permalink" href="#contents()"><b>contents()</b></a></dt>
+  <dd>Retourne toutes les données décompressées du membre ou undef en contexte
+      scalaire. Lorsqu'elle est appelée en contexte tableau, elle retourne <span class="Li">"(
+      $string,</span> <span class="Li">$status )"</span>; le statut sera
+      AZ_OK en cas de succès :
+        <pre>my $string = $member-&gt;contents();
+# ou
+my ( $string, $status ) = $member-&gt;contents();
+die "error $status" unless $status == AZ_OK;
+</pre>
+    <p class="Pp">Peut aussi être utilisée pour définir le contenu d'un membre (cela peut
+        changer la classe du membre) :</p>
+        <pre>$member-&gt;contents( "voici mon nouveau contenu" );
+</pre>
+  </dd>
+  <dt id="extractToFileHandle("><a class="permalink" href="#extractToFileHandle(">extractToFileHandle(
+    $fh )</a></dt>
+  <dd></dd>
+  <dt id="extractToFileHandle(~2"><a class="permalink" href="#extractToFileHandle(~2">extractToFileHandle(
+    { fileHandle =&gt; $fh } )</a></dt>
+  <dd>Extrait (et décompresse, si nécessaire) le contenu du membre vers la poignée
+      de fichier donnée. Retourne AZ_OK en cas de succès.
+    <p class="Pp">Pour les membres représentant des liens symboliques, passez le nom du
+        lien symbolique comme poignée de fichier. Assurez-vous que tous les répertoires
+        dans le chemin vers le lien symbolique existent déjà.</p>
+  </dd>
+</dl>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Archive::Zip::FileMember_methods'><a class='permalink' href='#Archive::Zip::FileMember_methods'&gt;Archive::Zip::FileMember   méthodes</a></h1>
+<p class="Pp">La classe Archive::Zip::FileMember étend Archive::Zip::Member.
+    C'est la classe de base des classes ZipFileMember et NewFileMember. Cette
+    classe ajoute un <span class="Li">"externalFileName"</span> et un
+    <span class="Li">"fh"</span> membre pour garder la trace du fichier
+    externe.</p>
+<dl class="Bl-tag">
+  <dt id="externalFileName()~2"><a class="permalink" href="#externalFileName()~2"><b>externalFileName()</b></a></dt>
+  <dd>Retourne le nom de fichier externe du membre.</dd>
+  <dt id="fh()"><a class="permalink" href="#fh()"><b>fh()</b></a></dt>
+  <dd>Retourne le descripteur de fichier de lecture du membre. Ouvre
+      automatiquement le fichier si nécessaire.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Archive::Zip::ZipFileMember_methods'><a class='permalink' href='#Archive::Zip::ZipFileMember_methods'>Archive::Zip::ZipFileMember   méthodes</a></h1>
+<p class="Pp">La classe Archive::Zip::ZipFileMember représente les membres qui ont
+    été lus depuis des fichiers zip externes.</p>
+<dl class="Bl-tag">
+  <dt id="diskNumberStart()"><a class="permalink" href="#diskNumberStart()"><b>diskNumberStart()</b></a></dt>
+  <dd>Retourne le numéro de disque où se trouve l'en-tête local du
+      membre. Devrait être 0.</dd>
+  <dt id="localHeaderRelativeOffset()"><a class="permalink" href="#localHeaderRelativeOffset()"><b>localHeaderRelativeOffset()</b></a></dt>
+  <dd>Retourne le décalage dans le fichier zip où se trouve l'en-tête
+    local du membre.</dd>
+  <dt id="dataOffset()"><a class="permalink" href="#dataOffset()"><b>dataOffset()</b></a></dt>
+  <dd>Retourne le décalage depuis le début du fichier zip jusqu'aux
+      données du membre.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='REQUIRED_MODULES'><a class='permalink' href='#REQUIRED_MODULES'>MODULES   REQUIS</a></h1>
+<p class="Pp">Archive::Zip nécessite plusieurs autres modules :</p>
+<p class="Pp">Carp</p>
+<p class="Pp">Compress::Raw::Zlib</p>
+<p class="Pp">Cwd</p>
+<p class="Pp">File::Basename</p>
+<p class="Pp">File::Copy</p>
+<p class="Pp">File::Find</p>
+<p class="Pp">File::Path</p>
+<p class="Pp">File::Spec</p>
+<p class="Pp">IO::File</p>
+<p class="Pp">IO::Seekable</p>
+<p class="Pp">Time::Local</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BUGS_AND_CAVEATS'><a class='permalink' href='#BUGS_AND_CAVEATS'>BUGS   ET RÉSERVES</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='When_not_to_use_Archive::Zip'><a class='permalink' href='#When_not_to_use_Archive::Zip'>Quand   ne pas utiliser Archive::Zip</a></h2>
+<p class="Pp">Si vous ne faites qu'extraire des fichiers zip (et/ou d'autres
+    archives), il est recommandé d'utiliser Archive::Extract à la place, car il
+    est beaucoup plus facile à utiliser et isole les fonctionnalités spécifiques
+    aux archives.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Zip64_Format_Support'><a class='permalink' href='#Zip64_Format_Support'>Prise en charge du format   Zip64</a></h2>
+<p class="Pp">Depuis la version 1.66, Archive::Zip prend en charge le format dit
+    zip64, qui surmonte diverses limitations du format de fichier zip
+    original. Sur certains interpréteurs Perl, cependant, même la version 1.11
+    et plus récente d'Archive::Zip ne peut pas prendre en charge le format
+    zip64. Parmi ceux-ci figurent tous les interpréteurs Perl dépourvus de
+    prise en charge 64 bits et ceux antérieurs à la version
+  5.10.0.</p>
+<p class="Pp">Constante <span class="Li">"ZIP64_SUPPORTED"</span>,
+    exportée avec le tag :CONSTANTS, est vraie si Archive::Zip sur
+    l'interpréteur Perl actuel prend en charge le format zip64. S'il ne le
+    prend pas et que vous essayez quand même de lire ou d'écrire une archive au
+    format zip64, Archive::Zip renvoie une erreur <span class="Li">"AZ_ERROR"</span> et signale un message
+    d'erreur du type « zip64 format not supported on this Perl
+    interpreter ».</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;versionMadeBy&amp;quot;_and_&amp;quot;versionNeededToExtract&amp;quot;'><a class='permalink' href='#&amp;quot;versionMadeBy&amp;quot;_and_&amp;quot;versionNeededToExtract&amp;quot;'>"versionMadeBy"   et "versionNeededToExtract"</a></h2>
+<p class="Pp">Le format zip64 et le format de fichier zip en général spécifient
+    quelles valeurs utiliser pour les champs <span class="Li">"versionMadeBy"</span> et
+    <span class="Li">"versionNeededToExtract"</span> dans l'en-tête de fichier local, l'en-tête de fichier du répertoire
+    central et l'enregistrement EOCD zip64. En pratique, cependant, ces champs
+    semblent être utilisés plus ou moins aléatoirement par diverses
+    implémentations d'archivers.</p>
+<p class="Pp">Pour trouver un compromis entre la rétrocompatibilité et la
+    conformité (quelconque) aux normes, Archive::Zip les gère comme suit :</p>
+<ul class="Bl-bullet">
+  <li>Pour le champ <span class="Li">"versionMadeBy"</span>, Archive::Zip utilise la valeur par défaut 20 (45 pour
+      l'enregistrement EOCD zip64) ou toute valeur lue précédemment. Il ne
+      change jamais cette valeur lors de l'écriture d'un en-tête, même s'il est
+      écrit au format zip64, ni lors de l'écriture de l'enregistrement EOCD
+      zip64.</li>
+  <li>De même pour le champ
+      <span class="Li">"versionNeededToExtract"</span>, mais ici Archive::Zip force une valeur
+      minimale de 45 lors de l'écriture d'un en-tête au format zip64 ou de
+      l'enregistrement EOCD zip64.</li>
+  <li>Enfin, Archive::Zip ne dépend jamais des valeurs de ces champs d'aucune
+    manière lors de la lecture d'une archive depuis un fichier ou un descripteur
+    de fichier.</li>
+</ul>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Try_to_avoid_IO::Scalar'><a class='permalink' href='#Try_to_avoid_IO::Scalar'>Essayer   d'éviter IO::Scalar</a></h2>
+<p class="Pp">L'une des façons les plus courantes d'utiliser Archive::Zip est de
+    générer des fichiers Zip en mémoire. La plupart des gens utilisent IO::Scalar
+    à cette fin.</p>
+<p class="Pp">Malheureusement, à partir de la version 1.11, ce module ne fonctionne
+    plus avec IO::Scalar car il implémente incorrectement le positionnement
+    (seeking).</p>
+<p class="Pp">Toute personne utilisant IO::Scalar devrait envisager de migrer vers
+    IO::String, qui est plus petit, plus léger et est implémenté pour être
+    parfaitement compatible avec les descripteurs de fichier positionnables
+    ordinaires.</p>
+<p class="Pp">La prise en charge de IO::Scalar ne sera très probablement <b>pas</b> rétablie à l'avenir, car IO::Scalar lui-même ne peut pas changer sa
+    façon d'être implémenté en raison de problèmes de rétrocompatibilité.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Wrong_password_for_encrypted_members'><a class='permalink' href='#Wrong_password_for_encrypted_members'>Mot de passe   incorrect pour les membres chiffrés</a></h2>
+<p class="Pp">Lorsqu'un membre chiffré est lu avec le mauvais mot de passe, vous
+    devez actuellement relire l'archive entière pour réessayer avec le bon mot de
+    passe.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='TO_DO'><a class='permalink' href='#TO_DO'>À   FAIRE</a></h1>
+<p class="Pp">* choix automatique entre stockage et compression</p>
+<p class="Pp">* hooks de champ supplémentaire (voir notes.txt)</p>
+<p class="Pp">* vérifier les doublons lors de l'ajout/renommage ?</p>
+<p class="Pp">* Extraction de fichiers texte (traduction de fin de ligne)</p>
+<p class="Pp">* Lecture de fichiers zip depuis des entrées non positionnables
+  <br/>
+   (Peut-être en passant par IO::String ?)</p>
+<p class="Pp">* séparer les constantes inutilisées dans un module distinct</p>
+<p class="Pp">* documentation style livre de recettes</p>
+<p class="Pp">* Gérer correctement les chemins contaminés (tainted)</p>
+<p class="Pp">* Travailler sur une meilleure compatibilité avec d'autres modules IO::</p>
+<p class="Pp">* Prise en charge du chiffrement</p>
+<p class="Pp">* Déchiffrement plus convivial</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SUPPORT'><a class='permalink' href='#SUPPORT'>SUPPORT</a></h1>
+<p class="Pp">Les bugs doivent être signalés sur GitHub</p>
+<p class="Pp"><a href='https://github.com/redhotpenguin/perl-Archive-Zip/issues'>https://github.com/redhotpenguin/perl-Archive-Zip/issues</a></p>
+<p class="Pp">Pour d'autres problèmes, contactez le mainteneur.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTEUR</a></h1>
+<p class="Pp">Actuellement maintenu par Fred Moyer
+  &lt;fred@redhotpenguin.com&gt;</p>
+<p class="Pp">Auparavant maintenu par Adam Kennedy &lt;adamk@cpan.org&gt;</p>
+<p class="Pp">Auparavant maintenu par Steve Peters
+    &lt;steve@fisharerojo.org&gt;.</p>
+<p class="Pp">Code des attributs de fichier par Maurice Aubrey
+    &lt;maurice@lovelyfilth.com&gt;.</p>
+<p class="Pp">À l'origine par Ned Konz &lt;nedkonz@cpan.org&gt;.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT'><a class='permalink' href='#COPYRIGHT'>DROITS   D'AUTEUR</a></h1>
+<p class="Pp">Certaines parties copyright 2006 - 2012 Adam Kennedy.</p>
+<p class="Pp">Certaines parties copyright 2005 Steve Peters.</p>
+<p class="Pp">Travail original copyright 2000 - 2004 Ned Konz.</p>
+<p class="Pp">Ce programme est un logiciel libre ; vous pouvez le redistribuer et/ou
+    le modifier selon les mêmes termes que Perl lui-même.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR   AUSSI</a></h1>
+<p class="Pp">Consultez Archive::Zip::MemberRead qui est un wrapper permettant de
+    lire les membres d'une archive Zip comme s'il s'agissait de fichiers.</p>
+<p class="Pp">Compress::Raw::Zlib, Archive::Tar, Archive::Extract</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-13</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-archive-zip/">extra/perl-archive-zip</a></dd>
+        <dt>Version :</dt>
+        <dd>1.68-11</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://search.cpan.org/dist/Archive-Zip/">https://search.cpan.org/dist/Archive-Zip/</a></dd>
+        <dt>Licences :</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-archive-zip/">/listing/extra/perl-archive-zip/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#EXPORTS">EXPORTS</a></li>
+        
+            <li><a href="#ERROR_CODES">CODES D'ERREUR</a></li>
+        
+            <li><a href="#Archive::Zip_Methods">Méthodes Archive::Zip</a></li>
+        
+            <li><a href="#Archive::Zip_Global_Variables">Variables globales Archive::Zip</a></li>
+        
+            <li><a href="#MEMBER_OPERATIONS">OPÉRATIONS SUR LES MEMBRES</a></li>
+        
+            <li><a href="#Archive::Zip::FileMember_methods">Méthodes Archive::Zip::FileMember</a></li>
+        
+            <li><a href="#Archive::Zip::ZipFileMember_methods">Méthodes Archive::Zip::ZipFileMember</a></li>
+        
+            <li><a href="#REQUIRED_MODULES">MODULES REQUIS</a></li>
+        
+            <li><a href="#BUGS_AND_CAVEATS">BUGS ET RÉSERVES</a></li>
+        
+            <li><a href="#TO_DO">À FAIRE</a></li>
+        
+            <li><a href="#SUPPORT">SUPPORT</a></li>
+        
+            <li><a href="#AUTHOR">AUTEUR</a></li>
+        
+            <li><a href="#COPYRIGHT">DROITS D'AUTEUR</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Archive::Zip.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/Archive::Zip.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               , à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Net::Server::HTTP(3) — Pages man Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Net__Server__HTTP(3pm)</h1>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Net::Server::HTTP(3)</td>
+    <td class="head-vol">Documentation des paquets contribués Perl</td>
+    <td class="head-rtitle">Net::Server::HTTP(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>Nom</a></h1>
+<p class="Pp">Net::Server::HTTP - classe de base pour un serveur HTTP basé sur Net::Server</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='TEST_ONE_LINER'><a class='permalink' href='#TEST_ONE_LINER'>TEST ONE LINER</a></h1>
+<pre>perl -e 'use base qw(Net::Server::HTTP); main-&gt;run(port =&gt; 8080)'
+# lancera un serveur echo</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNTAXE</a></h1>
+<pre>use base qw(Net::Server::HTTP);
+__PACKAGE__-&gt;run;
+sub process_http_request {
+    my $self = shift;
+    print &quot;Content-type: text/html\n\n&quot;;
+    print &quot;&lt;form method=post action=/bam&gt;&lt;input type=text name=foo&gt;&lt;input type=submit&gt;&lt;/form&gt;&quot;;
+    require Data::Dumper;
+    local $Data::Dumper::Sortkeys = 1;
+    require CGI;
+    my $form = {};
+    my $q = CGI-&gt;new; $form-&gt;{$_} = $q-&gt;param($_) for $q-&gt;param;
+    print &quot;&lt;pre&gt;&quot;.Data::Dumper-&gt;Dump([\%ENV, $form], ['*ENV', 'form']).&quot;&lt;/pre&gt;&quot;;
+}</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Bien que Net::Server::HTTP ne se trouve pas dans le parallélisme normal des autres arômes de Net::Server, la gestion des requêtes HTTP est une fonctionnalité couramment demandée et c'est un protocole standard et simple.</p>
+<p class="Pp">Net::Server::HTTP commence par le type de base MultiType par défaut qui correspond à Net::Server::PreFork. Il est facile de le changer à n'importe quel autre arôme de Net::Server en passant server_type =&gt; <span class="Li">$other_flavor</span> dans la configuration du serveur. Le port a également été défini par défaut à 80 - mais pourrait facilement être changé à un autre via la configuration du serveur. Vous pouvez également facilement ajouter SSL en incluant proto =&gt; &quot;ssl&quot; et en fournissant un SSL_cert_file et SSL_key_file.</p>
+<p class="Pp">Par exemple, voici un serveur de base qui se connectera à toutes les interfaces, parlera HTTP sur le port 8080 et HTTPS sur 8443, et parlera IPv4 et IPv6 si disponible.</p>
+<pre>use base qw(Net::Server::HTTP);
+__PACKAGE__-&gt;run(
+    port  =&gt; [8080, &quot;8443/ssl&quot;],
+    ipv   =&gt; '*', # IPv6 si disponible
+    SSL_key_file  =&gt; '/my/key',
+    SSL_cert_file =&gt; '/my/cert',
+);</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='METHODS'><a class='permalink' href='#METHODS'>MÉTHODES</a></h1>
+<dl class="Bl-tag">
+  <dt>&quot;_init_access_log&quot;</dt>
+  <dd>Utilisé pour ouvrir et initialiser tout access_log (voir access_log_file et access_log_format).</dd>
+  <dt>&quot;_tie_client_stdout&quot;</dt>
+  <dd>Utilisé pour initialiser l'analyse automatisée des en-têtes de réponse.</dd>
+  <dt>&quot;process_http_request&quot;</dt>
+  <dd>Le handle du client est passé et STDIO est lié à celui-ci. Pendant cette méthode, %ENV sera déjà configuré avec un environnement CGI standard. Vous devez vous assurer d'imprimer l'en-tête Content-type. C'est une différence importante par rapport aux autres bases Net::Server standard.</dd>
+  <dt>&quot;process_request&quot;</dt>
+  <dd>Cette méthode a été surchargée dans Net::Server::HTTP - vous ne devriez pas l'utiliser lorsque vous utilisez Net::Server::HTTP. Cette méthode surchargée analyse l'environnement, configure les alertes de requête et gère les échecs. Elle appelle process_http_request une fois que la requête est prête et que les en-têtes ont été analysés.</dd>
+  <dt>&quot;request_denied_hook&quot;</dt>
+  <dd>Cette méthode a été surchargée pour appeler send_400. Elle est nouvelle. Pour obtenir le comportement précédent (où le client est fermé sans indication), fournissez simplement</dd>
+  <dt>&quot;process_headers&quot;</dt>
+  <dd>Utilisé pour lire les en-têtes entrants et configurer %ENV.</dd>
+  <dt>&quot;_init_http_request_info&quot;</dt>
+  <dd>Appelé à la fin de process_headers. Initialise le contenu de http_request_info.</dd>
+  <dt>&quot;http_request_info&quot;</dt>
+  <dd>Renvoie un hashref d'informations spécifiques à la requête actuelle. Ces informations seront utilisées pour un enregistrement ultérieur.</dd>
+  <dt>&quot;send_status&quot;</dt>
+  <dd>Reçoit un statut HTTP, un message optionnel, un corps optionnel et un flag optionnel generate_body. Envoie les en-têtes corrects.
+        <pre>$self-&gt;send_status(500);
+$self-&gt;send_status(500, 'Internal Server Error');
+$self-&gt;send_status(500, 'Internal Server Error', &quot;&lt;h1&gt;Internal Server Error&lt;/h1&gt;&lt;p&gt;Msg&lt;/p&gt;&quot;);
+$self-&gt;send_status(500, undef, undef, ['Msg']);
+</pre>
+  </dd>
+  <dt>&quot;send_400&quot;</dt>
+  <dd>Appelle send_status avec 400 et les arguments passés comme generate_body.</dd>
+  <dt>&quot;send_500&quot;</dt>
+  <dd>Appelle send_status avec 500 et l'argument passé à send_500.</dd>
+  <dt id="c_log_http_request_"><a class="permalink" href="#c_log_http_request_">c&lt;log_http_request&gt;</a></dt>
+  <dd>Appelé à la fin de post_process_request. La méthode par défaut recherche l'access_log_format par défaut et vérifie si le logging a été initialisé pendant _init_access_log. Si les deux existent, http_request_info est formé en utilisant http_log_format et le résultat est enregistré. </dd>
+  <dt>&quot;http_log_format&quot;</dt>
+  <dd>Reçoit une chaîne de format, et request_info et renvoie une chaîne formatée. Le format doit suivre la spécification mod_log_config d'Apache. Comme dans la spécification mod_log_config, les barres obliques inverses, les guillemets doivent être échappés avec des barres obliques inverses et vous pouvez également inclure des caractères \n et \t.
+    <p class="Pp">Voici une liste des paramètres disponibles ainsi qu'un exemple de sortie basé sur un serveur HTTP très basique.</p>
+        <pre>%%                %                 # un signe pourcentage
+%a                ::1               # ip distante
+%A                ::1               # ip locale
+%b                83                # taille de la réponse (- si 0) format de log commun
+%B                83                # taille de la réponse
+%{bar}C           baz               # valeur du cookie pour ce nom
+%D                916               # temps écoulé en microsecondes
+%{HTTP_COOKIE}e   bar=baz           # valeur de %ENV pour ce nom
+%f                -                 # nom de fichier - non utilisé
+%h                ::1               # hôte distant si les requêtes sont actives, ip distante sinon
+%H                http              # protocole de la requête
+%{Host}i          localhost:8080    # valeur de la requête pour ce nom
+%I                336               # octets reçus, y compris les en-têtes
+%l                -                 # nom de connexion distante - non utilisé
+%m                GET               # méthode de la requête
+%n                Just a news       # news %ENV pour ce nom
+%{Content-type}o  text/html         # en-tête de sortie pour ce nom
+%O                189               # taille de la réponse, y compris les en-têtes
+%p                8080              # port du serveur
+%P                22999             # PID - ne supporte pas %{tid}P
+q                 ?hello=there      # chaîne de requête, y compris ? (- sinon)
+r                 GET /bam?hello=there HTTP/1.1      # première ligne de la requête
+%s                200               # code d'état de la réponse
+%u                -                 # utilisateur distant - non utilisé
+%U                /bam              # chemin de la requête (sans chaîne de requête)
+%t                [06/Jun/2012:12:14:21 -0600]       # format d'heure de log http_log_time standard
+%t{%F %T %z}t     [2012-06-06 12:14:21 -0600]        # format d'heure formaté
+%T                0                 # temps écoulé en secondes
+%v                localhost:8080    # vhost http_log_vhost - implémentation partielle
+%V                localhost:8080    # vhost http_log_vhost - implémentation partielle
+%X                -                 # connexion terminée et est 'close' (-)
+</pre>
+    <p class="Pp">De plus, l'analyse des logs permet le format suivant :</p>
+        <pre>%&gt;s               200               # dernier état de la requête
+%&lt;s               200               # état de la requête d'origine
+%400a             -                 # ip distante si l'état est 400
+%!400a            ::1               # ip distante si l'état n'est pas 400
+%!200a            -                 # ip distante si l'état n'est pas 200
+</pre>
+    <p class="Pp">Il y a quelques éléments qui ne sont pas entièrement implémentés :</p>
+        <pre>&gt; et &lt;    # pas de redirection interne
+%I         # la réponse est basée sur la taille de l'en-tête et Content-length, pas sur le nombre correct d'octets lus, bien que dans les cas courants, ceux-ci seraient les mêmes.
+%X         # pas de keepalive sur le serveur par défaut.
+%v et %V  # pas de vhosts sur le serveur HTTP par défaut.
+%{tid}P    # les serveurs par défaut ne sont pas multithreadés.</pre>
+    <p class="Pp">Voir l'option &quot;access_log_format&quot; pour savoir comment configurer un format différent ainsi que pour voir la chaîne par défaut.</p>
+  </dd>
+  <dt>&quot;exec_cgi&quot;</dt>
+  <dd>Permet d'appeler un exécutable CGI.</dd>
+  <dt>&quot;_init_http_request_info&quot;</dt>
+  <dd>Appelé à la fin de process_headers. Initialise le contenu de http_request_info.</dd>
+  <dt>&quot;http_request_info&quot;</dt>
+  <dd>Renvoie un hashref d'informations spécifiques à la requête actuelle. Ces informations seront utilisées pour un enregistrement ultérieur.</dd>
+  <dt>&quot;send_status&quot;</dt>
+  <dd>Reçoit un statut HTTP, un message optionnel, un corps optionnel et un flag optionnel generate_body. Envoie les en-têtes corrects.
+        <pre>$self-&gt;send_status(500);
+$self-&gt;send_status(500, 'Internal Server Error');
+$self-&gt;send_status(500, 'Internal Server Error', &quot;&lt;h1&gt;Internal Server Error&lt;/h1&gt;&lt;p&gt;Msg&lt;/p&gt;&quot;);
+$self-&gt;send_status(500, undef, undef, ['Msg']);
+</pre>
+  </dd>
+  <dt>&quot;send_400&quot;</dt>
+  <dd>Appelle send_status avec 400 et les arguments passés comme generate_body.</dd>
+  <dt>&quot;send_500&quot;</dt>
+  <dd>Appelle send_status avec 500 et l'argument passé à send_500.</dd>
+  <dt id="c_log_http_request_"><a class="permalink" href="#c_log_http_request_">c&lt;log_http_request&gt;</a></dt>
+  <dd>Appelé à la fin de post_process_request. La méthode par défaut recherche l'access_log_format par défaut et vérifie si le logging a été initialisé pendant _init_access_log. Si les deux existent, http_request_info est formé en utilisant http_log_format et le résultat est enregistré.</dd>
+  <dt>&quot;http_log_format&quot;</dt>
+  <dd>Reçoit une chaîne de format, et request_info et renvoie une chaîne formatée. Le format doit suivre la spécification mod_log_config d'Apache. Comme dans la spécification mod_log_config, les barres obliques inverses, les guillemets doivent être échappés avec des barres obliques inverses et vous pouvez également inclure des caractères \n et \t.
+    <p class="Pp">Voici une liste des paramètres disponibles ainsi qu'un exemple de sortie basé sur un serveur HTTP très basique.</p>
+        <pre>%%                %                 # un signe pourcentage
+%a                ::1               # ip distante
+%A                ::1               # ip locale
+%b                83                # taille de la réponse (- si 0) format de log commun
+%B                83                # taille de la réponse
+%{bar}C           baz               # valeur du cookie pour ce nom
+%D                916               # temps écoulé en microsecondes
+%{HTTP_COOKIE}e   bar=baz           # valeur de %ENV pour ce nom
+%f                -                 # nom de fichier - non utilisé
+%h                ::1               # hôte distant si les requêtes sont actives, ip distante sinon
+%H                http              # protocole de la requête
+%{Host}i          localhost:8080    # valeur de la requête pour ce nom
+%I                336               # octets reçus, y compris les en-têtes
+%l                -                 # nom de connexion distante - non utilisé
+%m                GET               # méthode de la requête
+%n                Just a news       # news %ENV pour ce nom
+%{Content-type}o  text/html         # en-tête de sortie pour ce nom
+%O                189               # taille de la réponse, y compris les en-têtes
+%p                8080              # port du serveur
+%P                22999             # PID - ne supporte pas %{tid}P
+q                 ?hello=there      # chaîne de requête, y compris ? (- sinon)
+r                 GET /bam?hello=there HTTP/1.1      # première ligne de la requête
+%s                200               # code d'état de la réponse
+%u                -                 # utilisateur distant - non utilisé
+%U                /bam              # chemin de la requête (sans chaîne de requête)
+%t                [06/Jun/2012:12:14:21 -0600]       # format d'heure de log http_log_time standard
+%t{%F %T %z}t     [2012-06-06 12:14:21 -0600]        # format d'heure formaté
+%T                0                 # temps écoulé en secondes
+%v                localhost:8080    # vhost http_log_vhost - implémentation partielle
+%V                localhost:8080    # vhost http_log_vhost - implémentation partielle
+%X                -                 # connexion terminée et est 'close' (-)
+</pre>
+    <p class="Pp">De plus, l'analyse des logs permet le format suivant :</p>
+        <pre>%&gt;s               200               # dernier état de la requête
+%&lt;s               200               # état de la requête d'origine
+%400a             -                 # ip distante si l'état est 400
+%!400a            ::1               # ip distante si l'état n'est pas 400
+%!200a            -                 # ip distante si l'état n'est pas 200
+</pre>
+    <p class="Pp">Il y a quelques éléments qui ne sont pas entièrement implémentés :</p>
+        <pre>&gt; et &lt;    # pas de redirection interne
+%I         # la réponse est basée sur la taille de l'en-tête et Content-length, pas sur le nombre correct d'octets lus, bien que dans les cas courants, ceux-ci seraient les mêmes.
+%X         # pas de keepalive sur le serveur par défaut.
+%v et %V  # pas de vhosts sur le serveur HTTP par défaut.
+%{tid}P    # les serveurs par défaut ne sont pas multithreadés.</pre>
+    <p class="Pp">Voir l'option &quot;access_log_format&quot; pour savoir comment configurer un format différent ainsi que pour voir la chaîne par défaut.</p>
+  </dd>
+  <dt>&quot;exec_cgi&quot;</dt>
+  <dd>Permet d'appeler un exécutable CGI.</dd>
+</dl>
+</section>
+</article>
+</main>
+</body>
+</html><section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Net::Server::HTTP</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPIS'><a class='permalink' href='#SYNOPIS'>SYNOPIS</a></h1>
+<pre>use base qw(Net::Server::HTTP);
+__PACKAGE__-&gt;run;
+sub process_http_request {
+    my $self = shift;
+    if ($ENV{'PATH_INFO'} &amp;&amp; $ENV{'PATH_INFO'} =~ s{^ (/foo) (?= $ | /) }{}x) {
+       $ENV{'SCRIPT_NAME'} = $1;
+       my $file = &quot;/var/www/cgi-bin/foo&quot;; # supposant que cela existe
+       return $self-&gt;exec_cgi($file);
+    }
+    print &quot;Content-type: text/html\n\n&quot;;
+    print &quot;&lt;a href=/foo&gt;Foo&lt;/a&gt;&quot;;
+}
+</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Ce script s'exécutera en tant que CGI. Il utilisera IPC::Open3 pour forcer un nouveau processus et lire/écrire depuis celui-ci.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXEMPLE'><a class='permalink' href='#EXEMPLE'>EXEMPLE</a></h1>
+<pre>use base qw(Net::Server::HTTP);
+__PACKAGE__-&gt;run;
+sub process_http_request {
+    my $self = shift;
+    if ($ENV{'PATH_INFO'} &amp;&amp; $ENV{'PATH_INFO'} =~ s{^ (/foo) (?= $ | /) }{}x) {
+       $ENV{'SCRIPT_NAME'} = $1;
+       my $file = &quot;/var/www/cgi-bin/foo&quot;; # supposant que cela existe
+       return $self-&gt;exec_cgi($file);
+    }
+    print &quot;Content-type: text/html\n\n&quot;;
+    print &quot;&lt;a href=/foo&gt;Foo&lt;/a&gt;&quot;;
+}
+</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='OPTIONS'><a class='permalink' href='#OPTIONS'>OPTIONS</a></h1>
+<p class="Pp">En plus des arguments de ligne de commande des classes Net::Server, vous pouvez également configurer les options suivantes.</p>
+<dl class="Bl-tag">
+  <dt id="max_header_size"><a class="permalink" href="#max_header_size">max_header_size</a></dt>
+  <dd>Par défaut, 100 000. Le nombre maximum d'octets à lire lors de l'analyse des en-têtes.</dd>
+  <dt id="server_revision"><a class="permalink" href="#server_revision">server_revision</a></dt>
+  <dd>Par défaut, Net::Server::HTTP/$Net::Server::VERSION.</dd>
+  <dt id="timeout_header"><a class="permalink" href="#timeout_header">timeout_header</a></dt>
+  <dd>Par défaut, 15 - le nombre de secondes pendant lesquelles on attend l'analyse des en-têtes.</dd>
+  <dt id="timeout_idle"><a class="permalink" href="#timeout_idle">timeout_idle</a></dt>
+  <dd>Par défaut, 60 - le nombre de secondes pendant lesquelles une requête peut être inactive avant d'être fermée.</dd>
+  <dt id="access_log_file"><a class="permalink" href="#access_log_file">access_log_file</a></dt>
+  <dd>Par défaut, undef. S'il est vrai, il représente l'emplacement où le fichier de journal d'accès doit être écrit. Si une valeur spéciale STDERR ou /dev/stderr est passée, le journal d'accès sera écrit au même endroit que le journal ERROR. Si une valeur spéciale STDOUT ou /dev/stdout est passée, le journal d'accès sera écrit au même endroit que STDOUT.</dd>
+  <dt id="access_log_function"><a class="permalink" href="#access_log_function">access_log_function</a></dt>
+  <dd>Peut prendre un coderef ou le nom d'une fonction à appeler lorsque la méthode log_http_request est invoquée. Le message de journal d'accès formaté lui sera passé.</dd>
+  <dt id="access_log_format"><a class="permalink" href="#access_log_format">access_log_format</a></dt>
+  <dd>Doit être un format de journal Apache valide qui sera passé à http_log_format. Voir la méthode http_log_format pour plus d'informations.</dd>
+  <dt id="app"><a class="permalink" href="#app">app</a></dt>
+  <dd>Prendra un ou plusieurs éléments et les enregistrera pour la distribution. Les arguments peuvent être passés sous forme d'arrayref avec des paires emplacement/destination, un hashref avec des paires emplacement/destination, un coderef qui utilisera / comme emplacement et le coderef comme destination, une chaîne avec un espace indiquant « emplacement destination », une chaîne avec « emplacement=destination », ou enfin une chaîne qui sera utilisée à la fois comme emplacement et destination. Pour les éléments passés sous forme d'arrayref ou de hashref, la destination peut être un coderef qui sera appelé et doit gérer la requête. Dans tous les autres cas, la destination doit être un exécutable valide approprié pour être passé à exec_cgi.</dd>
+  <p class="Pp">Les emplacements sont ajoutés dans l'ordre où ils sont configurés. Ils sont ajoutés à une expression régulière qui est appliquée à la chaîne PATH_INFO. Si la correspondance réussit, $ENV{'SCRIPT_NAME'} est défini sur la partie correspondante et la partie correspondante est supprimée de $ENV{'PATH_INFO'}</p>
+  <p class="Pp">Une fois qu'une application a été transmise, le serveur doit écouter sur /. Par conséquent, si / n'a pas été spécifiquement configuré pour la distribution, la première cible de distribution trouvée sera également utilisée pour gérer /.</p>
+  <p class="Pp">Pour plus de commodité, si le niveau de journal est de 2 ou plus, la table de distribution est affichée dans le journal.</p>
+  <p class="Pp">Ce mécanisme est maintenu comme un mécanisme générique approprié pour être surchargé par les serveurs qui gèrent une distribution plus complexe. Pour le moment, il n'y a pas de gestion des vhosts. À un moment donné, la capacité par défaut d'afficher du contenu statique et probablement la capacité de configurer des vhosts seront ajoutées - ou vous devrez attendre un module tiers.</p>
+<pre>app =&gt; &quot;/home/paul/foo.cgi&quot;,
+  # Dispatch: /home/paul/foo.cgi =&gt; home/paul/foo.cgi
+  # Dispatch: / =&gt; home/paul/foo.cgi (par défaut)
+app =&gt; &quot;../../foo.cgi&quot;,
+app =&gt; &quot;./bar.cgi&quot;,
+app =&gt; &quot;bim=./bar.cgi&quot;,
+  # Dispatch: /foo.cgi =&gt; ../../foo.cgi
+  # Dispatch: /bar.cgi =&gt; ./bar.cgi
+  # Dispatch: /baz =&gt; ./bar.cgi
+  # Dispatch: /bim =&gt; ./bar.cgi
+  # Dispatch: / =&gt; ../../foo.cgi (par défaut)
+app =&gt; &quot;../../foo.cgi&quot;,
+app =&gt; &quot;./bar.cgi&quot;,
+  # Dispatch: /foo.cgi =&gt; ../../foo.cgi
+  # Dispatch: / =&gt; ./bar.cgi
+# vous pouvez également faire cela sur la ligne de commande
+net-server HTTP app ../../foo.cgi app /=./bar.cgi
+# options étendues lorsqu'elles sont configurées à partir du code
+Net::Server::HTTP-&gt;run(app =&gt; { # perd l'ordre de correspondance
+  '/' =&gt; sub { ... },
+  '/foo' =&gt; sub { ... },
+  '/bar' =&gt; '/path/to/some.cgi',
+});
+Net::Server::HTTP-&gt;run(app =&gt; [
+  '/' =&gt; sub { ... },
+  '/foo' =&gt; sub { ... },
+  '/bar' =&gt; '/path/to/some.cgi',
+]));
+</pre>
+  <dd>Par défaut, text/html. Définissez cette valeur sur toute réponse qui n'a pas encore reçu de type de contenu.</dd>
+  <dd>Par défaut, ne permet pas de corps de contenu dans 204, 304 ou 1xx. Définissez ce drapeau pour envoyer un type de contenu également dans ces statuts.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='TODO'><a class='permalink' href='#TODO'>TODO</a></h1>
+<p class="Pp">Ajouter la prise en charge de l'écriture de HTTP/1.1.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Paul T. Seamons paul@seamons.com</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='REMERCIEMENTS'><a class='permalink' href='#REMERCIEMENTS'>REMERCIEMENTS</a></h1>
+<p class="Pp">Voir Net::Server</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR AUSSI</a></h1>
+<p class="Pp">Voir aussi Net::Server::Fork, Net::Server::INET, Net::Server::PreFork, Net::Server::PreForkSimple, Net::Server::MultiType, Net::Server::Single, Net::Server::SIG, Net::Server::Daemonize, Net::Server::Proto</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+<aside>
+    <dl>
+        <dt><a href="/listing/extra/perl-net-server/">/listing/extra/perl-net-server/</a></dt>
+        <dd></dd>
+    </dl>
+</aside>
+
+<details>
+    <summary>Contenu de la table</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#TEST_ONE_LINER">TEST EN UNE LIGNE</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#METHODS">MÉTHODES</a></li>
+        
+            <li><a href="#OPTIONS">OPTIONS</a></li>
+        
+            <li><a href="#TODO">À FAIRE</a></li>
+        
+            <li><a href="#AUTHOR">AUTEUR</a></li>
+        
+            <li><a href="#THANKS">REMERCIEMENTS</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>autres formats :
+        
+        <a href="/man/Net::Server::HTTP.3pm.en.txt">txt</a>, 
+        
+        <a href="/man/Net::Server::HTTP.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site est disponible sous la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

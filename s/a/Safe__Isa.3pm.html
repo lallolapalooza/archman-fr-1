@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Safe::Isa(3pm) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Safe__Isa(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-safe-isa/">perl-safe-isa</a></p>
+<p class="lic">Licences: PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Safe::Isa(3)</td>
+    <td class="head-vol">Documentation Perl contribuée par l'utilisateur</td>
+    <td class="head-rtitle">Safe::Isa(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Safe::Isa - Appelle isa, can, does et DOES en toute sécurité sur des éléments qui ne sont peut-être pas des objets</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<pre>use strict;
+use warnings;
+
+{ package Foo; sub new { bless({}, $_[0]) } }
+{ package Bar; our @ISA = qw(Foo); sub bar { 1 } }
+
+my $foo = Foo-&gt;new;
+my $bar = Bar-&gt;new;
+my $blam = [ 42 ];
+
+# Utilisation basique de isa -
+
+$foo-&gt;isa('Foo');  # vrai
+$bar-&gt;isa('Foo');  # vrai
+$blam-&gt;isa('Foo'); # BOUM
+
+$foo-&gt;can('bar');  # faux
+$bar-&gt;can('bar');  # vrai
+$blam-&gt;can('bar'); # BOUM
+
+# Utilisation de Safe::Isa -
+
+use Safe::Isa;
+
+$foo-&gt;$_isa('Foo');  # vrai
+$bar-&gt;$_isa('Foo');  # vrai
+$blam-&gt;$_isa('Foo'); # faux, pas de BOUM aujourd'hui
+
+$foo-&gt;$_can('bar');  # faux
+$bar-&gt;$_can('bar');  # vrai
+$blam-&gt;$_can('bar'); # faux, pas de BOUM aujourd'hui</pre>
+<p class="Pp">De même :</p>
+<pre>$maybe_an_object-&gt;$_does('RoleName'); # vrai ou faux, pas de BOUM aujourd'hui
+$maybe_an_object-&gt;$_DOES('RoleName'); # vrai ou faux, pas de BOUM aujourd'hui</pre>
+<p class="Pp">Et juste au cas où nous aurions manqué une ou deux méthodes :</p>
+<pre>$maybe_an_object-&gt;$_call_if_object(name =&gt; @args);
+$maybe_an_object-&gt;$_call_if_can(name =&gt; @args);</pre>
+<p class="Pp">Ou pour réutiliser un exemple précédent à des fins d'explication :</p>
+<pre>$foo-&gt;$_call_if_object(isa =&gt; 'Foo');  # vrai
+$bar-&gt;$_call_if_object(isa =&gt; 'Foo');  # vrai
+$blam-&gt;$_call_if_object(isa =&gt; 'Foo'); # faux, pas de BOUM aujourd'hui</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Combien de fois vous êtes-vous retrouvé à écrire :</p>
+<pre>if ($obj-&gt;isa('Something')) {</pre>
+<p class="Pp">et peu de temps après, à maudire et à changer en :</p>
+<pre>if (Scalar::Util::blessed($obj) and $obj-&gt;isa('Something')) {</pre>
+<p class="Pp">Exactement. C'est pourquoi ce module existe.</p>
+<p class="Pp">Puisque perl nous permet de fournir une référence de sous-routine ou
+    un nom de méthode à l'opérateur -&gt; lorsqu'il est utilisé comme appel de
+    méthode, et qu'une sous-routine ne nécessite pas que l'invocant soit
+    effectivement un objet, nous pouvons créer des versions sûres de isa, can et
+    similaires en utilisant une référence de sous-routine qui tente uniquement
+    d'appeler la méthode si elle est utilisée sur un objet. Donc :</p>
+<pre>my $isa_Foo = $maybe_an_object-&gt;$_call_if_object(isa =&gt; 'Foo');</pre>
+<p class="Pp">est équivalent à</p>
+<pre>my $isa_Foo = do {
+  if (Scalar::Util::blessed($maybe_an_object)) {
+    $maybe_an_object-&gt;isa('Foo');
+  } else {
+    undef;
+  }
+};</pre>
+<p class="Pp">Notez que nous ne gérons pas les noms de classe, car beaucoup de
+    choses sont des noms de classe valides que vous pourriez ne pas vouloir
+    traiter comme tels (comme par exemple &quot;Matt&quot;) - la fonction
+    <span class="Li">&quot;is_module_name&quot;</span> de Module::Runtime est un bon
+    moyen de vérifier quelque chose sur lequel vous pourriez être capable
+    d'appeler des méthodes si vous souhaitez le faire.</p>
+<p class="Pp">Nous veillons à ce que le contexte scalaire/liste soit préservé pour
+    la méthode qui est finalement appelée.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXPORT'><a class='permalink' href='#EXPORT'>EXPORT</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='$_isa'><a class='permalink' href='#$_isa'>$_isa</a></h2>
+<pre>$maybe_an_object-&gt;$_isa('Foo');</pre>
+<p class="Pp">Si appelée sur un objet, appelle <span class="Li">&quot;isa&quot;</span>
+    sur celui-ci et renvoie le résultat, sinon ne renvoie rien.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='$_can'><a class='permalink' href='#$_can'>$_can</a></h2>
+<pre>$maybe_an_object-&gt;$_can('Foo');</pre>
+<p class="Pp">Si appelée sur un objet, appelle <span class="Li">&quot;can&quot;</span>
+    sur celui-ci et renvoie le résultat, sinon ne renvoie rien.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='$_does'><a class='permalink' href='#$_does'>$_does</a></h2>
+<pre>$maybe_an_object-&gt;$_does('Foo');</pre>
+<p class="Pp">Si appelée sur un objet, appelle <span class="Li">&quot;does&quot;</span>
+    sur celui-ci et renvoie le résultat, sinon ne renvoie rien. Si la méthode
+    <span class="Li">&quot;does&quot;</span> n'existe pas, renvoie rien plutôt que
+    d'échouer.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='$_DOES'><a class='permalink' href='#$_DOES'>$_DOES</a></h2>
+<pre>$maybe_an_object-&gt;$_DOES('Foo');</pre>
+<p class="Pp">Si appelée sur un objet, appelle <span class="Li">&quot;DOES&quot;</span>
+    sur celui-ci et renvoie le résultat, sinon ne renvoie rien. Sur les versions
+    de perl antérieures à 5.10.0, la méthode intégrée <span class="Li">&quot;DOES&quot;</span>
+    n'existe pas. Si la méthode n'existe pas, cela se rabattra sur l'appel de
+    <span class="Li">&quot;isa&quot;</span> tout comme la méthode
+    <span class="Li">&quot;DOES&quot;</span> intégrée.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='$_call_if_object'><a class='permalink' href='#$_call_if_object'>$_call_if_object</a></h2>
+<pre>$maybe_an_object-&gt;$_call_if_object(method_name =&gt; @args);</pre>
+<p class="Pp">Si appelée sur un objet, appelle <span class="Li">&quot;method_name&quot;</span>
+    sur celui-ci et renvoie le résultat, sinon ne renvoie rien.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='$_call_if_can'><a class='permalink' href='#$_call_if_can'>$_call_if_can</a></h2>
+<pre>$maybe_an_object-&gt;$_call_if_can(name =&gt; @args);</pre>
+<p class="Pp">Si appelée sur un objet, appelle <span class="Li">&quot;can&quot;</span>
+    sur celui-ci ; si cela renvoie vrai, alors appelle <span class="Li">&quot;method_name&quot;</span>
+    sur celui-ci et renvoie le résultat ; si une condition est fausse, renvoie
+    rien.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR AUSSI</a></h1>
+<p class="Pp">J'ai donné une présentation éclair sur ce module (et curry et
+    Import::Into) à YAPC::NA 2013
+    &lt;<a href='https://www.youtube.com/watch?v=wFXWV2yY7gE'>https://www.youtube.com/watch?v=wFXWV2yY7gE</a>&amp;t=46m05s&gt;.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">mst - Matt S. Trout (cpan:MSTROUT) &lt;mst@shadowcat.co.uk&gt;</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CONTRIBUTEURS'><a class='permalink' href='#CONTRIBUTEURS'>CONTRIBUTEURS</a></h1>
+<p class="Pp">Aucun pour le moment. Qui se porte volontaire ? :)</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT'><a class='permalink' href='#COPYRIGHT'>COPYRIGHT</a></h1>
+<p class="Pp">Copyright (c) 2012 the Safe::Isa &quot;AUTHOR&quot; and
+    &quot;CONTRIBUTORS&quot; tels que listés ci-dessus.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='LICENCE'><a class='permalink' href='#LICENCE'>LICENCE</a></h1>
+<p class="Pp">Cette bibliothèque est un logiciel libre et peut être distribuée sous
+    les mêmes termes que perl lui-même.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-safe-isa/">extra/perl-safe-isa</a></dd>
+        <dt>Version :</dt>
+        <dd>1.000010-2</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://metacpan.org/dist/Safe-Isa">https://metacpan.org/dist/Safe-Isa</a></dd>
+        <dt>Licences :</dt>
+        <dd>PerlArtistic</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-safe-isa/">/listing/extra/perl-safe-isa/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#SYNTAXE">SYNTAXE</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#EXPORT">EXPORT</a></li>
+        
+            <li><a href="#VOIR_AUSSI">VOIR AUSSI</a></li>
+        
+            <li><a href="#AUTEUR">AUTEUR</a></li>
+        
+            <li><a href="#CONTRIBUTEURS">CONTRIBUTEURS</a></li>
+        
+            <li><a href="#COPYRIGHT">COPYRIGHT</a></li>
+        
+            <li><a href="#LICENCE">LICENCE</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Safe::Isa.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/Safe::Isa.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

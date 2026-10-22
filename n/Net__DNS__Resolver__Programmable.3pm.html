@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Net::DNS::Resolver::Programmable(3pm) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Net__DNS__Resolver__Programmable(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-net-dns-resolver-programmable/">perl-net-dns-resolver-programmable</a></p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Net::DNS::Resolver::Programmable(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">Net::DNS::Resolver::Programmable(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Net::DNS::Resolver::Programmable - classe de résolveur DNS programmable
+    pour l'émulation hors ligne du DNS</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<pre>use Net::DNS::Resolver::Programmable;
+use Net::DNS::RR;
+
+my $resolver = Net::DNS::Resolver::Programmable-&gt;new(
+    records         =&gt; {
+        'example.com'     =&gt; [
+            Net::DNS::RR-&gt;new('example.com.     NS  ns.example.org.'),
+            Net::DNS::RR-&gt;new('example.com.     A   192.168.0.1')
+        ],
+        'ns.example.org'  =&gt; [
+            Net::DNS::RR-&gt;new('ns.example.org.  A   192.168.1.1')
+        ]
+    },
+
+    resolver_code   =&gt; sub {
+        my ($domain, $rr_type, $class) = @_;
+        ...
+        return ($result, $aa, @rrs);
+    }
+);</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp"><b>Net::DNS::Resolver::Programmable</b> est une classe descendante
+    de <b>Net::DNS::Resolver</b> qui permet d'émuler un DNS virtuel au lieu de
+    requérir le vrai DNS. Un ensemble d'enregistrements DNS statiques peut être
+    fourni, ou du code arbitraire peut être spécifié comme moyen de récupérer
+    des enregistrements DNS, ou même de les générer à la volée.</p>
+<section class="Ss">
+<h2 class="Ss" id='Constructeur'><a class='permalink' href='#Constructeur'>Constructeur</a></h2>
+<p class="Pp">Le constructeur suivant est fourni :</p>
+<dl class="Bl-tag">
+  <dt id="nouveau(_options)"><a class="permalink" href="#nouveau(_options)"><b>new(%options)</b>:
+    retourne <i>Net::DNS::Resolver::Programmable</i></a></dt>
+  <dd>Crée un nouvel objet résolveur DNS programmé.
+    <p class="Pp"><span class="Li">%options</span> est une liste de paires clé/valeur
+        représentant toutes les options suivantes :</p>
+  </dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="enregistrements"><a class="permalink" href="#enregistrements"><b>records</b></a></dt>
+  <dd>Une référence à une table associant des tableaux contenant un ensemble statique
+      d'objets <i>Net::DNS::RR</i>. Les clés de la table doivent être des noms de
+      domaine entièrement qualifiés (en minuscules, sans points finaux), et les
+      entrées elles-mêmes doivent être des tableaux d'objets RR relatifs à ces
+      noms de domaine. Par exemple :
+        <pre>records =&gt; {
+    'example.com'     =&gt; [
+        Net::DNS::RR-&gt;new('example.com.     NS  ns.example.org.'),
+        Net::DNS::RR-&gt;new('example.com.     A   192.168.0.1')
+    ],
+    'www.example.com' =&gt; [
+        Net::DNS::RR-&gt;new('www.example.com. A   192.168.0.2')
+    ],
+    'ns.example.org'  =&gt; [
+        Net::DNS::RR-&gt;new('ns.example.org.  A   192.168.1.1')
+    ]
+}
+</pre>
+    <p class="Pp">Si cette option est spécifiée, le résolveur récupère les RR demandés
+        depuis cette structure de données.</p>
+  </dd>
+  <dt id="code_resoluteur"><a class="permalink" href="#code_resoluteur"><b>resolver_code</b></a></dt>
+  <dd>Une référence de code utilisée comme rappel pour récupérer dynamiquement les RR
+      demandés.
+    <p class="Pp">Le code doit prendre les paramètres de requête suivants comme
+        arguments : le <i>domaine</i>, le <i>type de RR</i> et la <i>classe</i>.</p>
+    <p class="Pp">Il doit retourner une liste composée de : le <i>RCODE</i> de la
+        réponse (par nom, tel que retourné par Net::DNS::Header-&gt;rcode), le
+        drapeau <span class="Li"><i>&quot;aa&quot;</i></span><i> (réponse faisant
+        autorité)</i> (<i>booléen</i>, utiliser <b>undef</b> si cela ne vous
+        importe pas), et les objets <i>Net::DNS::RR</i> de réponse. Si une chaîne
+        d'erreur est retournée au lieu d'un RCODE valide, un objet
+        <i>Net::DNS::Packet</i> n'est pas construit mais une condition d'erreur
+        pour le résolveur est signalée à la place.</p>
+    <p class="Pp">Par exemple :</p>
+        <pre>resolver_code =&gt; sub {
+    my ($domain, $rr_type, $class) = @_;
+    ...
+    return ($result, $aa, @rrs);
+}
+</pre>
+    <p class="Pp">Si à la fois cette option et l'option
+        <span class="Li">&quot;records&quot;</span> sont spécifiées, alors les
+        enregistrements programmés statiquement sont utilisés en plus de ceux qui
+        sont retournés par le code de résolveur configuré.</p>
+  </dd>
+  <dt id="defnames"><a class="permalink" href="#defnames"><b>defnames</b></a></dt>
+  <dd></dd>
+  <dt id="dnsrch"><a class="permalink" href="#dnsrch"><b>dnsrch</b></a></dt>
+  <dd></dd>
+  <dt id="domaine"><a class="permalink" href="#domaine"><b>domain</b></a></dt>
+  <dd></dd>
+  <dt id="liste_recherche"><a class="permalink" href="#liste_recherche"><b>searchlist</b></a></dt>
+  <dd></dd>
+  <dt id="debug"><a class="permalink" href="#debug"><b>debug</b></a></dt>
+  <dd>Ces options Net::DNS::Resolver sont également significatives avec
+      Net::DNS::Resolver::Programmable. Voir Net::DNS::Resolver pour leurs
+      descriptions.</dd>
+</dl>
+</div>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Méthodes_d_instance'><a class='permalink' href='#Méthodes_d_instance'>Méthodes d'instance</a></h2>
+<p class="Pp">Les méthodes d'instance suivantes de <i>Net::DNS::Resolver</i> sont
+    également supportées par <i>Net::DNS::Resolver::Programmable</i> :</p>
+<dl class="Bl-tag">
+  <dt id="recherche"><a class="permalink" href="#recherche"><b>search</b>: retourne
+    <i>Net::DNS::Packet</i></a></dt>
+  <dd></dd>
+  <dt id="requête"><a class="permalink" href="#requête"><b>query</b>: retourne
+    <i>Net::DNS::Packet</i></a></dt>
+  <dd></dd>
+  <dt id="envoyer"><a class="permalink" href="#envoyer"><b>send</b>: retourne
+    <i>Net::DNS::Packet</i></a></dt>
+  <dd>Effectue une requête DNS hors ligne, en utilisant les RR DNS programmés
+      statiquement et/ou le code de résolveur dynamique configuré. Voir les options
+      <span class="Li">&quot;records&quot;</span> et
+      <span class="Li">&quot;resolver_code&quot;</span> du constructeur
+      &quot;new&quot;. Voir les descriptions de search, query et send pour les
+      détails sur la syntaxe d'appel de ces méthodes.</dd>
+  <dt id="afficher"><a class="permalink" href="#afficher"><b>print</b></a></dt>
+  <dd></dd>
+  <dt id="chaîne"><a class="permalink" href="#chaîne"><b>string</b>: retourne
+    <i>chaîne</i></a></dt>
+  <dd></dd>
+  <dt id="liste_recherche~2"><a class="permalink" href="#liste_recherche~2"><b>searchlist</b>:
+    retourne <i>liste</i> de <i>chaîne</i></a></dt>
+  <dd></dd>
+  <dt id="defnames~2"><a class="permalink" href="#defnames~2"><b>defnames</b>:
+    retourne <i>booléen</i></a></dt>
+  <dd></dd>
+  <dt id="dnsrch~2"><a class="permalink" href="#dnsrch~2"><b>dnsrch</b>: retourne
+    <i>booléen</i></a></dt>
+  <dd></dd>
+  <dt id="debug~2"><a class="permalink" href="#debug~2"><b>debug</b>: retourne
+    <i>booléen</i></a></dt>
+  <dd></dd>
+  <dt id="chaîne_erreur"><a class="permalink" href="#chaîne_erreur"><b>errorstring</b>:
+    retourne <i>chaîne</i></a></dt>
+  <dd></dd>
+  <dt id="répondu_depuis"><a class="permalink" href="#répondu_depuis"><b>answerfrom</b>:
+    retourne <i>chaîne</i></a></dt>
+  <dd></dd>
+  <dt id="taille_réponse"><a class="permalink" href="#taille_réponse"><b>answersize</b>:
+    retourne <i>entier</i></a></dt>
+  <dd>Voir &quot;MÉTHODES&quot; dans Net::DNS::Resolver.</dd>
+</dl>
+<p class="Pp">Actuellement, les méthodes suivantes de <i>Net::DNS::Resolver</i> ne
+    sont <b>pas</b> supportées : <b>axfr</b>, <b>axfr_start</b>, <b>axfr_next</b>,
+    <b>nameservers</b>, <b>port</b>, <b>srcport</b>, <b>srcaddr</b>,
+    <b>bgsend</b>, <b>bgread</b>, <b>bgisready</b>, <b>tsig</b>, <b>retrans</b>,
+    <b>retry</b>, <b>recurse</b>, <b>usevc</b>, <b>tcp_timeout</b>,
+    <b>udp_timeout</b>, <b>persistent_tcp</b>, <b>persistent_udp</b>,
+    <b>igntc</b>, <b>dnssec</b>, <b>cdflag</b>, <b>udppacketsize</b>. Les
+    effets de l'utilisation de ces méthodes sur les objets
+    <i>Net::DNS::Resolver::Programmable</i> sont indéfinis.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR AUSSI</a></h1>
+<p class="Pp">Net::DNS::Resolver</p>
+<p class="Pp">Pour la disponibilité, le support et les informations de licence,
+    voir le fichier README inclus avec Net::DNS::Resolver::Programmable.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEURS'><a class='permalink' href='#AUTEURS'>AUTEURS</a></h1>
+<p class="Pp">David Precious (BIGPRESH)
+    <span class="Li">&quot;&lt;davidp@preshweb.co.uk&gt;&quot;</span> a pris la
+    maintenabilité en juillet 2017</p>
+<p class="Pp">Auteur original Julian Mehnle
+    <span class="Li">&quot;&lt;julian@mehnle.net&gt;&quot;</span></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='REMERCIEMENTS'><a class='permalink' href='#REMERCIEMENTS'>REMERCIEMENTS</a></h1>
+<p class="Pp">Dick Franks (rwfranks)</p>
+<p class="Pp">(Cette section a été ajoutée par BIGPRESH en juillet 2017, elle omet
+    donc actuellement les remerciements pour ceux qui ont contribué par le passé ;
+    je pourrais les ajouter rétrospectivement à l'avenir.)</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-13</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-net-dns-resolver-programmable/">extra/perl-net-dns-resolver-programmable</a></dd>
+        <dt>Version :</dt>
+        <dd>0.009-12</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://search.cpan.org/dist/Net-DNS-Resolver-Programmable/">https://search.cpan.org/dist/Net-DNS-Resolver-Programmable/</a></dd>
+</section>
+</dd>
+        <dt>Licences :</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-net-dns-resolver-programmable/">/listing/extra/perl-net-dns-resolver-programmable/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNTAXE</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+            <li><a href="#AUTHORS">AUTEURS</a></li>
+        
+            <li><a href="#ACKNOWLEDGEMENTS">REMERCIEMENTS</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Net::DNS::Resolver::Programmable.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/Net::DNS::Resolver::Programmable.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>POE::Component::IKC(3pm) — Pages man Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">POE__Component__IKC(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-poe-component-ikc/">perl-poe-component-ikc</a></p>
+<p class="lic">Licences: GPL, PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">IKC(3)</td>
+    <td class="head-vol">Documentation des contributeurs Perl</td>
+    <td class="head-rtitle">IKC(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">POE::Component::IKC -- Communication inter-noyaux POE</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='IKC_serveur'><a class='permalink' href='#IKC_serveur'>IKC   serveur</a></h2>
+<pre>use POE::Component::IKC::Server;
+# créez toutes vos sessions
+POE::Component::IKC::Server-&gt;spawn(
+            port=&gt;30, name=&gt;'Server'
+    ); # options supplémentaires disponibles
+$poe_kernel-&gt;run();</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='IKC_client'><a class='permalink' href='#IKC_client'>IKC   client</a></h2>
+<pre>use POE::Component::IKC::Client;
+POE::Component::IKC::Client-&gt;spawn(
+            host=&gt;name,
+            port=&gt;30,
+            name=&gt;'Client',
+            on_connect=&gt;\&amp;build);
+$poe_kernel-&gt;run();
+sub build
+{
+    # créez des sessions qui dépendent du noyau externe.
+}</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Poster_un_état_sur_un_noyau_étranger'><a class='permalink' href='#Poster_un_état_sur_un_noyau_étranger'>Poster   un état sur un noyau étranger</a></h2>
+<pre>$kernel-&gt;post('IKC', 'post', 'poe://Server/session/state', $ONE_arg);</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='L_IKC_est_pair-à-pair.'><a class='permalink' href='#L_IKC_est_pair-à-pair.'>L'IKC   est pair-à-pair.</a></h2>
+<p class="Pp">Le serveur peut poster à un client.</p>
+<pre>$kernel-&gt;post('IKC', 'post', 'poe://Client/session/state', $ONE_arg);</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Appeler_un_état_sur_un_noyau_distant'><a class='permalink' href='#Appeler_un_état_sur_un_noyau_distant'>Appeler   un état sur un noyau distant</a></h2>
+<p class="Pp">La sémantique d'appel est impossible, car elle bloquerait POE. L'appel IKC est un peu différent. C'est un 'post', mais avec un paramètre RSVP supplémentaire.</p>
+<pre>$kernel-&gt;post('IKC', 'call', 'poe://Server/hello/world', $ONE_arg,
+              'poe:callback');</pre>
+<p class="Pp">Cela provoquera l'envoi de la valeur de retour de l'état du noyau externe à l'état 'callback' dans la session actuelle. Vous pourriez vouloir que le callback soit dans une autre session, mais je ne pense pas que ce soit une bonne idée.</p>
+<pre>$kernel-&gt;post('IKC', 'call', 'poe://Server/hello/world', $ONE_arg,
+              'poe:/elsewhere/hi');</pre>
+<p class="Pp">Remarque : si vous utilisez -&gt;call('IKC'), il renverra le nombre de noyaux externes auxquels l'état a été posté. Ceci est utile pour savoir si vous êtes toujours connecté à un noyau externe.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Un_peu_de_magie'><a class='permalink' href='#Un_peu_de_magie'>Un   peu de magie</a></h2>
+<p class="Pp">Si un état est posté par un noyau externe, $_[SENDER] n'est valide que pendant cet état. Cependant, vous pourrez poster en retour.</p>
+<pre>$kernel-&gt;post($_[SENDER], 'something', 'the answer is foo');</pre>
+<p class="Pp">L'appelant distant doit avoir posté des états pour pouvoir être appelé, n'est-ce pas ?</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Publier_/_S'abonner'><a class='permalink' href='#Publier_/_S'abonner'>Publier   / S'abonner</a></h2>
+<p class="Pp">Vous devez publier l'interface d'une session pour qu'elle soit accessible par des noyaux externes.</p>
+<p class="Pp">Si vous vous abonnez à une session distante, vous pourrez y accéder comme s'il s'agissait d'une session locale.</p>
+<p class="Pp">Premièrement, une session publie ses interfaces :</p>
+<pre>$kernel-&gt;post('IKC', 'publish', 'session_alias',
+                    [qw(state1 state2 state3 state4)], );</pre>
+<p class="Pp">Ensuite, un noyau externe s'y abonne :</p>
+<pre># Chercher une session dans tous les noyaux connus
+$kernel-&gt;post('IKC', 'subscribe', [qw(poe://*/session_alias/)]);
+# Chercher une session dans un noyau spécifique
+$kernel-&gt;post('IKC', 'subscribe', [qw(poe://Pulse/timeserver)]);
+# Assurez-vous que la session a un état donné
+$kernel-&gt;post('IKC', 'subscribe', [qw(poe://*/timeserver/connect)]);</pre>
+<p class="Pp">Après l'abonnement, une session proxy est créée qui peut être accédée comme n'importe quelle session normale, bien que -&gt;call() agisse comme -&gt;post() pour des raisons évidentes :</p>
+<pre>$kernel-&gt;post('poe:/Pulse/timeserver', 'state', $arg1, $arg2...);</pre>
+<p class="Pp">Actuellement, l'alias de session utilisé lors de la publication vers la session proxy doit être le même que lors de l'abonnement. Comme les noyaux ont plusieurs noms, si vous utilisez '*' comme nom de noyau lors de l'abonnement, l'alias de session pourrait ne pas être ce que vous attendez. Voir "Moniteur" pour plus de détails.</p>
+<p class="Pp">Bien sûr, essayer de poster à une session proxy avant sa création sera problématique. Pour être notifié lorsque la session proxy est créée, un état de rappel peut être spécifié :</p>
+<pre>$kernel-&gt;post('IKC', 'subscribe', [qw(poe://*/timeserver)],
+        'timeserver_subscribed');</pre>
+<p class="Pp">Le rappel est appelé avec une liste de toutes les sessions auxquelles il a réussi à s'abonner. Vous devriez voir cette liste avant de continuer. Mieux encore, vous pouvez utiliser le moniteur IKC (voir ci-dessous).</p>
+<p class="Pp">Vous pouvez également laisser POE::Component::IKC::Client-&gt;spawn gérer tous les détails.</p>
+<pre>POE::Component::IKC::Client-&gt;spawn(
+        port=&gt;31337, name=&gt;$name,
+        subscribe=&gt;[qw(poe://*/timeserver)],
+        on_connect=&gt;\&amp;create_me,
+    );</pre>
+<p class="Pp">'on_connect' est appelé lorsque tous les abonnements ont été acceptés. Si un abonnement a été rejeté, create_ikc_client échouera. Si plusieurs noyaux externes ont été interrogés pour une session (comme dans l'exemple ci-dessus), l'abonnement est considéré comme réussi si au moins un noyau accepte l'abonnement.</p>
+<p class="Pp">Pour annuler les choses :</p>
+<pre>$kernel-&gt;post(IKC=&gt;'retract', 'session_alias'=&gt;[qw(states)]);
+$kernel-&gt;post(IKC=&gt;'unsubscribe', [qw(poe://Pulse/timeserver)]);</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Moniteur'><a class='permalink' href='#Moniteur'>Moniteur</a></h2>
+<p class="Pp">Vous dites que vous voulez surveiller tous les noyaux externes qui se connectent à vous :</p>
+<pre>$kernel-&gt;post(IKC=&gt;'monitor', '*'=&gt;{register=&gt;'some_event'});</pre>
+<pre>sub some_event
+{
+    my($name, $real)=@_[ARG1, ARG2];
+    print &quot;- Noyau &quot;, ($real ? '' : &quot;alias &quot;), &quot;$name connecté\n&quot;;
+}</pre>
+<p class="Pp">Ensuite, vous voulez savoir quand une session spécifique se déconnecte :</p>
+<pre>$kernel-&gt;post(IKC=&gt;'monitor', some_kernel=&gt;{unregister=&gt;'bye_bye'});</pre>
+<p class="Pp">Ou peut-être pensez-vous qu'une session devrait nettoyer et se terminer lorsque IKC le fait.</p>
+<pre>$kernel-&gt;post(IKC=&gt;'monitor', '*'=&gt;{shutdown=&gt;'other_event'});</pre>
+<pre>sub other_event
+{
+    # terminez les roues, les alarmes, les sélections et les alias ici
+}</pre>
+<p class="Pp">Voir le "moniteur" dans POE::Component::IKC::Responder pour plus de détails.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Arrêt'><a class='permalink' href='#Arrêt'>Arrêt</a></h2>
+<p class="Pp">Lorsque vous sentez que le moment est venu et que vous voulez supprimer toutes les sessions liées à IKC, faites simplement ceci :</p>
+<pre>$kernel-&gt;post(IKC=&gt;'shutdown');</pre>
+<p class="Pp">Et tout devrait disparaître. Dans le pire des cas, certains pourraient encore avoir des alias enregistrés, mais cela n'empêchera pas le noyau de se fermer.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Le_noyau_local'><a class='permalink' href='#Le_noyau_local'>Le   noyau local</a></h2>
+<p class="Pp">Vous pouvez poster à votre noyau local comme s'il était distant :</p>
+<pre>$kernel-&gt;post(IKC=&gt;'post',
+                &quot;poe://$kernel-&gt;ID/session/state'=&gt;$ONE_arg);</pre>
+<p class="Pp">Cependant, vous ne pouvez actuellement pas vous abonner à des sessions locales. Je ne sais pas comment résoudre cela.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Il s'agit de la communication inter-noyaux POE. Elle est utilisée pour obtenir des événements d'un noyau POE à un autre.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR   AUSSI</a></h1>
+<p class="Pp">POE::Component::IKC::Responder -- Cœur du système</p>
+<p class="Pp">POE::Component::IKC::Server -- Crée un processus qui écoute d'autres noyaux.</p>
+<p class="Pp">POE::Component::IKC::Client -- Crée un processus qui se connecte à d'autres noyaux.</p>
+<p class="Pp">POE::Component::IKC::ClientLite -- Implémentation légère d'IKC pour les endroits où POE ne peut pas être utilisé, comme mod_perl.</p>
+<p class="Pp">POE::Component::IKC::Channel -- Gestion de la communication avec d'autres noyaux.</p>
+<p class="Pp">POE::Component::IKC::Proxy -- Session proxy créée lorsque vous vous abonnez à une session distante.</p>
+<p class="Pp">POE::Component::IKC::Freezer -- Méthode de sérialisation pure Perl.</p>
+<p class="Pp">POE::Component::IKC::Specifier -- Routines d'aide pour l'analyse des spécificateurs IKC.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Philip Gwyn &lt;perl-ikc at pied.nu&gt;</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT_ET_LICENCE'><a class='permalink' href='#COPYRIGHT_ET_LICENCE'>COPYRIGHT   ET LICENCE</a></h1>
+<p class="Pp">Copyright 1999-2014 par Philip Gwyn. Tous droits réservés.</p>
+<p class="Pp">Ce livre est un logiciel libre ; vous pouvez le redistribuer et/ou le modifier sous les mêmes conditions que Perl lui-même. Veuillez vous référer à <a href='http://www.perl.com/language/misc/Artistic.html'>http://www.perl.com/language/misc/Artistic.html</a>.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-poe-component-ikc/">extra/perl-poe-component-ikc</a></dd>
+        <dt>Version :</dt>
+        <dd>0.2402-12</dd>
+        <dt>En amont :</dt>
+        <dd><a href="https://search.cpan.org/dist/POE-Component-IKC/">https://search.cpan.org/dist/POE-Component-IKC/</a></dd>
+        <dt>Licences :</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-poe-component-ikc/">/listing/extra/perl-poe-component-ikc/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+            <li><a href="#AUTHOR">AUTEUR</a></li>
+        
+            <li><a href="#COPYRIGHT_AND_LICENSE">DROITS D'AUTEUR ET LICENCE</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/POE::Component::IKC.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/POE::Component::IKC.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

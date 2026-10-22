@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>RRDs(3pm) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">RRDs(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/rrdtool/">rrdtool</a></p>
+<p class="lic">Licences: GPL-2.0-or-later</p>
+
+        
+        <main id="content">
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">RRDs(3pm)</td>
+    <td class="head-vol">Pages de manuel Arch</td>
+    <td class="head-rtitle">RRDs(3pm)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NAME</a></h1>
+<p class="Pp">RRDs - Accéder à RRDtool comme module partagé</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>use RRDs;
+RRDs::error
+RRDs::last ...
+RRDs::info ...
+RRDs::create ...
+RRDs::update ...
+RRDs::updatev ...
+RRDs::graph ...
+RRDs::fetch ...
+RRDs::tune ...
+RRDs::times(start, end)
+RRDs::dump ...
+RRDs::restore ...
+RRDs::flushcached ...
+RRDs::register_fetch_cb ...
+$RRDs::VERSION</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='Calling_Sequence'><a class='permalink' href='#Calling_Sequence'>Séquence d'appel</a></h2>
+<p class="Pp">Ce module accède directement à la fonctionnalité de RRDtool depuis Perl. Les arguments des fonctions mentionnées dans SYNOPSIS sont expliqués dans la documentation normale de RRDtool. L'appel à la ligne de commande</p>
+<pre>rrdtool update mydemo.rrd --template in:out N:12:13</pre>
+<p class="Pp">devient</p>
+<pre>RRDs::update (&quot;mydemo.rrd&quot;, &quot;--template&quot;, &quot;in:out&quot;, &quot;N:12:13&quot;);</pre>
+<p class="Pp">Notez que</p>
+<pre>--template=in:out</pre>
+<p class="Pp">est également valide.</p>
+<p class="Pp">La fonction RRDs::times prend deux paramètres : un temps de &quot;start&quot; et un temps de &quot;end&quot;. Ceux-ci doivent être spécifiés dans le format de spécification de temps de style AT par RRDtool. Voir la documentation de <b>rrdfetch</b> pour une explication détaillée de la façon de spécifier le temps.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Error_Handling'><a class='permalink' href='#Error_Handling'>Gestion des erreurs</a></h2>
+<p class="Pp">Les fonctions RRDs::update n'arrêtent pas le programme, même si elles ne peuvent pas interpréter les arguments que vous leur avez passés.</p>
+<p class="Pp">La fonction RRDs::error doit être appelée pour obtenir le statut d'erreur après chaque appel de fonction. Si RRDs::error ne renvoie rien, alors la fonction précédente a terminé sa tâche avec succès.</p>
+<pre>use RRDs;
+RRDs::update (&quot;mydemo.rrd&quot;,&quot;N:12:13&quot;);
+my $ERR=RRDs::error;
+die &quot;ERROR while updating mydemo.rrd: $ERR\n&quot; if $ERR;</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Return_Values'><a class='permalink' href='#Return_Values'>Valeurs de retour</a></h2>
+<p class="Pp">Les fonctions RRDs::last, RRDs::graph, RRDs::info, RRDs::fetch et RRDs::times renvoient leurs résultats.</p>
+<p class="Pp"><b>RRDs::last</b> renvoie un seul ENTIER représentant le temps de la dernière mise à jour.</p>
+<pre>$lastupdate = RRDs::last ...</pre>
+<p class="Pp"><b>RRDs::graph</b> renvoie un tableau avec la taille en largeur et hauteur de l'image créée et un pointeur vers un tableau avec les résultats des arguments PRINT.</p>
+<pre>($result_arr,$xsize,$ysize) = RRDs::graph ...
+print &quot;Image size: ${xsize}x${ysize}\n&quot;;
+print &quot;Averages: &quot;, (join &quot;, &quot;, @$averages);</pre>
+<p class="Pp"><b>RRDs::info</b> renvoie un pointeur vers une table de hachage. Les clés de la table de hachage représentent les noms des propriétés du RRD et les valeurs de la table de hachage sont les valeurs des propriétés.</p>
+<pre>$hash = RRDs::info &quot;example.rrd&quot;;
+foreach my $key (keys %$hash){
+  print &quot;$key = $$hash{$key}\n&quot;;
+}</pre>
+<p class="Pp"><b>RRDs::graphv</b> prend les mêmes paramètres que RRDs::graph mais renvoie un pointeur vers une table de hachage. La table de hachage renvoyée contient des méta-informations sur le graphique. Quelques exemples incluent sa taille et la position de la zone de graphique dans l'image. Lorsqu'elle est appelée avec '-' comme nom de fichier, le contenu du graphique est renvoyé dans la table de hachage sous la clé (key 'image').</p>
+<p class="Pp"><b>RRDs::updatev</b> renvoie également un pointeur vers une table de hachage. Les clés de la table de hachage sont des chaînes concaténées d'un temps, d'un index RRA et d'un nom de source de données pour chaque point de données consolidé (CDP) écrit sur disque en conséquence de l'appel actuel. Les valeurs de la table de hachage sont les valeurs des CDP.</p>
+<p class="Pp"><b>RRDs::fetch</b> est le plus complexe en termes de valeurs renvoyées. Il y a quatre valeurs. Deux entiers normaux, un pointeur vers un tableau et un pointeur vers un tableau de pointeurs.</p>
+<pre>my ($start,$step,$names,$data) = RRDs::fetch ... 
+print &quot;Start:       &quot;, scalar localtime($start), &quot; ($start)\n&quot;;
+print &quot;Step size:   $step seconds\n&quot;;
+print &quot;DS names:    &quot;, join (&quot;, &quot;, @$names).&quot;\n&quot;;
+print &quot;Data points: &quot;, $#$data + 1, &quot;\n&quot;;
+print &quot;Data:\n&quot;;
+for my $line (@$data) {
+  print &quot;  &quot;, scalar localtime($start), &quot; ($start) &quot;;
+  $start += $step;
+  for my $val (@$line) {
+    printf &quot;%12.1f &quot;, $val;
+  }
+  print &quot;\n&quot;;
+}</pre>
+<p class="Pp"><b>RRDs::xport</b> expose la fonctionnalité de rrdxport et renvoie des données avec la structure suivante :</p>
+<pre>my ($start,$end,$step,$cols,$names,$data) = RRDs::xport ...
+
+# $start : timestamp
+# $end   : timestamp
+# $step  : secondes
+# $cols  : nombre de colonnes renvoyées
+# $names : arrayref avec les noms des colonnes
+# $data  : arrayref d'arrayrefs avec les données (premier indice est le temps, second est la colonne)</pre>
+<p class="Pp"><b>RRDs::times</b> renvoie deux entiers qui sont le nombre de secondes depuis l'epoch (1970-01-01) pour les arguments &quot;start&quot; et &quot;end&quot; respectivement.</p>
+<p class="Pp">Voir le répertoire d'exemples pour plus de façons d'utiliser cette extension.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Fetch_Callback_Function'><a class='permalink' href='#Fetch_Callback_Function'>Fonction de rappel de récupération</a></h2>
+<p class="Pp">Normalement, lorsque vous utilisez graph, xport ou fetch, les données que vous voyez seront obtenues à partir d'un fichier rrd réel. Certains utilisateurs qui apprécient le style de graphiques rrd exportent leurs données d'une base de données, puis les chargent dans un fichier rrd afin de pouvoir appeler rrdgraph dessus. En utilisant une fonction de rappel personnalisée, vous pouvez fournir votre propre code pour gérer les demandes de données de graph, xport et fetch.</p>
+<p class="Pp">Pour ce faire, vous devez d'abord écrire une fonction fetch en perl, puis enregistrer cette fonction à l'aide de <span class="Li">RRDs::fetch_register_callback</span>.</p>
+<p class="Pp">Enfin, vous pouvez utiliser le nom de chemin pseudo <b>cb//</b>[<i>nom de fichier</i>] pour indiquer à rrdtool d'utiliser votre routine de rappel au lieu de la méthode normale de récupération de données rrd pour organiser les données nécessaires.</p>
+<p class="Pp">La fonction de rappel doit ressembler à ceci :</p>
+<pre>sub fetch_callback {
+    my $args_hash = shift;
+    # {
+    #  filename =&gt; 'cb//somefilename',
+    #  cd =&gt; 'AVERAGE',
+    #  start =&gt; 1401295291,   
+    #  end =&gt; 1401295591,
+    #  step =&gt; 300 }
+    # faire quelque chose d'intelligent pour récupérer ces données
+    return {
+        start =&gt; $unix_timestamp,
+        step =&gt; $step_width,
+        data =&gt; {
+            dsName1 =&gt; [ value1, value2, ... ],
+            dsName2 =&gt; [ value1, value2, ... ],
+            dsName3 =&gt; [ value1, value2, ... ],
+        }
+   };
+}</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='NOTE'><a class='permalink' href='#NOTE'>NOTE</a></h1>
+<p class="Pp">Si vous manipulez la variable TZ, vous devez également appeler la fonction POSIX <a href='/man/tzset.3.en'>tzset(3)</a> pour initialiser tous les états internes de la bibliothèque dans le fuseau horaire de votre choix.</p>
+<pre>use POSIX qw(tzset);
+$ENV{TZ} = 'CET';   
+POSIX::tzset();</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTEUR</a></h1>
+<p class="Pp">Tobias Oetiker &lt;tobi@oetiker.ch&gt;</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-10-15</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher une page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/rrdtool/">extra/rrdtool</a></dd>
+        <dt>Version :</dt>
+        <dd>1.9.0-8</dd>
+        <dt>Upstream :</dt>
+        <dd><a href="https://www.rrdtool.org">https://www.rrdtool.org</a></dd>
+        <dt>Licences :</dt>
+        <dd>GPL-2.0-or-later</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/rrdtool/">/listing/extra/rrdtool/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NAME</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#NOTE">NOTE</a></li>
+        
+            <li><a href="#AUTHOR">AUTEUR</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/RRDs.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/RRDs.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de <a href="https://">...</a>.</p>
+        </footer>
+    </body>
+</html><p>La licence GPL-3.0, à l'exception du contenu des pages de manuel, possède sa propre licence spécifiée dans le package Arch Linux correspondant.</p>

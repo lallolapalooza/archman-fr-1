@@ -1,0 +1,470 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>bootup(7) — Pages manuelles d'Arch</title>
+        
+        
+        
+        
+        
+    
+    
+        <link rel="alternate" href="/man/bootup.7.de" hreflang="de">
+    
+        <link rel="alternate" href="/man/bootup.7.zh_CN" hreflang="zh_CN">
+    
+        <link rel="alternate" href="/man/bootup.7.zh_TW" hreflang="zh_TW">
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">bootup(7)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/core/x86_64/systemd/">systemd</a></p>
+<p class="lic">Licences: LGPL-2.1-or-later, CC0-1.0, GPL-2.0-or-later, MIT-0</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">BOOTUP(7)</td>
+    <td class="head-vol">bootup</td>
+    <td class="head-rtitle">BOOTUP(7)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">bootup - Processus de démarrage du système</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Plusieurs composants différents interviennent lors du démarrage d'un
+    système Linux. Immédiatement après la mise sous tension, le firmware du
+    système effectue une initialisation matérielle minimale, puis transmet le
+    contrôle à un chargeur de démarrage (par ex. <a href='/man/systemd-boot.7.en'>systemd-boot(7)</a> ou <b>GRUB</b>[1]) stocké sur un périphérique de
+    stockage persistant. Ce chargeur de démarrage charge ensuite un noyau d'OS
+    depuis le disque (ou le réseau). Sur les systèmes utilisant EFI ou d'autres
+    types de firmware, ce firmware peut également charger le noyau directement.</p>
+<p class="Pp">Le noyau (facultativement) monte un système de fichiers en mémoire, qui
+    recherche le système de fichiers racine. De nos jours, cela est implémenté
+    sous la forme d'un « initramfs » — une archive CPIO compressée que le noyau
+    extrait dans une tmpfs. Par le passé, des systèmes de fichiers normaux
+    utilisant un périphérique de bloc en mémoire (ramdisk) étaient utilisés, et
+    le nom « initrd » est toujours utilisé pour décrire les deux concepts. C'est
+    le chargeur de démarrage ou le firmware qui charge à la fois le noyau et les
+    images initrd/initramfs en mémoire, mais c'est le noyau qui les interprète
+    comme un système de fichiers. <a href='/man/systemd.1.en'>systemd(1)</a> peut être utilisé
+    pour gérer les services dans l'initrd, de la même manière que sur le système
+    réel.</p>
+<p class="Pp">Une fois le système de fichiers racine trouvé et monté, l'initrd transmet
+    le contrôle au gestionnaire de système de l'hôte (tel que <a href='/man/systemd.1.en'>systemd(1)</a>) stocké
+    dans le système de fichiers racine, qui est alors responsable de détecter
+    tout le matériel restant, de monter tous les systèmes de fichiers nécessaires
+    et de lancer tous les services configurés.</p>
+<p class="Pp">Lors de l'arrêt, le gestionnaire de système arrête tous les services,
+    démonte tous les systèmes de fichiers non occupés (en détachant les
+    technologies de stockage qui les prennent en charge), puis (facultativement)
+    saute dans l'exitrd. L'exitrd est pris en charge par une tmpfs et
+    démonte/détache les systèmes de fichiers restants, y compris la racine réelle.
+    En dernière étape, le système est mis hors tension.</p>
+<p class="Pp">Des informations supplémentaires sur le processus de démarrage du système
+    peuvent être trouvées dans <a href='/man/boot.7.en'>boot(7)</a>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYSTEM_MANAGER_BOOTUP'><a class='permalink' href='#SYSTEM_MANAGER_BOOTUP'>DÉMARRAGE DU GESTIONNAIRE DE SYSTÈME</a></h1>
+<p class="Pp">Au démarrage, le gestionnaire de système sur l'image de l'OS est
+    responsable de l'initialisation des systèmes de fichiers, services et pilotes
+    requis pour le fonctionnement du système. Sur les systèmes <a href='/man/systemd.1.en'>systemd(1)</a> , ce
+    processus est divisé en plusieurs étapes discrètes qui sont exposées sous la
+    forme d'unités cibles. (Voir <a href='/man/systemd.target.5.en'>systemd.target(5)</a> pour des informations détaillées sur les
+    unités cibles.) Le processus de démarrage est hautement parallélisé de sorte
+    que l'ordre dans lequel les unités cibles spécifiques sont atteintes n'est pas
+    déterministe, mais respecte toujours une quantité limitée de structure
+    d'ordonnancement.</p>
+<p class="Pp">Lorsque systemd démarre le système, il active toutes les unités qui sont
+    des dépendances de default.target (ainsi que, récursivement, toutes les
+    dépendances de ces dépendances). Habituellement, default.target est simplement
+    un alias de graphical.target ou multi-user.target, selon que le système est
+    configuré pour une interface graphique ou seulement pour une console texte.
+    Pour imposer un ordonnancement minimal entre les unités activées, un certain
+    nombre d'unités cibles bien connues sont disponibles, comme listées sur <a href='/man/systemd.special.7.en'>systemd.special(7)</a>.</p>
+<p class="Pp">Le graphique suivant est un aperçu structurel de ces unités bien connues et
+    de leur position dans la logique de démarrage. Les flèches décrivent quelles
+    unités sont activées et ordonnées avant quelles autres unités. Les unités
+    proches du haut sont démarrées avant les unités plus proches du bas du
+    graphique.</p>
+<div class="Bd-indent">
+<pre>                             cryptsetup-pre.target veritysetup-pre.target
+                                                  |
+(various low-level                                v
+ API VFS mounts:             (various cryptsetup/veritysetup devices...)
+ mqueue, configfs,                                |    |
+ debugfs, ...)                                    v    |
+ |                                  cryptsetup.target  |
+ |  (various swap                                 |    |    remote-fs-pre.target
+ |   devices...)                                  |    |     |        |
+ |    |                                           |    |     |        v
+ |    v                       local-fs-pre.target |    |     |  (network file systems)
+ |  swap.target                       |           |    v     v                 |
+ |    |                               v           |  remote-cryptsetup.target  |
+ |    |  (various low-level  (various mounts and  |  remote-veritysetup.target |
+ |    |   services: udevd,    fsck services...)   |             |              |
+ |    |   tmpfiles, random            |           |             |    remote-fs.target
+ |    |   seed, sysctl, ...)          v           |             |              |
+ |    |      |                 local-fs.target    |             | _____________/
+ |    |      |                        |           |             |/
+ \____|______|_______________   ______|___________/             |
+                             \ /                                |
+                              v                                 |
+                       sysinit.target                           |
+                              |                                 |
+       ______________________/|\_____________________           |
+      /              |        |      |               \          |
+      |              |        |      |               |          |
+      v              v        |      v               |          |
+ (various       (various      |  (various            |          |
+  timers...)      paths...)   |   sockets...)        |          |
+      |              |        |      |               |          |
+      v              v        |      v               |          |
+timers.target  paths.target   |  sockets.target      |          |
+      |              |        |      |               v          |
+      v              \_______ | _____/         rescue.service   |
+                             \|/                     |          |
+                              v                      v          |
+                          basic.target         <i>rescue.target</i>    |
+                              |                                 |
+                      ________v____________________             |
+                     /              |              \            |
+                     |              |              |            |
+                     v              v              v            |
+                 display-    (various system   (various system  |
+             manager.service     services        services)      |
+                     |         required for        |            |
+                     |        graphical UIs)       v            v
+                     |              |            <i>multi-user.target</i>
+emergency.service    |              |              |
+        |            \_____________ | _____________/
+        v                          \|/
+<i>emergency.target</i>                    v
+                              <i>graphical.target</i></pre>
+</div>
+<p class="Pp">Les unités cibles couramment utilisées comme cibles de démarrage sont
+    <i>mises en évidence</i>. Ces unités sont de bons choix comme cibles finales, par exemple
+    en les passant à l'option de ligne de commande du noyau <i>systemd.unit=</i> (voir
+    <a href='/man/systemd.1.en'>systemd(1)</a>) ou en créant un lien symbolique de default.target vers elles.</p>
+<p class="Pp">timers.target est activée par basic.target de manière asynchrone. Cela
+    permet aux unités timers de dépendre de services qui ne deviennent disponibles
+    que plus tard dans le démarrage.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='USER_MANAGER_STARTUP'><a class='permalink' href='#USER_MANAGER_STARTUP'>DÉMARRAGE DU GESTIONNAIRE UTILISATEUR</a></h1>
+<p class="Pp">Le gestionnaire de système démarre l'unité user@<i>uid</i>.service pour
+    chaque utilisateur, qui lance une instance distincte non privilégiée de <b>systemd</b>
+    pour chaque utilisateur — le gestionnaire utilisateur. De la même manière que
+    le gestionnaire de système, le gestionnaire utilisateur démarre les unités qui
+    sont activées par default.target. Le graphique suivant est un aperçu
+    structurel des unités utilisateur bien connues. Pour les sessions non
+    graphiques, default.target est utilisée. Chaque fois que l'utilisateur se
+    connecte à une session graphique, le gestionnaire de connexion démarrera la
+    cible graphical-session.target qui est utilisée pour activer les unités
+    requises pour la session graphique. Un certain nombre de cibles (affichées sur
+    le côté droit) sont démarrées lorsque du matériel spécifique est disponible
+    pour l'utilisateur.</p>
+<div class="Bd-indent">
+<pre>   (various           (various         (various
+    timers...)         paths...)        sockets...)    (sound devices)
+        |                  |                 |               |
+        v                  v                 v               v
+  timers.target      paths.target     sockets.target    sound.target
+        |                  |                 |
+        \______________   _|_________________/         (bluetooth devices)
+                       \ /                                   |
+                        V                                    v
+                  basic.target                          bluetooth.target
+                        |
+             __________/ \_______                      (périphériques de carte à puce)
+            /                    \                           |
+            |                    |                           v
+            |                    v                      smartcard.target
+            v            graphical-session-pre.target
+(divers services utilisateur)  |                       (imprimantes)
+            |                    v                           |
+            |       (services pour la session graphique)     v
+            |                    |                       printer.target
+            v                    v
+     <i>default.target</i>      graphical-session.target</pre>
+</div>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BOOTUP_IN_THE_INITRD'><a class='permalink' href='#BOOTUP_IN_THE_INITRD'>DÉMARRAGE   DANS L'INITRD</a></h1>
+<p class="Pp">Systemd peut également être utilisé dans l'initrd. Il détecte l'environnement
+    de l'initrd en vérifiant la présence du fichier /etc/initrd-release. La cible
+    par défaut dans l'initrd est initrd.target. Le processus de démarrage est
+    identique à celui du gestionnaire système jusqu'à la cible basic.target. Après
+    cela, systemd exécute la cible spéciale initrd.target. Avant que tout système
+    de fichiers ne soit monté, le gestionnaire déterminera si le système doit
+    reprendre depuis l'hibernation ou poursuivre le démarrage normal. Ceci est
+    accompli par systemd-hibernate-resume.service qui doit être terminé avant
+    local-fs-pre.target, afin qu'aucun système de fichiers ne puisse être monté
+    avant que la vérification ne soit complète. Lorsque le périphérique racine
+    devient disponible, initrd-root-device.target est atteint. Si le périphérique
+    racine peut être monté sur /sysroot, l'unité sysroot.mount devient active et
+    initrd-root-fs.target est atteint. Le service initrd-parse-etc.service
+    analyse /sysroot/etc/fstab pour un éventuel point de montage /usr/ et des
+    entrées supplémentaires marquées avec l'option <i>x-initrd.mount</i> .
+    Toutes les entrées trouvées sont montées sous /sysroot, et initrd-fs.target
+    est atteint. Le service initrd-cleanup.service isole vers
+    initrd-switch-root.target, où les services de nettoyage peuvent s'exécuter.
+    En dernière étape, initrd-switch-root.service est activé, ce qui fera que le
+    système changera sa racine vers /sysroot.</p>
+<div class="Bd-indent">
+<pre>                               : (début identique à ci-dessus)
+                               :
+                               v
+                         basic.target
+                               |                       emergency.service
+        ______________________/|                               |
+       /                       |                               v
+       |            initrd-root-device.target          <i>emergency.target</i>
+       |                       |
+       |                       v
+       |                  sysroot.mount
+       |                       |
+       |                       v
+       |             initrd-root-fs.target
+       |                       |
+       |                       v
+       v            initrd-parse-etc.service
+(services initrd             |
+ personnalisés...)           v
+       |            (sysroot-usr.mount et
+       |             divers montages marqués
+       |               avec l'option fstab
+       |              x-initrd.mount...)
+       |                       |
+       |                       v
+       |                initrd-fs.target
+       \______________________ |
+                              \|
+                               v
+                          initrd.target
+                               |
+                               v
+                     initrd-cleanup.service
+                          isole vers
+                    initrd-switch-root.target
+                               |
+                               v
+        ______________________/|
+       /                       v
+       |        initrd-udevadm-cleanup-db.service
+       v                       |
+(services initrd             |
+ personnalisés...)           |
+       \______________________ |
+                              \|
+                               v
+                   initrd-switch-root.target
+                               |
+                               v
+                   initrd-switch-root.service
+                               |
+                               v
+                     Transition vers l'OS hôte</pre>
+</div>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYSTEM_MANAGER_SHUTDOWN'><a class='permalink' href='#SYSTEM_MANAGER_SHUTDOWN'>ARRÊT   DU GESTIONNAIRE SYSTÈME</a></h1>
+<p class="Pp">L'arrêt du système avec systemd consiste également en diverses unités cibles
+    avec une certaine structure d'ordonnancement minimale appliquée :</p>
+<div class="Bd-indent">
+<pre>                       (entre en conflit avec  (entre en conflit avec
+                          tous les services   tous les montages de
+                           système)            fichiers, échanges,
+                               |                cryptsetup/
+                               |                veritysetup
+                               |                périphériques, ...)
+                               |                     |
+                               v                     v
+                        shutdown.target    umount.target
+                               |                     |
+                               \_______   ______/
+                                       \ /
+                                        v
+                               (divers services
+                                    de bas niveau)
+                                        |
+                                        v
+                                  final.target
+                                        |
+            ___________________________/ \_________________________________
+           /               |               |               |               \
+           |               |               |               |               |
+           v               |               |               |               |
+systemd-reboot.service     |               |               |               |
+           |               v               |               |               |
+           |    systemd-poweroff.service   |               |               |
+           v               v               v               v               v
+     <i>reboot.target</i>         |      systemd-halt.service     |               |
+                           v               |               v               |
+                   <i>poweroff.target</i>         |    systemd-kexec.service      |
+                                           v               |               |
+                                      <i>halt.target</i>          |  systemd-soft-reboot.service
+                                                           v               |
+                                                     <i>kexec.target</i>          |
+                                                                           v
+                                                                   <i>soft-reboot.target</i></pre>
+</div>
+<p class="Pp">Les cibles d'arrêt du système couramment utilisées sont <i>en gras</i>.</p>
+<p class="Pp">Notez que <a href='/man/systemd-halt.service.8.en'>systemd-halt.service(8)</a>, systemd-reboot.service,
+    systemd-poweroff.service et systemd-kexec.service feront transiter le
+    système et le gestionnaire de serveur (PID 1) vers la deuxième phase de
+    l'arrêt du système (implémentée dans le binaire systemd-shutdown), qui
+    démontera tous les systèmes de fichiers restants, tuera tous les processus
+    restants et libérera toutes les autres ressources restantes, de manière
+    simple et robuste, sans plus tenir compte de aucun concept de service ou
+    d'unité. À ce stade, les applications et ressources régulières sont
+    généralement déjà terminées et libérées ; la deuxième phase n'opère donc
+    qu'en filet de sécurité pour tout ce qui n'a pas pu être arrêté ou libéré
+    pour une raison quelconque pendant la phase d'arrêt principale, basée sur
+    les unités, décrite ci-dessus.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='THE_EXITRD'><a class='permalink' href='#THE_EXITRD'>L'EXITRD</a></h1>
+<p class="Pp">L'« exitrd » est un concept symétrique à l'initrd.
+    Lorsque le gestionnaire système s'arrête et que /run/initramfs/shutdown
+    existe, il changera la racine vers /run/initramfs/ et exécutera /shutdown.
+    Ce programme s'exécute depuis le tmpfs monté sur /run/, il peut donc démonter
+    l'ancien système de fichiers racine et effectuer des étapes supplémentaires,
+    par exemple démanteler un stockage complexe ou effectuer des journaux
+    supplémentaires concernant l'arrêt.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR   AUSSI</a></h1>
+<p class="Pp"><a href='/man/systemd.1.en'>systemd(1)</a>, <a href='/man/boot.7.en'>boot(7)</a>, <a href='/man/systemd.special.7.en'>systemd.special(7)</a>,
+    <a href='/man/systemd.target.5.en'>systemd.target(5)</a>, <a href='/man/systemd-halt.service.8.en'>systemd-halt.service(8)</a>,
+    <a href='/man/systemd-soft-reboot.service.8.en'>systemd-soft-reboot.service(8)</a></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='NOTES'><a class='permalink' href='#NOTES'>NOTES</a></h1>
+<dl class="Bl-tag">
+  <dt> 1.</dt>
+  <dd>GRUB</dd>
+</dl>
+<div class="Bd-indent"><a href='https://www.gnu.org/software/grub/'>https://www.gnu.org/software/grub/</a></div>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date"></td>
+    <td class="foot-os">systemd 258.2</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/core/x86_64/systemd/">core/systemd</a></dd>
+        <dt>Version :</dt>
+        <dd>258.2-2</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://www.github.com/systemd/systemd">https://www.github.com/systemd/systemd</a></dd>
+        <dt>Licences :</dt>
+        <dd>LGPL-2.1-or-later, CC0-1.0, GPL-2.0-or-later, MIT-0</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/core/systemd/">/listing/core/systemd/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#SYSTEM_MANAGER_BOOTUP">DÉMARRAGE DU GESTIONNAIRE SYSTÈME</a></li>
+        
+            <li><a href="#USER_MANAGER_STARTUP">DÉMARRAGE DU GESTIONNAIRE UTILISATEUR</a></li>
+        
+            <li><a href="#BOOTUP_IN_THE_INITRD">DÉMARRAGE DANS L'INITRD</a></li>
+        
+            <li><a href="#SYSTEM_MANAGER_SHUTDOWN">ARRÊT DU GESTIONNAIRE SYSTÈME</a></li>
+        
+            <li><a href="#THE_EXITRD">L'EXITRD</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+            <li><a href="#NOTES">NOTES</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+<nav class="other-languages">
+    <p>Dans d'autres langues :</p>
+    <ul>
+    
+        <li><a href="/man/bootup.7.de">de</a></li>
+    
+        <li><a href="/man/bootup.7.zh_CN">zh_CN</a></li>
+    
+        <li><a href="/man/bootup.7.zh_TW">zh_TW</a></li>
+    
+    </ul>
+</nav>
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/bootup.7.en.txt">txt</a>, 
+        
+            <a href="/man/bootup.7.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               licence, à l'exception du contenu des pages de manuel, qui ont leur propre licence spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

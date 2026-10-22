@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>SSL_CTX_set_generate_session_id(3ssl) — Pages man d&#x27;Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">SSL_CTX_set_generate_session_id(3ssl)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/core/x86_64/openssl/">openssl</a></p>
+<p class="lic">Licences: Apache-2.0</p>
+
+        
+        <main id="content">
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">SSL_CTX_set_generate_session_id(3ssl)</td>
+    <td class="head-vol">OpenSSL</td>
+    <td class="head-rtitle">SSL_CTX_set_generate_session_id(3ssl)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">SSL_CTX_set_generate_session_id, SSL_set_generate_session_id,
+    SSL_has_matching_session_id, GEN_SESSION_CB - manipuler la génération d'ID de session SSL (serveur uniquement)</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXIS'><a class='permalink' href='#SYNTAXIS'>SYNTAXIS</a></h1>
+<pre>#include &lt;openssl/ssl.h&gt;
+typedef int (*GEN_SESSION_CB)(SSL *ssl, unsigned char *id,
+                              unsigned int *id_len);
+int SSL_CTX_set_generate_session_id(SSL_CTX *ctx, GEN_SESSION_CB cb);
+int SSL_set_generate_session_id(SSL *ssl, GEN_SESSION_CB, cb);
+int SSL_has_matching_session_id(const SSL *ssl, const unsigned char *id,
+                                unsigned int id_len);</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp"><b>SSL_CTX_set_generate_session_id()</b> définit la fonction de rappel pour générer de nouveaux ID de session pour les sessions SSL/TLS de <b>ctx</b> à <b>cb</b>.</p>
+<p class="Pp"><b>SSL_set_generate_session_id()</b> définit la fonction de rappel pour générer de nouveaux ID de session pour les sessions SSL/TLS de <b>ssl</b> à <b>cb</b>.</p>
+<p class="Pp"><b>SSL_has_matching_session_id()</b> vérifie si une session avec l'ID <b>id</b> (de longueur <b>id_len</b>) existe déjà dans le cache de sessions du contexte parent de <b>ssl</b>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='NOTES'><a class='permalink' href='#NOTES'>NOTES</a></h1>
+<p class="Pp">Lorsqu'une nouvelle session est établie entre un client et un serveur, le serveur génère un ID de session. L'ID de session est une séquence arbitraire d'octets. La longueur de l'ID de session se situe entre 1 et 32 octets. L'ID de session n'est pas critique en termes de sécurité, mais il doit être unique pour le serveur. De plus, l'ID de session est transmis en clair lorsque la session est réutilisée, il ne doit donc contenir aucune information sensible.</p>
+<p class="Pp">Sans fonction de rappel définie, un serveur OpenSSL génère un ID de session unique à partir de nombres pseudo-aléatoires de longueur maximale possible. Avec la fonction de rappel, l'ID de session peut être modifié pour inclure des informations supplémentaires, telles qu'un ID d'hôte, afin d'améliorer les techniques d'équilibrage de charge ou de mise en cache externe.</p>
+<p class="Pp">La fonction de rappel reçoit un pointeur vers l'emplacement mémoire où placer <b>id</b> et un pointeur vers la longueur maximale autorisée <b>id_len</b>. La zone mémoire à l'emplacement <b>id</b> est garantie d'avoir uniquement la taille <b>id_len</b>. La fonction ne permet de générer qu'un ID plus court et de réduire <b>id_len</b> ; la fonction ne doit <b>jamais</b> augmenter <b>id_len</b> ni écrire dans la zone <b>id</b> en dehors de la limite donnée.</p>
+<p class="Pp">L'emplacement <b>id</b> est initialement rempli de 0x00 avant que la fonction ne soit appelée, de sorte que la fonction puisse ne remplir qu'une partie de la longueur possible et laisser <b>id_len</b> inchangé, tout en maintenant la reproductibilité.</p>
+<p class="Pp">Puisque les sessions doivent être distinguées, les ID de session doivent être uniques. Sans la fonction de rappel, un nombre aléatoire est utilisé, de sorte que la probabilité de générer le même ID est extrêmement faible (2^256 pour SSLv3/TLSv1). Pour garantir l'unicité de l'ID de session généré, la fonction doit appeler <b>SSL_has_matching_session_id()</b> et générer un autre ID en cas de conflit. Si un conflit n'est pas résolu, le handshake échouera. Si l'application code par exemple un ID d'hôte unique, un numéro de processus unique et un numéro de séquence unique dans l'ID de session, l'unicité pourrait facilement être assurée sans la randomisation supplémentaire (bien qu'il faille faire attention à ne pas lire d'informations confidentielles de cette manière). Si l'application ne peut pas garantir l'unicité, il est recommandé d'utiliser le <b>id_len</b> maximum et de remplir les octets inutilisés avec des données aléatoires pour éviter les collisions.</p>
+<p class="Pp"><b>SSL_has_matching_session_id()</b> ne consulte que le cache de sessions interne, pas externe. Comme l'ID de session est généré avant le handshake, il n'est pas immédiatement ajouté au cache. Si un autre thread utilise le même cache de sessions interne, une condition de concurrence peut survenir dans un autre thread générant le même ID de session. Des collisions peuvent également survenir lors de l'utilisation d'un cache externe, car le cache externe n'est pas vérifié avec <b>SSL_has_matching_session_id()</b> et la même condition de concurrence s'applique.</p>
+<p class="Pp">La fonction doit retourner 0 si elle ne peut pas générer d'ID de session pour une raison quelconque et 1 en cas de succès.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VALEUR_DE_RETOUR'><a class='permalink' href='#VALEUR_DE_RETOUR'>VALEUR DE RETOUR</a></h1>
+<p class="Pp"><b>SSL_CTX_set_generate_session_id()</b> et <b>SSL_set_generate_session_id()</b> retournent 1 en cas de succès et 0 en cas d'échec.</p>
+<p class="Pp"><b>SSL_has_matching_session_id()</b> retourne 1 s'il y a déjà une session avec le même ID dans le cache, ou 0 sinon.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXEMPLES'><a class='permalink' href='#EXEMPLES'>EXEMPLES</a></h1>
+<p class="Pp">La fonction de rappel ci-dessous génère un ID de session avec l'ID donné par le serveur, et remplit le reste avec des octets pseudo-aléatoires:</p>
+<pre>const char session_id_prefix = "www-18";
+#define MAX_SESSION_ID_ATTEMPTS 10
+static int generate_session_id(SSL *ssl, unsigned char *id,
+                               unsigned int *id_len)
+{
+    unsigned int count = 0;
+    do {
+        RAND_pseudo_bytes(id, *id_len);
+        /*
+         * Préfixer l'ID de session avec le préfixe requis. NB : Si notre
+         * préfixe est trop long, le tronquer - mais il y aura de pires effets
+         * de toute façon, par exemple le serveur ne pourrait créer qu'une seule
+         * ID de session (c'est-à-dire le préfixe !) donc toutes les futures négociations
+         * de session échoueront en raison de conflits.
+         */
+        memcpy(id, session_id_prefix, strlen(session_id_prefix) &lt; *id_len ?
+                                      strlen(session_id_prefix) : *id_len);
+    } while (SSL_has_matching_session_id(ssl, id, *id_len)
+              &amp;&amp; ++count &lt; MAX_SESSION_ID_ATTEMPTS);
+    if (count &gt;= MAX_SESSION_ID_ATTEMPTS)
+        return 0;
+    return 1;
+}</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR AUSSI</a></h1>
+<p class="Pp"><a href='/man/ssl.7.fr'>ssl(7)</a>, <a href='/man/SSL_get_version.3.fr'>SSL_get_version(3)</a></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_DACTEUR'><a class='permalink' href='#DROITS_DACTEUR'>DROITS D'AUTEUR</a></h1>
+<p class="Pp">Copyright 2001-2020 des auteurs du projet OpenSSL. Tous droits réservés.</p>
+<p class="Pp">Sous licence Apache 2.0 (la « Licence »). Vous ne pouvez pas utiliser ce fichier sauf en conformité avec la Licence. Vous pouvez obtenir une copie dans le fichier LICENSE de la distribution source ou sur <a href='https://www.openssl.org/source/license.html'>https://www.openssl.org/source/license.html</a>.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-10-01</td>
+    <td class="foot-os">3.6.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher des pages man" name="q" value=""
+         />
+    <input type="submit" name="go" value="Aller" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/core/x86_64/openssl/">core/openssl</a></dd>
+        <dt>Version :</dt>
+        <dd>3.6.0-1</dd>
+        <dt>Upstream :</dt>
+        <dd><a href="https://www.openssl.org">https://www.openssl.org</a></dd>
+        <dt>Licences :</dt>
+        <dd>Apache-2.0</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/core/openssl/">/listing/core/openssl/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#SYNTAXIS">SYNTAXIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#NOTES">NOTES</a></li>
+        
+            <li><a href="#VALEUR_DE_RETOUR">VALEUR DE RETOUR</a></li>
+        
+            <li><a href="#EXEMPLES">EXEMPLES</a></li>
+        
+            <li><a href="#VOIR_AUSSI">VOIR AUSSI</a></li>
+        
+            <li><a href="#DROITS_DACTEUR">DROITS D'AUTEUR</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/SSL_CTX_set_generate_session_id.3ssl.fr.txt">txt</a>, 
+        
+            <a href="/man/SSL_CTX_set_generate_session_id.3ssl.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>, à l'exception du contenu des pages man, qui ont leur propre licence spécifiée dans le paquet Arch Linux correspondant.</p>
+        </footer>
+    </body>
+</html><footer>
+    <p>

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>error::dwarf(7stap) — Pages man Arch Linux</title>
+        
+        
+        
+        
+        
+    
+    
+        <link rel="alternate" href="/man/error::dwarf.7stap.cs" hreflang="cs">
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">error__dwarf.7stap</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/systemtap/">systemtap</a></p>
+<p class="lic">Licences: GPL-2.0-or-later</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">ERROR::DWARF(7stap)</td>
+    <td class="head-vol"></td>
+    <td class="head-rtitle">ERROR::DWARF(7stap)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">error::dwarf - problèmes de qualité des informations de débogage dwarf</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Systemtap s'appuie parfois sur les informations de débogage ELF/DWARF des programmes instrumentés pour localiser les points de sonde, ou pour lire/écrire des variables contextuelles, tout comme le fait un débogueur symbolique. Même si l'examen du code source du programme peut montrer des variables ou des lignes où des sondes peuvent être souhaitées, le compilateur doit préserver ces informations pour que systemtap (ou un débogueur comme gdb) puisse y accéder précisément. Si un script requiert de telles données, mais que le compilateur n'en a pas préservé suffisamment, des erreurs de passe-2 peuvent en résulter.</p>
+<p class="Pp">Les conditions courantes qui déclenchent ces problèmes incluent :</p>
+<dl class="Bl-tag">
+  <dt id="informations"><a class="permalink" href="#informations">informations de débogage manquantes ou non concordantes</a></dt>
+  <dd>Parfois, les informations de débogage sont installées, mais ne correspondent pas aux binaires sondés. Voir la page man <i>warning::debuginfo</i> pour plus d'aide afin de localiser les bonnes informations de débogage.
+    </dd>
+  <dt id="compilateur"><a class="permalink" href="#compilateur">version du compilateur</a></dt>
+  <dd>Avant la version 4.5 de GCC, la qualité des informations de débogage était assez limitée. Souvent, les développeurs étaient conseillés de compiler leurs programmes avec les drapeaux <i>-O0 -g</i> pour désactiver l'optimisation. La version 4.5 de GCC a introduit une fonctionnalité appelée « affectations de suivi de variables » qui lui permet de générer des informations de débogage de haute qualité sous optimisation complète <i>-O2 -g</i>. Ce n'est pas parfait, mais bien meilleur qu'avant. Notez que, en raison d'un autre bug de gcc (PR51358), <i>-O0 -g</i> peut parfois dégrader la qualité des informations de débogage par rapport à <i>-O2 -g</i>.
+    <p class="Pp">Un autre problème connexe concerne la qualité des informations de débogage pour la zone de prologue d'une fonction (PR15123), où un programme compilé avec CFLAGS=-mfentry (en particulier le noyau, pour ftrace) peut manquer d'informations de débogage précises pour les instructions d'entrée pour les versions de gcc antérieures à la version 4.8. Si possible, arrangez-vous pour compiler vos programmes avec des CFLAGS <i>-grecord-gcc-switches</i>, et/ou essayez de relancer systemtap avec <i>$PR15123_ASSUME_MFENTRY=1</i>.</p>
+      </dd>
+  <dt id="linux"><a class="permalink" href="#linux">le système de build Linux endommage la qualité des informations de débogage</a></dt>
+  <dd>Un commit du noyau en amont #2062afb4f804a a introduit -fno-var-tracking-assignments dans KCFLAGS, réduisant considérablement la qualité des informations de débogage, ce qui peut causer des échecs de débogage. La solution la plus simple est d'<b>effacer, supprimer, bref, éradiquer</b> cette ligne du Makefile principal de Linux :
+    <p class="Pp">KBUILD_CFLAGS += [...] -fno-var-tracking-assignments [...]</p>
+      </dd>
+  <dt id="fonction"><a class="permalink" href="#fonction">inlining de fonctions</a></dt>
+  <dd>Même les versions modernes de gcc ont parfois des problèmes avec les paramètres des fonctions inlinées. Il peut être nécessaire de modifier le script pour sonder un endroit légèrement différent. Essayez une sonde <i>.statement()</i>, au lieu d'une sonde <i>.function()</i>, quelque part quelques lignes de code dans le corps de la fonction inlinée. Ou essayez de placer une sonde sur le site d'appel de la fonction inlinée. Ou utilisez la construction de langage de script <i>if @defined($var) { ... }</i> pour tester la résolvabilité de la variable de contexte avant de l'utiliser.
+      </dd>
+  <dt id="instruction"><a class="permalink" href="#instruction">réorganisation des instructions</a></dt>
+  <dd>Le code fortement optimisé mélange souvent les instructions de plusieurs instructions source. Cela peut laisser systemtap sans endroit pour choisir de placer une sonde, en particulier une sonde d'instruction spécifiée par numéro de ligne. Systemtap peut conseiller d'essayer un numéro de ligne voisin, mais ceux-ci peuvent également ne pas bien fonctionner. Envisagez de placer une sonde par un caractère générique d'instruction ou une plage de numéros de ligne.
+      </dd>
+  <dt id="elfutils"><a class="permalink" href="#elfutils">configuration d'elfutils</a></dt>
+  <dd>Il est possible que les informations de débogage DWARF recherchées soient disponibles, mais pas dans un format acceptable pour la copie d'elfutils utilisée par systemtap. Par exemple, votre copie de gcc pourrait produire des informations de débogage compressées (sections ELF <i>.zdebug_*</i> ou fichiers <i>.xz</i>) alors que votre copie d'elfutils pourrait manquer des capacités de décompression appropriées. Malheureusement, il n'y a pas de moyen facile de savoir si c'est le problème. Si vous construisez votre propre copie d'elfutils, assurez-vous que toutes les bibliothèques de décompression sont disponibles au moment de la compilation.
+      </dd>
+  <dt id="informations~2"><a class="permalink" href="#informations~2">configuration des informations de débogage</a></dt>
+  <dd>Certains outils peuvent générer des informations de débogage non prises en charge par systemtap, telles que l'option CONFIG_DEBUG_INFO_SPLIT (fichiers <i>.dwo</i>) du noyau Linux. Privilégiez le format ELF/DWARF simple (éventuellement divisé, style Fedora) si possible.
+          </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ALTERNATIVES'><a class='permalink' href='#ALTERNATIVES'>ALTERNATIVES</a></h1>
+<p class="Pp">Afin de réduire la dépendance aux informations de débogage ELF/DWARF, envisagez l'utilisation d'instrumentation compilée statiquement, telle que les points de trace du noyau, ou les marqueurs utilisateur de <i>&lt;sys/sdt.h&gt;</i>. Ces sites de hook d'instrumentation ont un coût relativement faible (juste une instruction NOP pour sdt.h), et garantissent presque la disponibilité des données de paramètres et un site de sonde fiable, le tout sans dépendance aux informations de débogage.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR AUSSI</a></h1>
+<pre><a href='/man/stap.1.fr'>stap(1)</a>,
+<i>http://dwarfstd.org/</i>,
+<i>http://sourceware.org/systemtap/wiki/TipContextVariables</i>,
+<i>http://gcc.gnu.org/wiki/Var_Tracking_Assignments</i>,
+<i>warning::debuginfo</i>(7stap),
+<i>warning::buildid</i>(7stap),
+<i>error::reporting</i>(7stap)</pre>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date"></td>
+    <td class="foot-os"></td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher une page man" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/systemtap/">extra/systemtap</a></dd>
+        <dt>Version :</dt>
+        <dd>5.4-1</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://sourceware.org/systemtap/">https://sourceware.org/systemtap/</a></dd>
+        <dt>Licences :</dt>
+        <dd>GPL-2.0-or-later</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/systemtap/">/listing/extra/systemtap/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#ALTERNATIVES">ALTERNATIVES</a></li>
+        
+            <li><a href="#VOIR_AUSSI">VOIR AUSSI</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+<nav class="other-languages">
+    <p>Dans d'autres langues :</p>
+    <ul>
+    
+        <li><a href="/man/error::dwarf.7stap.cs">cs</a></li>
+    
+    </ul>
+</nav>
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/error::dwarf.7stap.en.txt">txt</a>, 
+        
+            <a href="/man/error::dwarf.7stap.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>, à l'exception du contenu des pages man, qui ont leur propre licence spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>del_PathCache(3) — Pages du manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">del_PathCache(3)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/libtecla/">libtecla</a></p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">pca_lookup_file(3)</td>
+    <td class="head-vol">Manuel des fonctions de bibliothèque</td>
+    <td class="head-rtitle">pca_lookup_file(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">pca_lookup_file, del_PathCache, del_PcaPathConf, new_PathCache,
+    new_PcaPathConf, pca_last_error, pca_path_completions, pca_scan_path,
+    pca_set_check_fn, ppc_file_start, ppc_literal_escapes - recherche un fichier dans une
+    liste de répertoires</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<pre>#include &lt;libtecla.h&gt;
+PathCache *new_PathCache(void);
+PathCache *del_PathCache(PathCache *pc);
+int pca_scan_path(PathCache *pc, const char *path);
+void pca_set_check_fn(PathCache *pc, CplCheckFn *check_fn,
+                      void *data);
+char *pca_lookup_file(PathCache *pc, const char *name,
+                      int name_len, int literal);
+const char *pca_last_error(PathCache *pc);
+CPL_MATCH_FN(pca_path_completions);</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">L'objet <b>PathCache</b> fait partie de la bibliothèque tecla (voir la
+    page de manuel libtecla(3)).</p>
+<p class="Pp">Les objets <b>PathCache</b> permettent à une application de rechercher
+    des fichiers dans n'importe quelle liste de répertoires séparés par des
+    deux-points, comme la variable d'environnement d'exécution unix PATH. Les
+    fichiers dans les répertoires absolus sont mis en cache dans un objet
+    <b>PathCache</b>, tandis que les répertoires relatifs sont analysés au besoin.
+    En utilisant un objet <b>PathCache</b>, vous pouvez rechercher le nom de chemin
+    complet d'un nom de fichier simple, ou vous pouvez obtenir une liste des
+    complétions possibles d'un préfixe de nom de fichier donné. Par défaut, tous
+    les fichiers de la liste des répertoires sont des cibles pour la recherche et la
+    complétion, mais un mécanisme polyvalent est fourni pour ne sélectionner que
+    certains types de fichiers. L'application évidente de cette fonctionnalité est de
+    fournir la complétion par tabulation et la recherche de commandes exécutables
+    dans le PATH unix, ainsi une fonction de rappel optionnelle qui rejette tout
+    sauf les fichiers exécutables, est fournie.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='UN_EXEMPLE'><a class='permalink' href='#UN_EXEMPLE'>UN EXEMPLE</a></h1>
+<p class="Pp">Sous UNIX, l'exemple de programme suivant recherche et affiche les
+    chemins complets de chacun des noms de commande sur la ligne de commande.</p>
+<pre>  #include &lt;stdio.h&gt;
+  #include &lt;stdlib.h&gt;
+  #include &lt;libtecla.h&gt;
+  int main(int argc, char *argv[])
+  {
+    int i;
+  /*
+   * Créer un cache pour les fichiers exécutables.
+   */
+    PathCache *pc = new_PathCache();
+    if(!pc)
+      exit(1);
+  /*
+   * Analyser le PATH de l'utilisateur pour les exécutables.
+   */
+    if(pca_scan_path(pc, getenv(&quot;PATH&quot;))) {
+      fprintf(stderr, &quot;%s\n&quot;, pca_last_error(pc));
+      exit(1);
+    }
+  /*
+   * S'arranger pour ne signaler que les fichiers exécutables.
+   */
+   pca_set_check_fn(pc, cpl_check_exe, NULL);
+  /*
+   * Rechercher et afficher le nom de chemin complet de chaque
+   * commande listée sur la ligne de commande.
+   */
+    for(i=1; i&lt;argc; i++) {
+      char *cmd = pca_lookup_file(pc, argv[i], -1, 0);
+      printf(&quot;Le nom de chemin complet de '%s' est %s\n&quot;, argv[i],
+             cmd ? cmd : &quot;inconnu&quot;);
+    }
+    pc = del_PathCache(pc);  /* Nettoyage */
+    return 0;
+  }</pre>
+<p class="Pp">Voici un exemple de ce que cela fait sur mon ordinateur portable sous
+    linux :</p>
+<pre>  $ ./example less more blob
+  Le nom de chemin complet de 'less' est /usr/bin/less
+  Le nom de chemin complet de 'more' est /bin/more
+  Le nom de chemin complet de 'blob' est inconnu
+  $ </pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTIONS_DES_FONCTIONS'><a class='permalink' href='#DESCRIPTIONS_DES_FONCTIONS'>DESCRIPTIONS DES FONCTIONS</a></h1>
+<p class="Pp">Pour utiliser les fonctionnalités de ce module, vous devez d'abord
+    allouer un objet <b>PathCache</b> en appelant la fonction constructeur
+    <b>new_PathCache()</b>.</p>
+<pre>  PathCache *new_PathCache(void)</pre>
+<p class="Pp">Cette fonction crée les ressources nécessaires pour mettre en cache
+    et rechercher des fichiers dans une liste de répertoires. Elle retourne
+    <b>NULL</b> en cas d'erreur.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='REMPLIR_LE_CACHE'><a class='permalink' href='#REMPLIR_LE_CACHE'>REMPLIR LE CACHE</a></h1>
+<p class="Pp">Une fois que vous avez créé un cache, il doit être rempli de fichiers.
+    Pour ce faire, appelez la fonction <b>pca_scan_path()</b>.</p>
+<pre>  int pca_scan_path(PathCache *pc, const char *path);</pre>
+<p class="Pp">Chaque fois que cette fonction est appelée, elle rejette le contenu
+    actuel du cache, puis analyse la liste des répertoires spécifiés dans son
+    argument <b>path</b> pour y trouver des fichiers. L'argument <b>path</b> doit
+    être une chaîne contenant une liste de répertoires séparés par des
+    deux-points, telle que
+    <b>&quot;/usr/bin:/home/mcs/bin:.&quot;</b>. Cela peut inclure des répertoires
+    spécifiés par des chemins absolus tels que <b>&quot;/usr/bin&quot;</b>, ainsi
+    que des sous-répertoires spécifiés par des chemins relatifs tels que
+    <b>&quot;.&quot;</b> ou <b>&quot;bin&quot;</b>. Les fichiers des répertoires
+    absolus sont immédiatement mis en cache dans l'objet <b>PathCache</b>
+    spécifié, tandis que les sous-répertoires, dont l'identité change évidemment
+    chaque fois que le répertoire de travail courant est modifié, sont marqués
+    pour être analysés à la volée chaque fois qu'un fichier est recherché.</p>
+<p class="Pp">En cas de succès, cette fonction retourne <b>0</b>. En cas d'erreur,
+    elle retourne <b>1</b>, et une description de l'erreur peut être obtenue en
+    appelant <b>pca_last_error(pc)</b>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='RECHERCHER_DES_FICHIERS'><a class='permalink' href='#RECHERCHER_DES_FICHIERS'>RECHERCHER DES FICHIERS</a></h1>
+<p class="Pp">Une fois que le cache a été rempli de fichiers, vous pouvez rechercher le
+    nom de chemin complet d'un fichier, simplement en spécifiant son nom de fichier
+    à <b>pca_lookup_file()</b>.</p>
+<pre>  char *pca_lookup_file(PathCache *pc, const char *name,
+                        int name_len, int literal);</pre>
+<p class="Pp">Pour permettre de passer à cette fonction un nom de fichier qui fait
+    en réalité partie d'une chaîne plus longue, l'argument <b>name_len</b> peut
+    être utilisé pour spécifier la longueur du nom de fichier au début de
+    l'argument <b>name[]</b>. Si vous passez <b>-1</b> pour cette longueur, la
+    longueur de la chaîne sera déterminée avec <b>strlen()</b>. Si la chaîne
+    <b>name[]</b> peut contenir des barres obliques inverses qui échappent la
+    signification spéciale des espaces et des tabulations dans le nom de
+    fichier, donnez à l'argument <b>literal</b> la valeur <b>0</b>. Sinon, si les
+    barres obliques inverses doivent être traitées comme des caractères normaux,
+    passez <b>1</b> pour la valeur de l'argument <b>literal</b>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COMPLETION_DE_NOMS_DE_FICHIER'><a class='permalink' href='#COMPLETION_DE_NOMS_DE_FICHIER'>COMPLETION DE NOMS DE FICHIER</a></h1>
+<p class="Pp">La recherche des complétions potentielles d'un préfixe de nom de
+    fichier dans le cache de noms de fichiers est réalisée en passant la fonction
+    de rappel fournie <b>pca_path_completions()</b> à la fonction
+    <b>cpl_complete_word()</b> (voir la page de manuel <a href='/man/cpl_complete_word.3.en'>cpl_complete_word(3)</a>).</p>
+<pre>  CPL_MATCH_FN(pca_path_completions);</pre>
+<p class="Pp">Cette fonction de rappel exige que son argument <b>data</b> soit un
+    pointeur vers un objet <b>PcaPathConf</b>. Les objets de configuration de ce
+    type sont alloués en appelant <b>new_PcaPathConf()</b>.</p>
+<pre>  PcaPathConf *new_PcaPathConf(PathCache *pc);</pre>
+<p class="Pp">Cette fonction retourne un objet initialisé avec des paramètres de
+    configuration par défaut, qui déterminent le comportement de la fonction de
+    rappel <b>cpl_path_completions()</b>. Les fonctions qui permettent de changer
+    individuellement ces paramètres sont décrites ci-dessous.</p>
+<p class="Pp">Par défaut, la fonction de rappel <b>pca_path_completions()</b>
+    recherche en arrière à partir du début du nom de fichier en cours de
+    complétion, à la recherche du premier espace non échappé ou du début de la
+    ligne d'entrée. Si vous souhaitez spécifier un emplacement différent, appelez
+    <b>ppc_file_start()</b> avec l'indice où le nom de fichier commence dans la
+    ligne d'entrée. Passer <b>start_index=-1</b> réactive le comportement par
+    défaut.</p>
+<pre>  void ppc_file_start(PcaPathConf *ppc, int start_index);</pre>
+<p class="Pp">Par défaut, lorsque <b>pca_path_completions()</b> examine un nom de
+    fichier dans la ligne d'entrée, chaque barre oblique inverse isolée dans la
+    ligne d'entrée est interprétée comme un caractère spécial qui supprime toute
+    signification spéciale du caractère qui la suit, tel qu'un espace qui doit
+    être considéré comme faisant partie du nom de fichier plutôt que de délimiter
+    le début du nom de fichier. Ces barres obliques inverses sont donc ignorées
+    lors de la recherche de complétions, et ajoutées ensuite avant les espaces,
+    les tabulations et les barres obliques inverses littérales dans la liste des
+    complétions. Pour que les barres obliques inverses non échappées soient traitées
+    comme des caractères normaux, appelez <b>ppc_literal_escapes()</b> avec une
+    valeur non nulle dans son argument <b>literal</b>.</p>
+<pre>  void ppc_literal_escapes(PcaPathConf *ppc, int literal);</pre>
+<p class="Pp">Lorsque vous avez terminé avec une variable <b>PcaPathConf</b>, vous
+    pouvez la passer à la fonction destructeur <b>del_PcaPathConf()</b> pour
+    récupérer sa mémoire.</p>
+<pre>  PcaPathConf *del_PcaPathConf(PcaPathConf *ppc);</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ETRE_SELECTIF'><a class='permalink' href='#ETRE_SELECTIF'>ETRE SELECTIF</a></h1>
+<p class="Pp">Si vous n'êtes intéressé que par certains types de fichiers, tels que,
+    par exemple, les fichiers exécutables, ou les fichiers dont les noms se
+    terminent par un suffixe particulier, vous pouvez faire en sorte que les
+    fonctions de complétion et de recherche de fichiers soient sélectives dans les
+    noms de fichiers qu'elles retournent. Ceci est fait en enregistrant une fonction
+    de rappel avec votre objet <b>PathCache</b>. Par la suite, chaque fois qu'un
+    nom de fichier est trouvé qui correspond soit à un nom de fichier recherché,
+    soit à un préfixe en cours de complétion, votre fonction de rappel</p>
+</section>
+</div>
+</section>
+
+            </article>
+            <aside id="content-right">
+                
+            </aside>
+        </main>
+        <footer>
+            
+        </footer>
+    </body>
+</html>
+ction sera appelée avec
+    le chemin complet du fichier, plus toute donnée spécifique à l'application que vous
+    fournissez, et si le rappel retourne <b>1,</b> le nom de fichier sera signalé
+    comme correspondance, et <b>s'il </b>retourne
+0, il sera ignoré. Les fonctions de rappel appropriées et leurs prototypes doivent être déclarées avec la
+    macro <b>suivante. </b>Le <b>CplCheckFn
+</b>typedef est également fourni au
+    cas où vous souhaiteriez déclarer </p>des
+<pre>  pointeurs vers de telles fonctions.
+#define CPL_CHECK_FN(fn) int (fn)(void *data, \
+                                    const char </pre>*pathname)
+<p class="Pp">typedef CPL_CHECK_FN(CplCheckFn);
+L'enregistrement de l'une de
+    <b>ces fonctions implique </b>l'appel de la
+    fonction
+pca_set_check_fn(). En plus de la fonction <b>de rappel,</b>
+    passée via l'argument
+check_fn, vous pouvez passer <b>un </b>pointeur vers n'importe quoi
+    via l'argument
+data. Ce pointeur sera transmis à <b>votre
+</b>    fonction de rappel, via son propre argument
+data, chaque fois qu'elle est appelée,
+    ce qui fournit ainsi un </p>moyen
+<pre>  de passer des données spécifiques à l'application à votre
+  rappel.
+void pca_set_check_fn(PathCach</pre>e
+<p class="Pp">*pc, CplCheckFn *check_fn,
+                        void *data);
+Notez que ces rappels reçoivent le chemin complet de chaque
+    fichier correspondant, de sorte que la décision de savoir si un fichier est d'intérêt peut être
+    basée sur <b>n'importe quelle </b>propriété du fichier, pas seulement son nom de fichier. Par exemple, la
+    fonction de rappel fournie
+cpl_check_exe() examine les permissions <b>d'exécution
+</b>    du fichier et les permissions de ses répertoires parents, et
+    ne retourne
+1 que si l'utilisateur a la permission d'exécuter le fichier. Cette
+    fonction de <b>rappel </b>peut ainsi être utilisée pour rechercher ou compléter des noms de commandes trouvés
+    dans les répertoires </p>listés
+<p class="Pp">dans la variable d'environnement
+    PATH de l'utilisateur.
+    Le programme exemple donné plus tôt dans cette page de manuel fournit une démonstration
+    de cela.
+Attention, si quelqu'un essaie de compléter une chaîne vide, votre
+    rappel sera appelé une fois pour chaque fichier du cache, ce qui peut
+    en </p>compter
+<p class="Pp">des milliers. Si votre rappel effectue une opération chronophage, cela
+    pourrait entraîner un délai inacceptable pour l'utilisateur, de sorte que les rappels doivent être
+    maintenus courts.
+Pour améliorer les performances, chaque fois que l'un de ces rappels est appelé,
+    le choix qu'il fait est mis en cache, et la prochaine fois que le fichier correspondant
+    est recherché, au lieu d'appeler à nouveau le rappel, l'enregistrement mis en cache de
+    savoir s'il a été accepté ou rejeté est utilisé. Ainsi, si quelqu'un essaie de
+    compléter une chaîne vide, et appuie <b>sur tab une </b>deuxième fois quand rien ne semble <b>se passer, il n'y </b>aura qu'un seul lo</p>ng délai, puisque</section> la deuxième passe
+<section class="Sh">
+<h1 class="Sh" id='ERROR_HANDLING'><a class='permalink' href='#ERROR_HANDLING'>fonctionnera </a></h1>entièrement
+<p class="Pp">à <b>partir des </b>dispositions mises en cache des fichiers. Ces <b>dispositions
+</b>    mises en cache sont jetées chaque fois que
+pca_scan_path() <b>est appelé, et
+   </b> chaque fois que
+pca_set_check_fn() est appelé avec des </p>arguments
+<pre>  de fonction de r</pre>appel
+    ou de d</section>onnées modifiés.
+<section class="Sh">
+<h1 class="Sh" id='CLEANING_UP'><a class='permalink' href='#CLEANING_UP'>GESTIO</a></h1>N
+<p class="Pp">DES ERREURS
+Si
+pca_scan_path() <b>signale </b>qu'une erreur s'est produite en
+    retournant
+1, vous pouvez <b>obtenir une </b>description concise de l'erreur en
+    appelant
+pca_last_error(pc). Cela retourne une chaîne interne
+    <b>NULL</b>.</p>
+<pre>  contenant un m</pre>essage d'erre</section>ur.
+const char
+<section class="Sh">
+<h1 class="Sh" id='THREAD_SAFETY'><a class='permalink' href='#THREAD_SAFETY'>*pca_last_error(PathCac</a></h1>he
+<p class="Pp">*pc);
+NETTOYAGE
+Une fois que vous avez fini <b>d'utiliser un
+</b>    objet
+PathCache, vous pouvez
+    récupérer ses ressources en le passant à la fonction destructrice <b>del_PathCache()</b>. Celle-ci prend un pointeur vers l'un de ces objets et
+    retourne toujours
+NULL.
+PathCache *del_PathCache(PathCache *pc);
+SÉCURITÉ   DES THREADS <b>Dans les </b>programmes multi-thread,
+    <b>vous dev</b>riez uti</p>liser la
+<p class="Pp">version <b>[[34]] </b>libtecla_r.a
+    de la bibliothèque. Celle-ci utilise les fonctions réentrantes POSIX lorsque c'est disponible
+    (d'où le
+    suffixe
+_r), et désactive les <b>fonctionnalités </b>qui reposent sur
+    des fonctions système non réentrantes. Dans le cas de ce module, la seule
+    <b>fonctionnal</b>ité désacti</p>vée est la</section> complétion
+<section class="Sh">
+<h1 class="Sh" id='FILES'><a class='permalink' href='#FILES'>de </a></h1>nom
+<pre>d'utilisateur dans les e</pre>xpressions
+    [[36]] ~us</section>ername/, dans
+    [[37]]
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>cpl_path_completions</a></h1>()
+<pre>.
+En utilisant la versi</pre>on
+    [[39]] libtecla_</section>r.a de la bibliothèque,
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>i</a></h1>l
+<p class="Pp">est sûr
+  </p>  d'utilise</section>r les fonct</div>ionnalités
+<table class="foot">
+  <tr>
+    <td class="foot-date"></td>
+    <td class="foot-os"></td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>de ce module dans </p>plusieurs
+    <dl>
+        <dt>threads, à </dt>condition
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/libtecla/">que chaque
+  </a></dd>  thread
+        <dt>utilise </dt>un objet
+        <dd>[[40]] </dd>PathCache
+        <dt>alloué </dt>séparément.
+        <dd><a href="http://www.astro.caltech.edu/~mcs/tecla/">En d'autres termes,
+    si deux threads </a></dd>veulent
+        <dt>effectuer </dt>une
+        <dd>recherche </dd>de chemin,
+        <dt>ils </dt>devraient chacun
+        <dd><a href="/listing/extra/libtecla/">appeler
+</a></dd>    [[41]</dl>] new_Pat</section>hCache()
+
+<details>
+    <summary>pour allouer </summary>leurs
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">propres </a></li>caches.
+FICHIERS
+        
+            <li><a href="#SYNOPSIS">libtecla.</a></li>a    -    La bibliothèque
+        
+            <li><a href="#DESCRIPTION">tecla
+</a></li>libtecla.h    -    Le
+        
+            <li><a href="#AN_EXAMPLE">fichier </a></li>d'en-tête tecla.
+VOIR
+        
+            <li><a href="#FUNCTION_DESCRIPTIONS">AUSSI
+libtecla(3), </a></li>gl_get_line(3), ef_expand_file(3)
+        
+            <li><a href="#POPULATING_THE_CACHE">,
+cpl_complete_word(3)</a></li>
+AUTEUR
+Martin
+        
+            <li><a href="#LOOKING_UP_FILES">Shepherd </a></li>(mcs@astro.caltech.edu)
+        
+            <li><a href="#FILENAME_COMPLETION">Informations sur le </a></li>paquet :
+Nom du paquet :
+        
+            <li><a href="#BEING_SELECTIVE">extra/libtecla
+</a></li>Version :
+1.6.3-2
+Amont
+        
+            <li><a href="#ERROR_HANDLING">:
+http://www.</a></li>astro.caltech.edu/~mcs/tecla/
+        
+            <li><a href="#CLEANING_UP">Licences :</a></li>
+custom:X11
+Manuels
+        
+            <li><a href="#THREAD_SAFETY">:
+</a></li>/listing/extra/libtecla/
+Table
+        
+            <li><a href="#FILES">des </a></li>matières
+NOM
+SYNOPSIS
+        
+            <li><a href="#SEE_ALSO">DESCRIPTION
+</a></li>UN EXEMPLE
+DESCRIPTION
+        
+            <li><a href="#AUTHOR">DES FON</a></li>CTIONS
+</ul>REMPLI</nav>SSAGE D</details>U CACHE
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>RECHERCHE DE FICHIERS
+COMPLÉTION DE
+        
+            <a href="/man/del_PathCache.3.en.txt">NOM </a>DE FICHIER
+ÊTRE SÉLECTIF 
+        
+            <a href="/man/del_PathCache.3.en.raw">GESTION DES</a> ERREURS
+N</p>ETTOYAGE
+SÉ</nav>CURITÉ DES </aside>THREADS
+FI</main>CHIERS
+VOIR
+        <footer>
+            la conversion
+            <p>des pages de manuel.
+Le site web est disponible <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">selon les termes de la licence
+   </a> [[82]] GPL-3.0
+               , </p>sauf pour le contenu des pages de </footer>manuel, qui ont leur propre licenc</body>e
+               spécifiée dans l</html>e paquet Arch Linux correspondant.

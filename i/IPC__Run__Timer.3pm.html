@@ -1,0 +1,386 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>IPC::Run::Timer(3pm) — Pages manuelles </title>d'Arch
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">IPC__Run__Timer(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-ipc-run/">perl-ipc-run</a></p>
+
+        er
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">IPC::Run::</td>Timer(3)
+    <td class="head-vol">Documentation Perl contribuée par les </td>utilisateurs
+    <td class="head-rtitle">IPC:</td>:Run:</tr>:Time</table>r(3)
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NO</a></h1>M
+<p class="Pp">IPC::Run::Timer --</p> Canaux de minute</section>rie pour IPC::Run.
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSI</a></h1>S
+<pre>use IPC::Run qw( run  timer timeout );
+## ou IPC::Run::Timer ( timer timeout );
+## ou IPC::Run::Timer ( :all );
+## Une minuterie non fatale :
+$t = timer( 5 ); # ou...
+$t = IO::Run::Timer-&gt;new( 5 );
+run $t, ...;
+## Un délai d'attente (qui est une minuterie qui meurt à l'expiration) :
+$t = timeout( 5 ); # ou...
+$t = IO::Run::Timer-&gt;new( 5, exception =&gt; "harness timed out" </pre>)</section>;
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTIO</a></h1>N
+<p class="Pp">Cette classe et ce module permettent de créer des minuteries et des
+    délais d'attente pour être utilisés par IPC::Run. Une minuterie expire
+    simplement lorsque son temps est écoulé. Un délai d'attente est une
+    minuterie qui lance une exception lorsqu'elle </p>expire.
+<p class="Pp">Les délais d'attente sont généralement un peu plus simples à utiliser
+    que les minuteries : ils lancent une exception à l'expiration, vous n'avez
+    donc pas besoin de les vérifier </p>:
+<pre>## Donnez à @cmd 10 secondes pour démarrer, puis 5 secondes pour répondre
+my $t = timeout( 10 );
+$h = start(
+   \@cmd, \$in, \$out,
+   $t,
+);
+pump $h until $out =~ /prompt/;
+$in = "some stimulus";
+$out = '';
+$t-&gt;time( 5 )
+pump $h until $out =~ /expected </pre>response/;
+<p class="Pp">Vous devez en revanche vérifier les minuteries </p>:
+<pre>## Donnez à @cmd 10 secondes pour démarrer, puis 5 secondes pour répondre
+my $t = timer( 10 );
+$h = start(
+   \@cmd, \$in, \$out,
+   $t,
+);
+pump $h until $t-&gt;is_expired || $out =~ /prompt/;
+$in = "some stimulus";
+$out = '';
+$t-&gt;time( 5 )
+pump $h until $out =~ /expected response/ || $t-&gt;</pre>is_expired;
+<p class="Pp">Les minuteries et délais d'attente réinitialisés sont démarrés par <b>start()</b>
+    et <b>pump(). </b>Les minuteries ne changent d'état que dans <b>pump()</b>. Comme
+    <b>run()</b> et <b>finish() </b>appellent tous deux <b>pump(),</b> ils se comportent comme
+    <b>pump() </b>en ce qui concerne les </p>minuteries.
+<p class="Pp">Les minuteries et délais d'attente ont trois états : réinitialisé,
+    en cours et expiré. Définir la valeur du délai d'attente réinitialise la
+    minuterie, comme l'appel de la méthode
+    <b>reset()</b>. La <b>méthode </b>start() démarre (ou redémarre) une
+    minuterie avec la valeur de temps définie le plus récemment, quel que soit
+  son </p>état.
+<section class="Ss">
+<h2 class="Ss" id='Time_values'><a class='permalink' href='#Time_values'>Valeurs de </a></h2>temps
+<p class="Pp">Toutes les valeurs de temps sont en secondes. Les temps peuvent être
+    de n'importe quel type de nombre perl, par exemple en secondes entières ou
+    en virgule flottante, éventuellement précédés de jours, heures et minutes
+    séparés par des </p>ponctuations.
+<p class="Pp">Exemples </p>:
+<pre>1           1 seconde
+1.1         1,1 secondes
+60          60 secondes
+1:0         1 minute
+1:1         1 minute, 1 seconde
+1:90        2 minutes, 30 secondes
+1:2:3:4.5   1 jour, 2 heures, 3 minutes, 4,5 secondes
+'inf'       le nombre spécial infini de perl (la minuterie ne se termine </pre>jamais)
+<p class="Pp">Les chaînes de date/heure absolues ne sont *pas* acceptées : l'analyse
+    de l'année, du mois et du jour du mois n'est pas disponible (patches
+    bienvenus :</p>-)</section>.
+<section class="Ss">
+<h2 class="Ss" id='Interval_fudging'><a class='permalink' href='#Interval_fudging'>Tolérance </a></h2>d'intervalle
+<p class="Pp">Lors du calcul d'une heure de fin à partir d'une heure de début et
+    d'un intervalle, les instances IPC::Run::Timer ajoutent un petit facteur de
+    tolérance. Cela garantit qu'aucun temps n'expirera avant la fin de
+    </p>l'intervalle.
+<p class="Pp">D'abord un peu de contexte. Le temps est échantillonné par incréments
+    discrets. Nous appellerons le moment exact où le temps rapporté passe d'un
+    intervalle au suivant un « tick », et l'intervalle entre deux ticks la
+    période. Voici un diagramme de trois ticks et les périodes entre eux </p>:
+<pre>  -0-0-0-0-0-0-0-0-0-0-1-1-1-1-1-1-1-1-1-1-2-...
+  ^                   ^                   ^
+  |&lt;--- période 0 ---&gt;|&lt;--- période 1 ---&gt;|
+  |                   |                   |
+tick 0              tick 1              tick </pre>2
+<p class="Pp">Pour voir pourquoi le facteur de tolérance est nécessaire, considérez
+    ce qui se passerait si une minuterie avec un intervalle de 1 seconde était
+    démarrée juste à la fin de la période 0 </p>:
+<pre>  -0-0-0-0-0-0-0-0-0-0-1-1-1-1-1-1-1-1-1-1-2-...
+  ^                ^  ^                   ^
+  |                |  |                   |
+  |                |  |                   |
+tick 0             |tick 1              tick 2
+                   |
+               start </pre>$t
+<p class="Pp">En supposant que <b>check()</b> est appelé de nombreuses fois par période, la
+    minuterie est susceptible d'expirer juste après le tick 1, car le temps
+    rapporté aura sauté de la valeur '0' à la valeur '1' </p>:
+<pre>  -0-0-0-0-0-0-0-0-0-0-1-1-1-1-1-1-1-1-1-1-2-...
+  ^                ^  ^   ^               ^
+  |                |  |   |               |
+  |                |  |   |               |
+tick 0             |tick 1|             tick 2
+                   |      |
+               start $t   |
+                          |
+                      check </pre>$t
+<p class="Pp">Ajouter une tolérance de '1' dans cet exemple signifie que la
+    minuterie est garantie de ne pas expirer avant le tick </p>2.
+<p class="Pp">La tolérance n'est pas ajoutée à un intervalle de </p>'0'.
+<p class="Pp">Cela signifie que les intervalles garantissent un intervalle minimum.
+    Étant d</p>onné que le processus exécutant perl peut être suspendu pendant un
+    certain te</section>mps, ou qu'il peut être occupé à faire quelque chose de
+    chronophage, il n'y a </section>aucune autre garantie sur le temps qu'il faudra à une
+    minuterie pour expirer.
+<section class="Sh">
+<h1 class="Sh" id='SUBCLASSING'><a class='permalink' href='#SUBCLASSING'>SOUS-CLASSEMEN</a></h1>T
+<p class="Pp">CHANGEMENT INCOMPATIBLE : En raison de la gêne introduite par le
+    retrait des pseudohashes de Perl, cette classe <i>n'utilise</i> plus la
+</p>    pragm</section>a fields.
+<section class="Sh">
+<h1 class="Sh" id='FUNCTIONS_&amp;amp;_METHODS'><a class='permalink' href='#FUNCTIONS_&amp;amp;_METHODS'>FONCTIONS ET </a></h1>MÉTHODES
+<dl class="Bl-tag">
+  <dt id="timer"><a class="permalink" href="#timer">tim</a></dt>er
+  <dd>Une fonction constructeur (et non méthode) d'instances IPC::Run::Timer :
+        <pre>$t = timer( 5 );
+$t = timer( 5, name =&gt; 'stall timer', debug =&gt; 1 );
+$t = timer;
+$t-&gt;interval( 5 );
+run ..., $t;
+run ..., $t = timer( </pre>5 );
+    <p class="Pp">Cette fonction de commodité est une écriture </p>abrégée de
+        <pre>IPC::Run::Timer-&gt;new( ..</pre>. );
+    <p class="Pp">. Elle renvoie une minuterie dans l'état réinitialisé avec un
+      intervalle </p>donné.
+    <p class="Pp">Si une exception est fournie, elle sera lancée lorsque la minuterie
+        constate qu'elle a expiré (dans <b>check()). Le nom est destiné au
+        déb</b>ogage, si vous prévoyez d'avoir plusieurs m</p>inuteries. Si aucun nom
+        n'est fourn</dd>i, un nom du type « timer #1 » sera fourni.
+  <dt id="timeout"><a class="permalink" href="#timeout">timeo</a></dt>ut
+  <dd>Une fonction constructeur (et non méthode) d'instances IPC::Run::Timer :
+        <pre>$t = timeout( 5 );
+$t = timeout( 5, exception =&gt; "kablooey" );
+$t = timeout( 5, name =&gt; "stall", exception =&gt; "kablooey" );
+$t = timeout;
+$t-&gt;interval( 5 );
+run ..., $t;
+run ..., $t = timeout( </pre>5 );
+    <p class="Pp">Cette fonction de commodité est une écriture </p>abrégée de
+        <pre>IPC::Run::Timer-&gt;new( exception =&gt; "IPC::Run: timeout ...", .</pre>.. );
+    <p class="Pp">. Elle renvoie une minuterie dans l'état réinitialisé qui lancera une
+        exception lorsqu'elle </p>expirera.
+    <p class="Pp">Prend les mêmes paramètres que « ti</p>mer » ; toute exception
+        pass</dd>ée remplace l'exception par défaut.
+  <dt id="new"><a class="permalink" href="#new">ne</a></dt>w
+  <dd>
+    <pre>IPC::Run::Timer-&gt;new()  ;
+IPC::Run::Timer-&gt;new( 5 )  ;
+IPC::Run::Timer-&gt;new( 5, exception =&gt; 'kablooey' </pre>)  ;
+    <p class="Pp">Constructeur. V</p>oir « timer » po</dd>ur les détails.
+  <dt id="check"><a class="permalink" href="#check">che</a></dt>ck
+  <dd>
+    <pre>check $t;
+check $t, $now;
+$t-&gt;</pre>check;
+    <p class="Pp">Vérifie si une minuterie a expiré depuis la dernière vérification. N'a
+        aucun effet sur les minuteries non en cours d'exécution. Lancera une
+        exception si une est </p>définie.
+    <p class="Pp"><b>IPC::Run::pump() </b>appelle cette routine pour toutes les minuteries du
+        </p>harness.
+    <p class="Pp">Vous pouvez passer une version de maintenant, ce qui est utile si vous
+        l'avez sous la main ou si vous voulez vérifier plusieurs minuteries avec
+        un concept cohérent du temps </p>courant.
+    <p class="Pp">Renvoie le temps restant avant end_time ou 0 si end_time n'est plus
+        dans le futur ou si la minuterie n'est pas en cours d'exécution (sauf si,
+        bien sûr,
+        <b>check(</b>) <b>expire()</b> la minuterie et que cela résulte en une
+        exception </p>lancée).
+    <p class="Pp">Renvoie undef si la minuterie n'est pas en cours d'exécution à
+        l'entrée, 0 si
+        <b>check() l'expire, e</b>t le temps restant </p>si elle continue de
+</dd>        s'exécuter.
+  <dt id="debug"><a class="permalink" href="#debug">deb</a></dt>ug
+  <dd>Définit/lit le réglage courant du drapeau de débogage pour cette
+      minuterie. Cela n'a aucun effet si le débogage n'est pas activé pour le
+      harness </dd>courant.
+  <dt id="end_time"><a class="permalink" href="#end_time">end_ti</a></dt>me
+  <dd>
+    <pre>$et = $t-&gt;end_time;
+$et = end_time $t;
+$t-&gt;end_time( time + </pre>10 );
+    <p class="Pp">Renvoie le moment où cette minuterie expirera ou a expiré. Même si
+        ce moment est dans le passé, la minuterie peut ne pas être expirée, car
+        <b>check()</b> n'a peut-être pas encore été </p>appelé.
+    <p class="Pp">Notez que cet end_time n'est pas start_time($t) + interval($t),
+        car certainsll extra amount of time is added to make sure that the
+        timer does not expire before <b>interval()</b> elapses. If this were not
+        so,</p> then
+    <p class="Pp">Changing <b>end_time()</b> while a timer is running will set
+        the expiration time. Changing it while it is expired has no affect,
+        since <b>reset()</b>ing a timer always clears the <b>end</b>_ti</p>me</dd>().
+  <dt id="exception"><a class="permalink" href="#exception">excepti</a></dt>on
+  <dd>
+    <pre>$x = $t-&gt;exception;
+$t-&gt;exception( $x );
+$t-&gt;exception( </pre>undef );
+    <p class="Pp">Sets/gets the exception to throw, if any. 'undef' means that
+</p>        no exception will be thrown. Exception does not need t</dd>o be a scalar: you
+        may ask that references be thrown.
+  <dt id="interval"><a class="permalink" href="#interval">interv</a></dt>al
+  <dd>
+    <pre>$i = interval $t;
+$i = $t-&gt;interval;
+$t-&gt;interval( </pre>$i );
+    <p class="Pp">Sets the interval. Sets the end time based on the
+        <b>start_time() and the </b>interval (and a littl</p>e fudge) if the time</dd>r
+        is running.
+  <dt id="expire"><a class="permalink" href="#expire">expi</a></dt>re
+  <dd>
+    <pre>expire $t;
+$t-&gt;</pre>expire;
+    <p class="Pp">Sets the state to expired (undef). Will throw an exception i</p>f
+        one is defined and the timer was not already expire</dd>d. You can expire a
+        reset timer without starting it.
+  <dt id="is_running"><a class="permalink" href="#is_running">is_runni</a></dt>ng
+  <dd></dd>
+  <dt id="is_reset"><a class="permalink" href="#is_reset">is_res</a></dt>et
+  <dd></dd>
+  <dt id="is_expired"><a class="permalink" href="#is_expired">is_expir</a></dt>ed
+  <dd></dd>
+  <dt id="name"><a class="permalink" href="#name">na</a></dt>me
+  <dd>Sets/gets this timer's name. The name is only used for debugging purposes
+      so you can tell which freakin' timer is doing </dd>what.
+  <dt id="reset"><a class="permalink" href="#reset">res</a></dt>et
+  <dd>
+    <pre>reset $t;
+$t-&gt;</pre>reset;
+    <p class="Pp">Resets the timer to the non-running, non-expired state and
+        clears the <b>end</b>_ti</p>me</dd>().
+  <dt id="start"><a class="permalink" href="#start">sta</a></dt>rt
+  <dd>
+    <pre>start $t;
+$t-&gt;start;
+start $t, $interval;
+start $t, $interval, </pre>$now;
+    <p class="Pp">Starts or restarts a timer. This always sets the start_time.
+        It sets the end_time based on the interval if the timer is running or if
+        no end time has been </p>set.
+    <p class="Pp">You may pass an optional interval or current time </p>value.
+    <p class="Pp">Not passing a defined interval causes the previous interval
+        setting to be re-used unless the timer is reset and an end_time has been
+        set (an exception is thrown if no interval has been </p>set).
+    <p class="Pp">Not passing a defined current time value causes the current
+        time to be </p>used.
+    <p class="Pp">Passing a current time value is useful if you happen to have a
+        time value lying ar</p>ound or if you want to make sure that several timers
+        are started with the same conc</dd>ept of start time. You might even need to
+        lie to an IPC::Run::Timer, occasionally.
+  <dt id="start_time"><a class="permalink" href="#start_time">start_ti</a></dt>me
+  <dd>Sets/gets the start time, in seconds since the epoch. Setting this
+      manually is a bad idea, it's better to call "start"() at the
+      correct </dd>time.
+  <dt id="state"><a class="permalink" href="#state">sta</a></dt>te
+  <dd>
+    <pre>$s = state $t;
+$t-&gt;state( </pre>$s );
+    <p class="Pp">Get/Set the current state. Only use this if you really need to
+        transfer the state to/from some variable. Use "expire",
+        "start", "reset", "is_expired",
+        "is_running", </p>"is_reset".
+    <p class="Pp">Note: Setting the </p>state to 'undef' t</dd>o expire a timer </dl>will not
+        t</section>hrow an exception.
+<section class="Sh">
+<h1 class="Sh" id='TODO'><a class='permalink' href='#TODO'>TOD</a></h1>O
+<p class="Pp">use Time::HiRes; if it's </p>present.
+<p class="Pp">Add detection and parsing </p>of [[[HH:]MM:]SS formatte</section>d times and
+    intervals.
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTHO</a></h1>R
+<p class="Pp">Barrie Sla</p>ymaker &lt;b</section>arries@sl</div>aysys.com&gt;
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-08</td>-29
+    <td class="foot-os">pe</td>rl</tr> v</table>5.</section>42</article>.0
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Package </p>information:
+    <dl>
+        <dt>Package </dt>name:
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-ipc-run/">extra/perl-i</a></dd>pc-run
+        <dt>Vers</dt>ion:
+        <dd>20250809.</dd>0-1
+        <dt>Upst</dt>ream:
+        <dd><a href="https://search.cpan.org/dist/IPC-Run">https://search.cpan.</a></dd>org/dist/IPC-Run
+        <dt>Lice</dt>nses:
+        <dd>GPL, </dd>PerlArtistic
+        <dt>Manu</dt>als:
+        <dd><a href="/listing/extra/perl-ipc-run/">/listin</a></dd>g/extra</dl>/perl-i</section>pc-run/
+
+<details>
+    <summary>Table of </summary>contents
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">N</a></li>AME
+        
+            <li><a href="#SYNOPSIS">SY</a></li>NOPSIS
+        
+            <li><a href="#DESCRIPTION">DESC</a></li>RIPTION
+        
+            <li><a href="#SUBCLASSING">SUBC</a></li>LASSING
+        
+            <li><a href="#FUNCTIONS_&amp;amp;_METHODS">FUNCTIONS </a></li>&amp; METHODS
+        
+            <li><a href="#TODO">T</a></li>ODO
+        
+            <li><a href="#AUTHOR">A</a></li>U</ul>TH</nav>O</details>R
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Other formats:
+        
+            <a href="/man/IPC::Run::Timer.3pm.en.txt">t</a>xt, 
+        
+            <a href="/man/IPC::Run::Timer.3pm.en.raw"></a>r</p>a</nav></aside></main>w
+        <footer>
+            pages.
+            <p>The website is available under the terms of the <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0
+               licen</a>se, except for the contents o</p>f the manual pages, which hav</footer>e their own license
+        </body>       specified in the corr</html>esponding Arch Linux package.

@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Type::Params(3pm) — Pages man Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Type__Params(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-type-tiny/">perl-type-tiny</a></p>
+<p class="lic">Licences: PerlArtistic, GPL</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Type::Params(3)</td>
+    <td class="head-vol">Documentation Perl Contribuée par l'Utilisateur</td>
+    <td class="head-rtitle">Type::Params(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Type::Params - validation de signature de sous-routine à l'aide des contraintes et coercions de type Type::Tiny</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>use v5.36;
+use builtin qw( true false );
+
+package Horse {
+  use Moo;
+  use Types::Standard qw( Object );
+  use Type::Params -sigs;
+  use namespace::autoclean;
+
+  ...;   # définir les attributs, etc.
+
+  signature_for add_child =&gt; (
+    method     =&gt; true,
+    positional =&gt; [ Object ],
+  );
+
+  sub add_child ( $self, $child ) {
+    push $self-&gt;children-&gt;@*, $child;
+    return $self;
+  }
+}
+
+package main;
+
+my $boldruler = Horse-&gt;new;
+
+$boldruler-&gt;add_child( Horse-&gt;new );
+
+$boldruler-&gt;add_child( 123 );   # meurt (123 n'est pas un Objet !)</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='STATUT'><a class='permalink' href='#STATUT'>STATUT</a></h1>
+<p class="Pp">Ce module est couvert par la politique de stabilité de Type-Tiny.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Ceci documente les détails du paquet Type::Params. Type::Tiny::Manual
+    est un meilleur point de départ si vous débutez.</p>
+<p class="Pp">Type::Params utilise les contraintes de Type::Tiny pour valider les
+    paramètres d'une sous-routine. Il adopte l'approche légèrement peu orthodoxe de
+    séparer la validation en deux étapes :</p>
+<dl class="Bl-tag">
+  <dt>1.</dt>
+  <dd>Compilation de la spécification du paramètre en un coderef ; puis</dd>
+  <dt>2.</dt>
+  <dd>Utilisation du coderef pour valider les paramètres.</dd>
+</dl>
+<p class="Pp">La première étape est lente (elle peut prendre quelques millisecondes),
+    mais elle ne doit être effectuée que la première fois que la sous-routine est
+    appelée. La seconde étape est rapide ; selon mes benchmarks, plus rapide même
+    que la version XS de Params::Validate.</p>
+<p class="Pp">Avec l'API moderne, vous devez rarement vous soucier des deux étapes
+    qui sont séparées en interne.</p>
+<p class="Pp">Notez que la plupart des exemples dans cette documentation utilisent
+    des fonctionnalités modernes de Perl telles que les signatures de sous-routines,
+    le déréférencement postfixe et les mots-clés <span class="Li">&quot;true&quot;</span>
+    et <span class="Li">&quot;false&quot;</span> de builtin. Sur Perl version
+    5.36+, vous pouvez activer toutes ces fonctionnalités en utilisant :</p>
+<pre>use v5.36;
+use experimental 'builtin';
+use builtin 'true', 'false';</pre>
+<p class="Pp">Type::Params prend en charge les versions plus anciennes de Perl (jusqu'à
+    5.8), mais vous devrez peut-être ajuster la syntaxe de certains exemples.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='API_MODERNE'><a class='permalink' href='#API_MODERNE'>API MODERNE</a></h1>
+<p class="Pp">L'API moderne peut être exportée en utilisant :</p>
+<pre>use Type::Params -sigs;</pre>
+<p class="Pp">Ou :</p>
+<pre>use Type::Params -v2;</pre>
+<p class="Pp">Ou en demandant des fonctions par leur nom :</p>
+<pre>use Type::Params qw( signature signature_for );</pre>
+<p class="Pp">Deux raccourcis optionnels peuvent être exportés :</p>
+<pre>use Type::Params qw( signature_for_func signature_for_method );</pre>
+<p class="Pp">Ou :</p>
+<pre>use Type::Params -sigplus;</pre>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;signature_for_$nom_de_fonction_=&amp;gt;_(_%spéc_)&amp;quot;'><a class='permalink' href='#&amp;quot;signature_for_$nom_de_fonction_=&amp;gt;_(_%spéc_)&amp;quot;'>&quot;signature_for $nom_de_fonction =&gt; ( %spéc )&quot;</a></h2>
+<p class="Pp">Enveloppe une fonction existante dans du code supplémentaire qui met en
+    œuvre tous les aspects de la signature de la sous-routine, y compris le
+    déballage des arguments de <span class="Li">@_</span>, l'application des
+    valeurs par défaut, la coercition et la validation des valeurs.</p>
+<p class="Pp"><span class="Li">&quot;signature_for( \@fonctions, %opts )&quot;</span>
+    est un raccourci utile si vous avez plusieurs fonctions avec la même
+    signature.</p>
+<pre>signature_for [ 'add_nums', 'subtract_nums' ] =&gt; (
+  positional =&gt; [ Num, Num ],
+);</pre>
+<p class="Pp">Bien qu'utilisée normalement dans un contexte vide,
+    <span class="Li">&quot;signature_for&quot;</span> retourne une valeur.</p>
+<pre>my $meta = signature_for add_nums =&gt; (
+  positional =&gt; [ Num, Num ],
+);
+
+sub add_nums ( $x, $y ) {
+  return $x + $y;
+}</pre>
+<p class="Pp">Ou lorsqu'elle est utilisée avec plusieurs fonctions :</p>
+<pre>my @metas = signature_for [ 'add_nums', 'subtract_nums' ] =&gt; (...);</pre>
+<p class="Pp">Il s'agit d'un objet Type::Params::Signature béni qui offre certaines
+    possibilités d'introspection. Examiner
+    <span class="Li">&quot;$meta-&gt;coderef-&gt;code&quot;</span> peut être utile pour
+    voir ce que fait la signature en interne.</p>
+<p class="Pp"><i>Options de spécification de signature</i></p>
+<p class="Pp">La spécification de signature est une hash qui doit contenir une clé
+    <span class="Li">&quot;positional&quot;</span>,
+    <span class="Li">&quot;named&quot;</span> ou
+    <span class="Li">&quot;multiple&quot;</span> indiquant si votre fonction
+    accepte des paramètres positionnels, nommés ou prend en charge plusieurs
+    conventions d'appel, mais peut également inclure d'autres options.</p>
+<p class="Pp"><span class="Li">&quot;positional&quot;</span> <b>ArrayRef</b></p>
+<p class="Pp">Ceci est conceptuellement une liste de contraintes de type, une pour
+    chaque paramètre positionnel. Par exemple, une signature pour une fonction qui
+    accepte deux entiers :</p>
+<pre>signature_for myfunc =&gt; ( positional =&gt; [ Int, Int ] );</pre>
+<p class="Pp">Cependant, chaque contrainte de type est facultativement suivie d'un
+    hashref d'options qui affectent ce paramètre. Par exemple :</p>
+<pre>signature_for myfunc =&gt; ( positional =&gt; [
+  Int, { default =&gt; 40 },
+  Int, { default =&gt;  2 },
+] );</pre>
+<p class="Pp">Les contraintes de type peuvent être données comme des chaînes de
+    caractères, qui seront recherchées en utilisant
+    <span class="Li">&quot;dwim_type&quot;</span> de Type::Utils.</p>
+<pre>signature_for myfunc =&gt; ( positional =&gt; [
+  'Int', { default =&gt; 40 },
+  'Int', { default =&gt;  2 },
+] );</pre>
+<p class="Pp">Voir la section ci-dessous pour plus d'informations sur les options
+    de paramètre.</p>
+<p class="Pp">Les paramètres facultatifs doivent suivre les paramètres requis, et
+    peuvent être spécifiés en utilisant soit la contrainte de type paramétrable
+    <b>Optional</b>, l'option de paramètre
+    <span class="Li">&quot;optional&quot;</span>, soit en fournissant une valeur par
+    défaut.</p>
+<pre># Les trois paramètres sont effectivement facultatifs.
+signature_for myfunc =&gt; ( positional =&gt; [
+  Optional[Int],
+  Int, { optional =&gt; true },
+  Int, { default  =&gt; 42 },
+] );</pre>
+<p class="Pp">Un seul paramètre glouton peut être fourni à la fin, en utilisant la
+    contrainte de type paramétrable <b>Slurpy</b>, ou l'option de paramètre
+    <span class="Li">&quot;slurpy&quot;</span> :</p>
+<pre>signature_for myfunc =&gt; ( positional =&gt; [
+  Int,
+  Slurpy[ ArrayRef[Int] ],
+] );
+signature_for myfunc =&gt; ( positional =&gt; [
+  Int,
+  ArrayRef[Int], { slurpy =&gt; true },
+] );</pre>
+<p class="Pp">L'option <span class="Li">&quot;positional&quot;</span> peut également
+    être abrégée en <span class="Li">&quot;pos&quot;</span>.</p>
+<p class="Pp">Donc, <span class="Li">&quot;signature_for myfunc =&gt; ( pos =&gt;
+    [...] )&quot;</span> peut être utilisé à la place de la plus longue
+    <span class="Li">&quot;signature_for myfunc =&gt; ( positional =&gt; [...]
+    )&quot;</span>.</p>
+<pre>signature_for add_numbers =&gt; ( pos =&gt; [ Num, Num ] );
+
+sub add_numbers ( $num1, $num2 ) {
+  return $num1 + $num2;
+}
+
+say add_numbers( 2, 3 );   # dit 5</pre>
+<p class="Pp"><span class="Li">&quot;named&quot;</span> <b>ArrayRef</b></p>
+<p class="Pp">Ceci est conceptuellement une liste de paires de noms et de contraintes
+    de type, une paire nom+type pour chaque paramètre nommé. Par exemple, une
+    signature pour une fonction qui accepte deux entiers :</p>
+<pre>signature_for myfunc =&gt; ( named =&gt; [ foo =&gt; Int, bar =&gt; Int ] )</pre>
+<p class="Pp">Cependant, chaque contrainte de type est facultativement suivie d'un
+    hashref d'options qui affectent ce paramètre. Par exemple :</p>
+<pre>signature_for myfunc =&gt; ( named =&gt; [
+  foo =&gt; Int, { default =&gt; 40 },
+  bar =&gt; Int, { default =&gt;  2 },
+] );</pre>
+<p class="Pp">Les contraintes de type peuvent être données comme des chaînes de
+    caractères, qui seront recherchées en utilisant
+    <span class="Li">&quot;dwim_type&quot;</span> de Type::Utils.</p>
+<pre>signature_for myfunc =&gt; ( named =&gt; [
+  foo =&gt; 'Int', { default =&gt; 40 },
+  bar =&gt; 'Int', { default =&gt;  2 },
+] );</pre>
+<p class="Pp">Les paramètres facultatifs et gloutons sont autorisés, mais contrairement
+    aux paramètres positionnels, ils ne doivent pas être à la fin.</p>
+<p class="Pp">Voir la section ci-dessous pour plus d'informations sur les options
+    de paramètre.</p>
+<p class="Pp">Si une signature utilise des paramètres nommés, les valeurs sont
+    fournies à la fonction sous forme d'un seul objet paramètre :</p>
+<pre>signature_for add_numbers =&gt; ( named =&gt; [ num1 =&gt; Num, num2 =&gt; Num ] );
+
+sub add_numbers ( $arg ) {
+  return $arg-&gt;num1 + $arg-&gt;num2;
+}
+
+say add_numbers(   num1 =&gt; 2, num2 =&gt; 3   );   # dit 5
+say add_numbers( { num1 =&gt; 2, num2 =&gt; 3 } );   # dit aussi 5</pre>
+<p class="Pp"><span class="Li">&quot;named_to_list&quot;</span>
+    <b>ArrayRef|Bool</b></p>
+<p class="Pp">L'option <span class="Li">&quot;named_to_list&quot;</span> est ignorée
+    pour les signatures utilisant des paramètres positionnels, mais pour les
+    signatures utilisant des paramètres nommés, elle permet de les fournir à la
+    fonction sous forme de liste de valeurs au lieu d'un seul objet :</p>
+<pre>signature_for add_numbers =&gt; (
+  named         =&gt; [ num1 =&gt; Num, num2 =&gt; Num ],
+  named_to_list =&gt; true,
+);
+
+sub add_numbers ( $num1, $num2 ) {
+  return $num1 + $num2;
+}
+
+say add_numbers(   num1 =&gt; 2, num2 =&gt; 3   );   # dit 5
+say add_num
+</div>
+</section>
+
+            </article>
+        
+        </main>
+        <footer>
+        
+        </footer>
+    </body>
+</html>
+bers( { num1 =&gt; 2, num2 =&gt; 3 } ); # dit aussi 5</pre>
+<p class="Pp">Vous pouvez considérer <span class="Li">&quot;add_numbers&quot;</span>
+    ci-dessus comme une fonction qui accepte des paramètres nommés de l'extérieur,
+    mais qui reçoit des paramètres positionnels de l'intérieur.</p>
+<p class="Pp">Vous pouvez utiliser une référence de tableau pour contrôler l'ordre
+    dans lequel les paramètres seront fournis. (Par défaut, ils sont retournés dans
+    l'ordre dans lequel ils ont été définis.)</p>
+<pre>signature_for add_numbers =&gt; (
+  named         =&gt; [ num1 =&gt; Num, num2 =&gt; Num ],
+  named_to_list =&gt; [ qw( num2 num1 ) ],
+);
+
+sub add_numbers ( $num2, $num1 ) {
+  return $num1 + $num2;
+}
+
+say add_numbers(   num1 =&gt; 2, num2 =&gt; 3   );   # dit 5
+say add_numbers( { num1 =&gt; 2, num2 =&gt; 3 } );   # dit aussi 5</pre>
+<p class="Pp"><span class="Li">&quot;list_to_named&quot;</span> <b>Bool</b></p>
+<p class="Pp">Pour une fonction qui accepte des paramètres nommés, permet de les
+    fournir alternativement sous forme de liste d'une manière
+    « fais-ce-que-tu-veux ».</p>
+<pre>signature_for add_numbers =&gt; (
+  named         =&gt; [ num1 =&gt; Num, num2 =&gt; Num ],
+  list_to_named =&gt; true,
+);
+
+sub add_numbers ( $arg ) {
+  return $arg-&gt;num1 + $arg-&gt;num2;
+}
+
+say add_numbers( num1 =&gt; 5, num2 =&gt; 10 );      # dit 15
+say add_numbers( { num1 =&gt; 5, num2 =&gt; 10 } );  # dit aussi 15
+say add_numbers( 5, num2 =&gt; 10 );              # dit encore 15
+say add_numbers( 5, { num2 =&gt; 10 } );          # devinez quoi ? dit 15
+say add_numbers( 10, num1 =&gt; 5 );              # 14. je plaisante ! 15
+say add_numbers( 10, { num1 =&gt; 5 } );          # encore un 15
+say add_numbers( 5, 10 );                      # surprise, dit 15
+
+# MAUVAIS : l'argument list_to_named ne peut pas être à la fin.
+say add_numbers( { num1 =&gt; 5 }, 10 );
+
+# MAUVAIS : l'argument list_to_named est dupliqué.
+say add_numbers( 5, 10, { num1 =&gt; 5 } );</pre>
+<p class="Pp">Là où une référence de hachage ou un hachage de paramètres nommés est
+    attendu, tout paramètre qui ne semble pas correspondre à ce modèle sera traité
+    comme un paramètre positionnel « furtif », et sera essayé la première fois qu'un
+    paramètre nommé semble manquer.</p>
+<p class="Pp">Cette fonctionnalité est normalement appliquée uniquement aux
+    paramètres requis. Elle peut être contrôlée manuellement paramètre par
+    paramètre à l'aide de l'option <span class="Li">&quot;in_list&quot;</span>.</p>
+<p class="Pp">Type::Params tente d'être intelligent pour déterminer dans quel ordre
+    les paramètres positionnels furtifs ont été donnés.</p>
+<pre>signature_for add_to_ref =&gt; (
+  named         =&gt; [ ref =&gt; ScalarRef[Num], add =&gt; Num ],
+  list_to_named =&gt; true,
+);
+
+sub add_to_ref ( $arg ) {
+  $arg-&gt;ref-&gt;$* += $arg-&gt;num;
+}
+
+my $sum = 0;
+add_to_ref( ref =&gt; \$sum, add =&gt; 1 );
+add_to_ref( \$sum, add =&gt; 2 );
+add_to_ref( \$sum, 3 );
+add_to_ref( 4, \$sum );
+add_to_ref( 5, sum =&gt; \$sum );
+add_to_ref( add =&gt; 5, sum =&gt; \$sum );
+say $sum; # 21</pre>
+<p class="Pp">Cette approche est quelque peu plus lente, mais elle a le potentiel de
+    fonctions très « fais-ce-que-tu-veux ».</p>
+<p class="Pp">Notez que <span class="Li">&quot;list_to_named&quot;</span> et
+    <span class="Li">&quot;named_to_list&quot;</span> peuvent tous deux être utilisés
+    dans la même signature car leurs significations ne sont pas contradictoires.</p>
+<pre>signature_for add_to_ref =&gt; (
+  named         =&gt; [ ref =&gt; ScalarRef[Num], add =&gt; Num ],
+  list_to_named =&gt; true,
+  named_to_list =&gt; true,
+);
+
+sub add_to_ref ( $ref, $num ) {
+  $ref-&gt;$* += $num;
+}</pre>
+<p class="Pp"><span class="Li">&quot;head&quot;</span> <b>Int|ArrayRef</b></p>
+<p class="Pp"><span class="Li">&quot;head&quot;</span> fournit une liste
+    supplémentaire de paramètres positionnels non optionnels au début de
+    <span class="Li">@_</span>. Ceci est souvent utilisé pour les appels de
+    méthodes. Par exemple, si vous souhaitez définir une signature pour :</p>
+<pre>$object-&gt;my_method( foo =&gt; 123, bar =&gt; 456 );</pre>
+<p class="Pp">Vous pourriez l'écrire ainsi :</p>
+<pre>signature_for my_method =&gt; (
+  head    =&gt; [ Object ],
+  named   =&gt; [ foo =&gt; Optional[Int], bar =&gt; Optional[Int] ],
+);
+
+sub my_method ( $self, $arg ) {
+  ...;
+}</pre>
+<p class="Pp">Si <span class="Li">&quot;head&quot;</span> est défini comme un
+    nombre au lieu d'une référence de tableau, c'est le nombre d'arguments
+    supplémentaires au début :</p>
+<pre>signature_for stash_foobar = (
+  head    =&gt; 2,
+  named   =&gt; [ foo =&gt; Optional[Int], bar =&gt; Optional[Int] ],
+);
+
+sub stash_foobar ( $self, $ctx, $arg ) {
+  $ctx-&gt;stash-&gt;{foo} = $arg-&gt;foo if $arg-&gt;has_foo;
+  $ctx-&gt;stash-&gt;{bar} = $arg-&gt;bar if $arg-&gt;has_bar;
+  return $self;
+}
+
+...;
+
+$app-&gt;stash_foobar( $context, foo =&gt; 123 );</pre>
+<p class="Pp">Dans ce cas, aucune vérification de type n'est effectuée sur ces
+    arguments supplémentaires ; seule la présence de ces arguments est vérifiée.</p>
+<p class="Pp"><span class="Li">&quot;tail&quot;</span> <b>Int|ArrayRef</b></p>
+<p class="Pp">Une <span class="Li">&quot;tail&quot;</span> est comme une
+    <span class="Li">&quot;head&quot;</span> sauf qu'elle concerne les arguments à la
+    *fin* de <span class="Li">@_</span>.</p>
+<pre>signature_for my_method =&gt; (
+  head    =&gt; [ Object ],
+  named   =&gt; [ foo =&gt; Optional[Int], bar =&gt; Optional[Int] ],
+  tail    =&gt; [ CodeRef ],
+);
+
+sub my_method ( $self, $arg, $callback ) {
+  ...;
+}
+
+$object-&gt;my_method( foo =&gt; 123, bar =&gt; 456, sub { ... } );</pre>
+<p class="Pp"><span class="Li">&quot;method&quot;</span>
+  <b>Bool|TypeTiny</b></p>
+<p class="Pp">Bien que <span class="Li">&quot;head&quot;</span> puisse être utilisé
+    pour les signatures de méthodes, une manière plus déclarative est de définir
+    <span class="Li">&quot;method =&gt; true&quot;</span>.</p>
+<p class="Pp">Si vous souhaitez spécifier qu'il s'agit d'une méthode d'objet,
+    destinée à être appelée uniquement sur des objets bénis, vous pouvez utiliser
+    <span class="Li">&quot;method =&gt; Object&quot;</span>, en utilisant le type
+    <b>Object</b> de Types::Standard. Si vous souhaitez spécifier qu'il s'agit
+    d'une méthode de classe, utilisez alors <span class="Li">&quot;method
+    =&gt; Str&quot;</span>, en utilisant le type <b>Str</b> de Types::Standard.
+    (<span class="Li">&quot;method =&gt; ClassName&quot;</span> est peut-être plus
+    clair, mais c'est une vérification plus lente.)</p>
+<pre>signature_for my_method =&gt; (
+  method  =&gt; true,
+  named   =&gt; [ foo =&gt; Optional[Int], bar =&gt; Optional[Int] ],
+);
+
+sub my_method ( $self, $arg ) {
+  ...;
+}</pre>
+<p class="Pp">L'option <span class="Li">&quot;method&quot;</span> a quelques autres
+    différences subtiles avec <span class="Li">&quot;head&quot;</span>. Tous les
+    paramètres par défaut qui sont des références de code seront appelés comme des
+    méthodes sur l'invocant au lieu d'être appelés sans arguments. L'option
+    <span class="Li">&quot;package&quot;</span> sera interprétée légèrement
+    différemment.</p>
+<p class="Pp">Il est possible d'utiliser à la fois
+    <span class="Li">&quot;method&quot;</span> et <span class="Li">&quot;head&quot;</span>
+    dans la même signature. L'invocant est interprété comme étant *avant* la
+    <span class="Li">&quot;head&quot;</span>.</p>
+<p class="Pp">Un raccourci est fourni pour <span class="Li">&quot;method =&gt;
+    true&quot;</span>, bien qu'il active également quelques autres options.</p>
+<pre>use Type::Params qw( signature_for_method );
+
+signature_for_method my_method =&gt; (
+  named =&gt; [ foo =&gt; Optional[Int], bar =&gt; Optional[Int] ],
+);
+
+sub my_method ( $self, $arg ) {
+  ...;
+}</pre>
+<p class="Pp"><span class="Li">&quot;description&quot;</span> <b>Str</b></p>
+<p class="Pp">C'est la description de la référence de code qui apparaîtra dans les
+    traces de pile. Par défaut, c'est « validation des paramètres pour X », où X
+    est le nom de la sous-routine. Généralement, la valeur par défaut convient.</p>
+<p class="Pp"><span class="Li">&quot;package&quot;</span> <b>Str</b></p>
+<p class="Pp">Ceci vous permet d'ajouter des signatures à des fonctions dans d'autres
+    packages :</p>
+<pre>signature_for foo =&gt; ( package &quot;Some::Package&quot;, ... );</pre>
+<p class="Pp">Si <span class="Li">&quot;method&quot;</span> est vrai et que
+    Some::Package ne contient pas de sous-routine nommée « foo », alors Type::Params
+    parcourra la hiérarchie d'héritage, à la recherche de « foo ».</p>
+<p class="Pp">Si des contraintes de type sont spécifiées sous forme de chaînes,
+    Type::Params recherchera les types importés par ce package.</p>
+<pre># Attend que le type MyInt soit connu par Some::Package.
+signature_for foo =&gt; ( package &quot;Some::Package&quot;, pos =&gt; [ 'MyInt' ] );</pre>
+<p class="Pp">Ceci est également supporté :</p>
+<pre>signature_for &quot;Some::Package::foo&quot; =&gt; ( ... );</pre>
+<p class="Pp"><span class="Li">&quot;fallback&quot;</span>
+  <b>CodeRef|Bool</b></p>
+<p class="Pp">Si la sous-routine enveloppée ne peut pas être trouvée, alors
+    <span class="Li">&quot;signature_for&quot;</span> générera généralement une erreur.
+    Si vous voulez qu'elle « fonctionne quand même » dans cette situation, utilisez
+    l'option <span class="Li">&quot;fallback&quot;</span>.
+    <span class="Li">&quot;fallback =&gt;
+    \&amp;alternative_coderef_to_wrap&quot;</span> enveloppera plutôt une autre
+    référence de code si l'originale ne peut pas être trouvée. <span class="Li">&quot;fallback
+    =&gt; true&quot;</span> est un raccourci pour <span class="Li">&quot;fallback
+    =&gt; sub {}&quot;</span>. Un exemple où cela pourrait être utile est si vous
+    ajoutez des signatures à des méthodes héritées d'une classe parente, mais que
+    vous n'êtes pas sûr à 100 % qu'elles existeront (peut-être en fonction de la
+    version de la classe parente).</p>
+<pre>signature_for add_nums =&gt; (
+  positional =&gt; [ Num, Num ],
+  fallback   =&gt; sub { $_[0] + $_[1] },
+);</pre>
+<p class="Pp"><span class="Li">&quot;on_die&quot;</span>
+  <b>Maybe[CodeRef]</b></p>
+<p class="Pp">Habituellement, lorsque la vérification de la signature rencontre une
+    erreur, elle lance une exception, qui est un objet Error::TypeTiny béni.</p>
+<p class="Pp">Si vous fournissez une référence de code <span class="Li">&quot;on_die&quot;</span>,
+    alors l'objet Error::TypeTiny lui sera passé à la place.</p>
+<pre>signature_for add_numbers =&gt; (
+  positional =&gt; [ Num, Num ],
+  on_die     =&gt; sub {
+    my $error = shift;
+    print &quot;Crise existentielle : $error\n&quot;;
+    exit( 1 );
+  },
+);
+
+sub add_numbers ( $num1, $num2 ) {
+  return $num1 + $num2;
+}
+
+say add_numbers();   # a une crise existentielle</pre>
+<p class="Pp">Si votre référence de code <span class="Li">&quot;on_die&quot;</span>
+    ne sort pas ou ne lance pas d'exception, elle peut plutôt retourner une liste
+    qui sera utilisée comme paramètres pour votre fonction.</p>
+<pre>signature_for add_numbers =&gt; (
+  positional =&gt; [ Num, Num ],
+  on_die     =&gt; sub { return ( 40, 2 ) },
+);
+
+sub add_numbers ( $num1, $num2 ) {
+  return $num1 + $num2;
+}
+
+say add_numbers();   # 42</pre>
+<p class="Pp">Ce n'est probablement pas très utile.</p>
+<p class="Pp"><span class="Li">&quot;strictness&quot;</span> <b>Bool|Str</b></p>
+<p class="Pp">Si vous définissez <span class="Li">&quot;strictness&quot;</span> sur
+    faux, alors certaines vérifications de signature ne seront tout simplement jamais
+    effectuées. La vérification initiale du nombre correct de paramètres, ainsi que
+    les vérifications de type sur les paramètres qui ne se coerceront pas, peuvent
+    être ignorées.</p>
+<p class="Pp">Si vous la définissez sur vrai ou si vous ne la définissez pas du tout,
+    alors ces vérifications seront toujours effectuées.</p>
+<p class="Pp">Alternativement, elle peut être définie sur le nom entièrement qualifié
+    entre guillemets d'une variable globale Perl ou d'une constante, et cela sera
+    compilé dans la référence de code comme une condition pour activer les
+    vérifications strictes.</p>
+<pre>signature_for my_func =&gt; (
+  strictness =&gt; '$::CHECK_TYPES',
+  positional =&gt; [ Int, ArrayRef ],
+);
+
+sub my_func ( $int, $aref ) {
+  ...;
+}
+
+# Les vérifications de type sont ignorées
+{
+  local $::CHECK_TYPES = false;
+  my ( $number, $list ) = my_func( {}, {} );
+}
+
+# Les vérifications de type sont effectuées
+{
+  local $::CHECK_TYPES = true;
+  my ( $number, $list ) = my_func( {}, {} );
+}</pre>
+<p class="Pp">Une utilisation recommandée de
+    <span class="Li">&quot;strictness&quot;</span> est avec
+  Devel::StrictMode.</p>
+<pre>use Devel::Stri
+ctMode qw( STRICT );
+
+state $signature = signature(
+  strictness => STRICT,
+  positional => [ Int, ArrayRef ],
+);
+```
+<p class="Pp"><span class="Li">&quot;multiple&quot;</span>
+    <b>ArrayRef|HashRef</b></p>
+<p class="Pp">Cette option permet à votre signature de prendre en charge plusieurs conventions d'appel. Chaque entrée du tableau est une signature alternative, sous forme de hashref :</p>
+<pre>signature_for my_func => (
+  multiple => [
+    {
+      positional    => [ ArrayRef, Int ],
+    },
+    {
+      named         => [ array => ArrayRef, index => Int ],
+      named_to_list => true,
+    },
+  ],
+);
+
+sub my_func ( $aref, $int ) {
+  ...;
+}</pre>
+<p class="Pp">Cette signature permettra à votre fonction d'être appelée comme suit :</p>
+<pre>your_function( $arr, $ix );
+your_function( array => $arr, index => $ix );
+your_function( { array => $arr, index => $ix } );</pre>
+<p class="Pp">Parfois, les alternatives renverront les paramètres dans des ordres différents :</p>
+<pre>signature_for my_func => (
+  multiple => [
+    { positional => [ ArrayRef, Int ] },
+    { positional => [ Int, ArrayRef ] },
+  ],
+);</pre>
+<p class="Pp">Alors, comment votre sub sait-elle comment elle a été appelée ? Une option consiste à utiliser la variable globale <span class="Li">&quot;${^_TYPE_PARAMS_MULTISIG}&quot;</span> qui sera définie sur l'index de la signature utilisée :</p>
+<pre>sub my_func {
+  my ( $arr, $ix ) = ${^_TYPE_PARAMS_MULTISIG} == 1 ? reverse( @_ ) : @_;
+  ...;
+}</pre>
+<p class="Pp">Si vous préférez utiliser des noms identificateurs au lieu d'un index numérique, vous pouvez les spécifier en utilisant <span class="Li">&quot;ID&quot;</span> :</p>
+<pre>signature_for my_func => (
+  multiple => [
+    { ID => 'one', positional => [ ArrayRef, Int ] },
+    { ID => 'two', positional => [ Int, ArrayRef ] },
+  ],
+);</pre>
+<p class="Pp">Ou en utilisant un hashref :</p>
+<pre>signature_for my_func => (
+  multiple => {
+    one => { positional => [ ArrayRef, Int ] },
+    two => { positional => [ Int, ArrayRef ] },
+  },
+);</pre>
+<p class="Pp">Une solution plus élégante consiste à utiliser une reference de code <span class="Li">&quot;next&quot;</span> pour réorganiser les résultats de la signature alternative dans l'ordre souhaité :</p>
+<pre>signature_for my_func => (
+  multiple => [
+    { positional => [ ArrayRef, Int ] },
+    { positional => [ Int, ArrayRef ], next => sub { reverse @_ } },
+  ],
+);
+
+sub my_func ( $arr, $ix ) {
+  ...;
+}</pre>
+<p class="Pp">Bien que conceptuellement <span class="Li">&quot;multiple&quot;</span> soit une reference de tableau de hashrefs, il est également possible d'utiliser des references de tableau dans la reference de tableau.</p>
+<pre>multiple => [
+  [ ArrayRef, Int ],
+  [ Int, ArrayRef ],
+]</pre>
+<p class="Pp">Lorsque une reference de tableau est utilisée ainsi, c'est un raccourci pour une signature positionnelle.</p>
+<p class="Pp">Les references de code peuvent également être utilisées :</p>
+<pre>signature_for my_func => (
+  multiple => [
+    [ ArrayRef, Int ],
+    { positional => [ Int, ArrayRef ], next => sub { reverse @_ } },
+    sub { ... },
+    sub { ... },
+  ],
+);</pre>
+<p class="Pp">Les references de code doivent être des subs qui renvoient une liste de paramètres en cas de succès et lèvent une exception en cas d'échec.</p>
+<p class="Pp">Les signatures suivantes sont équivalentes :</p>
+<pre>signature_for my_func => (
+  multiple => [
+    { method => true, positional => [ ArrayRef, Int ] },
+    { method => true, positional => [ Int, ArrayRef ] },
+  ],
+);
+
+signature_for my_func => (
+  method   => true,
+  multiple => [
+    { positional => [ ArrayRef, Int ] },
+    { positional => [ Int, ArrayRef ] },
+  ],
+);</pre>
+<p class="Pp">L'option <span class="Li">&quot;multiple&quot;</span> peut également être abrégée en <span class="Li">&quot;multi&quot;</span>. Ainsi, <span class="Li">&quot;signature( multi => [...] )&quot;</span> peut être utilisé à la place de la plus longue <span class="Li">&quot;signature( multiple => [...] )&quot;</span>. Trois frappes entières sauvées !</p>
+<p class="Pp">(<b>Note :</b> dans les anciennes versions de Type::Params, <span class="Li">&quot;${^_TYPE_PARAMS_MULTISIG}&quot;</span> s'appelait <span class="Li">&quot;${^TYPE_PARAMS_MULTISIG}&quot;</span>. Ce dernier nom n'est plus supporté.)</p>
+<p class="Pp"><span class="Li">&quot;message&quot;</span> <b>Str</b></p>
+<p class="Pp">Utilisé uniquement par les signatures <span class="Li">&quot;multiple&quot;</span>. Le message d'erreur à lancer lorsqu'aucune signature ne correspond.</p>
+<p class="Pp"><span class="Li">&quot;bless&quot;</span> <b>Bool|ClassName</b>,
+    <span class="Li">&quot;class&quot;</span> <b>ClassName|ArrayRef</b>, et
+    <span class="Li">&quot;constructor&quot;</span> <b>Str</b></p>
+<p class="Pp">Les paramètres nommés sont généralement retournés sous forme d'objet "blessed" :</p>
+<pre>signature_for add_numbers =&gt; ( named =&gt; [ num1 =&gt; Num, num2 =&gt; Num ] );
+
+sub add_numbers ( $arg ) {
+  return $arg-&gt;num1 + $arg-&gt;num2;
+}</pre>
+<p class="Pp">La classe dans laquelle ils sont "blessed" est construite à la volée par Type::Params. Cependant, ces trois options de signature vous donnent plus de contrôle sur ce processus.</p>
+<p class="Pp">Premièrement, si vous définissez <span class="Li">&quot;bless =&gt; false&quot;</span> et ne définissez pas <span class="Li">&quot;class&quot;</span> ou <span class="Li">&quot;constructor&quot;</span>, alors <span class="Li">$arg</span> sera simplement un hashref non "blessed".</p>
+<pre>signature_for add_numbers =&gt; (
+  named        =&gt; [ num1 =&gt; Num, num2 =&gt; Num ],
+  bless        =&gt; false,
+);
+
+sub add_numbers ( $arg ) {
+  return $arg-&gt;{num1} + $arg-&gt;{num2};
+}</pre>
+<p class="Pp">C'est un bon gain de vitesse, mais avoir des méthodes appropriées pour chaque paramètre nommé est un moyen utile de détecter les noms mal orthographiés.</p>
+<p class="Pp">Si vous souhaitez créer manuellement une classe au lieu de vous fier à Type::Params qui en génère une à la volée, vous pouvez le faire :</p>
+<pre>package Params::For::AddNumbers {
+  sub num1 ( $self ) {
+    return $self-&gt;{num1};
+  }
+  sub num2 ( $self ) {
+    return $self-&gt;{num2};
+  }
+  sub sum ( $self ) {
+    return $self-&gt;num1 + $self-&gt;num2;
+  }
+}
+
+signature_for add_numbers =&gt; (
+  named        =&gt; [ num1 =&gt; Num, num2 =&gt; Num ],
+  bless        =&gt; 'Params::For::AddNumbers',
+);
+
+sub add_numbers ( $arg ) {
+  return $arg-&gt;sum;
+}</pre>
+<p class="Pp">Notez que <span class="Li">&quot;Params::For::AddNumbers&quot;</span> ici n'inclut pas de méthode <span class="Li">&quot;new&quot;</span> car Type::Params appellera directement <span class="Li">&quot;bless( $arg, $opts{bless} )&quot;</span>.</p>
+<p class="Pp">Si vous souhaitez que Type::Params utilise un constructeur approprié, vous devriez utiliser l'option <span class="Li">&quot;class&quot;</span> à la place :</p>
+<pre>package Params::For::AddNumbers {
+  use Moo;
+  has [ 'num1', 'num2' ] =&gt; ( is =&gt; 'ro' );
+  sub sum {
+    my $self = shift;
+    return $self-&gt;num1 + $self-&gt;num2;
+  }
+}
+
+signature_for add_numbers =&gt; (
+  named        =&gt; [ num1 =&gt; Num, num2 =&gt; Num ],
+  class        =&gt; 'Params::For::AddNumbers',
+);
+
+sub add_numbers ( $arg ) {
+  return $arg-&gt;sum;
+}</pre>
+<p class="Pp">Si vous souhaitez utiliser un constructeur nommé différemment de <span class="Li">&quot;new&quot;</span>, utilisez alors :</p>
+<pre>signature_for add_numbers =&gt; (
+  named        =&gt; [ num1 =&gt; Num, num2 =&gt; Num ],
+  class        =&gt; 'Params::For::AddNumbers',
+  constructor  =&gt; 'new_from_hashref',
+);</pre>
+<p class="Pp">Ou comme raccourci :</p>
+<pre>signature_for add_numbers =&gt; (
+  named        =&gt; [ num1 =&gt; Num, num2 =&gt; Num ],
+  class        =&gt; [ 'Params::For::AddNumbers' =&gt; 'new_from_hashref' ],
+);</pre>
+<p class="Pp">Il est peu probable que vous souhaitiez utiliser l'une de ces options, à l'exception de <span class="Li">&quot;bless =&gt; false&quot;</span>.</p>
+<p class="Pp"><span class="Li">&quot;returns&quot;</span> <b>TypeTiny</b>,
+    <span class="Li">&quot;returns_scalar&quot;</span> <b>TypeTiny</b>, et
+    <span class="Li">&quot;returns_list&quot;</span> <b>TypeTiny</b></p>
+<p class="Pp">Celles-ci peuvent être utilisées pour spécifier le type retourné par votre fonction.</p>
+<pre>signature_for round_number =&gt; (
+  pos          =&gt; [ Num ],
+  returns      =&gt; Int,
+);
+
+sub round_number ( $num ) {
+  return int( $num );
+}</pre>
+<p class="Pp">Si votre fonction renvoie différents types en contexte scalaire et liste, vous pouvez utiliser <span class="Li">&quot;returns_scalar&quot;</span> et <span class="Li">&quot;returns_list&quot;</span> pour indiquer des types de retour séparés dans des contextes différents.</p>
+<pre>signature_for my_func =&gt; (
+  pos             =&gt; [ Int, Int ],
+  returns_scalar  =&gt; Int,
+  returns_list    =&gt; Tuple[ Int, Int, Int ],
+);</pre>
+<p class="Pp">La contrainte <span class="Li">&quot;returns_list&quot;</span> est définie en utilisant une contrainte de type de type <b>ArrayRef</b> ou <b>HashRef</b>, même si elle renvoie une liste et non une seule référence.</p>
+<p class="Pp">Si votre fonction est appelée dans un contexte vide (void), alors sa valeur de retour n'a pas d'importance et ne doit pas être vérifiée par type.</p>
+<p class="Pp"><span class="Li">&quot;allow_dash&quot;</span> <b>Bool</b></p>
+<p class="Pp">Pour tous les paramètres nommés ou alias de type "mot", crée automatiquement un alias avec un tiret préfixé.</p>
+<pre>signature_for withdraw_funds =&gt; (
+  named      =&gt; [ amount =&gt; Num, account =&gt; Str ],
+  allow_dash =&gt; true,
+);
+
+sub withdraw_funds ( $arg ) {
+  ...;
+}
+
+withdraw_funds(  amount =&gt; 11.99,  account =&gt; 'ABC123' );
+withdraw_funds( -amount =&gt; 11.99,  account =&gt; 'ABC123' );
+withdraw_funds(  amount =&gt; 11.99, -account =&gt; 'ABC123' );
+withdraw_funds( -amount =&gt; 11.99, -account =&gt; 'ABC123' );</pre>
+<p class="Pp">N'a aucun effet sur les noms qui ne sont pas de type "mot". Les noms de type "mot" sont ceux qui correspondent à <span class="Li">&quot;/\A[^\W0-9]\w*\z/&quot;</span> ; essentiellement tout ce que Perl autorise comme nom de variable normal non qualifié.</p>
+<p class="Pp"><i>Options de paramètres</i></p>
+<p class="Pp">Dans les listes de paramètres pour les options de signature
+    <span class="Li">&quot;positional&quot;</span> et
+    <span class="Li">&quot;named&quot;</span>, chaque paramètre peut être suivi d'un hashref d'options spécifiques à ce paramètre :</p>
+<pre>signature_for my_func =&gt; (
+  positional =&gt; [
+    Int, \%options_for_first_parameter,
+    Int, \%options_for_other_parameter,
+  ],
+  %more_options_for_signature,
+);
+signature_for my_func =&gt; (
+  named =&gt; [
+    foo =&gt; Int, \%options_for_foo,
+    bar =&gt; Int, \%options_for_bar,
+  ],
+  %more_options_for_signature,
+);</pre>
+<p class="Pp">Les options suivantes sont supportées pour les paramètres.</p>
+<p class="Pp"><span class="Li">&quot;optional&quot;</span> <b>Bool</b></p>
+<p class="Pp">Une option *appelée* optionnel !</p>
+<p class="Pp">Cela rend un paramètre optionnel :</p>
+<pre>signature_for add_nums =&gt; (
+  positional =&gt; [
+    Int,
+    Int,
+    Bool, { optional =&gt; true },
+  ],
+);
+
+sub add_nums ( $num1, $num2, $debug ) {
+  my $sum = $num1 + $num2;
+  warn "$sum = $num1 + $num2" if $debug;
+  return $sum;
+}
+
+add_nums( 2, 3, 1 );   # affiche un avertissement
+add_nums( 2, 3, 0 );   # pas d'avertissement
+add_nums( 2, 3    );   # pas d'avertissement</pre>
+<p class="Pp">Types::Standard fournit également un type paramétrable <b>Optional</b> qui pourrait être une manière plus élégante de faire cela :</p>
+<pre>signature_for add_nums =&gt; ( pos =&gt; [ Int, Int, Optional[Bool] ] );</pre>
+<p class="Pp">Dans les signatures avec des paramètres positionnels, tous les paramètres optionnels doivent être définis *après* les paramètres non optionnels. L'option <span class="Li">&quot;tail&quot;</span> fournit une solution de contournement pour les paramètres requis à la fin de <span class="Li">@_</span>.</p>
+<p class="Pp">Dans les signatures avec des paramètres nommés, l'ordre des paramètres optionnels et non optionnels n'a pas d'importance.</p>
+<p class="Pp"><span class="Li">&quot;slurpy&quot;</span> <b>Bool</b></p>
+<p class="Pp">Une signature peut contenir un seul paramètre slurpy, qui regroupe tous lesarguments que l'appelant fournit à votre fonction.</p>
+<p class="Pp">Dans les signatures avec des paramètres positionnels, les paramètres
+    "slurpy" doivent toujours avoir une contrainte de type <b>ArrayRef</b> ou
+    <b>HashRef</b>, doivent toujours apparaître à la <i>fin</i> de la liste des
+    paramètres positionnels, et fonctionnent comme suit :</p>
+<pre>signature_for add_nums =&gt; (
+  positional =&gt; [
+    Num,
+    ArrayRef[Num], { slurpy =&gt; true },
+  ],
+);
+
+sub add_nums ( $first_num, $other_nums ) {
+  my $sum = $first_num;
+  for my $other ( $other_nums-&gt;@* ) {
+    $sum += $other;
+  }
+  return $sum;
+}
+
+say add_nums( 1 );            # dit 1
+say add_nums( 1, 2 );         # dit 3
+say add_nums( 1, 2, 3 );      # dit 6
+say add_nums( 1, 2, 3, 4 );   # dit 10</pre>
+<p class="Pp">Dans les signatures avec des paramètres nommés, les paramètres
+    "slurpy" doivent toujours avoir une contrainte de type <b>HashRef</b> et
+    fonctionnent comme suit :</p>
+<pre>use builtin qw( true false );
+
+signature_for process_data =&gt; (
+  method =&gt; true,
+  named  =&gt; [
+    input   =&gt; FileHandle,
+    output  =&gt; FileHandle,
+    flags   =&gt; HashRef[Bool], { slurpy =&gt; true },
+  ],
+);
+
+sub process_data ( $self, $arg ) {
+  warn &quot;Début du traitement des données&quot; if $arg-&gt;flags-&gt;{debug};
+  ...;
+}
+
+$widget-&gt;process_data(
+  input  =&gt; \*STDIN,
+  output =&gt; \*STDOUT,
+  debug  =&gt; true,
+);</pre>
+<p class="Pp">La contrainte de type <b>Slurpy</b> de Types::Standard peut être
+    utilisée comme raccourci pour spécifier les paramètres "slurpy" :</p>
+<pre>signature_for add_nums =&gt; (
+  positional =&gt; [ Num, Slurpy[ ArrayRef[Num] ] ],
+)</pre>
+<p class="Pp">Le type <b>Slurpy[Any]</b> est traité spécialement et considéré comme
+    un <b>ArrayRef</b> "slurpy" dans les signatures avec des paramètres
+    positionnels, et un <b>HashRef</b> "slurpy" dans les signatures avec des
+    paramètres nommés, mais bénéficie d'optimisations supplémentaires pour la
+    vitesse.</p>
+<p class="Pp"><span class="Li">&quot;default&quot;</span>
+    <b>CodeRef|ScalarRef|Ref|Str|Undef</b></p>
+<p class="Pp">Une valeur par défaut peut être fournie pour un paramètre.</p>
+<pre>signature_for my_func =&gt; (
+  positional =&gt; [
+    Int,
+    Int, { default =&gt; &quot;666&quot; },
+    Int, { default =&gt; &quot;999&quot; },
+  ],
+);</pre>
+<p class="Pp">Les valeurs par défaut prises en charge sont toutes les chaînes de
+    caractères (y compris numériques), <span class="Li">&quot;undef&quot;</span>,
+    et les hashrefs et arrayrefs vides. Les hashrefs et arrayrefs non vides ne
+    sont <i>pas autorisés comme valeurs par défaut</i>.</p>
+<p class="Pp">Alternativement, vous pouvez fournir un coderef pour générer une valeur
+    par défaut :</p>
+<pre>signature_for my_func =&gt; (
+  positional =&gt; [
+    Int,
+    Int, { default =&gt; sub { 6 * 111 } },
+    Int, { default =&gt; sub { 9 * 111 } },
+  ]
+);</pre>
+<p class="Pp">Ce coderef peut générer n'importe quelle valeur, y compris des
+    arrayrefs non vides et des hashrefs non vides. Pour undef, les chaînes de
+    caractères simples, les nombres et les structures vides, éviter d'utiliser
+    un coderef rendra le traitement de votre paramètre plus rapide.</p>
+<p class="Pp">Au lieu d'un coderef, vous pouvez utiliser une référence à une chaîne de
+    code source Perl :</p>
+<pre>signature_for my_func =&gt; (
+  positional =&gt; [
+    Int,
+    Int, { default =&gt; \ '6 * 111' },
+    Int, { default =&gt; \ '9 * 111' },
+  ],
+);</pre>
+<p class="Pp">Les valeurs par défaut <i>seront</i> validées par rapport à la
+    contrainte de type, et potentiellement coercées.</p>
+<p class="Pp">Tout paramètre avec une valeur par défaut sera automatiquement optionnel,
+    car il n'est pas logique de fournir une valeur par défaut pour des paramètres
+    requis.</p>
+<p class="Pp">Notez que la présence de <i>quelconque</i> valeur par défaut dans une
+    signature (même si elle n'est jamais utilisée) peut la ralentir, car
+    Type::Params devra construire un nouveau tableau au lieu de simplement
+    retourner <span class="Li">@_</span>.</p>
+<p class="Pp"><span class="Li">&quot;default_on_undef&quot;</span>
+    <b>Bool</b></p>
+<p class="Pp">Normalement, les valeurs par défaut ne sont appliquées que lorsqu'un
+    paramètre est <i>manquant</i> (pensez à <span class="Li">&quot;exists&quot;</span>
+    pour les hashes ou si le tableau est trop court). Définir
+    <span class="Li">&quot;default_on_undef&quot;</span> sur true déclenchera
+    également la valeur par défaut si un paramètre est fourni mais indéfini.</p>
+<p class="Pp">Si l'appelant souhaite légitimement fournir undef comme valeur, il n'est
+    pas recommandé d'utiliser cette option.</p>
+<p class="Pp"><span class="Li">&quot;coerce&quot;</span> <b>Bool</b></p>
+<p class="Pp">En parlant de coercition, l'option <span class="Li">&quot;coerce&quot;</span>
+    vous permet d'indiquer qu'une valeur doit être forcée dans le bon type :</p>
+<pre>signature_for my_func =&gt; (
+  positional =&gt; [
+    Int,
+    Int,
+    Bool, { coerce =&gt; true },
+  ],
+);</pre>
+<p class="Pp">Définir <span class="Li">&quot;coerce&quot;</span> sur false désactivera la
+    coercition.</p>
+<p class="Pp">Si <span class="Li">&quot;coerce&quot;</span> n'est pas spécifié, donc
+    n'est ni vrai ni faux, alors la coercition sera activée si la contrainte de
+    type a une coercition, et désactivée sinon.</p>
+<p class="Pp">Notez que la présence de <i>quelconque</i> coercition dans une signature
+    (même si elle n'est jamais utilisée) peut la ralentir, car Type::Params devra
+    construire un nouveau tableau au lieu de simplement retourner <span class="Li">@_</span>.</p>
+<p class="Pp"><span class="Li">&quot;clone&quot;</span> <b>Bool</b></p>
+<p class="Pp">Si ceci est défini sur true, il clonera en profondeur les valeurs
+    entrantes via <span class="Li">&quot;dclone&quot;</span> de Storable (un module
+    de base depuis Perl 5.7.3).</p>
+<p class="Pp">Dans l'exemple ci-dessous, <span class="Li">$arr</span> est une référence
+    vers un <i>clone de</i> <span class="Li">@numbers</span>, donc pousser des nombres
+    supplémentaires dedans laisse <span class="Li">@numbers</span> inchangé.</p>
+<pre>signature_for foo =&gt; (
+  positional =&gt; [ ArrayRef, { clone =&gt; true } ],
+);
+
+sub foo ( $arr ) {
+  push @$arr, 4, 5, 6;
+}
+
+my @numbers = ( 1, 2, 3 );
+foo( \@numbers );
+print &quot;@numbers\n&quot;;  ## 1 2 3</pre>
+<p class="Pp">Notez que le clonage ralentira considérablement votre signature.</p>
+<p class="Pp"><span class="Li">&quot;name&quot;</span> <b>Str</b></p>
+<p class="Pp">Ceci remplace le nom d'un paramètre nommé. Je ne sais pas pourquoi vous
+    voudriez faire cela.</p>
+<p class="Pp">La signature suivante a deux paramètres : <span class="Li">&quot;foo&quot;</span>
+    et <span class="Li">&quot;bar&quot;</span>. Le nom <span class="Li">&quot;fool&quot;</span>
+    est complètement ignoré.</p>
+<pre>signature_for my_func =&gt; (
+  named =&gt; [
+    fool   =&gt; Int, { name =&gt; 'foo' },
+    bar    =&gt; Int,
+  ],
+);</pre>
+<p class="Pp">Vous pouvez cependant également nommer des paramètres positionnels, qui
+    n'ont généralement pas de nom.</p>
+<pre>signature_for my_func =&gt; (
+  positional =&gt; [
+    Int, { name =&gt; 'foo' },
+    Int, { name =&gt; 'bar' },
+  ],
+);</pre>
+<p class="Pp">Les noms des paramètres positionnels ne sont pas réellement <i>utilisés</i>
+    pour quoi que ce soit pour le moment, mais pourraient être intégrés dans les
+    messages d'erreur ou similaires à l'avenir.</p>
+<p class="Pp"><span class="Li">&quot;getter&quot;</span> <b>Str</b></p>
+<p class="Pp">Pour les signatures avec des paramètres nommés, spécifie le nom de la
+    méthode utilisée pour récupérer la valeur de ce paramètre depuis l'objet
+    <span class="Li">$arg</span>.</p>
+<pre>signature_for process_data =&gt; (
+  method =&gt; true,
+  named  =&gt; [
+    input   =&gt; FileHandle,    { getter =&gt; 'in' },
+    output  =&gt; FileHandle,    { getter =&gt; 'out' },
+    flags   =&gt; HashRef[Bool], { slurpy =&gt; true },
+  ],
+);
+
+sub process_data ( $self, $arg ) {
+  warn &quot;Début du traitement des données&quot; if $arg-&gt;flags-&gt;{debug};
+
+  my ( $in, $out ) = ( $arg-&gt;in, $arg-&gt;out );
+  ...;
+}
+
+$widget-&gt;process_data(
+  input  =&gt; \*STDIN,
+  output =&gt; \*STDOUT,
+  debug  =&gt; true,
+);</pre>
+<p class="Pp">Ignoré par les signatures avec des paramètres positionnels.</p>
+<p class="Pp"><span class="Li">&quot;predicate&quot;</span> <b>Str</b></p>
+<p class="Pp">L'objet <span class="Li">$arg</span> fourni par les signatures avec des
+    paramètres nommés inclura également des méthodes "has" pour tous les
+    arguments optionnels. Par exemple :</p>
+<pre>signature_for process_data =&gt; (
+  method =&gt; true,
+  named  =&gt; [
+    input   =&gt; Optional[ FileHandle ],
+    output  =&gt; Optional[ FileHandle ],
+    flags   =&gt; Slurpy[ HashRef[Bool] ],
+  ],
+);
+
+sub process_data ( $self, $arg ) {
+
+  if ( $self-&gt;has_input and $self-&gt;has_output ) {
+    ...;
+  }
+
+  ...;
+}</pre>
+<p class="Pp">La définition d'une option <span class="Li">&quot;predicate&quot;</span>
+    vous permet de choisir un nom différent pour cette méthode au lieu de
+    &quot;has_*&quot;.</p>
+<p class="Pp">Il est également possible de définir un
+    <span class="Li">&quot;predicate&quot;</span> pour les paramètres non optionnels,
+    qui n'ont normalement pas de méthode &quot;has&quot;.</p>
+<p class="Pp">Ignoré par les signatures avec des paramètres positionnels.</p>
+<p class="Pp"><span class="Li">&quot;alias&quot;</span>
+    <b>Str|ArrayRef[Str]</b></p>
+<p class="Pp">Une liste de noms alternatifs pour le paramètre, ou un seul nom
+    alternatif.</p>
+<pre>signature_for add_numbers =&gt; (
+  named =&gt; [
+    first_number   =&gt; Int, { alias =&gt; [ 'x' ] },
+    second_number  =&gt; Int, { alias =&gt;   'y'   },
+  ],
+);
+
+sub add_numbers ( $arg ) {
+  return $arg-&gt;first_number + $arg-&gt;second_number;
+}
+
+say add_numbers( first_number =&gt; 40, second_number =&gt; 2 );  # 42
+say add_numbers( x            =&gt; 40, y             =&gt; 2 );  # 42
+say add_numbers( first_number =&gt; 40, y             =&gt; 2 );  # 42
+say add_numbers( first_number =&gt; 40, x =&gt; 1, y =&gt; 2 );      # meurt !</pre>
+<p class="Pp">Ignoré par les signatures avec des paramètres positionnels.</p>
+<p class="Pp"><span class="Li">&quot;in_list&quot;</span> <b>Bool</b></p>
+<p class="Pp">En conjonction avec <span class="Li">&quot;list_to_named&quot;</span>,
+    détermine si ce paramètre peut être fourni comme faisant partie de la liste
+    des paramètres positionnels &quot;furtifs&quot;. Si
+    <span class="Li">&quot;list_to_named&quot;</span> n'est pas utilisé,
+    <span class="Li">&quot;in_list&quot;</span> est ignoré.</p>
+<p class="Pp">Par défaut à false si le paramètre est optionnel ou a une valeur par
+    défaut. Par défaut à true si le paramètre est requis.</p>
+<p class="Pp"><span class="Li">&quot;strictness&quot;</span> <b>Bool|Str</b></p>
+<p class="Pp">Remplace l'option de signature <span class="Li">&quot;strictness&quot;</span>
+    sur une base par paramètre.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;signature_for_func_$function_name_=&amp;gt;_(_%spec_)&amp;quot;'><a class='permalink' href='#&amp;quot;signature_for_func_$function_name_=&amp;gt;_(_%spec_)&amp;quot;'>&quot;signature_for_func   $function_name =&gt; ( %spec )&quot;</a></h2>
+<p class="Pp">Comme <span class="Li">&quot;signature_for&quot;</span> et vaut par
+    défaut <span class="Li">&quot;method =&gt; false&quot;</span>.</p>
+<p class="Pp">Si la signature a des paramètres nommés, elle utilisera par défaut
+    <span class="Li">&quot;list_to_named&quot;</span> et
+    <span class="Li">&quot;allow_dash&quot;</span> à true.</p>
+<pre>signature_for_func add_to_ref =&gt; (
+  named         =&gt; [ ref =&gt; ScalarRef[Num], add =&gt; Num ],
+  named_to_list =&gt; true,
+);
+
+sub add_to_ref ( $ref, $add ) {
+  $ref-&gt;$* += $add;
+}
+
+my $sum = 0;
+add_to_ref( ref =&gt; \$sum, add =&gt; 1 );
+add_to_ref( \$sum, 2 );
+add_to_ref( 3, \$sum );
+add_to_ref( 4, { -ref =&gt; \$sum } );
+say $sum; # 10</pre>
+<p class="Pp">Le comportement exact de <span class="Li">&quot;signature_for_func&quot;</span>
+    est instable et peut changer dans les futures versions de Type::Params.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;signature_for_method_$function_name_=&amp;gt;_(_%spec_)&amp;quot;'><a class='permalink' href='#&amp;quot;signature_for_method_$function_name_=&amp;gt;_(_%spec_)&amp;quot;'>&quot;signature_for_method   $function_name =&gt; ( %spec )&quot;</a></h2>
+<p class="Pp">Comme <span class="Li">&quot;signature_for&quot;</span> mais vaut par
+    défaut <span class="Li">&qu
+ot;méthode =&gt; vrai&quot;</span>.</p>
+<p class="Pp">Si la signature a des paramètres nommés, elle mettra également
+    par défaut <span class="Li">&quot;list_to_named&quot;</span> et
+    <span class="Li">&quot;allow_dash&quot;</span> à vrai.</p>
+<pre>package Calculateur {
+  use Types::Standard qw( Num ScalarRef );
+  use Type::Params qw( signature_for_method );
+
+  ...;
+
+  signature_for_method add_to_ref =&gt; (
+    named         =&gt; [ ref =&gt; ScalarRef[Num], add =&gt; Num ],
+    named_to_list =&gt; vrai,
+  );
+
+  sub add_to_ref ( $self, $ref, $add ) {
+    $ref-&gt;$* += $add;
+  }
+}
+
+my $calc = Calculateur-&gt;new;
+my $sum = 0;
+$calc-&gt;add_to_ref( ref =&gt; \$sum, add =&gt; 1 );
+$calc-&gt;add_to_ref( \$sum, 2 );
+$calc-&gt;add_to_ref( 3, \$sum );
+$calc-&gt;add_to_ref( 4, { -ref =&gt; \$sum } );
+say $sum; # 10</pre>
+<p class="Pp">Le comportement exact de
+    <span class="Li">&quot;signature_for_method&quot;</span> est instable et peut
+    changer dans les futures versions de Type::Params.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='signature(_%spec_)'><a class='permalink' href='#signature(_%spec_)'>signature(   %spec )</a></h2>
+<p class="Pp">La fonction <span class="Li">&quot;signature&quot;</span> permet
+    un contrôle plus précis des signatures. Au lieu d'envelopper automatiquement
+    votre fonction, elle retourne un coderef auquel vous pouvez passer
+    <span class="Li">@_</span>.</p>
+<p class="Pp">Ce qui suit est à peu près équivalent :</p>
+<pre>signature_for add_nums =&gt; ( pos =&gt; [ Num, Num ] );
+
+sub add_nums ( $x, $y ) {
+  return $x + $y;
+}</pre>
+<p class="Pp">Et :</p>
+<pre>sub add_nums {
+  state $signature = signature( pos =&gt; [ Num, Num ] );
+  my ( $x, $y ) = $signature-&gt;( @_ );
+
+  return $x + $y;
+}</pre>
+<p class="Pp">Perl autorise une manière légèrement archaïque d'appeler des
+    coderefs sans utiliser de parenthèses, ce qui peut être légèrement plus
+    rapide au détriment d'être plus obscur :</p>
+<pre>sub add_nums {
+  state $signature = signature( pos =&gt; [ Num, Num ] );
+  my ( $x, $y ) = &amp;$signature; # important : pas de parenthèses !
+
+  return $x + $y;
+}</pre>
+<p class="Pp">Si vous avez besoin de supporter Perl 5.8, qui n'avait pas le mot-clé
+    <span class="Li">&quot;state&quot;</span> :</p>
+<pre>my $__add_nums_sig;
+sub add_nums {
+  $__add_nums_sig ||= signature( pos =&gt; [ Num, Num ] );
+  my ( $x, $y ) = &amp;$__add_nums_sig;
+
+  ...;
+}</pre>
+<p class="Pp">Cela vous donne plus de contrôle sur comment et quand la signature
+    est construite et utilisée, et ce qui est fait des valeurs qu'elle dépaquette.</p>
+<p class="Pp">En particulier, notez que si votre fonction n'est jamais appelée,
+    la signature n'est même jamais construite, ce qui signifie que pour les
+    fonctions que vous utilisez rarement, le coût d'avoir la signature est
+    moindre.</p>
+<p class="Pp">À partir de 2025, vous voudrez probablement utiliser
+    <span class="Li">&quot;signature_for&quot;</span> plutôt que
+    <span class="Li">&quot;signature&quot;</span> dans la plupart des cas.</p>
+<p class="Pp"><i>Options de spécification de signature supplémentaires</i></p>
+<p class="Pp">Il existe certaines options qui n'ont aucun sens pour
+    <span class="Li">&quot;signature_for&quot;</span>, et ne sont utiles que pour
+    <span class="Li">&quot;signature&quot;</span>. D'autres peuvent se comporter
+    légèrement différemment. Elles sont notées ici.</p>
+<p class="Pp"><span class="Li">&quot;returns&quot;</span> <b>TypeTiny</b>,
+    <span class="Li">&quot;returns_scalar&quot;</span> <b>TypeTiny</b>, et
+    <span class="Li">&quot;returns_list&quot;</span> <b>TypeTiny</b></p>
+<p class="Pp">Parce que <span class="Li">&quot;signature&quot;</span> n'est pas
+    capable d'envelopper complètement votre fonction, les options
+    <span class="Li">&quot;returns&quot;</span>,
+    <span class="Li">&quot;returns_scalar&quot;</span> et
+    <span class="Li">&quot;returns_list&quot;</span> ne peuvent rien faire. Vous
+    devriez les considérer comme étant uniquement de la documentation.</p>
+<p class="Pp"><span class="Li">&quot;subname&quot;</span> <b>Str</b></p>
+<p class="Pp">Le nom de la sous-routine dont nous sommes censés vérifier les
+    paramètres. Ceci est utile dans les traces de pile, etc. Par défaut, c'est
+    l'appelant.</p>
+<p class="Pp"><span class="Li">&quot;package&quot;</span> <b>Str</b></p>
+<p class="Pp">Fonctionne de la même manière qu'en
+    <span class="Li">&quot;signature_for&quot;</span>, mais il vaut la peine de le
+    mentionner à nouveau car il est étroitement lié à
+    <span class="Li">&quot;subname&quot;</span>.</p>
+<p class="Pp"><span class="Li">&quot;caller_level&quot;</span> <b>Int</b></p>
+<p class="Pp">Si vous enveloppez <span class="Li">&quot;signature&quot;</span>
+    pour pouvoir vérifier les signatures pour le compte d'un autre package, alors
+    définir <span class="Li">&quot;caller_level&quot;</span> à 1 (ou plus, selon
+    le niveau d'enveloppement !) peut être une alternative à la définition manuelle
+    de <span class="Li">&quot;package&quot;</span> et
+    <span class="Li">&quot;subname&quot;</span>.</p>
+<p class="Pp"><span class="Li">&quot;next&quot;</span> <b>Bool|CodeLike</b></p>
+<p class="Pp">Ceci peut être utilisé pour chaîner des coderefs. Si vous comprenez
+    <span class="Li">&quot;on_die&quot;</span>, cela agit comme un
+    &quot;on_live&quot;.</p>
+<pre>sub add_numbers {
+  state $sig = signature(
+    positional =&gt; [ Num, Num ],
+    next =&gt; sub {
+      my ( $num1, $num2 ) = @_;
+
+      return $num1 + $num2;
+    },
+  );
+
+  my $sum = $sig-&gt;( @_ );
+  return $sum;
+}
+
+say add_numbers( 2, 3 );   # dit 5</pre>
+<p class="Pp">S'il est défini à vrai au lieu d'un coderef, a un comportement légèrement
+    différent :</p>
+<pre>sub add_numbers {
+  state $sig = signature(
+    positional =&gt; [ Num, Num ],
+    next       =&gt; vrai,
+  );
+
+  my $sum = $sig-&gt;(
+    sub { return $_[0] + $_[1] },
+    @_,
+  );
+  return $sum;
+}
+
+say add_numbers( 2, 3 );   # dit 5</pre>
+<p class="Pp">Cela semble étrange. Pourquoi serait-ce utile ? Eh bien, cela fonctionne
+    bien avec le mot-clé <span class="Li">&quot;around&quot;</span> de Moose.</p>
+<pre>sub add_numbers {
+  return $_[1] + $_[2];
+}
+
+around add_numbers =&gt; signature(
+  method     =&gt; vrai,
+  positional =&gt; [ Num, Num ],
+  next       =&gt; vrai,
+  package    =&gt; __PACKAGE__,
+  subname    =&gt; 'add_numbers',
+);
+
+say __PACKAGE__-&gt;add_numbers( 2, 3 );   # dit 5</pre>
+<p class="Pp">Notez la façon dont <span class="Li">&quot;around&quot;</span> fonctionne
+    dans Moose : il attend un coderef enveloppant comme dernier argument. Ce
+    coderef enveloppant attend ensuite qu'on lui donne une référence à la fonction
+    originale comme premier paramètre.</p>
+<p class="Pp">Cela peut permettre, par exemple, à un rôle de fournir une signature
+    enveloppant une méthode définie dans une classe.</p>
+<p class="Pp">C'est assez complexe, et vous l'utiliserez probablement peu, mais cela
+    s'est avéré utile pour les outils qui intègrent Type::Params avec des modificateurs
+    de méthode de type Moose.</p>
+<p class="Pp">Notez que <span class="Li">&quot;next&quot;</span> est le mécanisme que
+    <span class="Li">&quot;signature_for&quot;</span> utilise en interne pour connecter
+    la signature à la sous-routine enveloppée, donc utiliser
+    <span class="Li">&quot;next&quot;</span> avec
+    <span class="Li">&quot;signature_for&quot;</span> est une bonne recette pour
+    les maux de tête.</p>
+<p class="Pp">Si vous utilisez des signatures <span class="Li">&quot;multiple&quot;</span>,
+    <span class="Li">&quot;next&quot;</span> est utile pour chaque signature
+    &quot;interne&quot; pour organiser les paramètres dans le bon ordre. Cette
+    utilisation de <span class="Li">&quot;next&quot;</span> <i>est</i> supportée pour
+    <span class="Li">&quot;signature_for&quot;</span>.</p>
+<p class="Pp">L'option <span class="Li">&quot;goto_next&quot;</span> est supportée comme
+    alias historique pour <span class="Li">&quot;next&quot;</span>.</p>
+<p class="Pp"><span class="Li">&quot;want_source&quot;</span> <b>Bool</b></p>
+<p class="Pp">Au lieu de retourner un coderef, retourne une chaîne de code source
+    Perl. Pratique pour le débogage.</p>
+<p class="Pp"><span class="Li">&quot;want_details&quot;</span> <b>Bool</b></p>
+<p class="Pp">Au lieu de retourner un coderef, retourne un hashref de choses
+    incluant le coderef. Ceci est principalement pour les personnes qui étendent
+    Type::Params et je n'entrerai pas dans trop de détails sur ce que contient ce
+    hashref.</p>
+<p class="Pp"><span class="Li">&quot;want_object&quot;</span> <b>Bool</b></p>
+<p class="Pp">Au lieu de retourner un coderef, retourne un objet
+    Type::Params::Signature. C'est la version plus moderne de
+    <span class="Li">&quot;want_details&quot;</span>.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='API_LEGALE'><a class='permalink' href='#API_LEGALE'>API   LEGALE</a></h1>
+<p class="Pp">Les fonctions suivantes étaient l'API avant Type::Params v2. Elles sont
+    toujours supportées, mais leur utilisation est maintenant déconseillée.</p>
+<p class="Pp">Si vous ne fournissez pas du tout de liste d'importation, vous importerez
+    <span class="Li">&quot;compile&quot;</span> et
+    <span class="Li">&quot;compile_named&quot;</span> :</p>
+<pre>use Type::Params;</pre>
+<p class="Pp">Ceci fait la même chose :</p>
+<pre>use Type::Params -v1;</pre>
+<p class="Pp">Ceci importe <span class="Li">&quot;compile&quot;</span>,
+    <span class="Li">&quot;compile_named&quot;</span>, et
+    <span class="Li">&quot;compile_named_oo&quot;</span> :</p>
+<pre>use Type::Params -compile;</pre>
+<p class="Pp">Ceci importe
+    <span class="Li">&quot;wrap_subs&quot;</span> et
+    <span class="Li">&quot;wrap_methods&quot;</span> :</p>
+<pre>use Type::Params -wrap;</pre>
+<section class="Ss">
+<h2 class="Ss" id='compile(_@pos_params_)'><a class='permalink' href='#compile(_@pos_params_)'>compile(   @pos_params )</a></h2>
+<p class="Pp">Équivalent à <span class="Li">&quot;signature( positional =&gt;
+    \@pos_params )&quot;</span>.</p>
+<p class="Pp"><span class="Li">&quot;compile( \%spec, @pos_params )&quot;</span>
+    est équivalent à <span class="Li">&quot;signature( %spec, positional =&gt;
+    \@pos_params )&quot;</span>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='compile_named(_@named_params_)'><a class='permalink' href='#compile_named(_@named_params_)'>compile_named(   @named_params )</a></h2>
+<p class="Pp">Équivalent à <span class="Li">&quot;signature( bless =&gt; 0,
+    named =&gt; \@named_params )&quot;</span>.</p>
+<p class="Pp"><span class="Li">&quot;compile_named( \%spec, @named_params
+    )&quot;</span> est équivalent à <span class="Li">&quot;signature( bless
+    =&gt; faux, %spec, named =&gt; \@named_params )&quot;</span>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='compile_named_oo(_@named_params_)'><a class='permalink' href='#compile_named_oo(_@named_params_)'>compile_named_oo(   @named_params )</a></h2>
+<p class="Pp">Équivalent à <span class="Li">&quot;signature( bless =&gt; vrai,
+    named =&gt; \@named_params )&quot;</span>.</p>
+<p class="Pp"><span class="Li">&quot;compile_named_oo( \%spec, @named_params
+    )&quot;</span> est équivalent à <span class="Li">&quot;signature( bless
+    =&gt; vrai, %spec, named =&gt; \@named_params )&quot;</span>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;validate(_\@args,_@pos_params_)&amp;quot;'><a class='permalink' href='#&amp;quot;validate(_\@args,_@pos_params_)&amp;quot;'>&quot;validate(   \@args, @pos_params )&quot;</a></h2>
+<p class="Pp">Équivalent à <span class="Li">&quot;signature( positional =&gt;
+    \@pos_params )-&gt;( @args )&quot;</span>.</p>
+<p class="Pp">La fonction <span class="Li">&quot;validate&quot;</span> n'a jamais
+    été recommandée et n'est pas exportée sauf si demandée par nom.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;validate_named(_\@args,_@named_params_)&amp;quot;'><a class='permalink' href='#&amp;quot;validate_named(_\@args,_@named_params_)&amp;quot;'>&quot;validate_named(   \@args, @named_params )&quot;</a></h2>
+<p class="Pp">Équivalent à <span class="Li">&quot;signature( bless =&gt; faux,
+    named =&gt; \@named_params )-&gt;( @args )&quot;</span>.</p>
+<p class="Pp">La fonction <span class="Li">&quot;validate_named&quot;</span> n'a jamais
+    été recommandée et n'est pas exportée sauf si demandée par nom.</p>
+</section>
+<section class="Ss">
+<section class="Sh">
+<h1 class="Sh" id="LEGACY_API"><a class="permalink" href="#LEGACY_API">API    LEGACY</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;wrap_subs(_func1_=&amp;gt;_\@params1,_func2_=&amp;gt;_\@params2,_..._)&amp;quot;'><a class="permalink" href='#&amp;quot;wrap_subs(_func1_=&amp;gt;_\@params1,_func2_=&amp;gt;_\@params2,_..._)&amp;quot;'>&quot;wrap_subs(   func1 =&gt; \@params1, func2 =&gt; \@params2, ... )&quot;</a></h2>
+<p class="Pp">Équivalent à :</p>
+<pre>signature_for func1 =&gt; ( positional =&gt; \@params1 );
+signature_for func2 =&gt; ( positional =&gt; \@params2 );</pre>
+<p class="Pp">Une légère différence est qu'au lieu de tableaux références, vous pouvez
+    fournir le résultat de l'une des fonctions <span class="Li">&quot;compile&quot;</span> :</p>
+<pre>wrap_subs( func1 =&gt; compile_named( @params1 ) );</pre>
+<p class="Pp"><span class="Li">&quot;wrap_subs&quot;</span> n'est pas exporté
+    sauf sur demande explicite.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;wrap_methods(_func1_=&amp;gt;_\@params1,_func2_=&amp;gt;_\@params2,_..._)&amp;quot;'><a class="permalink" href='#&amp;quot;wrap_methods(_func1_=&amp;gt;_\@params1,_func2_=&amp;gt;_\@params2,_..._)&amp;quot;'>&quot;wrap_methods(   func1 =&gt; \@params1, func2 =&gt; \@params2, ... )&quot;</a></h2>
+<p class="Pp">Équivalent à :</p>
+<pre>signature_for func1 =&gt; ( method =&gt; 1, positional =&gt; \@params1 );
+signature_for func2 =&gt; ( method =&gt; 1, positional =&gt; \@params2 );</pre>
+<p class="Pp">Une légère différence est qu'au lieu de tableaux références, vous pouvez
+    fournir le résultat de l'une des fonctions <span class="Li">&quot;compile&quot;</span> :</p>
+<pre>wrap_methods( func1 =&gt; compile_named( @params1 ) );</pre>
+<p class="Pp"><span class="Li">&quot;wrap_methods&quot;</span> n'est pas exporté
+    sauf sur demande explicite.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='multisig(_@alternatives_)'><a class="permalink" href='#multisig(_@alternatives_)'>multisig(   @alternatives )</a></h2>
+<p class="Pp">Équivalent à :</p>
+<pre>signature( multiple =&gt; \@alternatives )</pre>
+<p class="Pp"><span class="Li">&quot;multisig( \%spec, @alternatives
+    )&quot;</span> est équivalent à <span class="Li">&quot;signature( %spec,
+    multiple =&gt; \@alternatives )&quot;</span>.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="TYPE_CONSTRAINTS"><a class="permalink" href='#TYPE_CONSTRAINTS'>CONTRAINTES    DE TYPE</a></h1>
+<p class="Pp">Bien que Type::Params ne soit pas une véritable bibliothèque de types, il
+    exporte deux contraintes de type. Leur utilisation n'est plus recommandée.</p>
+<section class="Ss">
+<h2 class="Ss"><b>Invocant</b></h2>
+<p class="Pp">Type::Params exporte un type <b>Invocant</b> sur demande. Cela vous donne
+    une contrainte de type qui accepte les noms de classe *et* les objets
+    blessés.</p>
+<pre>use Type::Params qw( compile Invocant );
+
+signature_for my_method =&gt; (
+  method     =&gt; Invocant,
+  positional =&gt; [ ArrayRef, Int ],
+);
+
+sub my_method ($self_or_class, $arr, $ix) {
+  return $arr-&gt;[ $ix ];
+}</pre>
+<p class="Pp"><span class="Li">&quot;Invocant&quot;</span> n'est pas exporté
+    sauf sur demande explicite.</p>
+<p class="Pp">Recommandation : utiliser <b>Defined</b> de Types::Standard
+    à la place.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>ArgsObject</b></h2>
+<p class="Pp">Type::Params exporte une contrainte de type paramétrable
+    <b>ArgsObject</b>. Elle accepte les types d'objets retournés par les vérifications
+    de paramètres pour les paramètres nommés.</p>
+<pre>use v5.36;
+
+package Foo {
+  use Moo;
+  use Type::Params 'ArgsObject';
+
+  has args =&gt; (
+    is  =&gt; 'ro',
+    isa =&gt; ArgsObject['Bar::bar'],
+  );
+}
+
+package Bar {
+  use Types::Standard -types;
+  use Type::Params 'signature_for';
+
+  signature_for bar =&gt; ( named =&gt; [ xxx =&gt; Int, yyy =&gt; ArrayRef ] );
+
+  sub bar ( $got ) {
+    return 'Foo'-&gt;new( args =&gt; $got );
+  }
+}
+
+Bar::bar( xxx =&gt; 42, yyy =&gt; [] );</pre>
+<p class="Pp">Le paramètre &quot;Bar::bar&quot; fait référence à l'appelant lorsque
+    la vérification est compilée, plutôt que lors de la vérification des
+    paramètres.</p>
+<p class="Pp"><span class="Li">&quot;ArgsObject&quot;</span> n'est pas exporté
+    sauf sur demande explicite.</p>
+<p class="Pp">Recommandation : utiliser <b>Object</b> de Types::Standard
+    à la place.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="ENVIRONMENT"><a class="permalink" href='#ENVIRONMENT'>ENVIRONNEMENT</a></h1>
+<dl class="Bl-tag">
+  <dt>&quot;PERL_TYPE_PARAMS_XS&quot;</dt>
+  <dd>Affecte la construction des accesseurs pour les objets <span class="Li">$arg</span>.
+      S'il est défini sur vrai, utilisera Class::XSAccessor. S'il est défini sur
+      faux, utilisera du Perl pur. Si cette variable d'environnement n'existe pas,
+      utilisera Class::XSAccessor.
+    <p class="Pp">Si Class::XSAccessor n'est pas installé ou est trop ancien, du Perl
+        pur sera toujours utilisé en solution de repli.</p>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="BUGS"><a class="permalink" href='#BUGS'>BOGUES</a></h1>
+<p class="Pp">Veuillez signaler tout bogue à
+    <a href='https://github.com/tobyink/p5-type-tiny/issues'>https://github.com/tobyink/p5-type-tiny/issues</a>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href='#SEE_ALSO'>VOIR   AUSSI</a></h1>
+<p class="Pp">La page d'accueil de Type::Tiny <a href='https://typetiny.toby.ink/'>https://typetiny.toby.ink/</a>.</p>
+<p class="Pp">Type::Tiny, Type::Coercion, Types::Standard.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href='#AUTHOR'>AUTEUR</a></h1>
+<p class="Pp">Toby Inkster &lt;tobyink@cpan.org&gt;.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="COPYRIGHT_AND_LICENCE"><a class="permalink" href='#COPYRIGHT_AND_LICENCE'>DROITS   D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Ce logiciel est la propriété (c) 2013-2014, 2017-2025 par Toby
+    Inkster.</p>
+<p class="Pp">Ceci est un logiciel libre ; vous pouvez le redistribuer et/ou le
+    modifier selon les mêmes termes que le système de programmation Perl 5
+    lui-même.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DISCLAIMER_OF_WARRANTIES"><a class="permalink" href='#DISCLAIMER_OF_WARRANTIES'>CLAUSE   DE NON-GARANTIE</a></h1>
+<p class="Pp">CE PAQUET EST FOURNI &quot;TEL QUEL&quot; ET SANS AUCUNE GARANTIE EXPRESSE
+    OU IMPLICITE, Y COMPRIS, SANS LIMITATION, LES GARANTIES IMPLICITES DE
+    QUALITÉ MARCHANDE ET D'ADÉQUATION À UN USAGE PARTICULIER.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-11-02</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher une page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-type-tiny/">extra/perl-type-tiny</a></dd>
+        <dt>Version :</dt>
+        <dd>2.008004-1</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://metacpan.org/release/Type-Tiny">https://metacpan.org/release/Type-Tiny</a></dd>
+        <dt>Licences :</dt>
+        <dd>PerlArtistic, GPL</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-type-tiny/">/listing/extra/perl-type-tiny/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNTAXE</a></li>
+        
+            <li><a href="#STATUS">STATUT</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#MODERN_API">API MODERNE</a></li>
+        
+            <li><a href="#LEGACY_API">API LEGACY</a></li>
+        
+            <li><a href="#TYPE_CONSTRAINTS">CONTRAINTES DE TYPE</a></li>
+        
+            <li><a href="#ENVIRONMENT">ENVIRONNEMENT</a></li>
+        
+            <li><a href="#BUGS">BOGUES</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+            <li><a href="#AUTHOR">AUTEUR</a></li>
+        
+            <li><a href="#COPYRIGHT_AND_LICENCE">DROITS D'AUTEUR ET LICENCE</a></li>
+        
+            <li><a href="#DISCLAIMER_OF_WARRANTIES">CLAUSE DE NON-GARANTIE</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Type::Params.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/Type::Params.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

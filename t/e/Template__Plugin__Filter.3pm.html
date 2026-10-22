@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Template::Plugin::Filter(3pm) — Pages manuelles Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Template__Plugin__Filter(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/perl-template-toolkit/">perl-template-toolkit</a></p>
+<p class="lic">Licences: PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Template::Plugin::Filter(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">Template::Plugin::Filter(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Template::Plugin::Filter - Classe de base pour les filtres de plugins</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>package MyOrg::Template::Plugin::MyFilter;
+use Template::Plugin::Filter;
+use base qw( Template::Plugin::Filter );
+sub filter {
+    my ($self, $text) = @_;
+    # ...modifier $text...
+    return $text;
+}
+# maintenant, chargez-le...
+[% USE MyFilter %]
+# ...et utilisez l'objet retourné comme filtre
+[% FILTER $MyFilter %]
+  ...
+[% END %]</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Ce module implémente une classe de base pour les filtres de plugins. Il masque la complexité sous-jacente impliquée dans la création et l'utilisation de filtres qui sont définis et mis à disposition en chargeant un plugin.</p>
+<p class="Pp">Pour utiliser le module, créez simplement votre propre module de plugin dont hérite la classe
+    <span class="Li">&quot;Template::Plugin::Filter&quot;</span>.</p>
+<pre>package MyOrg::Template::Plugin::MyFilter;
+use Template::Plugin::Filter;
+use base qw( Template::Plugin::Filter );</pre>
+<p class="Pp">Définissez ensuite simplement votre méthode <span class="Li">filter()</span>. Lorsqu'elle est appelée, une référence à votre objet plugin
+    (<span class="Li">$self</span>) et le texte à filtrer vous sont passés.</p>
+<pre>sub filter {
+    my ($self, $text) = @_;
+    # ...modifier $text...
+    return $text;
+}</pre>
+<p class="Pp">Pour utiliser votre plugin personnalisé, vous devez vous assurer que le Template Toolkit connaît votre espace de noms de plugin.</p>
+<pre>my $tt2 = Template-&gt;new({
+    PLUGIN_BASE =&gt; 'MyOrg::Template::Plugin',
+});</pre>
+<p class="Pp">Ou pour des plugins individuels, vous pouvez faire ceci :</p>
+<pre>my $tt2 = Template-&gt;new({
+    PLUGINS =&gt; {
+        MyFilter =&gt; 'MyOrg::Template::Plugin::MyFilter',
+    },
+});</pre>
+<p class="Pp">Ensuite, vous <span class="Li">&quot;USE&quot;</span>z votre plugin de la manière habituelle.</p>
+<pre>[% USE MyFilter %]</pre>
+<p class="Pp">L'objet retourné est stocké dans la variable du même nom,
+    '<span class="Li">&quot;MyFilter&quot;</span>'. Lorsque vous l'utilisez comme
+    <span class="Li">&quot;FILTER&quot;</span>, vous devez ajouter un préfixe dollar.
+    Cela indique que vous voulez utiliser le filtre stocké dans la variable
+    '<span class="Li">&quot;MyFilter&quot;</span>' plutôt que le filtre nommé
+    '<span class="Li">&quot;MyFilter&quot;</span>', ce qui est une chose totalement
+    différente (voir plus loin pour des informations sur la définition de filtres par nom).</p>
+<pre>[% FILTER $MyFilter %]
+   ...texte à filtrer...
+[% END %]</pre>
+<p class="Pp">Vous pouvez, bien sûr, l'assigner à une autre variable.</p>
+<pre>[% USE blat = MyFilter %]
+[% FILTER $blat %]
+   ...texte à filtrer...
+[% END %]</pre>
+<p class="Pp">Tous les paramètres de configuration passés au constructeur du plugin depuis la directive
+    <span class="Li">&quot;USE&quot;</span> sont stockés en interne dans l'objet pour être inspectés par la méthode
+    <span class="Li">filter()</span> (ou toute autre méthode d'ailleurs). Les arguments positionnels sont stockés sous forme de référence à une liste dans l'élément
+    <span class="Li">&quot;_ARGS&quot;</span> tandis que les paramètres de configuration nommés sont stockés sous forme de référence à un tableau associatif dans l'élément
+    <span class="Li">&quot;_CONFIG&quot;</span>.</p>
+<p class="Pp">Par exemple, charger un plugin comme montré ici :</p>
+<pre>[% USE blat = MyFilter 'foo' 'bar' baz = 'blam' %]</pre>
+<p class="Pp">permettrait à la méthode <span class="Li">filter()</span> de faire ceci :</p>
+<pre>sub filter {
+    my ($self, $text) = @_;
+    my $args = $self-&gt;{ _ARGS   };  # [ 'foo', 'bar' ]
+    my $conf = $self-&gt;{ _CONFIG };  # { baz =&gt; 'blam' }
+    # ...modifier $text...
+    return $text;
+}</pre>
+<p class="Pp">Par défaut, les plugins dérivés de ce module créeront des filtres statiques. Un filtre statique est créé une fois lorsque le plugin est chargé via la directive
+    <span class="Li">&quot;USE&quot;</span> et réutilisé pour toutes les opérations
+    <span class="Li">&quot;FILTER&quot;</span> ultérieures. Cela signifie que tous les arguments spécifiés avec la directive
+    <span class="Li">&quot;FILTER&quot;</span> sont ignorés.</p>
+<p class="Pp">Les filtres dynamiques, en revanche, sont recréés chaque fois qu'ils sont utilisés par une directive
+    <span class="Li">&quot;FILTER&quot;</span>. Cela leur permet d'agir sur tous les paramètres passés depuis la directive
+    <span class="Li">&quot;FILTER&quot;</span> et de modifier leur comportement en conséquence.</p>
+<p class="Pp">Il y a deux façons de créer un filtre dynamique. La première est de définir une variable de classe <span class="Li">$DYNAMIC</span> définie à une valeur vraie.</p>
+<pre>package MyOrg::Template::Plugin::MyFilter;
+use base 'Template::Plugin::Filter';
+our $DYNAMIC = 1;</pre>
+<p class="Pp">L'autre façon est de définir la valeur interne
+    <span class="Li">&quot;_DYNAMIC&quot;</span> dans la méthode
+    <span class="Li">init()</span> qui est appelée par le constructeur
+    <span class="Li">new()</span>.</p>
+<pre>sub init {
+    my $self = shift;
+    $self-&gt;{ _DYNAMIC } = 1;
+    return $self;
+}</pre>
+<p class="Pp">Lorsque ceci est défini à une valeur vraie, le plugin créera automatiquement un filtre dynamique. Le résultat est que la méthode
+    <span class="Li">filter()</span> recevra également une référence à un tableau d'arguments positionnels et une référence à un tableau associatif de paramètres nommés.</p>
+<p class="Pp">Ainsi, utiliser un filtre de plugin comme ceci :</p>
+<pre>[% FILTER $blat 'foo' 'bar' baz = 'blam' %]</pre>
+<p class="Pp">permettrait à la méthode <span class="Li">filter()</span> de fonctionner comme ceci :</p>
+<pre>sub filter {
+    my ($self, $text, $args, $conf) = @_;
+    # $args = [ 'foo', 'bar' ]
+    # $conf = { baz =&gt; 'blam' }
+}</pre>
+<p class="Pp">Dans ce cas, vous pouvez passer des paramètres aux directives USE et FILTER, votre méthode <b>filter()</b> devrait donc probablement en tenir compte.</p>
+<pre>[% USE MyFilter 'foo' wiz =&gt; 'waz' %]
+[% FILTER $MyFilter 'bar' biz =&gt; 'baz' %]
+   ...
+[% END %]</pre>
+<p class="Pp">Vous pouvez utiliser les méthodes <span class="Li">merge_args()</span> et
+    <span class="Li">merge_config()</span> pour fusionner facilement et rapidement les paramètres locaux (par exemple, <span class="Li">&quot;FILTER&quot;</span>) avec les valeurs internes (par exemple,
+    <span class="Li">&quot;USE&quot;</span>) et retourner de nouveaux ensembles de données concaténées.</p>
+<pre>sub filter {
+    my ($self, $text, $args, $conf) = @_;
+    $args = $self-&gt;merge_args($args);
+    $conf = $self-&gt;merge_config($conf);
+    # $args = [ 'foo', 'bar' ]
+    # $conf = { wiz =&gt; 'waz', biz =&gt; 'baz' }
+    ...
+}</pre>
+<p class="Pp">Vous pouvez également faire en sorte que votre plugin s'installe comme filtre nommé en appelant la méthode
+    <span class="Li">install_filter()</span> depuis la méthode
+    <span class="Li">init()</span>. Vous devriez fournir un nom pour le filtre, quelque chose qui pourrait être une option de configuration.</p>
+<pre>sub init {
+    my $self = shift;
+    my $name = $self-&gt;{ _CONFIG }-&gt;{ name } || 'myfilter';
+    $self-&gt;install_filter($name);
+    return $self;
+}</pre>
+<p class="Pp">Cela permet d'utiliser le filtre du plugin comme suit :</p>
+<pre>[% USE MyFilter %]
+[% FILTER myfilter %]
+   ...
+[% END %]</pre>
+<p class="Pp">ou</p>
+<pre>[% USE MyFilter name = 'swipe' %]
+[% FILTER swipe %]
+   ...
+[% END %]</pre>
+<p class="Pp">Alternativement, vous pouvez permettre qu'un nom de filtre soit spécifié comme premier argument positionnel.</p>
+<pre>sub init {
+    my $self = shift;
+    my $name = $self-&gt;{ _ARGS }-&gt;[0] || 'myfilter';
+    $self-&gt;install_filter($name);
+    return $self;
+}
+[% USE MyFilter 'swipe' %]
+[% FILTER swipe %]
+   ...
+[% END %]</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXEMPLE'><a class='permalink' href='#EXEMPLE'>EXEMPLE</a></h1>
+<p class="Pp">Voici un exemple complet de module de filtre de plugin.</p>
+<pre>package My::Template::Plugin::Change;
+use Template::Plugin::Filter;
+use base qw( Template::Plugin::Filter );
+sub init {
+    my $self = shift;
+    $self-&gt;{ _DYNAMIC } = 1;
+    # le premier argument peut spécifier le nom du filtre
+    $self-&gt;install_filter($self-&gt;{ _ARGS }-&gt;[0] || 'change');
+    return $self;
+}
+sub filter {
+    my ($self, $text, $args, $config) = @_;
+    $config = $self-&gt;merge_config($config);
+    my $regex = join('|', keys %$config);
+    $text =~ s/($regex)/$config-&gt;{ $1 }/ge;
+    return $text;
+}
+1;</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Andy Wardley &lt;abw@wardley.org&gt;
+  <a href='http://wardley.org/'>http://wardley.org/</a></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_DAUTELUR'><a class='permalink' href='#DROITS_DAUTELUR'>DROITS D'AUTELUR</a></h1>
+<p class="Pp">Copyright (C) 1996-2022 Andy Wardley. Tous droits réservés.</p>
+<p class="Pp">Ce module est un logiciel libre ; vous pouvez le redistribuer et/ou le modifier sous les mêmes conditions que Perl lui-même.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR AUSSI</a></h1>
+<p class="Pp">Template::Plugin, Template::Filters, Template::Manual::Filters</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page man" name="q" value=""
+         />
+    <input type="submit" name=
+</section>
+            </aside>
+        </main>
+    </body>
+</html>
+<go value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/perl-template-toolkit/">extra/perl-template-toolkit</a></dd>
+        <dt>Version :</dt>
+        <dd>3.102-3</dd>
+        <dt>Origine :</dt>
+        <dd><a href="https://search.cpan.org/dist/Template-Toolkit/">https://search.cpan.org/dist/Template-Toolkit/</a></dd>
+        <dt>Licences :</dt>
+        <dd>PerlArtistic</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-template-toolkit/">/listing/extra/perl-template-toolkit/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNTAXE</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#EXAMPLE">EXEMPLE</a></li>
+        
+            <li><a href="#AUTHOR">AUTEUR</a></li>
+        
+            <li><a href="#COPYRIGHT">DROIT D'AUTEUR</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Template::Plugin::Filter.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/Template::Plugin::Filter.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

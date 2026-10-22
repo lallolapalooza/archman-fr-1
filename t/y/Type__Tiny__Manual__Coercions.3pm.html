@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Type::Tiny::Manual::Coercions(3pm) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Type__Tiny__Manual__Coercions(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-type-tiny/">perl-type-tiny</a></p>
+<p class="lic">Licences: PerlArtistic, GPL</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Type::Tiny::Manual::Coercions(3)</td>
+    <td class="head-vol">Documentation Perl Contribuée par les Utilisateurs</td>
+    <td class="head-rtitle">Type::Tiny::Manual::Coercions(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Type::Tiny::Manual::Coercions - informations avancées sur les
+  coercitions</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MANUEL'><a class='permalink' href='#MANUEL'>MANUEL</a></h1>
+<p class="Pp">Cette section du manuel suppose que vous avez déjà lu
+    Type::Tiny::Manual::UsingWithMoo.</p>
+<p class="Pp">Type::Tiny adopte une approche légèrement différente des contraintes
+    de type par rapport à Moose. Dans Moose, il existe un espace de noms unique et
+    plat pour les contraintes de type. Moose définit une contrainte de type appelée
+    <b>Str</b> pour les chaînes de caractères et une contrainte de type appelée
+    <b>ArrayRef</b> pour les références de tableau. Si vous souhaitez définir des
+    chaînes de caractères différemment (peut-être que vous pensez que la chaîne
+    vide ne compte pas vraiment comme une chaîne, ou peut-être que vous pensez que
+    les objets qui surchargent <span class="Li">&quot;q[&quot;&quot;]&quot;</span>
+    devraient être considérés comme des chaînes de caractères), alors vous ne pouvez
+    pas l'appeler <b>Str</b> ; vous devez choisir un nom différent.</p>
+<p class="Pp">Avec Type::Tiny, deux bibliothèques de types peuvent chacune offrir
+    une contrainte de type chaîne de caractères avec leurs propres définitions de ce
+    qui compte comme une chaîne de caractères, et vous pouvez choisir laquelle
+    importer, ou les importer toutes les deux avec des noms différents :</p>
+<pre>use Some::Types qw( Str );
+use Other::Types &quot;Str&quot; =&gt; { -as =&gt; &quot;Str2&quot; };</pre>
+<p class="Pp">Cela pourrait sembler être un petit avantage de Type::Tiny, mais là
+    où cette philosophie globale versus locale fait vraiment la différence, ce sont
+    les coercions.</p>
+<p class="Pp">Imaginons que pour une partie de votre application qui traite de la
+    lecture de données de nom d'utilisateur et de mot de passe, vous ayez besoin d'une
+    chaîne de caractères de type « nom d'utilisateur:mot de passe ». Vous
+    pourriez souhaiter accepter une référence de tableau
+    <span class="Li">&quot;[$username, $password]&quot;</span> et la contraindre
+    en une chaîne de caractères en utilisant
+    <span class="Li">&quot;join &quot;:&quot;, @$arrayref&quot;</span>. Mais une autre
+    partie de votre application traite de la lecture de fichiers journaux et souhaite
+    contraindre une chaîne de caractères à partir d'une référence de tableau en
+    utilisant <span class="Li">&quot;join &quot;\n&quot;, @$arrayref&quot;</span>. Ce
+    sont toutes deux des manières parfaitement sensées de contraindre une référence
+    de tableau. Dans Moose, une façon typique de faire cela serait :</p>
+<pre>package My::UserManager {
+  use Moose;
+  use Moose::Util::TypeConstraints;
+
+  coerce 'Str',
+    from 'ArrayRef', via { join &quot;:&quot;, @$_ };
+
+  ...;
+}
+
+package My::LogReader {
+  use Moose;
+  use Moose::Util::TypeConstraints;
+
+  coerce 'Str',
+    from 'ArrayRef', via { join &quot;\n&quot;, @$_ };
+
+  ...;
+}</pre>
+<p class="Pp">Cependant, parce que dans Moose tous les types et toutes les
+    coercions sont globaux, si ces deux classes sont chargées, une seule d'entre elles
+    fonctionnera. Une classe annulera la coercion de l'autre. Laquelle des deux
+    « gagne » dépendra de l'ordre de chargement.</p>
+<p class="Pp">Il est possible de résoudre cela avec des types natifs Moose, mais
+    cela demande un travail supplémentaire. (La solution consiste pour
+    My::UserManager et My::LogReader à créer chacun un sous-type de
+    <b>Str</b> et à définir la coercion sur ce sous-type plutôt que directement sur
+    <b>Str</b>.)</p>
+<p class="Pp">Type::Tiny résout cela de deux manières :</p>
+<dl class="Bl-tag">
+  <dt>1.</dt>
+  <dd>Type::Tiny permet aux bibliothèques de types de « protéger » leurs
+      contraintes de types pour empêcher le code externe d'ajouter de nouvelles
+      coercions.
+        <pre>$type-&gt;coercion-&gt;freeze();
+</pre>
+    <p class="Pp">Vous pouvez figer les coercions pour l'ensemble de votre bibliothèque
+        de types en utilisant :</p>
+        <pre>__PACKAGE__-&gt;make_immutable;
+</pre>
+    <p class="Pp">Si vous essayez d'ajouter des coercions à une contrainte de type
+        qui a des coercions figées, cela provoquera une erreur.</p>
+        <pre>use Types::Standard qw( Str ArrayRef );
+
+Str-&gt;coercion-&gt;add_type_coercions(
+  ArrayRef, sub { join &quot;\n&quot;, @$_ },
+);
+</pre>
+  </dd>
+  <dt>2.</dt>
+  <dd>Type::Tiny facilite le modèle mentionné ci-dessus consistant à ajouter des
+      coercions à un sous-type.
+        <pre>use Types::Standard ( Str ArrayRef );
+
+my $subtype = Str-&gt;plus_coercions(
+  ArrayRef, sub { join &quot;\n&quot;, @$_ },
+);
+</pre>
+    <p class="Pp">La méthode <span class="Li">&quot;plus_coercions&quot;</span>
+        crée un nouveau type enfant, y ajoute de nouvelles coercions, copie les
+        coercions existantes du type parent, puis fige les coercions pour le nouveau
+        type enfant.</p>
+    <p class="Pp">Le résultat final est que vous avez maintenant une « copie »
+        de <b>Str</b> qui peut contraindre à partir de <b>ArrayRef</b>, mais d'autres
+        copies de <b>Str</b> ne seront pas affectées par votre coercion.</p>
+  </dd>
+</dl>
+<section class="Ss">
+<h2 class="Ss" id='Définir_des_coercions_au_sein_des_bibliothèques_de_types'><a class='permalink' href='#Définir_des_coercions_au_sein_des_bibliothèques_de_types'>Définir des coercions au sein des bibliothèques de types</a></h2>
+<p class="Pp">Certaines coercions, comme joindre une référence de tableau pour faire
+    une chaîne de caractères, ne seront pas des coercions sur lesquelles tout le monde
+    sera d'accord. Joindre avec un saut de ligne entre eux comme ci-dessus ? Ou
+    avec deux-points, une tabulation, un espace, un autre caractère ? Cela dépend
+    beaucoup de votre application.</p>
+<p class="Pp">D'autres, comme contraindre un objet Path::Tiny à partir d'une chaîne
+    de caractères, seront probablement très évidentes. C'est ce genre de coercion
+    qu'il est logique de définir au sein de la bibliothèque elle-même afin qu'elle
+    soit disponible pour tous les packages qui utilisent la bibliothèque.</p>
+<pre>my $pt = __PACKAGE__-&gt;add_type(
+  Type::Tiny::Class-&gt;new(
+    name    =&gt; 'Path',
+    class   =&gt; 'Path::Tiny',
+  ),
+);
+
+$pt-&gt;coercion-&gt;add_type_coercions(
+  Str, q{ Path::Tiny::path($_) },
+);
+
+$pt-&gt;coercion-&gt;freeze;</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Ajuster_les_coercions_en_dehors_des_bibliothèques_de_types'><a class='permalink' href='#Ajuster_les_coercions_en_dehors_des_bibliothèques_de_types'>Ajuster les coercions en dehors des bibliothèques de types</a></h2>
+<p class="Pp">La méthode <span class="Li">&quot;plus_coercions&quot;</span> crée une
+    nouvelle contrainte de type avec des coercions supplémentaires. Si le type
+    original avait déjà des coercions, les nouvelles coercions ont une priorité plus
+    élevée.</p>
+<p class="Pp">Il existe également une méthode
+    <span class="Li">&quot;plus_fallback_coercions&quot;</span> qui fait la même
+    chose que <span class="Li">&quot;plus_coercions&quot;</span> mais ajoute les
+    nouvelles coercions avec une priorité inférieure à celle des coercions
+    existantes.</p>
+<p class="Pp">Type::Tiny::Class fournit une méthode
+    <span class="Li">&quot;plus_constructors&quot;</span> comme raccourci pour contraindre
+    via une méthode constructeur. Les deux suivants sont identiques :</p>
+<pre>Path-&gt;plus_constructors( Str, &quot;new&quot; )
+
+Path-&gt;plus_coercions( Str, q{ Path::Tiny-&gt;new($_) } )</pre>
+<p class="Pp">Pour créer une contrainte de type sans coercions existantes
+    particulières, vous pouvez utiliser
+    <span class="Li">&quot;minus_coercions&quot;</span>. Ce qui suit utilise le type
+    <b>Datetime</b> défini dans
+    Type::Tiny::Manual::Libraries, en supprimant la coercion de <b>Int</b> mais en
+    conservant les coercions de <b>Undef</b> et <b>Dict</b>.</p>
+<pre>use Types::Standard qw( Int );
+use Example::Types qw( Datetime );
+
+has start_date =&gt; (
+  is      =&gt; 'ro',
+  isa     =&gt; Datetime-&gt;minus_coercions( Int ),
+  coerce  =&gt; 1,
+);</pre>
+<p class="Pp">Il existe également une méthode <span class="Li">&quot;no_coercions&quot;</span>
+    qui crée un sous-type sans aucune coercion. C'est surtout utile soit pour créer
+    une « ardoise vierge » pour
+    <span class="Li">&quot;plus_coercions&quot;</span> :</p>
+<pre>my $Path = Path-&gt;no_coercions-&gt;plus_coercions( Str, sub { ... } );</pre>
+<p class="Pp">Soit pour désactiver les coercions pour Type::Params. Type::Params contraindra
+    toujours automatiquement un paramètre s'il existe une coercion pour ce type.</p>
+<pre>use Types::Standard qw( Object );
+use Types::Common::String qw( UpperCaseStr );
+use Type::Params qw( signature_for );
+
+signature_for set_account_name =&gt; (
+  method     =&gt; Object,
+  positional =&gt; [ UpperCaseStr-&gt;no_coercions ],
+);
+
+sub set_account_name ( $self, $name ) {
+  $self-&gt;_account_name( $name );
+  $self-&gt;db-&gt;update( $self );
+  return $self;
+}
+
+# Cela mourra au lieu de contraindre à partir de minuscules
+$robert-&gt;set_account_name( 'bob' );</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Coercions_Nommées'><a class='permalink' href='#Coercions_Nommées'>Coercions Nommées</a></h2>
+<p class="Pp">Un compromis entre la définition d'une coercion dans la bibliothèque de
+    types ou leur définition dans le package qui utilise la bibliothèque de types
+    consiste pour une bibliothèque de types à définir une collection nommée de
+    coercions qui peuvent être ajoutées facultativement à une contrainte de type.</p>
+<pre>{
+  package MyApp::Types;
+  use Type::Library
+    -extends =&gt; [ 'Types::Standard' ];
+
+  __PACKAGE__-&gt;add_coercion(
+    name              =&gt; &quot;FromLines&quot;,
+    type_constraint   =&gt; ArrayRef,
+    type_coercion_map =&gt; [
+      Str,     q{ [split /\n/] },
+      Undef,   q{ [] },
+    ],
+  );
+}</pre>
+<p class="Pp">Cet ensemble de coercions a un nom et peut être importé et utilisé :</p>
+<pre>use MyApp::Types qw( ArrayRef FromLines );
+
+has lines =&gt; (
+  is      =&gt; 'ro',
+  isa     =&gt; ArrayRef-&gt;plus_coercions( FromLines ),
+  coerce  =&gt; 1,
+);</pre>
+<p class="Pp">Types::Standard définit une coercion nommée <b>MkOpt</b> conçue pour
+    être utilisée pour <b>OptList</b>.</p>
+<pre>use Types::Standard qw( OptList MkOpt );
+my $OptList = OptList-&gt;plus_coercions( MkOpt );</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Coercions_Paramétrées'><a class='permalink' href='#Coercions_Paramétrées'>Coercions Paramétrées</a></h2>
+<p class="Pp">Les coercions nommées peuvent également être paramétrables.</p>
+<pre>my $ArrayOfLines = ArrayRef-&gt;plus_coercions( Split[ qr{\n} ] );</pre>
+<p class="Pp">Types::Standard définit les coercions paramétrables <b>Split</b> et
+    <b>Join</b>.</p>
+<p class="Pp">
+</p>
+</div>
+</section>
+
+            </article>
+            
+        </main>
+        <footer>
+            
+        </footer>
+    </body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Type::Tiny::Manual::Coercions(3pm) - Arch Linux</title>
+    <link rel="stylesheet" href="/css/arch.css"/>
+    <link rel="stylesheet" href="/css/manual.css"/>
+</head>
+<body>
+    
+    <main class="container">
+        <article>
+            
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">Type::Tiny::Manual::Coercions - Coercions</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="MANUAL"><a class="permalink" href="#MANUAL">MANUAL</a></h1>
+<p class="Pp">Viewing the source code for Types::Standard should give you hints
+    as to how they are implemented.</p>
+<section class="Ss">
+<h2 class="Ss" id="&amp;quot;Deep&amp;quot;_Coercions"><a class="permalink" href="#&amp;quot;Deep&amp;quot;_Coercions">"Deep"
+    Coercions</a></h2>
+<p class="Pp">Certain parameterized type constraints can automatically acquire
+    coercions if their parameters have coercions. For example:</p>
+<pre>ArrayRef[ Int-&gt;plus_coercions( Num, q{int($_)} ) ]</pre>
+<p class="Pp">... does what you mean!</p>
+<p class="Pp">The parameterized type constraints that do this magic include the
+    following ones from Types::Standard:</p>
+<ul class="Bl-bullet">
+  <li><b>ScalarRef</b></li>
+  <li><b>ArrayRef</b></li>
+  <li><b>HashRef</b></li>
+  <li><b>Map</b></li>
+  <li><b>Tuple</b></li>
+  <li><b>CycleTuple</b></li>
+  <li><b>Dict</b></li>
+  <li><b>Optional</b></li>
+  <li><b>Maybe</b></li>
+</ul>
+<p class="Pp">Imagine we're defining a type <b>Paths</b> in a type library:</p>
+<pre>__PACKAGE__-&gt;add_type(
+  name      =&gt; 'Paths',
+  parent    =&gt; ArrayRef[Path],
+);</pre>
+<p class="Pp">The <b>Path</b> type has a coercion from <b>Str</b>, so
+    <b>Paths</b> should be able to coerce from an arrayref of strings,
+    right?</p>
+<p class="Pp"><i>Wrong!</i> Although <b>ArrayRef[Path]</b> could coerce from an
+    arrayref of strings, <b>Paths</b> is a separate type constraint which,
+    although it inherits from <b>ArrayRef[Path]</b> has its own (currently
+    empty) set of coercions.</p>
+<p class="Pp">Because that is often not what you want, Type::Tiny provides a
+    shortcut when declaring a subtype to copy the parent type constraint's
+    coercions:</p>
+<pre>__PACKAGE__-&gt;add_type(
+  name      =&gt; 'Paths',
+  parent    =&gt; ArrayRef[Path],
+  coercion  =&gt; 1,   # inherit
+);</pre>
+<p class="Pp">Now <b>Paths</b> can coerce from an arrayref of strings.</p>
+<p class="Pp"><i>Deep Caveat</i></p>
+<p class="Pp">Currently there exists ill-defined behaviour resulting from mixing
+    deep coercions and mutable (non-frozen) coercions. Consider the
+    following:</p>
+<pre>class_type Path, { class =&gt; &quot;Path::Tiny&quot; };
+coerce Path,
+   from Str, via { &quot;Path::Tiny&quot;-&gt;new($_) };
+
+declare Paths, as ArrayRef[Path], coercion =&gt; 1;
+
+coerce Path,
+   from InstanceOf[&quot;My::File&quot;], via { $_-&gt;get_path };</pre>
+<p class="Pp">An arrayref of strings can now be coerced to an arrayref of
+    Path::Tiny objects, but is it also now possible to coerce an arrayref of
+    My::File objects to an arrayref of Path::Tiny objects?</p>
+<p class="Pp">Currently the answer is &quot;no&quot;, but this is mostly down to
+    implementation details. It's not clear what the best way to behave in this
+    situation is, and it could start working at some point in the future.</p>
+<p class="Pp">This is why you should freeze coercions.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id="Chained_Coercions"><a class="permalink" href="#Chained_Coercions">Chained
+    Coercions</a></h2>
+<p class="Pp">Consider the following type library:</p>
+<pre>package Types::Geometric {
+   use Type::Library -base, -declare =&gt; qw(
+      VectorArray
+      VectorArray3D
+      Point
+      Point3D
+   );
+   use Type::Utils;
+   use Types::Standard qw( Num Tuple InstanceOf );
+
+   declare VectorArray,
+      as Tuple[Num, Num];
+
+   declare VectorArray3D,
+      as Tuple[Num, Num, Num];
+
+   coerce VectorArray3D,
+      from VectorArray, via {
+         [ @$_, 0 ];
+      };
+
+   class_type Point, { class =&gt; &quot;Point&quot; };
+
+   coerce Point,
+      from VectorArray, via {
+         Point-&gt;new(x =&gt; $_-&gt;[0], y =&gt; $_-&gt;[1]);
+      };
+
+   class_type Point3D, { class =&gt; &quot;Point3D&quot; };
+
+   coerce Point3D,
+      from VectorArray3D, via {
+         Point3D-&gt;new(x =&gt; $_-&gt;[0], y =&gt; $_-&gt;[1], z =&gt; $_-&gt;[2]);
+      },
+      from Point, via {
+         Point3D-&gt;new(x =&gt; $_-&gt;x, y =&gt; $_-&gt;y, z =&gt; 0);
+      };
+}</pre>
+<p class="Pp">Given an arrayref <span class="Li">&quot;[1, 1]&quot;</span> you
+    might reasonably expect it to be coercible to a <b>Point3D</b> object; it
+    matches the type constraint <b>VectorArray</b> so can be coerced to
+    <b>VectorArray3D</b> and thus to <b>Point3D</b>.</p>
+<p class="Pp">However, Type::Coercion does not automatically chain coercions
+    like this. Firstly, it would be incompatible with Moose's type coercion
+    system which does not chain coercions. Secondly, it's ambiguous; in our
+    example, the arrayref could be coerced along two different paths (via
+    <b>VectorArray3D</b> or via <b>Point</b>); in this case the end result would
+    be the same, but in other cases it might not. Thirdly, it runs the risk of
+    accidentally creating loops.</p>
+<p class="Pp">Doing the chaining manually though is pretty simple. Firstly,
+    we'll take note of the <span class="Li">&quot;coercibles&quot;</span> method
+    in Type::Tiny. This method called as
+    <span class="Li">&quot;VectorArray3D-&gt;coercibles&quot;</span> returns a
+    type constraint meaning &quot;anything that can be coerced to a
+    <b>VectorArray3D</b>&quot;.</p>
+<p class="Pp">So we can define the coercions for <b>Point3D</b> as:</p>
+<pre>coerce Point3D,
+   from VectorArray3D-&gt;coercibles, via {
+      my $tmp = to_VectorArray3D($_);
+      Point3D-&gt;new(x =&gt; $tmp-&gt;[0], y =&gt; $tmp-&gt;[1], z =&gt; $tmp-&gt;[2]);
+   },
+   from Point, via {
+      Point3D-&gt;new(x =&gt; $_-&gt;x, y =&gt; $_-&gt;y, z =&gt; 0);
+   };</pre>
+<p class="Pp">... and now coercing from <span class="Li">&quot;[1,
+    1]&quot;</span> will work.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
+    ALSO</a></h1>
+<p class="Pp">Moose::Manual::BestPractices,
+    <a href="https://web.archive.org/web/20090624164256/http://www.catalyzed.org/2009/06/keeping-your-coercions-to-yourself.html">https://web.archive.org/web/20090624164256/http://www.catalyzed.org/2009/06/keeping-your-coercions-to-yourself.html</a>,
+    MooseX::Types::MoreUtils.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="NEXT_STEPS"><a class="permalink" href="#NEXT_STEPS">NEXT
+    STEPS</a></h1>
+<p class="Pp">After that last example, probably have a little lie down. Once
+    you're recovered, here's your next step:</p>
+<dl class="Bl-tag">
+  <dt>&#x2022;</dt>
+  <dd>Type::Tiny::Manual::AllTypes
+    <p class="Pp">An alphabetical list of all type constraints bundled with
+        Type::Tiny.</p>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">Toby Inkster &lt;tobyink@cpan.org&gt;.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="COPYRIGHT_AND_LICENCE"><a class="permalink" href="#COPYRIGHT_AND_LICENCE">COPYRIGHT
+    AND LICENCE</a></h1>
+<p class="Pp">This software is copyright (c) 2013-2014, 2017-2025 by Toby
+    Inkster.</p>
+<p class="Pp">This is free software; you can redistribute it and/or modify it
+    under the same terms as the Perl 5 programming language system itself.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DISCLAIMER_OF_WARRANTIES"><a class="permalink" href="#DISCLAIMER_OF_WARRANTIES">DISCLAIMER
+    OF WARRANTIES</a></h1>
+<p class="Pp">THIS PACKAGE IS PROVIDED &quot;AS IS&quot; AND WITHOUT ANY EXPRESS
+    OR IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES
+    OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.</p>
+</section>
+<div class="foot">
+  <table>
+    <tr>
+      <td class="foot-date">2025-11-02</td>
+      <td class="foot-os">perl v5.42.0</td>
+    </tr>
+  </table>
+</div>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Package information:</p>
+    <dl>
+        <dt>Package name:</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-type-tiny/">extra/perl-type-tiny</a></dd>
+        <dt>Version:</dt>
+        <dd>2.008004-1</dd>
+        <dt>Upstream:</dt>
+        <dd><a href="https://metacpan.org/release/Type-Tiny">https://metacpan.org/release/Type-Tiny</a></dd>
+        <dt>Licenses:</dt>
+        <dd>PerlArtistic, GPL</dd>
+        <dt>Manuals:</dt>
+        <dd><a href="/listing/extra/perl-type-tiny/">/listing/extra/perl-type-tiny/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table of contents</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NAME</a></li>
+        
+            <li><a href="#MANUAL">MANUAL</a></li>
+        
+            <li><a href="#SEE_ALSO">SEE ALSO</a></li>
+        
+            <li><a href="#NEXT_STEPS">NEXT STEPS</a></li>
+        
+            <li><a href="#AUTHOR">AUTHOR</a></li>
+        
+            <li><a href="#COPYRIGHT_AND_LICENCE">COPYRIGHT AND LICENCE</a></li>
+        
+            <li><a href="#DISCLAIMER_OF_WARRANTIES">DISCLAIMER OF WARRANTIES</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Other formats:
+        
+            <a href="/man/Type::Tiny::Manual::Coercions.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/Type::Tiny::Manual::Coercions.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>The website is available under the terms of the <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               license, except for the contents of the manual pages, which have their own license
+               specified in the corresponding Arch Linux package.
+            </p>
+        </footer>
+    </body>
+</html>

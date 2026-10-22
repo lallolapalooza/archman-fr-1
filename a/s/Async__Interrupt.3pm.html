@@ -1,0 +1,780 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Async::Interrupt(3pm) — Pages manuelles </title>d'Arch
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Async__Interrupt(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/perl-async-interrupt/">perl-async-interrupt</a></p>
+
+        nt
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Interrup</td>t(3)
+    <td class="head-vol">Documentation Perl contribuée par les </td>utilisateurs
+    <td class="head-rtitle">Int</td>err</tr>upt</table>(3)
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NO</a></h1>M
+<p class="Pp">Async::Interrupt - permettre aux</p> bibliothèques C/XS d'interrompr</section>e perl
+    de manière asynchrone
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSI</a></h1>S
+<pre>use Asy</pre>nc::Int</section>errupt;
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTIO</a></h1>N
+<p class="Pp">Ce module implémente une seule fonctionnalité qui n'intéresse que les
+    modules perl avancés, à savoir les interruptions asynchrones (pensez aux « signaux UNIX », qui sont très similaires)</p>.
+<p class="Pp">Parfois, les modules souhaitent exécuter du code de manière asynchrone (dans un autre
+    thread, ou depuis un gestionnaire de signaux), puis signaler à l'interpréteur perl
+    certains événements. Une méthode courante consiste à écrire des données dans un tube et à utiliser une
+    boîte à outils de gestion d'événements pour surveiller les événements d'E/S. Une autre méthode consiste à envoyer un
+    signal. Ces méthodes sont lentes et, dans le cas d'un tube, ne sont pas non plus
+    asynchrones — elles n'interrompront pas un interpréteur perl en cours </p>d'exécution.
+<p class="Pp">Ce module implémente des notifications asynchrones qui vous permettent
+    de signaler du code perl en cours d'exécution depuis un autre thread, de manière asynchrone, et
+    parfois même sans utiliser une seule </p>syscall.
+<section class="Ss">
+<h2 class="Ss" id='USAGE_SCENARIOS'><a class='permalink' href='#USAGE_SCENARIOS'>SCÉNARIOS </a></h2>D'UTILISATION
+<dl class="Bl-tag">
+  <dt id="Race"><a class="permalink" href="#Race">Gestion de signaux sans
+    condition de </a></dt>course
+  <dd>Il semble qu'il n'y ait aucun moyen de gérer les signaux sans condition de course en perl : pour attraper
+      un signal, vous devez exécuter du code Perl, et entre l'entrée dans
+      l'interpréteur <span class="Li">la fonction </span>« select » (ou d'autres
+      fonctions bloquantes) et l'exécution de la syscall select, il y a une période de temps petite mais
+      pertinente pendant laquelle les signaux seront mis en file d'attente, mais les gestionnaires de signaux perl ne seront pas
+      exécutés et la syscall bloquante ne sera pas
+      interrompue.
+    <p class="Pp">Vous pouvez utiliser ce module pour lier un signal à un rappel tout en
+        activant simultanément un tube d'événements sur lequel vous pouvez
+        <span class="Li">appeler « </span>select », éliminant complètement la condition de </p>course.
+    <p class="Pp">Cela peut être utilisé pour implémenter la gestion des signaux dans des boucles
+        d'événements, par exemple AnyEvent, POE, IO::Async::Loop,</p> </dd>etc.
+  <dt id="Background"><a class="permalink" href="#Background">Les threads d'arrière-plan
+    veulent un signalement </a></dt>rapide
+  <dd>Supposiez que vous ayez besoin d'un minutage très précis et que vous puissiez économiser un cœur de CPU supplémentaire pour
+      cela. Vous pouvez alors exécuter un thread supplémentaire qui signale votre interpréteur perl.
+      Cela signifie que vous pouvez obtenir une source de minutage très précise pendant que votre code perl effectue
+      des calculs intensifs, sans même utiliser de syscall pour communiquer entre vos
+      threads.
+    <p class="Pp">Par exemple, le serveur de jeu deliantra utilise une variante de cette
+        technique pour interrompre régulièrement les processus d'arrière-plan afin d'envoyer des mises à jour de carte
+        aux clients </p>du jeu.
+    <p class="Pp">Ou EV::Loop::Async utilise un objet interrupt pour réveiller perl
+        lorsque de nouveaux événements sont </p>arrivés.
+    <p class="Pp">IO::AIO et BDB pourraient égalemen</p>t utiliser cela pour accélérer le </dd>signalement des
+        résultats.
+  <dt id="Speedy"><a class="permalink" href="#Speedy">Invocation rapide de la
+    boucle </a></dt>d'événements
+  <dd>On pourrait utiliser ce module, par exemple dans Coro, pour interrompre un coro-thread en cours d'exécution
+      et le forcer à entrer dans la boucle d'événements.
+    <p class="Pp">Ou on pourrait se lier à <span class="Li">« SIGIO »
+        et indique</span>r à certains sockets importa</p>nts d'envoyer ce signal, pro</dd>voquant l'entrée dans la
+   </dl>     boucle d'événements pou</section>r réduire la latence réseau.
+<section class="Ss">
+<h2 class="Ss" id='HOW_TO_USE'><a class='permalink' href='#HOW_TO_USE'>COMMENT </a></h2>L'UTILISER
+<p class="Pp">Vous pouvez utiliser ce module en créant un
+    <span class="Li">objet « Async::Interrupt </span>» pour chaque source
+    d'événements de ce type. Cet objet stocke un rappel au niveau perl et/ou au niveau C qui est
+    invoqué lorsque l' <span class="Li">objet « Async::Interrupt </span>»
+    reçoit un signal. Il est exécuté à la prochaine fois où l'interpréteur perl est
+    en cours d'exécution (c'est-à-dire qu'il interrompra un calcul, mais pas une fonction XS ou une
+    syscall)</p>.
+<p class="Pp">Vous pouvez signaler l'
+    <span class="Li">objet « Async::</span>Interrupt » soit en
+    appelant sa <span class="Li">méthode « </span>-&gt;signal », ou,
+    plus couramment, en appelant une fonction C. Il existe également la source de signaux intégrée (POSIX)</p>.
+<p class="Pp">La <span class="Li">« -&gt;signal_func </span>» renvoie
+    l'adresse de la fonction C qui doit être appelée (plus un argument à utiliser pendant
+    l'appel). La fonction de signalement prend également un argument entier
+    dans la plage SIG_ATOMIC_MIN à SIG_ATOMIC_MAX (garantissant au moins 0..127)</p>.
+<p class="Pp">Étant donné que ce type d'interruption est rapide, mais ne peut interrompre qu'un
+    <i>interpréteur </i>en cours d'exécution, il existe une prise en charge facultative pour signaler un
+    tube — cela signifie que vous pouvez également attendre que le tube devienne lisible (par exemple via EV
+    ou AnyEvent). Cela entraîne bien sûr le surcoût d'un
+    <span class="Li">syscall </span>« read » et
+    <span class="Li">« </span>wr</p>it</section>e </section>».
+<section class="Sh">
+<h1 class="Sh" id='USAGE_EXAMPLES'><a class='permalink' href='#USAGE_EXAMPLES'>EXEMPLES </a></h1>D'UTILISATION
+<section class="Ss">
+<h2 class="Ss" id='Implementing_race-free_signal_handling'><a class='permalink' href='#Implementing_race-free_signal_handling'>Implémentation de la gestion de signaux sans condition de </a></h2>course
+<p class="Pp">Cet exemple utilise un seul tube d'événements pour tous les signaux, et un
+    Async::Interrupt par signal. Ce code est en fait celui que le module AnyEvent utilise
+    lui-même lorsque Async::Interrupt est </p>disponible.
+<p class="Pp">D'abord, créez le tube d'événements et intégrez-le dans la boucle </p>d'événements
+<pre>$SIGPIPE = new Async::Interrupt::EventPipe;
+$SIGPIPE_W = AnyEvent-&gt;io (
+   fh   =&gt; $SIGPIPE-&gt;fileno,
+   poll =&gt; "r",
+   cb   =&gt; \&amp;_signal_check, # défini plus tard
+)</pre>;
+<p class="Pp">Ensuite, pour chaque signal à intercepter, créez un objet Async::Interrupt.
+    Le rappel définit simplement une variable globale, car nous ne sommes intéressés que par
+    les signaux synchrones (c'est-à-dire lorsque la boucle d'événements interroge), ce qui explique pourquoi le
+    vidange du tube n'est pas effectuée automatiquement</p>.
+<pre>my $interrupt = new Async::Interrupt
+   cb             =&gt; sub { undef $SIGNAL_RECEIVED{$signum} },
+   signal         =&gt; $signum,
+   pipe           =&gt; [$SIGPIPE-&gt;filenos],
+   pipe_autodrain =&gt; 0,
+</pre>;
+<p class="Pp">Enfin, le rappel d'E/S pour le tube d'événements gère les
+  signaux </p>:
+<pre>sub _signal_check {
+   # vider d'abord le tube
+   $SIGPIPE-&gt;drain;
+   # deux boucles, juste pour être sûr
+   while (%SIGNAL_RECEIVED) {
+      for (keys %SIGNAL_RECEIVED) {
+         delete $SIGNAL_RECEIVED{$_};
+         warn "signal $_ received\n";
+      }
+   }</pre>
+</section>}
+<section class="Ss">
+<h2 class="Ss" id='Interrupt_perl_from_another_thread'><a class='permalink' href='#Interrupt_perl_from_another_thread'>Interrompre perl depuis un autre </a></h2>thread
+<p class="Pp">Cet exemple interrompt l'interpréteur Perl depuis un autre thread,
+    via l'API XS. C'est utilisé par, par exemple, le module EV::Loop::</p>Async.
+<p class="Pp">Au niveau Perl, un nouvel objet boucle (qui contient le thread)
+    est créé, en appelant d'abord un constructeur XS, en interrogeant la fonction de rappel au niveau C et en la passant en tant que
+    <span class="Li">« c_cb </span>» au constructeur Async::Interrupt </p>:
+<pre>my $self = XS_thread_constructor;
+my ($c_func, $c_arg) = _c_func $self; # renvoie le rappel c
+my $asy = new Async::Interrupt c_cb =&gt; [$c_func, $c_arg]</pre>;
+<p class="Pp">Ensuite, l'objet Interrupt nouvellement créé est interrogé pour la
+    fonction de signalement que le thread nouvellement créé doit appeler, et celle-ci est
+    à son tour transmise à l'objet thread </p>:
+<pre>_attach $self, $asy-&gt;</pre>signal_func;
+<p class="Pp">Pour résumer : d'abord l'objet XS est créé, puis il est interrogé
+    pour le rappel qui doit être appelé lorsque l'objet Interrupt reçoit
+    un </p>signal.
+<p class="Pp">Ensuite, l'objet interrupt est interrogé pour la fonction de rappel
+    que le thread doit appeler pour signaler l'objet Interrupt, et ce
+    rappel est ensuite attaché au </p>thread.
+<p class="Pp">Vous devez faire attention à ce que votre nouveau thread ne signale pas
+    avant que la fonction de signalement ait été configurée, par exemple en démarrant le
+    thread d'arrière-plan uniquement à l'intérieur de
+  <span class="Li">« _attach </span>»</p>.
+<p class="Pp">Cela conclut la partie </p>Perl.
+<p class="Pp">La partie XS se compose du constructeur réel qui crée un
+    thread, ce qui n'est pas pertinent pour cet exemple, et de deux fonctions,
+    <span class="Li">« _c_func </span>», qui renvoie le rappel côté Perl,
+    et <span class="Li">« _attach »</span>, qui configure
+    la fonction de signalement qui est sûre à appeler depuis un autre thread. Pour
+    simplifier, nous utiliserons des variables globales pour stocker les fonctions ; normalement,
+    vous les attacheriez d'une certaine manière à <span class="Li">$sel</span>f</p>.
+<p class="Pp">La <span class="Li">« c_func </span>» renvoie simplement
+    l'adresse d'une fonction statique et arrange les choses pour que l'objet pointé par
+    <span class="Li">$self </span>lui soit transmis, en tant qu'entier </p>:
+<pre>void
+_c_func (SV *loop)
+        PPCODE:
+        EXTEND (SP, 2);
+        PUSHs (sv_2mortal (newSViv (PTR2IV (c_func))));
+        PUSHs (sv_2mortal (newSViv (SvRV (loop))))</pre>;
+<p class="Pp">Ceci serait le rappel (puisqu'il s'exécute dans un contexte Perl
+    normal, il est permis de manipuler des valeurs Perl) :&gt;
+<pre>static void
+c_func (pTHX_ void *loop_, int value)
+{
+  SV *loop_object = (SV *)loop_;
+  ...
+}
+</pre>Et
+<p class="Pp">ceci attache le rappel de signalisation :
+</p>static
+<pre>void (*my_sig_func) (void *signal_arg, int value);
+static void *my_sig_arg;
+void
+_attach (SV *loop_, IV sig_func, void *sig_arg)
+        CODE:
+{
+        my_sig_func = sig_func;
+        my_sig_arg  = sig_arg;
+        /* now run the thread */
+        thread_create (&amp;u-&gt;tid, l_run, 0);
+}
+Et
+"l_run" (le </pre>thread
+<p class="Pp">d <span class="Li">'arrière-plan)</span>
+    finirait par appeler la fonction de signalisation :
+</p>my_sig_func
+<pre>(my_sig_arg, 0);
+Vous pouvez </pre>consulter
+<p class="Pp">EV::Loop::Async pour un exemple</p> réel utilisant
+    la communic</section>ation entre threads, le verrou</section>illage, etc.
+LA   CLASSE Async:
+<section class="Sh">
+<h1 class="Sh" id='THE_Async::Interrupt_CLASS'><a class='permalink' href='#THE_Async::Interrupt_CLASS'>:Interrupt
+$async = new </a></h1>Async:
+<dl class="Bl-tag">
+  <dt>:Interrupt key =&gt; value...
+Crée un nouvel </dt>objet
+  <dd>Async::Interrupt. Vous ne pouvez utiliser les
+      notifications asynchrones sur cet objet que pendant qu'il existe, vous
+      devez donc conserver une référence à celui-ci en permanence tant qu'il
+    <p class="Pp">est utilisé.
+Les arguments de constructeur facultatifs incluent (normalement vous <span class="Li">spécifierez </span>au moins
+        <span class="Li">l'</span>un </p>de</dd>
+"c</dl>b"
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="cb"><a class="permalink" href="#cb">ou
+"c_cb").
+cb =&gt;
+    </a></dt>$coderef-&gt;
+  <dd>($value)
+Enregistre un rappel perl à invoquer chaque fois que l'interruption
+      asynchrone est
+    <p class="Pp">signalée.
+Notez que, puisque ce rappel peut être invoqué à peu près à tout
+        moment, il ne doit modifier aucune variable globale bien connue telle
+        <span class="Li">que
+</span>$/ sans les restaurer avant de
+        retourner.
+Les </p>exceptions
+    <p class="Pp">sont
+$! et
+$@, <span class="Li">qui </span>sont sauvegardées
+        <span class="Li">et </span>restaurées par
+        Async::Interrupt.
+Si le rappel </p>doit
+    <p class="Pp">lever une exception, celle-ci sera
+        capturée, et
+$Async::Interrupt::DIED sera <span class="Li">appelée avec
+$@ </span>contenant l'exception. Par <span class="Li">défaut,</span> elle fera simplement un
+"warn" concernant le <span class="Li">message et co</span>ntinuera.
+c_c</p>b =&gt; [$c_func</dd>,
+    $c_arg]
+  <dt id="c_cb"><a class="permalink" href="#c_cb">Enregistre un rappel C à </a></dt>invoquer
+  <dd>chaque fois que l'interruption
+      asynchrone est signalée.
+Le rappel C doit avoir le prototype
+    <p class="Pp">suivant :
+void c_func (pTHX_ void *c_arg, int </p>value);
+Tant
+        <pre>$c_func que
+$c_arg doivent être spécifiés </pre>comme
+    <p class="Pp">des <span class="Li">entiers/IV,</span> et
+$value
+        <span class="Li">est la
+</span>"value" passée à un appel précédent à
+        soit
+        <span class="Li">$signal </span>ou la fonction
+        <span class="Li">"signal_func".</span>
+Notez que, parce que le rappel peut être <span class="Li">invoqué </span>à peu près à tout
+        <span class="Li">moment, </span>vous </p>devez
+    <p class="Pp">faire attention à sauvegarder et restaurer les
+        variables globales que Perl pourrait utiliser (l'exception est
+"errno", qui est sauvegardée et restaurée
+        par Async::Interrupt). Le rappel
+        <span class="Li">lui-même </span>s'exécute dans le contexte
+        perl, vous pouvez donc appeler n'importe quelles fonctions perl et
+        modifier n'importe quelles structures de données perl (auquel cas les
+        exigences énoncées pour
+"cb" s'appliquent également).
+var =&gt; $scalar_ref
+Lorsqu'il
+        <span class="Li">est sp</span>écifié</p>, l'ar</dd>gument
+  <dt id="var"><a class="permalink" href="#var">donné doit être </a></dt>une
+  <dd>référence à un
+      scalaire. Le scalaire sera défini à
+0 initialement. Signaler
+      l'objet d'interruption <span class="Li">le </span>définira à la valeur passée, le traitement de
+      l'interruption le réinitialisera à
+0.
+Notez que la seule chose que vous êtes légalement <span class="Li">a</span>utorisé
+    <p class="Pp">à faire est
+        de vérifier la variable dans un contexte booléen ou entier (par ex. la
+        comparer avec une chaîne, ou l'afficher, la
+détruira et pourrait faire
+        planter votre programme <i>ou pire).
+signal =&gt;</i>
+    $signame_or_va</p>lue
+Lorsque ce para</dd>mètre est spécifié,
+  <dt id="signal"><a class="permalink" href="#signal">Async::Interrupt </a></dt>interceptera
+  <dd>le
+      signal donné, c'est-à-dire qu'il appellera effectivement
+"-&gt;signal (0)" chaque fois que le signal
+      donné est capté par le processus.
+      <span class="Li">Seul un async </span>peut intercepter un signal donné, et le signal sera
+    <p class="Pp">restauré à ses valeurs par défaut lorsque l'objet Asyn</p>c::Interrupt sera
+      détruit.
+signal_hysteresis
+   </dd> =&gt; $boolean
+Définit l'état initial de l'hystérésis du
+  <dt id="signal_hysteresis"><a class="permalink" href="#signal_hysteresis">signal, voir la
+méthode "signal_hysteres</a></dt>is",
+  <dd>ci-dessous.
+pipe =&gt;
+    [$fileno_or_fh_for_reading,
+      <span class="Li">$fileno_or_fh_for_writing]</span>
+</dd>Spécifie
+  <dt id="pipe"><a class="permalink" href="#pipe">deux descripteurs de fichier (ou handles de fichier) qui
+      doivent </a></dt>être
+  <dd>signalés chaque fois que l'interruption asynchrone est
+      signalée. Cela signifie qu'un octet y sera écrit, et avant que le rappel
+      ne soit invoqué, il sera relu. En raison des conditions de course, il est
+      peu probable mais possible que plusieurs octets soient écrits. Il est
+      requis que les handles de fichier soient tous deux en mode non bloquant.
+L'objet conservera une référence aux handles de fichier.
+    <p class="Pp">Cela peut être utilisé pour s'assurer que les </p>notifications
+    <p class="Pp">asynchrones
+        interrompront également les frameworks d'événements.
+Notez que
+"Async::</p>Interrupt"
+    <p class="Pp">créera <span class="Li">automatiquement un </span>fd de signal approprié lorsque votre programme
+        en demande un, vous n'avez donc pas à spécifier cet argument lorsque
+        tout ce que vous voulez est un descripteur de fichier supplémentaire à
+        </p>surveiller.
+    <p class="Pp">Si vous souhaitez partager un seul pipe d'événements entre plusieurs
+        objets Async::Interrupt, vous pouvez utiliser
+        <span class="Li">la
+classe "Async</span>::Interrupt::Eve</p>ntPipe" pour
+  </dd>      les gérer.
+  <dt id="pipe_autodrain"><a class="permalink" href="#pipe_autodrain">pipe_autodrain
+    =&gt; $boolean
+</a></dt>Définit
+  <dd>l'état initial d'autodrainage, voir la
+méthode
+      <span class="Li">"pipe_aut</span>odrain", </dd>ci-desso</dl>us.
+($sig</div>nal_func,
+<dl class="Bl-tag">
+  <dt>$signal_arg) = $async-&gt;signal_func
+Renvoie </dt>l'adresse
+  <dd>d'une fonction à appeler de manière asynchrone. La
+      fonction a le prototype suivant et doit recevoir le
+$signal_arg spécifié, qui est un
+"void *"
+      <span class="Li">converti en
+</span>"IV" :
+void (*signal_func)
+      <span class="Li">(void </span>*signal_arg,
+      <span class="Li">int </span>value)
+Un
+        <pre>exemple d'appel ressemblerait à :
+signal_func </pre>(signal_arg,
+    <p class="Pp">0);
+La fonction peut être appelée </p>en toute
+        <pre>sécurité depuis les contextes </pre>de
+    <p class="Pp">signal et de thread, à tout moment. La
+"value" spécifiée est passée à la fois
+        aux rappels C et Perl.
+        <span class="Li">$value </span>doit être dans la plage valide pour
+        un
+</p>"sig_atomic_t",
+    <p class="Pp"><span class="Li">sauf
+</span>0 (1..127 est portable).
+Si la fonction <span class="Li">est appelée </span>alors que l'objet
+        <span class="Li">Async:</span>:Interrupt est </p>déjà
+    <p class="Pp">signalé mais avant que les rappels ne soient exécutés, alors la
+        "value" stockée est soit l'ancienne soit
+        la nouvelle. En raison de la nature <span class="Li">asynchrone </span>du code, la
+"value" peut même être passée à deux
+        invocations consécutives du rappel.
+$address =
+        <span class="Li">$async-&gt;c_var
+Renvoie l'</span>adresse (convertie en I</p>V) d'une
+variable "IV".</dd> La variable est définie
+  <dt>à
+0 initialement et </dt>est
+  <dd>définie à la valeur
+      passée chaque fois que
+      <span class="Li">l'objet </span>est signalé, et réinitialisée à
+0
+      <span class="Li">une </span>fois l'interruption traitée.
+Notez qu'il est souvent bénéfique d'appeler simplement
+"PERL_ASYNC_CHECK <span class="Li">()</span>" pour traiter les
+        interruptions.
+Exemple
+    <p class="Pp">: appeler une fonction XS pour stocker l'adresse, puis
+        <span class="Li">afficher
+        du </span>code C l'attendant.
+my_xs_func </p>$async-&gt;
+    <p class="Pp">c_var;
+static IV *valuep;
+void
+my_xs_func (void *addr)
+        CODE:
+        valuep = (IV *)addr;
+</p>// code in
+        <pre>a loop, waiting
+while (!*valuep)
+  ; // do something
+$async-&gt;signal</pre> ($value=1)
+Cela signale l'objet async donné depuis le code Perl. </dd>Semi-évidemment,
+      cela déclenchera instantanément l'invocation
+  <dt>du rappel (cela ne </dt>fait
+  <dd>pas, comme le nom pourrait le laisser croire, quoi que ce soit avec les
+      signaux POSIX).
+$value doit être dans la plage valide pour
+        un
+"sig_atomic_t", sauf
+0 (1..127 est portable).
+$async-&gt;handle
+Appelle
+    <p class="Pp"><span class="Li">le </span>rappel si l'objet est en attente.
+Cette méthode <span class="Li">n'a pas besoin </span>d'être appelée
+        <span class="Li">normal</span>ement, </p>car ell</dd>e sera
+  <dt>invoqué</dt>e
+  <dd>automatiquement. Cependant, elle peut être utilisée pour
+    <p class="Pp">forcer
+        le traitement des interruptions en attente pendant que l'objet est
+        bloqué.
+Une raison pour laquelle on pourrait vouloir le faire est lorsque vous
+        voulez passer des </p>interruptions
+    <p class="Pp">asynchrones à des interruptions
+        synchrones, en utilisant par ex. une boucle d'événements. Pour ce faire,
+        on d'abord
+"$async-&gt;block" l'objet
+        d'interruption, puis enregistrer un observateur
+        <span class="Li">de lecture sur </span>le
+"pipe_fileno" qui appelle
+"$async-&gt;handle".
+Cela désactive les interruptions
+        <span class="Li">asynchrones,</span> mais garantit que
+        <span class="Li">les
+    </span>    inter</p>ruptions
+    <p class="Pp">sont traitées par la boucle d'événements</p>.
+$async-&gt;signal_hysteresis ($enable)
+Ac</dd>tive ou désactive l'hystérésis du signal
+  <dt>(par défaut : désactivé).
+      Si </dt>un
+  <dd>signal POSIX est utilisé comme source de signal pour l'objet
+      d'interruption, alors l'activation de l'hystérésis du signal fait que
+      Async::Interrupt réinitialise l'action du signal à
+"SIG_IGN" dans le gestionnaire de signal et
+      le
+      <span class="Li">restaure </span>juste avant de traiter l'interruption.
+Lorsque vous attendez beaucoup de signaux (par ex.
+    <p class="Pp">lors de l'utilisation
+        de SIGIO), l'activation de l'hystérésis du signal peut réduire
+        considérablement le nombre d'invocations du gestionnaire, au prix de
+        deux appels système </p>supplémentaires.
+    <p class="Pp">Notez que définir le signal à
+"SIG_IGN"
+        <span class="Li">peut avoir des effets de bord
+        indés</span>irables lorsque vous fork et exec d'autres </p>programmes, car ils
+        n'attendent sou</dd>vent pas que les signaux soient ignorés par
+  <dt>défaut.
+</dt>$async-&gt;
+  <dd></dd>
+  <dt>block
+$async-&gt;</dt>unblock
+  <dd>Parfois vous avez besoin d'une "section critique" de code qui ne sera
+      pas interrompue par un Async::Interrupt. Cela peut être implémenté en
+      <span class="Li">appelant
+"$async-&gt;</span>block" avant la section
+      critique, et <span class="Li">"$async-&gt;unblock"
+</span>      après.
+Notez qu'il
+    <p class="Pp">doit y avoir exactement un appel à
+"unblock" pour chaque
+        <span class="Li">appel </span>précédent à
+"block" (c.-à-d. les appels
+        <span class="Li">peuvent </span>être
+        imbriqués)</p>.
+    <p class="Pp">Puisque garantir cela en présence d'exceptions et de threads est
+        généralement plus difficile que vous ne l'imaginez, je recommande d'utiliser
+        <span class="Li">"$async-</span>&gt;scoped_b</p>lock" à l</dd>a place.
+  <dt>$async-&gt;scope_block
+</dt>Cet
+  <dd>appel <span class="Li">"$async-&gt;block" </span>et
+      installe un gestionnaire qui est appelé lorsque la portée courante est quittée (via une
+      exception, en annulant le thread Coro, en appelant last/goto
+    <p class="Pp">etc.).
+C'est la manière recommandée (et la plus rapide) d'implémenter
+     </p>   </dd>des
+  <dt>sections critiques.
+($block_func, $block_arg) = </dt>$async-&gt;
+  <dd>scope_block_func
+Renvoie l'adresse d'une fonction qui implémente
+      <span class="Li">la
+       </span> fonctionnalité
+    <p class="Pp">"scope_block".
+Elle a le prototype suivant et doit recevoir le
+        $block_arg <span class="Li">spécifié,</span>
+qui est un
+"void
+        <span class="Li">*" </span>converti en
+"IV" :
+        <span class="Li">void (</span>*block</p>_func)
+        <pre>(void *block_arg)
+Un exemple </pre>d'appel
+    <p class="Pp">ressemblerait à :
+block_func </p>(block_arg);
+        <pre>La fonction ne peut </pre>être
+    <p class="Pp">appelée en toute sécurité que depuis le niveau supérieur
+        d'une fonction XS perl et appellera
+"LEAVE" et
+        <span class="Li">"ENTER" </span>(dans cet
+        <span class="Li">ordre !</span>).
+$asy</p>nc-&gt;pipe</dd>_enable
+  <dt>$async-&gt;</dt>pipe_disable
+  <dd></dd>
+  <dt>Active/désactive </dt>la
+  <dd>signalisation du pipe lorsque l'interruption se produit (par défaut
+      activé). Écrire dans un pipe est relativement coûteux, il peut donc être désactivé
+      lorsque vous savez que vous n'attendez pas sur lui (par exemple, avec EV vous pourriez
+      désactiver le pipe dans un watcher check, et l'activer dans un
+    <p class="Pp">watcher prepare).
+Notez que
+        <span class="Li">actuellement, pendant que
+"pipe_disable" est</span> en vigueur, aucune
+        tentative de lect</p>ure depuis le pipe ne sera faite lors du trai</dd>tement des événements. Cela
+        pourrait
+  <dt>changer dès que je réaliserai </dt>pourquoi
+  <dd>c'est une erreur.
+$fileno = $async-&gt;pipe_fileno
+Renvoie le côté lecture du pipe de signalisation. Si aucun pipe de signalisation n'est
+    <p class="Pp">actuellement attaché à l'objet, il en créera dynamiquement un.
+Notez que la seule opération valide sur ce descripteur de fichier est
+        d'attendre qu'il soit lisible. Le fd pourrait actuellement appartenir à un pipe, une <span class="Li">socket </span>tcp, </p>ou </dd>un
+  <dt>eventfd, selon la plateforme, et </dt>est
+  <dd>garanti<span class="Li">d'être
+</span>sélectionnable<span class="Li">("select"able)</span>.
+$async-&gt;pipe_autodrain ($enable)
+Active (
+1) ou désactive
+      (
+[[ 30]] 0) le vidage automatique du pipe (par défaut :
+      activé). Lorsque le vidage automatique est activé, Async::Interrupt
+    <p class="Pp">videra automatiquement le pipe. S</p>inon, l'utilisateur est responsabl</dd>e de ce
+      vidage.
+C'est utile
+  <dt>lorsque vous </dt>souhaitez
+  <dd>partager un pipe entre de nombreux
+        objets Async::Interrupt.
+$async-&gt;pipe_drain
+Vide le pipe </dd>manuellement,
+  <dt>par </dt>exemple
+  <dd>lorsque le vidage automatique est désactivé. Ne fait
+      rien si aucun pipe n'est activé.
+$async-&gt;post_fork
+L'objet ne sera normalement pas utilisable après un fork (car le fd du pipe est
+      partagé entre les processus). Appeler cette méthode après un fork dans l'enfant
+    <p class="Pp">garantit que l'objet fonctionnera à nouveau comme prévu. Il n'a besoin </p>d'être
+    <p class="Pp">appelé que lorsque l'objet asy</p>nc est utilisé dans l'enfant.
+</dd>Cela ne fonctionne que lorsque
+  <dt>le pipe a été créé par
+      Async::Interrupt.
+Async:</dt>:
+  <dd></dd>
+  <dt>Interrupt garantit que le descripteur de fichier de </dt>lecture
+  <dd>ne
+        change pas de valeur.
+$signum = Async::Interrupt::sig2num $signame_or_number
+$signame = Async::Interrupt::sig2name $signame_or_number
+Ces deux fonctions de commodité convertissent simplement un nom ou un numéro de
+    <p class="Pp">signal en
+      le <span class="Li">nom ou l</span>e numéro</p> corresp</dd>ondant. E</dl>lles ne </section>sont pas
+<section class="Sh">
+<h1 class="Sh" id='THE_Async::Interrupt::EventPipe_CLASS'><a class='permalink' href='#THE_Async::Interrupt::EventPipe_CLASS'>utilisées par ce module et
+      </a></h1>existent
+<p class="Pp">simplement parce que perl n'a pas de bonne façon de le faire lui-même.
+Elles renverront
+"undef" pour
+        les noms ou numéros illégaux.
+LA   CLASSE Async::Interrupt::EventPipe
+Les pipes sont l'utilitaire principal
+    <span class="Li">pour </span>rendre </p>les
+<p class="Pp">signaux asynchrones
+    synchrones. Cependant, les pipes sont difficiles à obtenir : ils n'existent pas sur la
+    plateforme Windows défectueuse, et sur les systèmes GNU/Linux, vous pourriez vouloir utiliser un
+"eventfd" à la </p>place.
+<dl class="Bl-tag">
+  <dt>Cette classe crée des pipes </dt>d'événements
+  <dd>sélectionnables de manière portable :
+    sur windows, elle essaiera de créer une paire de </dd>sockets
+  <dt>tcp, sur GNU/Linux, elle
+    </dt>essaiera
+  <dd>de créer un eventfd et partout ailleurs elle essaiera d'utiliser un pipe
+    <p class="Pp">normal.
+$epipe = new Async::Interrupt::EventPipe
+Cela crée et renvoie un objet eventpipe. Cet objet est simplement une
+      référence </p>de tableau
+        <pre>bénie :
+($r_fd, $w_fd) = $epipe-&gt;filenos
+Renvoie le descripteur de fichier côté lecture et le descripteur de fichier côté écriture.
+Exemple : passer un objet eventpipe comme </pre>pipe </dd>au
+  <dt>constructeur </dt>Async:
+  <dd>:Interrupt, et créer un watcher </dd>AnyEvent
+  <dt>pour </dt>le
+  <dd>côté lecture.
+my $epipe = new Async::Interrupt:</dd>:
+  <dt>EventPipe;
+my </dt>$asy =
+  <dd>new Async::Interrupt </dd>pipe
+  <dt>=&gt; [$epipe-&gt;filenos];
+my $iow = </dt>AnyEvent-&gt;
+  <dd></dd>
+  <dt>io (fh =&gt; $epipe-&gt;fileno, poll =&gt; </dt>'r',
+  <dd>cb =&gt; sub { });
+$r_fd = $epipe-&gt;fileno
+Renvoie uniquement
+      <span class="Li">le côté </span>lecture/écoute.
+$epipe-&gt;signal
+Écrire quelque chose <span class="Li">dans le pipe, </span>de manière <span class="Li">portable.
+$epipe-&gt;</span>drain
+Vider (vider complètement) le pipe.
+    <p class="Pp">($c_func, $c_arg) = $epipe-&gt;signal_func
+($c_func, $c_arg) = $epipe-&gt; <span class="Li">drain_func
+</span>Ces deux méthodes
+        <span class="Li">renvoient </span>un pointeur de
+        <span class="Li">fonct</span>ion </p>et un
+        <pre>argument "void *" qui peut être </pre>appelé
+    <p class="Pp">pour
+      avoir l'effet de
+</p>"$epipe-&gt;
+        <pre>signal"
+ </pre>     ou
+</dd>"$epipe-&gt;
+  <dt>drain"</dt>,
+  <dd>respectivement, au
+      niveau XS.
+Tous deux ont le prototype suivant et doivent recevoir
+        leur
+$c_arg, qui est un
+"void *" converti en
+"IV" :
+void (*c_func) </dd>(void
+  <dt>*c_arg)
+</dt>Un
+  <dd>exemple d'appel ressemblerait à :
+c_func (c_a</dd>rg);
+$epipe-&gt;renew
+Recrée le pipe (généraleme</dl>nt requis dans l'enfant après un fork). Le
+   </section>   côté lecture ne changera pas son numéro de
+<section class="Sh">
+<h1 class="Sh" id='IMPLEMENTATION_DETAILS_AND_LIMITATIONS'><a class='permalink' href='#IMPLEMENTATION_DETAILS_AND_LIMITATIONS'>descripteur de fichier, mais le </a></h1>côté
+<p class="Pp">écriture pourrait le changer.
+$epipe-&gt;wait
+Cette méthode bloque le processus jusqu'à ce qu'il y ait des événements sur le pipe. </p>Ce
+<p class="Pp">n'est
+      pas une manière très événementielle ou élégante d'utiliser un pipe d'événements, mais cela peut être
+      occasionnellement utile.
+DÉTAILS   D'IMPLÉMENTATION ET LIMITATIONS
+Ce module fonctionne en "détournant" SIGKILL, qui est
+    garanti d'exister toujours, mais qui ne peut pas non plus être </p>intercepté,
+<p class="Pp">et est donc <span class="Li">toujou</span>rs
+    <span class="Li">disp</span>onible.
+    <span class="Li">Fondamentale</span>ment, ce mod</p>ule simule </section>l'occurrence
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'></a></h1>d
+<pre>'un signal SIGK</pre>ILL et
+    inte</section>rcepte ensuite</div> l'interpréteur
+<table class="foot">
+  <tr>
+    <td class="foot-date">qui le </td>traite.
+    <td class="foot-os">Cela r</td>end l</tr>e trai</table>tement</section> norm</article>al des
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>signaux plus lent </p>(probablement
+    <dl>
+        <dt>de manière </dt>non
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/perl-async-interrupt/">mesurable, cependant), mais a </a></dd>l'avantage
+        <dt>de
+   </dt> ne pas
+        <dd>nécessiter </dd>de
+        <dt>fonction </dt>runops
+        <dd><a href="https://metacpan.org/release/Async-Interrupt">spéciale, ni de ralentir un peu l'exécution </a></dd>normale de
+        <dt>perl.
+Il </dt>suppose
+        <dd>que
+"sig_atomic_t",</dd>
+"int"
+        <dt>et
+"IV" </dt>sont tous
+        <dd><a href="/listing/extra/perl-async-interrupt/">modifiable</a></dd>s de maniè</dl>re asynch</section>rone sûre.
+
+<details>
+    <summary>AUTEUR
+Marc </summary>Lehmann
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">&lt;schmorp@schmorp.</a></li>de&gt;
+http:
+        
+            <li><a href="#SYNOPSIS">//home.</a></li>schmorp.de/
+2025-07-14
+        
+            <li><a href="#DESCRIPTION">perl v5.42.</a></li>0
+Informations sur le
+        
+            <li><a href="#USAGE_EXAMPLES">paquet :
+</a></li>Nom du paquet :
+        
+            <li><a href="#THE_Async::Interrupt_CLASS">extra/perl-async-interrupt
+</a></li>Version :
+1.26-8
+Amont :
+https:
+        
+            <li><a href="#THE_Async::Interrupt::EventPipe_CLASS">//metacpan.org/release/Async-Interrupt
+</a></li>Licences :
+PerlArtistic,
+        
+            <li><a href="#IMPLEMENTATION_DETAILS_AND_LIMITATIONS">GPL
+Manuels :
+/listing/extra/perl-a</a></li>sync-interrupt/
+Table
+        
+            <li><a href="#AUTHOR">des mat</a></li>ières
+NO</ul>M
+SYNOP</nav>SIS
+DESC</details>RIPTION
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>EXEMPLES D'UTILISATION
+LA CLASSE
+        
+            <a href="/man/Async::Interrupt.3pm.en.txt">Async:</a>:Interrupt
+LA CLASSE 
+        
+            <a href="/man/Async::Interrupt.3pm.en.raw">Async::In</a>terrupt::</p>EventPipe
+</nav>DÉTAILS D</aside>'IMPLÉMEN</main>TATION ET
+        <footer>
+            la conversion
+            <p>des pages de manuel.
+Le site web est <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">disponible selon les termes de la
+</a>licence GPL-3.0
+               , </p>sauf pour le contenu des pages de </footer>manuel, qui ont leur propre licenc</body>e
+               spécifiée dans l</html>e paquet Arch Linux correspondant.

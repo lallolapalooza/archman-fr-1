@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Net::DNS::SEC::Validator(3pm) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Net__DNS__SEC__Validator(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/dnssec-tools/">dnssec-tools</a></p>
+<p class="lic">Licences: BSD</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Validator(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">Validator(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Net::DNS::SEC::Validator - interface vers libval(3) et constantes, structures et fonctions associées</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<pre>use Net::DNS::SEC::Validator;
+use Net::DNS::Packet;
+use Net::hostent;
+use Net::addrinfo;
+use Socket qw(:all);
+sub callback {
+}
+my $validator = new Net::DNS::SEC::Validator(policy =&gt; &quot;:&quot;);
+$validator.map_ns(&quot;dnssec-tools.org&quot;, &quot;127.0.0.1&quot;);
+my (@r) = $validator-&gt;getaddrinfo(&quot;good-A.test.dnssec-tools.org&quot;);
+my $r = $validator-&gt;res_query(&quot;dnssec-tools.org&quot;, &quot;IN&quot;, &quot;MX&quot;);
+my $h = $validator-&gt;gethostbyname(&quot;good-AAAA.test.dnssec-tools.org&quot;,
+                                  AF_INET6);
+$validator-&gt;async_submit(&quot;badsign-a.test.dnssec-tools.org&quot;, 
+      &quot;IN&quot;, &quot;A&quot;, 0, \&amp;callback, undef);
+do {
+  my $ref = $val-&gt;async_gather($readfds, $timeout);
+  my $ret = $ref-&gt;[0];
+  my $readfds = $ref-&gt;[1];
+  my $timeout = $ref-&gt;[2];
+  if (! @$readfds) {
+      last;
+  }
+  my @readyarr = IO::Select-&gt;new(@$readfds)-&gt;can_read($timeout);
+  $ret = $validator-&gt;async_check(\@readyarr);
+} while(1);</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Le module <b>Validator</b> fournit un accès à la bibliothèque de
+    résolution validante <a href='/man/libval.3.en'>libval(3)</a>, ainsi qu'aux
+    constantes, structures et fonctions associées. Les fonctions de la bibliothèque
+    sont accessibles via une interface orientée objet. L'interface est conçue
+    pour masquer une partie de la complexité des résolveurs de validation. Le
+    comportement de l'interface applicative peut être personnalisé via des fichiers
+    de configuration fournis par <b>libval</b>, et des codes d'erreur détaillés
+    sont retournés.</p>
+<p class="Pp">Comme <b>Validator</b> est une passerelle vers <b>libval</b>, la
+    documentation de <b>libval</b> fournira des détails supplémentaires sur la
+    manière dont les interfaces et les paramètres de <b>Validator</b> peuvent être
+    utilisés.</p>
+<p class="Pp">Des détails sur DNSSEC et le comportement des résolveurs associés
+    peuvent être trouvés dans les RFC DNSSEC principaux (4033-4035).</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INTERFACE'><a class='permalink' href='#INTERFACE'>INTERFACE</a></h1>
+<p class="Pp">Ce module prend en charge les recherches synchrones et asynchrones. Une
+    description de l'API suit.</p>
+<section class="Ss">
+<h2 class="Ss">Constructeur <b>Validator</b></h2>
+<p class="Pp">Ce constructeur crée un nouvel objet validateur, utilisé pour effectuer
+    les différents appels de résolution. Lors de la création de l'objet validateur,
+    un objet <i>policy</i> est créé. L'objet <i>policy</i> fournit un certain nombre
+    de paramètres qui contrôleront divers aspects de la résolution DNS.</p>
+<p class="Pp">Pour créer un objet validateur, utilisez la méthode
+    <i>Net::DNS::SEC::Validator-</i><b>new()</b>&gt;. Cette méthode accepte un
+    certain nombre de paramètres optionnels, qui seront décrits ci-dessous.</p>
+<p class="Pp">Un objet policy peut être nommé avec le paramètre <i>policy</i>,
+    qui associe une étiquette à une policy particulière. Cela permet de référencer
+    cette policy ultérieurement. Si l'étiquette n'est pas spécifiée, elle recevra
+    l'étiquette par défaut du fichier <b>dnsval.conf</b> de <b>libval</b>.</p>
+<p class="Pp">Les paramètres du constructeur sont passés sous forme de hachage, la clé
+    et la valeur étant données dans l'appel. Outre l'étiquette de policy, il existe
+    deux ensembles de paramètres de constructeur. Ceux-ci sont séparés en fonction de
+    la manière dont ils sont stockés et utilisés dans <b>libval</b>.</p>
+<p class="Pp"><i>Options de Contexte</i></p>
+<p class="Pp">Ce groupe de paramètres est stocké dans une structure
+    <i>val_context_opt</i> dans <b>libval</b>. Cette structure est définie dans
+    <b>dnssec/validator/include/validator/validator.h</b>. Les options de contexte
+    ci-dessous sont les valeurs de clé de hachage utilisées dans l'appel du
+    constructeur.</p>
+<dl class="Bl-tag">
+  <dt id="dnsval_conf"><a class="permalink" href="#dnsval_conf"><i>dnsval_conf</i></a></dt>
+  <dd>Politique de configuration pour la bibliothèque <b>libval</b>.
+    <p class="Pp">Ce fichier contient la politique du validateur. La valeur par
+        défaut est <b>/usr/local/etc/dnssec-tools/dnsval.conf</b>, mais cela
+        peut avoir été modifié lors de la construction et de l'installation de
+        <b>libval</b>.</p>
+    <p class="Pp">Champ <i>val_context_opt</i> : <i>vc_val_conf</i></p>
+  </dd>
+  <dt id="nslist"><a class="permalink" href="#nslist"><i>nslist</i></a></dt>
+  <dd>Ceci est une liste de serveurs de noms qui devraient être utilisés pour la
+      résolution des noms. Il doit s'agir d'une liste d'adresses IP ou IPv6
+      délimitées par des espaces blancs.
+    <p class="Pp">Champ <i>val_context_opt</i> : <i>vc_nslist</i></p>
+  </dd>
+  <dt id="polflags"><a class="permalink" href="#polflags"><i>polflags</i></a></dt>
+  <dd>Il s'agit d'un ensemble de drapeaux de politique bitmap. Les drapeaux valides
+      sont définis dans <b>dnssec/validator/include/validator/validator.h</b>. La
+      valeur par défaut est <b>CTX_DYN_POL_RES_OVR</b>.
+    <p class="Pp">Champ <i>val_context_opt</i> : <i>vc_polflags</i></p>
+  </dd>
+  <dt id="qflags"><a class="permalink" href="#qflags"><i>qflags</i></a></dt>
+  <dd>Ceci est l'ensemble des drapeaux de requête par défaut. Les drapeaux valides
+      sont définis dans <b>dnssec/validator/include/validator/validator.h</b>. La
+      valeur par défaut est 0.
+    <p class="Pp">Champ <i>val_context_opt</i> : <i>vc_qflags</i></p>
+  </dd>
+  <dt id="resolv_conf"><a class="permalink" href="#resolv_conf"><i>resolv_conf</i></a></dt>
+  <dd>Ce fichier contient les options de noms de serveur et de recherche pour la
+      bibliothèque <b>libval</b>. La valeur par défaut est
+      <b>/usr/local/etc/dnssec-tools/resolv.conf</b>, mais cela peut avoir été
+      modifié lors de la construction et de l'installation de <b>libval</b>.
+    <p class="Pp">Champ <i>val_context_opt</i> : <i>vc_res_conf</i></p>
+  </dd>
+  <dt id="root_hints"><a class="permalink" href="#root_hints"><i>root_hints</i></a></dt>
+  <dd>Ce fichier contient des informations d'amorçage pour le résolveur de noms. La
+      valeur par défaut est <b>/usr/local/etc/dnssec-tools/root.hints</b>, mais
+      cela peut avoir été modifié lors de la construction et de l'installation de
+        <b>libval</b>.
+    <p class="Pp">Champ <i>val_context_opt</i> : <i>vc_root_conf</i></p>
+  </dd>
+  <dt id="valpol"><a class="permalink" href="#valpol"><i>valpol</i></a></dt>
+  <dd>Ceci fournit un élément personnalisé de configuration du validateur à la
+      configuration du validateur par défaut en tant qu'extension ou remplacement.
+      Ceci est nul par défaut.
+    <p class="Pp">Champ <i>val_context_opt</i> : <i>vc_valpol</i></p>
+  </dd>
+</dl>
+<p class="Pp"><i>Options Globales</i></p>
+<p class="Pp">Ce groupe de paramètres est stocké dans une structure
+    <i>val_global_opt</i>, qui est elle-même stockée dans le champ <i>gopt</i> de la
+    structure <i>val_context_opt</i>. Cette structure est définie dans
+    <b>dnssec/validator/include/validator/validator.h</b>. Les options globales
+    ci-dessous sont les valeurs de clé de hachage utilisées dans l'appel du
+    constructeur.</p>
+<p class="Pp">Pour tous les champs sauf <i>log_target</i>, une valeur de -1
+    indique une condition "ignorer". Cela signifie que le validateur n'inclura pas
+    les options globales fournies dynamiquement avec une valeur de -1 lors de la
+    création de son contexte. Cela permet à une application de remplacer un sous-ensemble
+    d'options globales tout en utilisant les options globales fournies par défaut dans
+    le fichier <b>dnsval.conf</b>.</p>
+<p class="Pp">Même si <b>libval</b> utilise les options globales dans une structure
+    séparée des options de contexte, elles sont toutes spécifiées dans le même
+    hachage lorsqu'elles sont passées en paramètres au constructeur <b>Validator</b>.</p>
+<dl class="Bl-tag">
+  <dt id="app_policy"><a class="permalink" href="#app_policy"><i>app_policy</i></a></dt>
+  <dd>Ce champ est équivalent à l'option <i>env-policy</i> dans un fichier
+      <b>dnsval.conf</b>. Les valeurs suivantes sont légales et leurs équivalences
+      <i>env-policy</i> :
+        <pre>VAL_POL_GOPT_DISABLE       &quot;disable&quot;
+VAL_POL_GOPT_ENABLE        &quot;enable&quot;
+VAL_POL_GOPT_OVERRIDE      &quot;override&quot;
+</pre>
+    <p class="Pp">La valeur par défaut est -1.</p>
+    <p class="Pp">Champ <i>val_global_opt</i> : <i>gopt.app_policy</i></p>
+  </dd>
+  <dt id="closest_ta_only"><a class="permalink" href="#closest_ta_only"><i>closest_ta_only</i></a></dt>
+  <dd>Ce champ est équivalent à l'option <i>closest-ta-only</i> dans un fichier
+      <b>dnsval.conf</b>. Le régler à 1 est équivalent à régler
+      <i>closest-ta-only</i> à &quot;yes&quot; ; le régler à 0 est équivalent à
+      &quot;no&quot;. La valeur par défaut est -1.
+    <p class="Pp">Champ <i>val_global_opt</i> : <i>gopt.closest_ta_only</i></p>
+  </dd>
+  <dt id="edns0_size"><a class="permalink" href="#edns0_size"><i>edns0_size</i></a></dt>
+  <dd>Ce champ est équivalent à l'option <i>edns0-size</i> dans un fichier
+        <b>dnsval.conf</b>. La valeur par défaut est -1.
+    <p class="Pp">Champ <i>val_global_opt</i> : <i>gopt.edns0_size</i></p>
+  </dd>
+  <dt id="env_policy"><a class="permalink" href="#env_policy"><i>env_policy</i></a></dt>
+  <dd>Ce champ est équivalent à l'option <i>env-policy</i> dans un fichier
+      <b>dnsval.conf</b>. Les valeurs suivantes sont légales et leurs équivalences
+      <i>env-policy</i> :
+        <pre>VAL_POL_GOPT_DISABLE       &quot;disable&quot;
+VAL_POL_GOPT_ENABLE        &quot;enable&quot;
+VAL_POL_GOPT_OVERRIDE      &quot;override&quot;
+</pre>
+    <p class="Pp">La valeur par défaut est -1.</p>
+    <p class="Pp">Champ <i>val_global_opt</i> : <i>gopt.env_policy</i></p>
+  </dd>
+  <dt id="local_is_trusted"><a class="permalink" href="#local_is_trusted"><i>local_is_trusted</i></a></dt>
+  <dd>Ce champ est équivalent à l'option <i>trust-oob-answers</i> dans un fichier
+      <b>dnsval.conf</b>. Le régler à 1 est équivalent
+</p>
+</section>
+</section>
+</div>
+</section>
+            </article>
+            <aside id="content-right">
+                
+            </aside>
+        </main>
+        <footer>
+            
+        </footer>
+    </body>
+</html>
+Mantén toda la estructura del archivo.
+<dt id="log_target"><a class="permalink" href="#log_target"><i>log_target</i></a></dt>
+<dd>Este campo permite al llamador especificar otros objetivos de registro adicionales que se encuentren en el archivo <b>dnsval.conf</b>. Por defecto, no se listan otros registros de log.
+<p class="Pp">Campo <i>val_global_opt</i>: <i>gopt.log_target</i></p>
+</dd>
+<dt id="rec_fallback"><a class="permalink" href="#rec_fallback"><i>rec_fallback</i></a></dt>
+<dd>Este campo es equivalente a la opción <i>rec-fallback</i> en un archivo <b>dnsval.conf</b>. Establecerlo a 1 es equivalente a establecer <i>rec-fallback</i> a "yes"; establecerlo a 0 es equivalente a "no". El valor por defecto es -1.
+<p class="Pp">Campo <i>val_global_opt</i>: <i>gopt.rec_fallback</i></p>
+</dd>
+<dt id="max_refresh"><a class="permalink" href="#max_refresh"><i>max_refresh</i></a></dt>
+<dd>Este campo es equivalente a la opción <i>max-refresh</i> en un archivo <b>dnsval.conf</b>.
+<p class="Pp">Campo <i>val_global_opt</i>: <i>gopt.max_refresh</i></p>
+</dd>
+<dt id="proto"><a class="permalink" href="#proto"><i>proto</i></a></dt>
+<dd>Este campo es equivalente a la opción <i>proto</i> en un archivo <b>dnsval.conf</b>. Establecer este valor a 1 es equivalente a establecer <i>proto</i> a "ipv4"; establecer este valor a 2 es equivalente a establecer <i>proto</i> a "ipv6". El valor por defecto es 0, equivalente a establecer <i>proto</i> a "any".
+<p class="Pp">Campo <i>val_global_opt</i>: <i>gopt.proto</i></p>
+</dd>
+<dt id="timeout"><a class="permalink" href="#timeout"><i>timeout</i></a></dt>
+<dd>Este campo es equivalente a la opción <i>timeout</i> en un archivo <b>dnsval.conf</b>.
+<p class="Pp">Campo <i>val_global_opt</i>: <i>gopt.timeout</i></p>
+</dd>
+<dt id="retry"><a class="permalink" href="#retry"><i>retry</i></a></dt>
+<dd>Este campo es equivalente a la opción <i>retry</i> en un archivo <b>dnsval.conf</b>.
+<p class="Pp">Campo <i>val_global_opt</i>: <i>gopt.retry</i></p>
+</dd>
+</dl>
+<p class="Pp"><i>Champs de résultat du validateur</i></p>
+<p class="Pp">L'état des opérations et les résultats se trouvent dans les champs de résultat du validateur suivants :</p>
+<pre>$validator-&gt;{error}        =&gt; le code d'erreur du dernier appel
+$validator-&gt;{errorStr}     =&gt; la chaîne d'erreur du dernier appel
+$validator-&gt;{valStatus}    =&gt; le val_status du dernier appel (si c'est un appel unique)
+$validator-&gt;{valStatusStr} =&gt; la chaîne val_status du dernier appel</pre>
+<p class="Pp">Les valeurs de ces champs sont décrites dans la section suivante.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='$validator-&amp;gt;getaddrinfo(&amp;lt;name&amp;gt;[,&amp;lt;service&amp;gt;[,&amp;lt;hints&amp;gt;]])'><a class='permalink' href='#$validator-&amp;gt;getaddrinfo(&amp;lt;name&amp;gt;%5B,&amp;lt;service&amp;gt;%5B,&amp;lt;hints&amp;gt;%5D%5D)'>$validator-&gt;getaddrinfo(&lt;name&gt;[,&lt;service&gt;[,&lt;hints&gt;]])</a></h2>
+<p class="Pp"><i>où :</i></p>
+<pre>&lt;name&gt; =&gt; est le nom du nœud ou l'adresse numérique en cours de requête
+&lt;service&gt; =&gt; est le nom ou le numéro représentant le service
+(note : &lt;name&gt; ou &lt;service&gt; peut être indéfini, mais pas les deux)
+&lt;hint&gt; =&gt; un objet Net::addrinfo spécifiant les flags, la famille, etc.</pre>
+<p class="Pp"><i>retourne :</i></p>
+<pre>Un tableau d'objets Net::addrinfo (avec un champ 'val_status') en cas de succès. En cas d'erreur, retourne un tableau vide. En contexte scalaire, retourne le premier objet Net::addrinfo, ou undef en cas d'erreur.</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='$validator-&amp;gt;gethostbyname(&amp;lt;name&amp;gt;[,&amp;lt;family&amp;gt;])'><a class='permalink' href='#$validator-&amp;gt;gethostbyname(&amp;lt;name&amp;gt;%5B,&amp;lt;family&amp;gt;%5D)'>$validator-&gt;gethostbyname(&lt;name&gt;[,&lt;family&gt;])</a></h2>
+<p class="Pp"><i>où :</i></p>
+<pre>&lt;name&gt; =&gt; est le nom du nœud ou l'adresse numérique en cours de requête
+&lt;family&gt; =&gt; la famille d'adresse de l'enregistrement retourné (par défaut : AF_INET)</pre>
+<p class="Pp"><i>retourne :</i></p>
+<pre>Un objet Net::hostent. Les champs valStatus/valStatusStr du validateur seront mis à jour. En cas d'erreur, undef est retourné et les champs de l'objet validateur sont mis à jour.</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='$validator-&amp;gt;res_query(&amp;lt;name&amp;gt;[,&amp;lt;class&amp;gt;[,&amp;lt;type&amp;gt;]])'><a class='permalink' href='#$validator-&amp;gt;res_query(&amp;lt;name&amp;gt;%5B,&amp;lt;class&amp;gt;%5B,&amp;lt;type&amp;gt;%5D%5D)'>$validator-&gt;res_query(&lt;name&gt;[,&lt;class&gt;[,&lt;type&gt;]])</a></h2>
+<p class="Pp"><i>où :</i></p>
+<pre>&lt;name&gt;      =&gt; est le nom du nœud ou l'adresse numérique en cours de requête
+&lt;class&gt;     =&gt; est la classe DNS de l'enregistrement en cours de requête (par défaut : IN)
+&lt;type&gt;      =&gt; est le type d'enregistrement DNS en cours de requête (par défaut : A)</pre>
+<p class="Pp"><i>retourne :</i></p>
+<pre>Un résultat de requête DNS packagé est retourné en cas de succès. Cet objet est approprié pour être passé à l'interface Net::DNS::Packet(\$result) pour analyse. Les champs valStatus/valStatusStr du validateur seront mis à jour. En cas d'erreur, undef est retourné et les champs de l'objet validateur sont mis à jour.</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='$validator-&amp;gt;policy([&amp;lt;label&amp;gt;])'><a class='permalink' href='#$validator-&amp;gt;policy(%5B&amp;lt;label&amp;gt;%5D)'>$validator-&gt;policy([&lt;label&gt;])</a></h2>
+<p class="Pp"><i>où :</i></p>
+<pre>&lt;label&gt;     =&gt; l'étiquette de politique à utiliser (le contexte précédent est détruit)
+(par défaut : &quot;: &quot; la politique par défaut de dnsval.conf)</pre>
+<p class="Pp"><i>retourne :</i></p>
+<pre>L'étiquette de politique actuelle (après changement).</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='$validator-&amp;gt;istrusted([&amp;lt;val_status&amp;gt;])'><a class='permalink' href='#$validator-&amp;gt;istrusted(%5B&amp;lt;val_status&amp;gt;%5D)'>$validator-&gt;istrusted([&lt;val_status&gt;])</a></h2>
+<p class="Pp"><i>où :</i></p>
+<pre>&lt;val_status&gt; =&gt; le code numérique de l'état du validateur
+(par défaut : $validator-&gt;{valStatus})</pre>
+<p class="Pp"><i>retourne :</i></p>
+<pre>Une valeur booléenne positive si &lt;val_status&gt; est un résultat de confiance.</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='$validator-&amp;gt;valStatusStr([&amp;lt;val_status&amp;gt;])'><a class='permalink' href='#$validator-&amp;gt;valStatusStr(%5B&amp;lt;val_status&amp;gt;%5D)'>$validator-&gt;valStatusStr([&lt;val_status&gt;])</a></h2>
+<p class="Pp"><i>où :</i></p>
+<pre>&lt;val_status&gt; =&gt; le code numérique de l'état du validateur
+(par défaut : $validator-&gt;{valStatus})</pre>
+<p class="Pp"><i>retourne :</i></p>
+<pre>Une représentation textuelle de la valeur &lt;val_status&gt; donnée.</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss">$validator-&gt;map_ns(&lt;zone&gt;, &lt;ipaddr&gt;,
+  &lt;recursive&gt;)</h2>
+<p class="Pp"><i>où :</i></p>
+<pre>&lt;zone&gt; =&gt; la valeur de la zone
+&lt;ipaddr&gt; =&gt; l'adresse IP à laquelle toutes les requêtes associées à la zone précédente doivent être adressées.
+&lt;recursive&gt; =&gt; si défini sur 1, ce serveur de noms est considéré comme récursif (les requêtes avec le bit RD défini sont envoyées). La valeur par défaut est de considérer ce serveur de noms comme autoritaire.</pre>
+<p class="Pp"><i>retourne :</i></p>
+<pre>0 si l'association entre la zone et l'adresse IP peut être faite avec succès ; une autre valeur si l'association ne peut pas être créée.</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VALIDATOR_DATA_FIELDS'><a class='permalink' href='#VALIDATOR_DATA_FIELDS'>CHAMP_DONNÉES_VALIDATEUR</a></h1>
+<p class="Pp">Les champs <i>error</i> et <i>errorStr</i> du validateur sont définis avec des valeurs correspondant à celles des fonctions standard <b><i>herror()</i></b> et <b><i>hstrerror()</i></b> de <b>netdb.h</b>. Ces valeurs sont définies dans <b>netdb.h</b>. Ces valeurs sont :</p>
+<pre>error      errorStr
+  0        Resolver Error 0 (pas d'erreur)
+  1        Hôte introuvable
+  2        Erreur de recherche de nom d'hôte
+  3        Erreur de serveur
+  4        Aucune adresse associée au nom</pre>
+<p class="Pp">Les valeurs du champ <i>valStatus</i> du validateur sont définies dans <b>.../dnssec-tools/validator/include/validator/val_errors.h</b>. Les valeurs des champs <i>valStatusStr</i> sont représentées textuellement comme les valeurs des constantes <i>valStatus</i>. Les valeurs possibles pour <i>valStatus</i> sont indiquées ci-dessous, et plus de détails se trouvent dans <a href='/man/libval.3.en'>libval(3)</a> :</p>
+<pre>VAL_BARE_RRSIG
+VAL_INDETERMINATE
+VAL_BOGUS
+VAL_DNS_ERROR
+VAL_IGNORE_VALIDATION
+VAL_NONEXISTENT_NAME
+VAL_NONEXISTENT_NAME_NOCHAIN
+VAL_NONEXISTENT_TYPE
+VAL_NONEXISTENT_TYPE_NOCHAIN
+VAL_NOTRUST
+VAL_OOB_ANSWER
+VAL_PINSECURE
+VAL_PINSECURE_UNTRUSTED
+VAL_SUCCESS
+VAL_TRUSTED_ANSWER
+VAL_UNTRUSTED_ANSWER
+VAL_UNTRUSTED_ZONE
+VAL_VALIDATED_ANSWER</pre>
+<p class="Pp">Les fonctions <b><i>istrusted()</i></b> et <b><i>isvalidated()</i></b> peuvent être utilisées pour tester si une valeur particulière de <i>valStatus</i> correspond à un état de confiance ou à un état validé. Les valeurs qui ne sont ni de confiance ni validées doivent être traitées comme non fiables par l'application.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXAMPLES'><a class='permalink' href='#EXAMPLES'>EXEMPLES</a></h1>
+<pre>  use Net::DNS::SEC::Validator;
+  use Net::DNS::Packet;
+  use Net::hostent;
+  use Net::addrinfo;
+  use Socket qw(:all);
+
+  # construire l'objet
+  my $validator = new Net::DNS::SEC::Validator(policy =&gt; &quot;:&quot;);
+
+  # changer la politique de validation
+  $validator-&gt;policy(&quot;validate_tools:&quot;);
+
+  # obtenir un tableau de Net::addrinfo
+  my (@r) = $validator-&gt;getaddrinfo(&quot;good-A.test.dnssec-tools.org&quot;);
+  foreach $a (@r) {
+     print $a-&gt;stringify, &quot; est digne de confiance\n&quot;
+        if $validator-&gt;istrusted($a-&gt;val_status));
+  }
+
+  # interroger un enregistrement MX
+  my $r = $validator-&gt;res_query(&quot;dnssec-tools.org&quot;, &quot;IN&quot;, &quot;MX&quot;);
+  my ($pkt, $err) = new Net::DNS::Packet(\$r);
+  print ($validator-&gt;istrusted ?
+        &quot;le résultat est digne de confiance\n&quot; :
+        &quot;le résultat N'EST PAS digne de confiance\n&quot;);
+
+  my $h = $validator-&gt;gethostbyname(&quot;good-A.test.dnssec-tools.org&quot;);
+  if ( @{$h-&gt;addr_list}) {
+  my $i;
+     for $addr ( @{$h-&gt;addr_list} ) {
+        printf &quot;\tadresse #%d est [%s]\n&quot;, $i++, inet_ntoa($addr);
+     }
+  }
+  # obtenir les détails de validation
+  my $a = $validator-&gt;resolve_and_check(&quot;good-a.test.dnssec-tools.org&quot;, &quot;IN&quot;, &quot;A&quot;, 0);
+  foreach my $h (@$a) {
+   print &quot;Statut : &quot; .  ${$h}{status} . &quot;\n&quot;;
+   print ($validator-&gt;istrusted(${$h}{status}) ?
+           &quot;le résultat est digne de confiance\n&quot; :
+           &quot;le résultat N'EST PAS digne de confiance\n&quot;);
+   $acs = ${$h}{answer};
+   foreach my $ac ($acs) {
+        print &quot;Statut AC : &quot; . ${$ac}{status} . &quot;\n&quot;;
+        $acr = ${$ac}{rrset};
+        $acd = ${$acr}{data};
+        foreach $d (@$acd) {
+            print &quot;Statut RR données : &quot; . ${$d}{rrstatus} . &quot;\n&quot;;
+            ${$d}{rrdata}-&gt;print;
+        }
+        $acs = ${$acr}{sigs};
+        foreach $d (@$acs) {
+            print &quot;Statut RR Sig : &quot; . ${$d}{rrstatus} . &quot;\n&quot;;
+            ${$d}{rrdata}-&gt;print;
+        }
+   }
+}</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR AUSSI</a></h1>
+<p class="Pp"><a href='/man/libval.3.en'>libval(3)</a>, <a href='/man/dnsval.conf.3.en'>dnsval.conf(3)</a>, <a href='/man/resolv.conf.3.en'>resolv.conf(3)</a>,
+    <a href='/man/root.hints.3.en'>root.hints(3)</a></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT'><a class='permalink' href='#COPYRIGHT'>DROITS D'AUTEUR</a></h1>>COPYRIGHT</a></h1>
+<p class="Pp">Copyright (c) 2006 G. S. Marzot. Tous droits réservés. Ce programme
+    est un logiciel libre ; vous pouvez le redistribuer et/ou le modifier selon les mêmes
+    termes que Perl lui-même.</p>
+<p class="Pp">Copyright (c) 2006-2013 SPARTA, Inc. Tous droits réservés. Ce programme
+    est un logiciel libre ; vous pouvez le redistribuer et/ou le modifier selon les mêmes
+    termes que Perl lui-même.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<pre>G. S. Marzot (marz@users.sourceforge.net)</pre>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-08-31</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher une page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/dnssec-tools/">extra/dnssec-tools</a></dd>
+        <dt>Version :</dt>
+        <dd>2.2.3-15</dd>
+        <dt>Amont :</dt>
+        <dd><a href="http://www.dnssec-tools.org">http://www.dnssec-tools.org</a></dd>
+        <dt>Licences :</dt>
+        <dd>BSD</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/dnssec-tools/">/listing/extra/dnssec-tools/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#INTERFACE">INTERFACE</a></li>
+        
+            <li><a href="#CHAMPSS_DONNEES_VALIDATEUR">CHAMPSS DONNEES VALIDATEUR</a></li>
+        
+            <li><a href="#EXEMPLES">EXEMPLES</a></li>
+        
+            <li><a href="#VOIR_AUSSI">VOIR AUSSI</a></li>
+        
+            <li><a href="#DROITSAUTEUR">DROITSAUTEUR</a></li>
+        
+            <li><a href="#AUTEUR">AUTEUR</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Net::DNS::SEC::Validator.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/Net::DNS::SEC::Validator.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

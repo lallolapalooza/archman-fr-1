@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Type::Tiny::Manual::UsingWithMoose(3pm) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Type__Tiny__Manual__UsingWithMoose(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-type-tiny/">perl-type-tiny</a></p>
+<p class="lic">Licences: PerlArtistic, GPL</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Type::Tiny::Manual::UsingWithMoose(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">Type::Tiny::Manual::UsingWithMoose(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Type::Tiny::Manual::UsingWithMoose - comment utiliser Type::Tiny avec
+    Moose</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MANUEL'><a class='permalink' href='#MANUEL'>MANUEL</a></h1>
+<p class="Pp">Lisez d'abord Type::Tiny::Manual::UsingWithMoo,
+    Type::Tiny::Manual::UsingWithMoo2 et Type::Tiny::Manual::UsingWithMoo3.
+    Tout ce qui se trouve dans ces parties du manuel devrait fonctionner exactement de la même manière dans
+    Moose.</p>
+<p class="Pp">Cette partie du manuel se concentrera sur les spécificités de Moose.</p>
+<section class="Ss">
+<h2 class="Ss" id='Pourquoi_utiliser_Type::Tiny_en_fait?'><a class='permalink' href='#Pourquoi_utiliser_Type::Tiny_en_fait?'>Pourquoi utiliser Type::Tiny en fait ?</a></h2>
+<p class="Pp">Moose possède un système de contraintes de type intégré qui est assez
+    pratique à utiliser, mais il y a plusieurs raisons pour lesquelles vous devriez envisager d'utiliser Type::Tiny à la place.</p>
+<ul class="Bl-bullet">
+  <li>Les contraintes de type Type::Tiny seront généralement plus rapides que les intégrées de Moose.
+      Même sans Type::Tiny::XS installé, Type::Tiny produit généralement du code inline plus efficace que Moose. Les coercitions seront généralement beaucoup plus rapides.</li>
+  <li>Type::Tiny fournit des méthodes utiles comme
+      <span class="Li">&quot;where&quot;</span> et
+      <span class="Li">&quot;plus_coercions&quot;</span> qui permettent de modifier facilement les contraintes de type et les coercitions au niveau de chaque attribut.
+    <p class="Pp">Quelque chose comme ceci est beaucoup plus difficile à faire avec des types Moose simples :</p>
+        <pre>has name =&gt; (
+  is      =&gt; &quot;ro&quot;,
+  isa     =&gt; Str-&gt;plus_coercions(
+    ArrayRef[Str], sub { join &quot; &quot;, @$_ },
+  ),
+  coerce  =&gt; 1,
+);
+</pre>
+    <p class="Pp">Moose a tendance à encourager la définition globale des coercitions, donc si vous vouliez qu'un attribut <b>Str</b> puisse être converti à partir de
+        <b>ArrayRef[Str]</b>, alors *tous* les attributs <b>Str</b> seraient convertis à partir de
+        <b>ArrayRef[Str]</b>, et ils le feraient tous de la même manière. (Même s'il peut être judicieux de joindre par un espace dans certains endroits, une virgule dans d'autres, et un saut de ligne dans d'autres encore !)</p>
+  </li>
+  <li>Type::Tiny fournit des coercions profondes automatiques, donc si le type <b>Xyz</b> a une
+      coercion, ce qui suit devrait « simplement fonctionner » :
+        <pre>has xyzlist =&gt; ( is =&gt; 'ro', isa =&gt; ArrayRef[Xyz], coerce =&gt; 1 );
+</pre>
+  </li>
+  <li>Type::Tiny offre une sélection plus large de types intégrés.</li>
+  <li>En utilisant Type::Tiny, vous pouvez utiliser les mêmes contraintes de type et coercitions
+      pour les attributs et les paramètres de méthodes, dans du code Moose et non-Moose.</li>
+</ul>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Type::Utils'><a class='permalink' href='#Type::Utils'>Type::Utils</a></h2>
+<p class="Pp">Si vous avez utilisé Moose::Util::TypeConstraints, vous êtes peut-être habitué à utiliser un DSL pour déclarer des contraintes de type :</p>
+<pre>use Moose::Util::TypeConstraints;
+
+subtype 'Natural',
+  as 'Int',
+  where { $_ &gt; 0 };</pre>
+<p class="Pp">Il existe un module appelé Type::Utils qui fournit un DSL très similaire pour déclarer des types dans des bibliothèques de types basées sur Type::Library.</p>
+<pre>package My::Types {
+  use Type::Library -base;
+  use Type::Utils;
+  use Types::Standard qw( Int );
+
+  declare 'Natural',
+    as Int,
+    where { $_ &gt; 0 };
+}</pre>
+<p class="Pp">Personnellement, je préfère cependant la manière plus orientée objet de déclarer des types.</p>
+<p class="Pp">Depuis Type::Library 1.012, un raccourci est disponible pour importer Type::Library et Type::Utils en même temps :</p>
+<pre>package MyType {
+  use Type::Library -base, -utils;
+
+  ...;
+}</pre>
+<p class="Pp">Dans Moose, vous pourriez également déclarer des types comme ceci à l'intérieur des classes et des rôles. Contrairement à Moose, Type::Tiny ne conserve pas les types dans un seul espace de noms plat global, donc cela ne fonctionne pas exactement de la même manière avec Type::Utils. Il crée toujours le type, mais il ne le stocke dans aucune bibliothèque de types ; le type est retourné.</p>
+<pre>package My::Class {
+  use Moose;
+  use Type::Utils;
+  use Types::Standard qw( Int );
+
+  my $Natural =          # stocker le type dans une variable
+    declare 'Natural',
+    as Int,
+    where { $_ &gt; 0 };
+
+  has number =&gt; ( is =&gt; 'ro', isa =&gt; $Natural );
+}</pre>
+<p class="Pp">Mais vraiment, la manière orientée objet n'est-elle pas plus propre ?</p>
+<pre>package My::Class {
+  use Moose;
+  use Types::Standard qw( Int );
+
+  has number =&gt; (
+    is   =&gt; 'ro',
+    isa  =&gt; Int-&gt;where('$_ &gt; 0'),
+  );
+}</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Type::Tiny_et_MooseX::Types'><a class='permalink' href='#Type::Tiny_et_MooseX::Types'>Type::Tiny et MooseX::Types</a></h2>
+<p class="Pp">Types::Standard devrait être un remplacement direct pour MooseX::Types. Et Types::Common::Numeric et Types::Common::String devraient facilement remplacer MooseX::Types::Common::Numeric et MooseX::Types::Common::String.</p>
+<p class="Pp">Cela dit, si vous souhaitez utiliser un mélange de Type::Tiny et
+    MooseX::Types, ils devraient s'intégrer de manière transparente.</p>
+<pre>use Types::Standard qw( ArrayRef );
+use MooseX::Types::Common::Numeric qw( PositiveInt );
+
+# cela devrait simplement fonctionner
+my $list_of_nums = ArrayRef[PositiveInt];
+
+# et ceci
+my $list_or_num = ArrayRef | PositiveInt;</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Paramètre_d&amp;#039;importation_&amp;quot;-moose&amp;quot;'><a class='permalink' href='#Paramètre_d&amp;#039;importation_&amp;quot;-moose&amp;quot;'>Paramètre d'importation « -moose »</a></h2>
+<p class="Pp">Si vous avez lu jusqu'ici dans le manuel, vous saurez que c'est la manière habituelle d'importer des contraintes de type :</p>
+<pre>use Types::Standard qw( Int );</pre>
+<p class="Pp">Et le <span class="Li">&quot;Int&quot;</span> qui est importé
+    est une fonction qui ne prend aucun argument et retourne la contrainte de type <b>Int</b>, qui est un objet béni dans la classe Type::Tiny.</p>
+<p class="Pp">Type::Tiny imite l'API Moose::Meta::TypeConstraint si bien que la plupart des codes Moose et MooseX ne pourront pas faire la différence.</p>
+<p class="Pp">Mais que faire si vous avez besoin d'un véritable objet Moose::Meta::TypeConstraint ?</p>
+<pre>use Types::Standard -moose, qw( Int );</pre>
+<p class="Pp">Maintenant, la fonction <span class="Li">&quot;Int&quot;</span> importée
+    retournera une véritable contrainte de type native Moose.</p>
+<p class="Pp">Ce drapeau est principalement un vestige de l'époque où les objets natifs de Type::Tiny ne fonctionnaient *pas* directement dans Moose. Dans 99,9 % des cas, il n'y a aucune raison de l'utiliser et de nombreuses raisons de ne pas le faire. (Les contraintes de type natives de Moose n'offrent pas de méthodes utiles comme
+    <span class="Li">&quot;plus_coercions&quot;</span> et
+    <span class="Li">&quot;where&quot;</span>.)</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Méthode_&amp;quot;moose_type&amp;quot;'><a class='permalink' href='#Méthode_&amp;quot;moose_type&amp;quot;'>Méthode « moose_type »</a></h2>
+<p class="Pp">Une autre façon rapide d'obtenir un objet de contrainte de type Moose natif à partir d'un objet Type::Tiny est d'appeler la méthode
+    <span class="Li">&quot;moose_type&quot;</span> :</p>
+<pre>use Types::Standard qw( Int );
+
+my $tiny_type   = Int;
+my $moose_type  = $tiny_type-&gt;moose_type;</pre>
+<p class="Pp">En interne, c'est ce que fait le drapeau
+    <span class="Li">&quot;-moose&quot;</span> lors de l'importation de fonctions.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PROCHAINES_ÉTAPES'><a class='permalink' href='#PROCHAINES_ÉTAPES'>PROCHAINES ÉTAPES</a></h1>
+<p class="Pp">Voici votre prochaine étape :</p>
+<dl class="Bl-tag">
+  <dt>&#x2022;</dt>
+  <dd>Type::Tiny::Manual::UsingWithMouse
+    <p class="Pp">Comment utiliser Type::Tiny avec Mouse, y compris les avantages de
+        Type::Tiny par rapport aux contraintes de type intégrées, et les fonctionnalités spécifiques à Mouse.</p>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Toby Inkster &lt;tobyink@cpan.org&gt;.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT_ET_LICENCE'><a class='permalink' href='#COPYRIGHT_ET_LICENCE'>COPYRIGHT ET LICENCE</a></h1>
+<p class="Pp">Ce logiciel est sous copyright (c) 2013-2014, 2017-2025 par Toby
+    Inkster.</p>
+<p class="Pp">C'est un logiciel libre ; vous pouvez le redistribuer et/ou le modifier
+    selon les mêmes termes que le système de programmation Perl 5 lui-même.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CLAUSE_DE_NON-RESPONSABILITÉ_DES_GARANTIES'><a class='permalink' href='#CLAUSE_DE_NON-RESPONSABILITÉ_DES_GARANTIES'>CLAUSE DE NON-RESPONSABILITÉ DES GARANTIES</a></h1>
+<p class="Pp">CE PAQUET EST FOURNI « TEL QUEL » ET SANS AUCUNE GARANTIE, EXPLICITE OU IMPLICITE, Y COMPRIS, SANS S'Y LIMITER, LES GARANTIES IMPLICITES DE QUALITÉ MARCHANDE ET D'ADÉQUATION À UN USAGE PARTICULIER.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-11-02</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher une page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-type-tiny/">extra/perl-type-tiny</a></dd>
+        <dt>Version :</dt>
+        <dd>2.008004-1</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://metacpan.org/release/Type-Tiny">https://metacpan.org/release/Type-Tiny</a></dd>
+        <dt>Licences :</dt>
+        <dd>PerlArtistic, GPL</dd>
+        <dt>Manuels :</dt>
+      <dd><a href="/listing/extra/perl-type-tiny/">/listing/extra/perl-type-tiny/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#MANUAL">MANUEL</a></li>
+        
+            <li><a href="#NEXT_STEPS">PROCHAINES ÉTAPES</a></li>
+        
+            <li><a href="#AUTHOR">AUTEUR</a></li>
+        
+            <li><a href="#COPYRIGHT_AND_LICENCE">COPYRIGHT ET LICENCE</a></li>
+        
+            <li><a href="#DISCLAIMER_OF_WARRANTIES">AVERTISSEMENT DE GARANTIES</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Type::Tiny::Manual::UsingWithMoose.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/Type::Tiny::Manual::UsingWithMoose.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

@@ -1,0 +1,486 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>bt_postprocess(1) — Pages manuelles </title>d'Arch
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">bt_postprocess(1)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/perl-text-bibtex/">perl-text-bibtex</a></p>
+<p class="lic">Licences: PerlArtistic, GPL</p>
+
+        nt
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">BT_POSTPROCES</td>S(1)
+    <td class="head-vol">btpa</td>rse
+    <td class="head-rtitle">BT_POSTPROCES</td>S(</tr>1</table>)
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NO</a></h1>M
+<p class="Pp">bt_postprocess - post-traite</p>ment des chaînes, des valeu</section>rs et des
+    entrées BibTeX
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSI</a></h1>S
+<pre>void bt_postprocess_string (char * s,
+                            btshort options)
+char * bt_postprocess_value (AST *   value,
+                      </pre>       btshort  options, 
+                             boolean replace);
+char * bt_postprocess_field (AST *   field, 
+                             bts</section>hort  options, 
+                             boolean replace);
+void bt_postprocess_entry (AST *   entry,
+                           btshort options);
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTIO</a></h1>N
+<p class="Pp">Quand <b>btparse </b>analyse une entrée BibTeX, il stocke initialement les
+    résultats dans un arbre de syntaxe abstraite (AST), sous une forme qui
+    reflète exactement les données analysées. Par exemple, </p>l'entrée
+<pre>@Article{Jones:1997a,
+  AuThOr = "Bob   Jones" # and # "Jim Smith ",
+  TITLE = "Feeding Habits of
+           the Common Cockroach",
+  JoUrNaL = j_ent,
+  YEAR = 1997
+</pre>}
+<p class="Pp">serait analysée en un AST qui pourrait être représenté comme suit </p>:
+<pre>(entry,"Article")
+  (key,"Jones:1997a")
+  (field,"AuThOr")
+    (string,"Bob   Jones")
+    (macro,"and")
+    (string,"Jim Smith ")
+  (field,"TITLE")
+    (string,"Feeding Habits of               the Common Cockroach")
+  (field,"JoUrNaL")
+    (macro,"j_ent")
+  (field,"YEAR")
+    (number,</pre>"1997")
+<p class="Pp">L'avantage de cette forme est que toutes les informations importantes
+    de l'entrée sont facilement accessibles en parcourant l'arbre à l'aide des
+    fonctions décrites dans bt_traversal. Le problème évident est que les
+    données sont un peu trop brutes pour être immédiatement utiles : les types
+    d'entrées et les noms de champs sont capitalisés de manière
+    incohérente, les chaînes sont pleines d'espaces indésirables, les valeurs
+    de champ ne sont pas réduites à une seule chaîne, </p>etc.
+<p class="Pp">Tous ces problèmes sont traités par les <b>fonctions de
+    post-traitement de btparse, décrites ici. Normalement, vous n'aurez pas à
+    appeler ces fonctions --- la bibliothèque fait la bonne chose pour vous
+    après l'analyse de chaque entrée, et vous pouvez personnaliser ce qu'est
+    exacteme</b>nt la bonne chose pour votre application. (Par exemple, vous pouvez
+    lui dire d'étendre les macros, mais pas de concaténer les sous-chaînes
+    ensemble.) Cependant, il est concevable que vous souhaitiez déplacer le
+    post-traitement dans votre propr</p>e code et hors du contrôle de la
+    bibliothèque. Plus probablement, vous pourriez avoir des chaînes qui
+    proviennent d'autre chose que des fichiers BibTeX et que vous aimeriez
+    traiter comme des chaînes BibTeX ; pour cette situation, les fonctions</section> de
+    post-traitement sont essentielles. Enfin, vous pourriez simplement être
+    curieux de savoir ce qui arrive exactement à vos données après leur
+    analyse. Si c'est le cas, vous êtes au bon endroit pour des explications
+    détaillées à l'extrême.
+<section class="Sh">
+<h1 class="Sh" id='FUNCTIONS'><a class='permalink' href='#FUNCTIONS'>FONCTION</a></h1>S
+<p class="Pp"><b>btparse </b>offre quatre points d'entrée vers son code de
+    post-traitement. Parmi ceux-ci, probablement seulement le premier et le
+    dernier --- pour le traitement de chaînes individuelles et d'entrées
+    entières --- seront couramment </p>utilisés.
+<section class="Ss">
+<h2 class="Ss">Points d'entrée de </h2>post-traitement
+<p class="Pp">Pour comprendre pourquoi quatre points d'entrée sont offerts, une
+    explication de l'AST d'exemple montré ci-dessus aidera. Tout d'abord,
+    l'entrée entière est représentée par le
+    <span class="Li">nœud "(entry,"Article")</span>" ; ce
+    nœud a la clé de l'entrée et toutes ses paires champ/valeur comme enfants.
+    Les nœuds d'entrée sont retournés par <span class="Li">bt_parse_entry()</span> et
+    <span class="Li">bt_parse_entry_s()</span> (voir bt_input) ainsi que
+    <span class="Li">bt_next_entry()</span> (qui parcourt une liste d'entrées
+    retournées par <span class="Li">bt_parse_file() </span>--- voir bt_traversal).
+    Des entrées entières peuvent être post-traitées avec
+    <span class="Li">bt_postp</span>rocess_</p>entry().
+<p class="Pp">Vous pourriez aussi avoir besoin de post-traiter un champ
+    individuel, ou seulement la valeur qui lui est associée. (La différence est
+    que le traitement du champ peut changer le nom du champ --- par exemple en
+    minuscules --- en plus de la valeur du champ.) Le <span class="Li">nœud "(field,"AuThOr")</span>"
+    ci-dessus est un exemple d'un sous-AST de champ, et
+    <span class="Li">"(string,"Bob Jones")" </span>est le
+    premier nœud de la liste de valeurs simples représentant la valeur de ce
+    champ. (Rappelez-vous qu'une valeur de champ est, en général, une liste de
+    valeurs simples.) Les nœuds de champ sont retournés par <span class="Li">bt_next_field(), </span>les nœuds de valeur
+    par <span class="Li">bt_next_value().</span> Les premiers peuvent être passés à
+    <span class="Li">bt_postprocess_field() </span>pour le post-traitement, les
+    seconds à <span class="Li">bt_postp</span>rocess_</p>value().
+<p class="Pp">Enfin, des chaînes individuelles peuvent arriver dans votre programme
+    de nombreux endroits autres qu'un <b>AST </b>btparse. Pour cette raison,
+    <span class="Li">bt_postprocess_string</span>() est disponible pou</p>r
+    post-traiter des</section> chaînes arbitraires.
+<section class="Ss">
+<h2 class="Ss">Options de </h2>post-traitement
+<p class="Pp">Toutes les routines de post-traitement ont un
+    <span class="Li">paramètre </span>"options", que vous pouvez utiliser pour
+    ajuster finement le post-traitement. (C'est juste comme les options de
+    traitement de chaînes par méta-type que vous pouvez définir avant d'analyser
+    des entrées ; voir
+    <span class="Li">bt_set_stringopts() </span>dans bt_input.) Comme ailleurs dans
+    la bibliothèque, <span class="Li">"options" </span>est un bitmap
+    construit en combinant par un ou logique diverses constantes prédéfinies.
+    Ces constantes et leurs effets sont documentées dans "String processing
+    option macros" dans </p>btparse.
+<dl class="Bl-tag">
+  <dt id="bt_postprocess_string"><a class="permalink" href="#bt_postprocess_string">bt_postprocess_string
+   </a></dt> ()
+  <dd>
+    <pre>void bt_postprocess_string (char * s,
+                            btshort </pre>options)
+    <p class="Pp">Post-traite une chaîne individuelle,
+        <span class="Li">"s",</span> qui est modifiée sur place. La
+        seule option de post-traitement qui a du sens sur des chaînes
+        individuelles est de savoir s'il faut réduire les espaces selon les
+        règles BibTeX ; ainsi, si
+        <span class="Li">"options &amp; BTO_COLLAPSE" </span>est faux,
+        cette fonction n'a aucun effet. (Bien qu'elle fasse quand même un
+        passage complet sur la chaîne. C'est pour une future expansion.</p>)
+    <p class="Pp">Les règles exactes pour réduire les espaces sont simples :
+        les caractères d'espacement non-espace (principalement les tabulations
+        et les retours à la ligne) sont convertis en espace, toutes les chaînes
+        de plus d'un espace à l'intérieur sont réduites à un seul espace, et
+        tous les espaces de début ou de fin sont supprimés. (Le fait de s'assurer
+        que tout l'espacement est des espaces est en fait fait par <b>le scanner </b>lexical de
+        btparse, donc les chaînes dans les <b>AST de </b>btparse n'auront
+        jamais d'espacement à part les espaces. De même, toute chaîne passée à
+        <b>bt_postprocess_string() </b>ne devrait pas contenir </p>de
+        caractères d</dd>'espacement non-espace.)
+  <dt id="bt_postprocess_value"><a class="permalink" href="#bt_postprocess_value">bt_postprocess_value
+   </a></dt> ()
+  <dd>
+    <pre>char * bt_postprocess_value (AST *   value,
+                             btshort  options, 
+                             boolean </pre>replace);
+    <p class="Pp">Post-traite une valeur de champ individuelle, qui est la tête
+        d'une liste de valeurs simples telles que retournées par
+        <span class="Li">bt_next_value().</span> Toutes les options pertinentes de
+        traitement de chaînes entrent en jeu ici : conversion des nombres en
+        chaînes (<span class="Li">"BTO_CONVERT"),</span> extension
+        des macros (<span class="Li">"BTO_EXPAND")</span>, réduction
+        des espaces (<span class="Li">"BTO_COLLAPSE")</span>, et
+        collage de chaînes (<span class="Li">"BTO_PASTE")</span>. Puisque
+        coller des sous-chaînes ensemble sans d'abord étendre les macros et
+        convertir les nombres serait absurde, tenter de le faire est une erreur
+        </p>fatale.
+    <p class="Pp">Si <span class="Li">"replace" </span>est vrai, alors
+        la liste dont la tête est <span class="Li">"value" </span>sera
+        remplacée par une liste représentant la valeur traitée. C'est-à-dire que
+        si le collage de chaînes est activé (<span class="Li">"options &amp;
+        BTO_PASTE" </span>est vrai), alors cette liste sera réduite à un
+        seul nœud contenant la chaîne unique résultant du collage de toutes les
+        sous-chaînes. Si le collage de chaînes n'est pas activé, alors chaque
+        nœud dans la liste sera laissé intact, mais aura son texte remplacé par
+        le texte </p>traité.
+    <p class="Pp">Si <span class="Li">"replace" </span>est faux, alors
+        une nouvelle chaîne sera construite à la volée et retournée par la
+        fonction. Notez que si le collage n'est pas activé dans ce cas, vous
+        n'aurez que la dernière chaîne dans la liste. (Cela n'a pas vraiment
+        beaucoup de sens de post-traiter une valeur sans la coller à moins que
+        vous ne la remplaciez par la nouvelle valeur, cependant.</p>)
+    <p class="Pp">Retourne la chaîne résultant du traitement de la valeur
+        entière, ce qui n'a de sens que si le collage était activé ou s'il n'y
+        avait qu'une seule valeur dans la liste. Si une multi<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>bt_postprocess(1) - Arch manual pages</title>
+        <link rel="stylesheet" href="/css/style.css">
+        <link rel="stylesheet" href="/css/colors.css">
+        <link rel="stylesheet" href="/css/fonts.css">
+        <link rel="stylesheet" href="/css/layout.css">
+        <link rel="stylesheet" href="/css/man.css">
+        <link rel="stylesheet" href="/css/header.css">
+        <link rel="stylesheet" href="/css/footer.css">
+        <link rel="stylesheet" href="/css/sidebar.css">
+        <link rel="stylesheet" href="/css/search.css">
+        <link rel="stylesheet" href="/css/man-specific.css">
+    </head>
+    <body>
+        
+        <main class="container">
+            <article>
+                <section class="man-page">
+    <div class="man-header">
+        <div class="man-title">
+            <h1>bt_postprocess(1)</h1>
+            <p>btparse, version 0.91</p>
+        </div>
+        <div class="man-date">
+            <p>2025-07-14</p>
+        </div>
+    </div>
+    <section class="Sh">
+    <h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NAME</a></h1>
+    <p class="Nm">bt_postprocess, bt_postprocess_value, bt_postprocess_field, bt_postprocess_entry - post-process parsed BibTeX data</p>
+    </section>
+    <section class="Sh">
+    <h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+    <pre>
+<span class="Nm">bt_postprocess_value</span> (AST *value, btshort options, boolean replace);
+<span class="Nm">bt_postprocess_field</span> (AST *field, btshort options, boolean replace);
+<span class="Nm">bt_postprocess_entry</span> (AST *entry, btshort options);
+    </pre>
+    </section>
+    <section class="Sh">
+    <h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+    <p class="Pp">These functions provide ways to canonicalize values from a parsed BibTeX file. They are intended to be used after the file has been parsed, to clean up the values (e.g. expanding macros, collapsing whitespace, converting numbers to strings).</p>
+    <p class="Pp">The core of the post-processing logic is in <span class="Nm">bt_postprocess_value</span>. The other functions are convenience wrappers around it.</p>
+    <section class="Ss">
+    <h2 class="Ss" id='BTO_OPTIONS'><a class='permalink' href='#BTO_OPTIONS'>BTO_OPTIONS</a></h2>
+    <p class="Pp">The <span class="Nm">options</span> argument is a bitmask specifying which operations to perform. The possible bits are:</p>
+    <dl class="Bl-tag">
+        <dt id="BTO_CONVERT"><a class="permalink" href="#BTO_CONVERT"><b>BTO_CONVERT</b></a></dt>
+        <dd>Convert numbers to strings. (This is pretty trivial, just changing the node type.)</dd>
+        <dt id="BTO_EXPAND"><a class="permalink" href="#BTO_EXPAND"><b>BTO_EXPAND</b></a></dt>
+        <dd>Expand any macros. This means replacing macro references with their definitions. This is done recursively, so macros defined in terms of other macros will also be expanded.</dd>
+        <dt id="BTO_PASTE"><a class="permalink" href="#BTO_PASTE"><b>BTO_PASTE</b></a></dt>
+        <dd>Concatenate adjacent string literals and macro expansions. For example, <code class="Li">(string, "hello") (macro, "there") (string, "!")</code> would become <code class="Li">(string, "hello there!")</code>.</dd>
+        <dt id="BTO_COLLAPSE"><a class="permalink" href="#BTO_COLLAPSE"><b>BTO_COLLAPSE</b></a></dt>
+        <dd>Collapse sequences of whitespace characters (spaces, tabs, newlines) into a single space. This is intended to happen *after* macros have been expanded and adjacent strings have been pasted together.</dd>
+    </dl>
+    </section>
+    </section>
+    <section class="Sh">
+    <h1 class="Sh" id='FUNCTIONS'><a class='permalink' href='#FUNCTIONS'>FUNCTIONS</a></h1>
+    <dl class="Bl-tag">
+    <dt id="bt_postprocess_value"><a class="permalink" href="#bt_postprocess_value">bt_postprocess_value
+      ()</a></dt>
+    <dd>
+        <pre>AST * bt_postprocess_value (AST *   value,
+                                 btshort options,
+                                 boolean replace);
+</pre>
+        <p class="Pp">This is the main workhorse. It takes a pointer to the
+            sub-AST representing the value to be processed, a bitmask of
+            <span class="Nm">options</span>, and a boolean flag. If
+            <span class="Li">replace</span> is true, the original AST is modified
+            in-place. If false, a new AST is created and returned.</p>
+        <p class="Pp">The return value is a pointer to the fully processed
+            value. If <span class="Li">replace</span> is true, this will be the
+            same as the input <span class="Li">value</span>. If
+            <span class="Li">replace</span> is false, it will be a newly allocated
+            AST node (or possibly a pointer to an existing node if no changes
+            were necessary).</p>
+        <p class="Pp">If the value is a list of elements and the
+            <span class="Li">BTO_PASTE</span> option is set, but the list
+            contains non-string/non-macro elements (e.g. numbers, or other
+            lists), then <span class="Li">BTO_PASTE</span> is ignored for that
+            list. If the value is a list and
+            <span class="Li">BTO_PASTE</span> is not specified, then each element
+            in the list is processed recursively, but the list itself is not
+            modified (except that its elements might be replaced if
+            <span class="Li">replace</span> is true).</p>
+        <p class="Pp">If the value is a list and <span class="Li">BTO_PASTE</span>
+            is specified, and all elements are strings or macros, then the list
+            is converted into a single string element, containing the pasted,
+            expanded, and potentially whitespace-collapsed value. If the list
+            was empty, an empty string is returned. If the original list had only
+            one element, that element is returned (after recursive processing).
+            Only when the original list had two or more elements will the
+            result be a single string element.</p>
+        <p class="Pp">If a list was processed without
+            <span class="Li">BTO_PASTE</span>, the last string in the list is
+            returned (after processing).</p>
+        <p class="Pp">Consider what might be done to the value of the
+            <span class="Li">&quot;author&quot;</span> field in the above example,
+            which is the concatenation of a string, a macro, and another string.
+            Assume that the macro <span class="Li">&quot;and&quot;</span> expands to
+            <span class="Li">&quot; and &quot;</span>, and that the variable
+            <span class="Li">&quot;value&quot;</span> points to the sub-AST for this
+            value. The original sub-AST corresponding to this value is</p>
+            <pre>(string,"Bob   Jones")
+(macro,"and")
+(string,"Jim Smith ")
+</pre>
+        <p class="Pp">To fully process this value in-place, you would call</p>
+            <pre>bt_postprocess_value (value, BTO_FULL, TRUE);
+</pre>
+        <p class="Pp">This would convert the value to a single-element list,</p>
+            <pre>(string,"Bob Jones and Jim Smith")
+</pre>
+        <p class="Pp">and return the fully-processed string
+            <span class="Li">&quot;Bob Jones and Jim Smith&quot;</span>. Note that
+            the <span class="Li">&quot;and&quot;</span> macro has been expanded,
+            interpolated between the two literal strings, everything pasted
+            together, and finally whitespace collapsed. (Collapsing whitespace
+            before concatenating the strings would be a bad idea.)</p>
+        <p class="Pp">(Incidentally, <span class="Li">&quot;BTO_FULL&quot;</span> is
+            just a macro for the combination of all possible string-processing
+            options, currently:</p>
+            <pre>BTO_CONVERT | BTO_EXPAND | BTO_PASTE | BTO_COLLAPSE
+</pre>
+        <p class="Pp">There are two other similar shortcut macros:
+            <span class="Li">&quot;BTO_MACRO&quot;</span> to express the special
+            string-processing done on macro values, which is the same as
+            <span class="Li">&quot;BTO_FULL&quot;</span> except for the absence of
+            <span class="Li">&quot;BTO_COLLAPSE&quot;</span>; and
+            <span class="Li">&quot;BTO_MINIMAL&quot;</span>, which means no
+            string-processing is to be done.)</p>
+        <p class="Pp">Let's say you'd rather preserve the list nature of the value,
+            while expanding macros and converting any numbers to strings. (This
+            conversion is trivial: it just changes the type of the node from
+            <span class="Li">&quot;BTAST_NUMBER&quot;</span> to
+            <span class="Li">&quot;BTAST_STRING&quot;</span>. &quot;Number&quot;
+            values are always stored as a string of digits, just as they appear in
+            the file.) This would be done with the call</p>
+            <pre>bt_postprocess_value
+       (value, BTO_CONVERT|BTO_EXPAND|BTO_COLLAPSE,TRUE);
+</pre>
+        <p class="Pp">which would change the list to</p>
+            <pre>(string,"Bob Jones")
+(string,"and")
+(string,"Jim Smith")
+</pre>
+        <p class="Pp">Note that whitespace is collapsed here <i>before</i> any
+            concatenation can be done; this is probably a bad idea. But you can do
+            it if you wish. (If you get any ideas about cooking up your own value
+            post-processing scheme by doing it in little steps like this, take a
+            look at the source to <span class="Li">bt_postprocess_value()</span>; it
+            should dissuade you from such a venture.)</p>
+      </dd>
+      <dt id="bt_postprocess_field"><a class="permalink" href="#bt_postprocess_field">bt_postprocess_field
+        ()</a></dt>
+      <dd>
+        <pre>char * bt_postprocess_field (AST *   field,
+                                 btshort  options,
+                                 boolean replace);
+</pre>
+        <p class="Pp">This is little more than a front-end to
+            <span class="Li">bt_postprocess_value()</span>; the only difference is
+            that you pass it a &quot;field&quot; AST node (eg. the
+            <span class="Li">&quot;(field,&quot;AuThOr&quot;)&quot;</span> in the
+            above example), and that it transforms the field name in addition to its
+            value. In particular, the field name is forced to lowercase; this
+            behaviour is (currently) not optional.</p>
+        <p class="Pp">Returns the string returned by
+            <span class="Li">bt_postprocess_value()</span>.</p>
+      </dd>
+      <dt id="bt_postprocess_entry"><a class="permalink" href="#bt_postprocess_entry">bt_postprocess_entry
+        ()</a></dt>
+      <dd>
+        <pre>void bt_postprocess_entry (AST *  entry,
+                               btshort options);
+</pre>
+        <p class="Pp">Post-processes all values in an entry. If
+            <span class="Li">&quot;entry&quot;</span> points to the AST for a
+            &quot;regular&quot; or &quot;macro definition&quot; entry, then the
+            values are just what you'd expect: everything on the right-hand side of
+            a field or macro &quot;assignment.&quot; You can also post-process
+            comment and preamble entries, though. Comment entries are essentially
+            one big string, so only whitespace collapsing makes sense on them.
+            Preambles may have multiple strings pasted together, so all the
+            string-processing options apply to them. (And there's nothing to prevent
+            you from using macros in a preamble.)</p>
+      </dd>
+    </dl>
+    </section>
+    <section class="Sh">
+    <h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>SEE   ALSO</a></h1>
+    <p class="Pp">btparse(1), bt_input(3), bt_traversal(3)</p>
+    </section>
+    <section class="Sh">
+    <h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTHOR</a></h1>
+    <p class="Pp">Greg Ward &lt;gward@python.net&gt;</p>
+    </section>
+</section>
+</article>
+<aside id="sidebar">
+
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Package information:</p>
+    <dl>
+        <dt>Package name:</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/perl-text-bibtex/">extra/perl-text-bibtex</a></dd>
+        <dt>Version:</dt>
+        <dd>0.91-2</dd>
+        <dt>Upstream:</dt>
+        <dd><a href="https://metacpan.org/release/Text-BibTeX">https://metacpan.org/release/Text-BibTeX</a></dd>
+        <dt>Licenses:</dt>
+        <dd>PerlArtistic, GPL</dd>
+        <dt>Manuals:</dt>
+        <dd><a href="/listing/extra/perl-text-bibtex/">/listing/extra/perl-text-bibtex/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table of contents</summary>
+    <nav class="toc">
+        <ul>
+
+            <li><a href="#NAME">NAME</a></li>
+
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+
+            <li><a href="#FUNCTIONS">FUNCTIONS</a></li>
+
+            <li><a href="#SEE_ALSO">SEE ALSO</a></li>
+
+            <li><a href="#AUTHOR">AUTHOR</a></li>
+
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Other formats:
+
+            <a href="/man/bt_postprocess.1.en.txt">txt</a>,
+
+            <a href="/man/bt_postprocess.1.en.raw">raw</a>
+
+    </p>
+</nav>
+
+</aside>
+
+        </main>
+        <footer>
+            
+            <p>The website is available under the terms of the <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               license, except for the contents of the manual pages, which have their own license
+               specified in the corresponding Arch Linux package.
+            </p>
+        </footer>
+    </body>
+</html>

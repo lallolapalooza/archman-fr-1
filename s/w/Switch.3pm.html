@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Switch(3) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Switch(3pm)</h1>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Switch(3)</td>
+    <td class="head-vol">Documentation contribuée par Perl</td>
+    <td class="head-rtitle">Switch(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">Switch - Un cas pour Perl, n'utilisez pas si vous pouvez utiliser given/when</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPIS</a></h1>
+<pre>use Switch;
+switch ($val) {
+    case 1          { print "nombre 1" }
+    case "a"        { print "chaîne a" }
+    case [1..10,42] { print "nombre dans la liste" }
+    case (\@array)  { print "nombre dans la liste" }
+    case /\w+/      { print "modèle" }
+    case qr/\w+/    { print "modèle" }
+    case (\%hash)   { print "entrée dans le hash" }
+    case (\&amp;sub)    { print "argument pour la sous-routine" }
+    else            { print "cas précédent non vrai" }
+}</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BACKGROUND'><a class='permalink' href='#BACKGROUND'>PRÉAMBULE</a></h1>
+<p class="Pp">[Sautez à « DESCRIPTION » si les pourquoi et où de cette structure de contrôle vous indiffèrent]</p>
+<p class="Pp">En quête d'une « meilleure instruction de cas » pour les conditions distribuées en Perl, il est utile de généraliser cette notion de conditions distribuées autant que possible. Spécifiquement, le concept de « correspondance » entre la valeur du switch et les valeurs des cas ne devrait pas être limité à l'égalité numérique (ou chaîne, ou référentielle), comme c'est le cas dans d'autres langages. En fait, comme le montre le Tableau 1, Perl offre au moins dix-huit manières différentes dont deux valeurs pourraient correspondre.</p>
+<pre>Tableau 1: Correspondance d'une valeur de switch ($s) avec une valeur de cas ($c)
+Valeur  Valeur  Type de Comparaison Implicite   Code de Comparaison
+Switch  Cas     
+======  =====   =====================   =============
+nombre  identique   numérique ou référentielle  correspond si $s == $c;
+ou objet
+référence  méthode  résultat d'appel de méthode  correspond si $s->$c();
+référence  nom     correspond si defined $s->$c();
+ou objet
+autre   autre   égalité de chaîne   correspond si $s eq $c;
+non référence non référence
+scalaire scalaire
+chaîne  regexp  correspondance de modèle    correspond si $s =~ /$c/;
+tableau  scalaire  existence d'élément dans un tableau  correspond si 0<=$c && $c<@$s;
+référence  référence  définition d'élément dans un tableau  correspond si defined $s->[$c];
+ou vrai de tableau  correspond si $s->[$c];
+tableau  tableau  intersection de tableaux    correspond si intersecte (@$s, @$c);
+référence  référence  (appliquer ce tableau à toutes les paires d'éléments
+$s->[$i] et $c->[$j])
+tableau  regexp  grep de tableau    correspond si grep /$c/, @$s;
+référence  référence  vrai de hash    correspond si $s->{$c};
+hash    scalaire  existence d'une entrée dans un hash  correspond si exists $s->{$c};
+référence  référence  définition d'une entrée dans un hash  correspond si defined $s->{$c};
+ou vrai de hash  correspond si $s->{$c};
+hash    regexp  grep de hash    correspond si grep /$c/, keys %$s;
+référence  référence  vrai de sub    correspond si $s->($c);
+sub     scalaire  définition de la valeur renvoyée correspond si defined $s->($c);
+référence  référence  vrai de sub    correspond si $s->(@$c);
+sub     tableau  définition de la valeur renvoyée correspond si defined $s->(@$c);
+</pre>
+<p class="Pp">En réalité, le Tableau 1 couvre 31 alternatives, car seules les tests d'égalité et d'intersection sont commutatifs ; dans les autres cas, les rôles des variables $s et $c peuvent être inversés pour produire un test différent. Par exemple, au lieu de tester une seule clé dans un ensemble de hashs (correspond si exists $s->{$c}), on pourrait tester l'existence d'une seule clé dans un ensemble de hashs (correspond si exists $c->{$s}).</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Le module Switch.pm implémente un mécanisme de contrôle généralisé qui couvre la plupart (mais pas toutes) des diverses combinaisons possibles de switch et de case décrites ci-dessus.</p>
+<p class="Pp">Le module étend la syntaxe standard de Perl avec deux nouvelles instructions de contrôle : <span class="Li">switch</span> et <span class="Li">case</span>. Le <span class="Li">switch</span> prend un argument scalaire de n'importe quel type, spécifié entre parenthèses. Le <span class="Li">switch</span> stocke cette valeur comme la valeur de switch actuelle dans une variable de contrôle locale. La valeur est suivie d'un bloc qui peut contenir une ou plusieurs instructions Perl (y compris l'instruction <span class="Li">case</span> décrite ci-dessous). Le bloc est exécuté de manière inconditionnelle une fois que la valeur du switch a été mise en cache.</p>
+<p class="Pp">Une instruction <span class="Li">case</span> prend un argument scalaire (entre parenthèses obligatoires s'il s'agit d'une variable ; sinon, les parenthèses sont optionnelles) et sélectionne le type de comparaison approprié entre cet argument et la valeur actuelle du switch. Le type de comparaison est déterminé par les types respectifs de la valeur du switch et de l'argument du <span class="Li">case</span>, tel que spécifié dans le Tableau 1. Si la comparaison réussit, le bloc obligatoire associé à l'instruction <span class="Li">case</span> est exécuté.</p>
+<p class="Pp">Pour le reste, l'instruction <span class="Li">case</span> est sémantiquement identique à une instruction <span class="Li">if</span>. Par exemple, elle peut être suivie d'une instruction <span class="Li">else</span> et peut être utilisée comme modificateur d'instruction ultérieure.</p>
+<p class="Pp">Cependant, lorsqu'un bloc <span class="Li">case</span> est exécuté, le contrôle passe automatiquement à l'instruction suivant le bloc <span class="Li">switch</span> englobant, plutôt qu'à l'instruction suivante dans le bloc. En d'autres termes, le succès de n'importe quelle instruction <span class="Li">case</span> empêche l'exécution d'autres cas dans le même périmètre. Mais voir « Autoriser la chute » ci-dessous.</p>
+<p class="Pp">Ces deux nouvelles instructions fournissent un mécanisme de contrôle entièrement généralisé :</p>
+<pre>use Switch;
+# Et puis...
+%special = ( woohoo => 1,  d'oh => 1 );
+while (&lt;&gt;) {
+    chomp;
+    switch ($_) {
+        case (%special) { print "homer\n"; }      # si $special{$_}
+        case /[a-z]/i   { print "alpha\n"; }      # si $_ =~ /a-z/i
+        case [1..9]     { print "petit nombre\n"; }  # si $_ dans [1..9]
+        case { $_[0] >= 10 } { print "grand nombre\n"; } # si $_ >= 10
+        print "doit être de la ponctuation\n"; case /\W/;  # si $_ n'est pas /\W/
+    }
+}</pre>
+<p class="Pp">Remarque : Les <span class="Li">switch</span> peuvent être imbriqués dans des blocs <span class="Li">case</span> (ou tout autre bloc) et une série d'instructions <span class="Li">case</span> peuvent tenter différents types de comparaisons — appartenance à un hash, correspondance de modèle, intersection de tableaux, etc. — avec la même valeur de switch.</p>
+<p class="Pp">L'utilisation de tests d'intersection sur une référence de tableau est particulièrement utile pour regrouper des cas entiers :</p>
+<pre>sub classifier_digit
+{
+        switch ($_[0]) { case 0            { return 'zéro' }
+                         case [2,4,6,8]    { return 'pair' }
+                         case [1,3,5,7,9]  { return 'impair' }
+                         case /[A-F]/i     { return 'hex' }
+                       }
+}</pre>
+<section class="Ss">
+<h2 class="Ss" id='Allowing_fall-through'><a class='permalink' href='#Allowing_fall-through'>Autoriser la chute</a></h2>
+<p class="Pp">La chute (tenter un autre cas après qu'un autre ait déjà réussi) est généralement une mauvaise idée dans un bloc de switch. Cependant, en Perl, ce n'est pas un état réprimandé, il existe donc un moyen de le faire si vous le souhaitez.</p>
+<p class="Pp">Si un bloc <span class="Li">case</span> exécute une instruction <span class="Li">next</span> sans argument, le contrôle passe immédiatement à l'instruction suivant le bloc <span class="Li">case</span> (c'est-à-dire, généralement une autre instruction de cas), au lieu de sortir du bloc <span class="Li">switch</span> englobant.</p>
+<p class="Pp">Exemple :</p>
+<pre>switch ($val) {
+        case 1      { handle_num_1(); next }    # et tentez le cas suivant...
+        case "1"     { handle_str_1(); next }    # et tentez le cas suivant...
+        case [0..9] { handle_num_any(); }       # et nous avons terminé
+        case /\d/   { handle_dig_any(); next }  # et tentez le cas suivant...
+        case /.*/   { handle_str_any(); next }  # et tentez le cas suivant...
+}</pre>
+<p class="Pp">Si $val valait le nombre 1, le bloc <span class="Li">switch</span> devrait appeler les trois premières instructions <span class="Li">handle_...</span>, en passant à chaque test de cas lorsqu'il rencontre un <span class="Li">next</span>. Après l'exécution du troisième bloc <span class="Li">case</span>, le contrôle passerait à la fin du bloc <span class="Li">switch</span> englobant.</p>
+<p class="Pp">En revanche, si $val valait 10, seules les deux dernières instructions <span class="Li">handle_...</span> seraient appelées.</p>
+<p class="Pp">Remarque : Cette mécanique permet la notion de <i>chute conditionnelle</i>. Par exemple :</p>
+<pre>switch ($val)
+</pre></div>
+</section>
+                
+            </article>
+        </main>
+    </body>
+</html>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp"><span class="Li">Switch</span> - une instruction <span class="Li">switch</span>/<span>case</span> plus flexible pour Perl</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<pre>    use Switch;
+    use Switch '-t';
+    use Switch qw( $switch_op );
+    use Switch qw( default );
+    use Switch qw( fallthrough );
+    use Switch qw( Perl6 );
+    use Switch qw( __ );
+    use Switch qw( default Perl6 );
+    use Switch qw( default fallthrough );
+
+    switch ( EXPR ) {
+        case LIST    { STATEMENT(S) }
+        case /REGEXP/ { STATEMENT(S) }
+        case SUB     { STATEMENT(S) }
+        case ( VAL ) { STATEMENT(S) }
+        case ( VAL ) { STATEMENT(S) }
+        ...
+        default      { STATEMENT(S) }
+    }</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CONTEXTE'><a class='permalink' href='#CONTEXTE'>CONTEXTE</a></h1>
+<p class="Pp">Dans la conception de Perl, les instructions <span class="Li">if</span> et <span class="Li">else</span> sont utilisées pour le contrôle de flux conditionnel. Cependant, pour une série de tests d'égalité sur une seule variable, une longue chaîne <span class="Li">if</span>/<span class="Li">elsif</span> peut devenir fastidieuse et inefficace. L'instruction <span class="Li">switch</span> de ce module offre une alternative plus lisible et souvent plus performante.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Le module <span class="Li">Switch</span> fournit une construction <span class="Li">switch</span>/<span>case</span> plus flexible que ce qui était traditionnellement disponible en Perl. Il permet de tester une expression contre diverses listes, expressions régulières, sous-routines ou valeurs scalaires.</p>
+<section class="Ss">
+<h2 class="Ss" id='Permettre_le_passage'><a class='permalink' href='#Permettre_le_passage'>Permettre le passage</a></h2>
+<p class="Pp">Par défaut, chaque bloc <span class="Li">case</span> se termine par un <span class="Li">next</span> implicite, qui passe le contrôle au cas suivant. Pour inhiber ce comportement et sortir complètement du bloc <span class="Li">switch</span>, un <span class="Li">last</span> doit être explicitement utilisé. Le comportement par défaut peut être inversé en important le module avec l'option <span class="Li">'-t'</span> (pour "fall-through").</p>
+<pre>    use Switch '-t';
+    switch ($val) {
+            case 1      { handle_num_1(); }
+            case "1"    { handle_str_1(); }
+            case [0..9] { handle_num_any(); last } # Le last est nécessaire ici
+            case /\d/   { handle_dig_any(); }
+            case /.*/   { handle_str_any(); }
+    }</pre>
+<p class="Pp">Dans cet exemple, le contrôle passe automatiquement au cas suivant à moins qu'un <span class="Li">last</span> ne soit rencontré.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Utilisation_de_last_et_next'><a class='permalink' href='#Utilisation_de_last_et_next'>Utilisation de last et next</a></h2>
+<p class="Pp">Les mots-clés <span class="Li">last</span> et <span class="Li">next</span> peuvent être utilisés dans les blocs <span class="Li">case</span> pour contrôler le flux de sortie du bloc <span class="Li">switch</span>. <span class="Li">last</span> quitte complètement le bloc <span class="Li">switch</span>, tandis que <span class="Li">next</span> passe au bloc <span class="Li">case</span> suivant.</p>
+<pre>switch ($val) {
+        case [0..9] { handle_num_any(); next if $val &lt; 7; }
+        case /\d/   { handle_dig_any(); }
+}</pre>
+<p class="Pp">Si une instruction <span class="Li">last</span> non ciblée est exécutée dans un bloc <span class="Li">case</span>, elle transfère immédiatement le contrôle hors du bloc <span class="Li">switch</span> englobant (en d'autres termes, il y a un <span class="Li">last</span> implicite à la fin de chaque bloc <span class="Li">case</span> normal). Ainsi, l'exemple précédent aurait également pu être écrit:</p>
+<pre>switch ($val) {
+        case [0..9] { handle_num_any(); last if $val &gt;= 7; next; }
+        case /\d/   { handle_dig_any(); }
+}</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Automatiser_le_passage'><a class='permalink' href='#Automatiser_le_passage'>Automatiser le passage</a></h2>
+<p class="Pp">Dans les situations où le passage des cas devrait être la norme, plutôt qu'une exception, une succession infinie de <span class="Li">next</span> terminaux est fastidieuse et laide. Par conséquent, il est possible d'inverser le comportement par défaut en spécifiant la chaîne &quot;fallthrough&quot; lors de l'importation du module. Par exemple, le code suivant est équivalent au premier exemple dans &quot;Permettre le passage&quot;:</p>
+<pre>use Switch 'fallthrough';
+switch ($val) {
+        case 1      { handle_num_1(); }
+        case "1"    { handle_str_1(); }
+        case [0..9] { handle_num_any(); last }
+        case /\d/   { handle_dig_any(); }
+        case /.*/   { handle_str_any(); }
+}</pre>
+<p class="Pp">Notez l'utilisation explicite d'un <span class="Li">last</span> pour préserver le comportement sans passage du troisième cas.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Syntaxe_alternative'><a class='permalink' href='#Syntaxe_alternative'>Syntaxe alternative</a></h2>
+<p class="Pp">Perl 6 fournira une instruction <span class="Li">switch</span> intégrée avec des sémantiques essentiellement identiques à celles offertes par Switch.pm, mais avec une paire de mots-clés différente. En Perl 6, <span class="Li">switch</span> sera orthographié <span class="Li">given</span>, et <span class="Li">case</span> sera prononcé <span class="Li">when</span>. De plus, l'instruction <span class="Li">when</span> ne nécessitera pas que les valeurs de switch ou de case soient entre parenthèses.</p>
+<p class="Pp">Cette syntaxe future est également (en grande partie) disponible via le module Switch.pm, en l'important avec l'argument <span class="Li">Perl6</span>. Par exemple:</p>
+<pre>use Switch 'Perl6';
+given ($val) {
+        when 1       { handle_num_1(); }
+        when ($str1) { handle_str_1(); }
+        when [0..9]  { handle_num_any(); last }
+        when /\d/    { handle_dig_any(); }
+        when /.*/    { handle_str_any(); }
+        default      { handle anything else; }
+}</pre>
+<p class="Pp">Notez que les scalaires doivent toujours être mis entre parenthèses, car ils seraient ambigus en Perl 5.</p>
+<p class="Pp">Notez également que vous pouvez mélanger les deux syntaxes en important le module avec:</p>
+<pre>use Switch 'Perl5', 'Perl6';</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Opérations_d_ordre_supérieur'><a class='permalink' href='#Opérations_d_ordre_supérieur'>Opérations d'ordre supérieur</a></h2>
+<p class="Pp">Une situation où <span class="Li">switch</span> et <span class="Li">case</span> ne fournissent pas un bon substitut à un <span class="Li">if</span> en cascade est lorsqu'une valeur de switch doit être testée par rapport à une série de conditions. Par exemple:</p>
+<pre>sub beverage {
+    switch (shift) {
+        case { $_[0] &lt; 10 } { return 'milk' }
+        case { $_[0] &lt; 20 } { return 'coke' }
+        case { $_[0] &lt; 30 } { return 'beer' }
+        case { $_[0] &lt; 40 } { return 'wine' }
+        case { $_[0] &lt; 50 } { return 'malt' }
+        case { $_[0] &lt; 60 } { return 'Moet' }
+        else                { return 'milk' }
+    }
+}</pre>
+<p class="Pp">(Ceci est équivalent à écrire <span class="Li">case (sub {
+    $_[0] &lt; 10 })</span>, etc. ; <span class="Li">$_[0]</span> est l'argument de la sous-routine anonyme.)</p>
+<p class="Pp">La nécessité de spécifier chaque condition comme un bloc de sous-routine est fastidieuse. Pour surmonter cela, lors de l'importation de Switch.pm, une sous-routine spéciale &quot;placeholder&quot; nommée <span class="Li">__</span> [sic] peut également être importée. Cette sous-routine convertit (presque) toute expression dans laquelle elle apparaît en une référence à une fonction d'ordre supérieur. C'est-à-dire que l'expression:</p>
+<pre>use Switch '__';
+__ &lt; 2</pre>
+<p class="Pp">est équivalente à:</p>
+<pre>sub { $_[0] &lt; 2 }</pre>
+<p class="Pp">Avec <span class="Li">__</span>, les déclarations <span class="Li">case</span> laides précédentes peuvent être réécrites:</p>
+<pre>case  __ &lt; 10  { return 'milk' }
+case  __ &lt; 20  { return 'coke' }
+case  __ &lt; 30  { return 'beer' }
+case  __ &lt; 40  { return 'wine' }
+case  __ &lt; 50  { return 'malt' }
+case  __ &lt; 60  { return 'Moet' }
+else           { return 'milk' }</pre>
+<p class="Pp">La sous-routine <span class="Li">__</span> utilise intensivement la surcharge d'opérateurs pour effectuer sa magie. Toutes les opérations impliquant __ sont surchargées pour produire une sous-routine anonyme qui implémente une version paresseuse de l'opération d'origine.</p>
+<p class="Pp">Le seul problème est que la surcharge d'opérateurs ne permet pas de surcharger les opérateurs booléens <span class="Li">&amp;&amp;</span> et <span class="Li">||</span>. Ainsi, une instruction <span class="Li">case</span> comme celle-ci:</p>
+<pre>case  0 &lt;= __ &amp;&amp; __ &lt; 10  { return 'digit' }</pre>
+<p class="Pp">n'agit pas comme prévu, car lorsqu'elle est exécutée, elle construit deux sous-routines d'ordre supérieur, puis traite les deux références résultantes comme des arguments pour <span class="Li">&amp;&amp;</span>:</p>
+<pre>sub { 0 &lt;= $_[0] } &amp;&amp; sub { $_[0] &lt; 10 }</pre>
+<p class="Pp">Cette expression booléenne est inévitablement vraie, car les deux références ne sont pas fausses. Heureusement, l'opérateur <span class="Li">'bool'</span> surchargé attrape cette situation et la signale comme une erreur.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DÉPENDANCES'><a class='permalink' href='#DÉPENDANCES'>DÉPENDANCES</a></h1>
+<p class="Pp">Le module est implémenté en utilisant Filter::Util::Call et Text::Balanced et nécessite que ces deux modules soient installés.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Damian Conway (damian@conway.org). Ce module est maintenant maintenu par Alexandr Ciornii (alexchorny@gmail.com). Auparavant, il était maintenu par Rafael Garcia-Suarez et les porteurs de perl5.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BOGUES'><a class='permalink' href='#BOGUES'>BOGUES</a></h1>
+<p class="Pp">Il y a sans aucun doute des bogues sérieux qui se cachent quelque part dans un code aussi funky :-) Les rapports de bogues et autres commentaires sont les bienvenus.</p>
+<p class="Pp">Peut créer des erreurs de syntaxe dans d'autres parties du code.</p>
+<p class="Pp">Sur perl 5.10.x, peut causer une erreur de syntaxe si &quot;case&quot; est présent à l'intérieur d'un heredoc.</p>
+<p class="Pp">En général, utilisez plutôt given/when. Ils ont été introduits dans perl 5.10.0. Perl 5.10.0 a été publié en 2007.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='LIMITATIONS'><a class='permalink' href='#LIMITATIONS'>LIMITATIONS</a></h1>
+<p class="Pp">En raison de la nature heuristique de l'analyse de source de Switch.pm, la présence d'expressions régulières avec des sauts de ligne intégrés qui sont spécifiées avec des délimiteurs bruts <span class="Li">/.../</span> et qui n'ont pas de modificateur <span class="Li">//x</span> sont indiscernables des blocs de code commençant par l'opérateur de division <span class="Li">/</span>. Comme solution de contournement, vous devez utiliser <span class="Li">m/.../</span> ou <span class="Li">m?...?</span> pour de tels motifs. De plus, la présence d'expressions régulières spécifiées avec des délimiteurs bruts <span class="Li">?...?</span> peut provoquer des erreurs mystérieuses. La solution de contournement est d'utiliser <span class="Li">m?...?</span> à la place.</p>
+<p class="Pp">En raison de la façon dont les filtres source fonctionnent dans Perl, vous ne pouvez pas utiliser Switch dans un <span class="Li">eval</span> de chaîne.</p>
+<p class="Pp">Peut ne pas fonctionner si des prototypes de sous-routines sont utilisés (RT#33988).</p>
+<p class="Pp">Les captures d'expressions régulières dans <span class="Li">when</span> ne sont pas disponibles pour le code.</p>
+<p class="Pp">Si votre fichier source est plus long qu'un million de caractères et que vous avez une instruction <span class="Li">switch</span> qui traverse la limite d'un million (ou deux millions, etc.) de caractères, vous obtiendrez des erreurs mystérieuses. La solution de contournement consiste à utiliser des fichiers source plus petits.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR'><a class='permalink' href='#DROITS_D_AUTEUR'>DROITS D'AUTEUR</a></h1>
+<pre>Copyright (c) 1997-2008, Damian Conway. Tous droits réservés.
+Ce module est un logiciel libre. Il peut être utilisé, redistribué
+    et/ou modifié aux mêmes conditions que Perl lui-même.</pre>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>

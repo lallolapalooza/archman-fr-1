@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>apparmor(7) — Pages man Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">apparmor(7)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/apparmor/">apparmor</a></p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">APPARMOR(7)</td>
+    <td class="head-vol">AppArmor</td>
+    <td class="head-rtitle">APPARMOR(7)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">AppArmor - amélioration du noyau pour confiner les programmes à un ensemble limité de ressources.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">AppArmor est une amélioration du noyau pour confiner les programmes à un ensemble limité de ressources. Le modèle de sécurité unique d'AppArmor consiste à lier les attributs de contrôle d'accès aux programmes plutôt qu'aux utilisateurs.</p>
+<p class="Pp">Le confinement AppArmor est assuré via des <i>profils</i> chargés dans le noyau via <a href='/man/apparmor_parser.8.en'>apparmor_parser(8)</a>, généralement via l'unité systemd <i>apparmor.service</i>, qui s'utilise comme suit :</p>
+<pre># systemctl start apparmor
+# systemctl reload apparmor</pre>
+<p class="Pp">AppArmor peut fonctionner dans deux modes : <i>enforcement</i> (application) et <i>complain</i> (plainte ou apprentissage) :</p>
+<ul class="Bl-bullet">
+  <li><i>enforcement</i> - Les profils chargés en mode enforcement entraîneront l'application de la politique définie dans le profil ainsi que le signalement des tentatives de violation de politique à syslogd.</li>
+  <li><i>complain</i> - Les profils chargés en mode <span class="Li">&quot;complain&quot;</span> n'appliqueront pas la politique. Au lieu de cela, ils signaleront les tentatives de violation de politique. Ce mode est pratique pour développer des profils. Pour gérer le mode complain pour des profils individuels, les utilitaires <a href='/man/aa-complain.8.en'>aa-complain(8)</a> et <a href='/man/aa-enforce.8.en'>aa-enforce(8)</a> peuvent être utilisés. Ces utilitaires prennent un nom de programme comme argument.</li>
+</ul>
+<p class="Pp">Les profils sont traditionnellement stockés dans des fichiers dans <i>/etc/apparmor.d/</i> sous des noms de fichiers suivant la convention de remplacement du <b>/</b> dans les chemins par <b>.</b> (sauf pour le <b>/</b> racine) afin que les profils soient plus faciles à gérer (par exemple, le profil <i>/usr/sbin/nscd</i> serait nommé <i>usr.sbin.nscd</i>).</p>
+<p class="Pp">Les profils sont appliqués à un processus au moment de l'<a href='/man/exec.3.en'>exec(3)</a> (comme vu à travers l'appel système <a href='/man/execve.2.en'>execve(2)</a>) : une fois qu'un profil est chargé pour un programme, ce programme sera confiné lors du prochain <a href='/man/exec.3.en'>exec(3)</a>. Si un processus est déjà en cours d'exécution sous un profil, lorsque l'on remplace ce profil dans le noyau, le profil mis à jour est immédiatement appliqué à ce processus. D'autre part, un processus déjà en cours d'exécution sans confinement ne peut pas être confiné.</p>
+<p class="Pp">AppArmor prend en charge le système de fichiers securityfs du noyau Linux, et rend disponible la liste des profils actuellement chargés ; pour monter le système de fichiers :</p>
+<pre># mount -tsecurityfs securityfs /sys/kernel/security
+$ cat /sys/kernel/security/apparmor/profiles
+/usr/bin/mutt
+/usr/bin/gpg
+   ...</pre>
+<p class="Pp">Normalement, le script init montera securityfs s'il ne l'a pas déjà fait.</p>
+<p class="Pp">AppArmor restreint également les opérations privilégiées qu'un processus confiné peut exécuter, même si le processus s'exécute en tant que root. Un processus confiné ne peut pas appeler les appels système suivants :</p>
+<pre>create_module(2) delete_module(2) init_module(2) ioperm(2)
+iopl(2) ptrace(2) reboot(2) setdomainname(2)
+sethostname(2) swapoff(2) swapon(2) sysctl(2)</pre>
+<section class="Ss">
+<h2 class="Ss" id='Mode_Complain'><a class='permalink' href='#Mode_Complain'>Mode Complain</a></h2>
+<p class="Pp">Au lieu de refuser l'accès aux ressources pour lesquelles le profil n'a pas de règle, AppArmor peut &quot;autoriser&quot; l'accès et enregistrer un message pour l'opération qui le déclenche. C'est ce qu'on appelle le <i>mode complain</i>. Il est important de noter que les règles présentes dans le profil sont toujours appliquées, donc les règles d'autorisation continueront de supprimer ou de forcer les messages d'audit, et les règles de refus entraîneront toujours des refus et la suppression des messages de refus (voir <i>Désactiver la mise en sourdine des audits de refus</i> si cela pose problème).</p>
+<p class="Pp">Le mode complain peut être utilisé pour développer des profils de manière incrémentielle au fur et à mesure que l'on utilise une application. Les accès enregistrés peuvent être ajoutés au profil, puis l'application peut être davantage utilisée pour découvrir d'autres ajouts nécessaires. Comme AppArmor autorise les accès, l'application se comportera comme si AppArmor ne la confinait pas.</p>
+<p class="Pp"><b>Attention</b> le mode complain n'offre aucune sécurité, seulement de l'audit, tant qu'il est activé. Il ne doit pas être utilisé dans un environnement hostile, car les mauvais comportements pourraient être enregistrés et ajoutés au profil comme s'il s'agissait d'accès aux ressources que l'application devrait utiliser.</p>
+<p class="Pp"><b>Note</b> le mode complain peut être très verbeux avec des profils nouveaux ou vides, mais avec des profils développés, il peut ne rien enregistrer si le profil couvre bien le comportement de l'application. Voir <i>Limitation du débit d'audit</i> si le mode complain génère trop de messages de journal.</p>
+<p class="Pp">Pour mettre un profil et tous ses enfants ou profils chapeau qu'il pourrait contenir en mode complain, utilisez :</p>
+<pre>aa-complain /etc/apparmor.d/&lt;l-application&gt;</pre>
+<p class="Pp">Pour définir manuellement un profil spécifique en mode complain, ajoutez le drapeau <span class="Li">&quot;complain&quot;</span>, puis rechargez manuellement le profil :</p>
+<pre>profile foo flags=(complain) { ... }</pre>
+<p class="Pp">Notez que le drapeau <span class="Li">&quot;complain&quot;</span> doit également être ajouté manuellement à tous les chapeaux ou profils enfants du profil, sinon ils continueront d'utiliser le mode précédent.</p>
+<p class="Pp">Pour activer le mode complain globalement, exécutez :</p>
+<pre>echo -n complain &gt; /sys/module/apparmor/parameters/mode</pre>
+<p class="Pp">ou pour le définir au démarrage, ajoutez :</p>
+<pre>apparmor.mode=complain</pre>
+<p class="Pp">comme paramètre de démarrage du noyau.</p>
+<p class="Pp"><b>Attention</b> définir le mode complain globalement désactive toutes les protections de sécurité d'apparmor. Cela peut être utile lors du débogage ou du développement de profils, mais il est plus sûr de le définir sélectivement par profil.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ERREURS'><a class='permalink' href='#ERREURS'>ERREURS</a></h1>
+<p class="Pp">Lorsqu'un processus confiné tente d'accéder à un fichier auquel il n'a pas la permission, le noyau signalera un message via l'audit, similaire à :</p>
+<pre>audit(1386511672.612:238): apparmor=&quot;DENIED&quot; operation=&quot;exec&quot; 
+  parent=7589 profile=&quot;/tmp/sh&quot; name=&quot;/bin/uname&quot; pid=7605 
+  comm=&quot;sh&quot; requested_mask=&quot;x&quot; denied_mask=&quot;x&quot; fsuid=0 ouid=0
+audit(1386511672.613:239): apparmor=&quot;DENIED&quot; operation=&quot;open&quot; 
+  parent=7589 profile=&quot;/tmp/sh&quot; name=&quot;/bin/uname&quot; pid=7605 
+  comm=&quot;sh&quot; requested_mask=&quot;r&quot; denied_mask=&quot;r&quot; fsuid=0 ouid=0
+audit(1386511772.804:246): apparmor=&quot;DENIED&quot; operation=&quot;capable&quot;
+  parent=7246 profile=&quot;/tmp/sh&quot; pid=7589 comm=&quot;sh&quot; pid=7589 
+  comm=&quot;sh&quot; capability=2  capname=&quot;dac_override&quot;</pre>
+<p class="Pp">Les permissions demandées par le processus sont décrites dans operation= et denied_mask= (pour les fichiers - les capacités etc. utilisent un format de journal légèrement différent). Le nom et l'ID de processus du programme en cours d'exécution sont signalés, ainsi que le nom du profil incluant tout &quot;chapeau&quot; qui pourrait être actif, séparé par &quot;//&quot;. (&quot;Name&quot; est entre guillemets, car le nom du processus est limité à 15 octets ; il est identique à celui rapporté via la comptabilité de processus Berkeley.)</p>
+<p class="Pp">Pour les processus confinés exécutés sous un profil qui a été chargé en mode complain, l'application n'aura pas lieu et les messages de journal signalés à l'audit seront de la forme :</p>
+<pre>audit(1386512577.017:275): apparmor=&quot;ALLOWED&quot; operation=&quot;open&quot;
+  parent=8012 profile=&quot;/usr/bin/du&quot; name=&quot;/etc/apparmor.d/tunables/&quot;
+  pid=8049 comm=&quot;du&quot; requested_mask=&quot;r&quot; denied_mask=&quot;r&quot; fsuid=1000 ouid=0
+audit(1386512577.017:276): apparmor=&quot;ALLOWED&quot; operation=&quot;open&quot;
+  parent=8012 profile=&quot;/usr/bin/du&quot; name=&quot;/etc/apparmor.d/tunables/&quot;
+  pid=8049 comm=&quot;du&quot; requested_mask=&quot;r&quot; denied_mask=&quot;r&quot; fsuid=1000 ouid=0</pre>
+<p class="Pp">Si le démon d'audit userland (auditd) n'est pas en cours d'exécution, le noyau enverra les événements d'audit à klogd ; klogd enverra les messages à syslog, qui enregistrera les messages avec la facilité KERN. Ainsi, les messages de REFUS et d'AUTORISATION peuvent aller soit dans <i>/var/log/audit/audit.log</i>, soit dans <i>/var/log/messages</i>, selon la configuration locale.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DEBOGAGE'><a class='permalink' href='#DEBOGAGE'>DÉBOGAGE</a></h1>
+<p class="Pp">AppArmor fournit quelques facilités pour enregistrer plus d'informations, ce qui peut aider au débogage des profils.</p>
+<section class="Ss">
+<h2 class="Ss" id='Activer_le_mode_debug'><a class='permalink' href='#Activer_le_mode_debug'>Activer le mode debug</a></h2>
+<p class="Pp">Lorsque le mode debug est activé, AppArmor enregistrera quelques messages supplémentaires dans dmesg (pas via le sous-système d'audit). Par exemple, les journaux indiqueront si le nettoyage de l'environnement a été appliqué.</p>
+<p class="Pp">Pour activer le mode debug, exécutez :</p>
+<pre>echo 1 &gt; /sys/module/apparmor/parameters/debug</pre>
+<p class="Pp">ou pour le définir au démarrage, ajoutez :</p>
+<pre>apparmor.debug=1</pre>
+<p class="Pp">comme paramètre de démarrage du noyau.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Desactiver_la_mise_en_sourdine_des_audits_de_refus'><a class='permalink' href='#Desactiver_la_mise_en_sourdine_des_audits_de_refus'>Désactiver la mise en sourdine des audits de refus</a></h2>
+<p class="Pp">Par défaut, les opérations qui déclenchent les règles de
+    <span class="Li">&quot;deny&quot;</span> (refus) ne sont pas enregistrées. C'est
+ 
+</p></div>
+</section>
+</article>
+
+            
+        </main>
+        <footer>
+            
+        </footer>
+    </body>
+</html>
+   appelé <i>silence </i>d'audit d</p>es refus
+<p class="Pp"></p>.
+<pre>Pour désactiver le silence d'audit des refus, exécutez </pre>:
+<p class="Pp">echo -n noquiet &gt;/sys/module/apparmor/parameters/aud</p>it
+<pre>ou pour le définir au démarrage, ajoutez </pre>:
+<p class="Pp">apparmo</p>r.audit=</section>noquiet
+<section class="Ss">
+<h2 class="Ss" id='Force_audit_mode'><a class='permalink' href='#Force_audit_mode'>comme paramètre de démarrage du </a></h2>noyau.
+<p class="Pp">Mode   d'audit forcé <i>AppArmor peut journaliser un message pour chaque opération qui déclenche une
+    règle configurée dans la politique. C'est ce </i>qu'on </p>appelle le
+<p class="Pp"><b>mode </b>d'audit </p>forcé
+<p class="Pp">.
+    <span class="Li">Avert</span>issem</p>ent !
+<pre>Le mode d'audit forcé peut être extrêmement verbeux, même pour un
+    seul profil, et encore plus s'il est activé </pre>globalement.
+<p class="Pp">Pour définir un profil spécifique en mode d'audit forcé, ajoutez
+    </p>l'indicateur
+<pre>"audit</pre>"
+<p class="Pp"></p>:
+<pre>profile foo flags=(audit) { ...</pre> }
+<p class="Pp">Pour activer le mode d'audit forcé globalement, exécutez </p>:
+<p class="Pp"><b>echo -n all &gt; /sys/module/apparmor/parameters/au</b></p>dit
+<p class="Pp">ou pour le définir au démarrage, ajoutez </p>:
+<pre>apparmor.</pre>audit=all
+<p class="Pp">comme paramètre de démarrage du noyau. Limitation du débit </p>d'audit
+<p class="Pp">Si auditd n'est pas en cours d'exécution, pour éviter de perdre trop de
+    messages de journal supplémentaires, vous devrez probablement désactiver la
+    limitation du débit en effectuant : <a href='/man/auditd.8.en'>echo 0 &gt; </a>/proc/sys/kernel/printk_ratelimit
+    <a href='/man/auditd.conf.5.en'>Mais même dans ce cas,</a> le tampon circulaire</p> du noyau peut déborde</section>r et vous
+    pourrie</section>z perdre des messages.
+<section class="Sh">
+<h1 class="Sh" id='FILES'><a class='permalink' href='#FILES'>Sinon, si auditd est en cours d'exécution, </a></h1>consultez
+<dl class="Bl-tag">
+  <dt><i>auditd(8</i></dt>)
+  <dd></dd>
+  <dt><i>et auditd.</i></dt>conf(5)
+  <dd></dd>
+  <dt><i>. FICHIERS /etc/apparmor.d/ /var/cache/appa</i></dt>rmor/
+  <dd></dd>
+  <dt><i>/var/log/audit/audit.</i></dt>log
+  <dd></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>/var/log/messag</a></h1>es
+<p class="Pp"><a href='/man/apparmor_parser.8.en'>VOIR   </a>AUSSI <a href='/man/aa_change_hat.2.en'>apparmor_pars</a>er(8)
+    <a href='/man/apparmor.d.5.en'>, aa_change_hat(2)</a> , <a href='/man/aa-autodep.1.en'>apparmor.d(5)</a> , <a href='/man/clean.1.en'>aa-auto</a>dep(1)
+    <a href='/man/auditd.8.en'></a>, <a href='/man/aa-unconfined.8.en'>clean(1</a>) <a href='/man/aa-enforce.1.en'>, auditd(8) , </a>aa-unconfined(8)
+    <a href='/man/aa-complain.1.en'>, </a>aa-enforce(1) <a href='https://wiki.apparmor.net'>, a</a>a-c</p>ompl</section>ain</div>(1)
+<table class="foot">
+  <tr>
+    <td class="foot-date">, </td>et
+    <td class="foot-os">http</td>s://w</tr>iki.a</table>ppar</section>mor.</article>net .
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>2025-09-12 AppArmor 4.1.2 Informations sur le paquet : </p>Nom du paquet :
+    <dl>
+        <dt>extra/ap</dt>parmor
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/apparmor/">Version </a></dd>:
+        <dt>4.</dt>1.2-1
+        <dd>Amont </dd>:
+        <dt>https://gitlab.</dt>com/apparmor/apparmor
+        <dd><a href="https://gitlab.com/apparmor/apparmor">Licences : GPL-2.0-only, LGPL-2.0-only, </a></dd>LGPL-2.1-only
+        <dt>Manuels </dt>:
+        <dd>/listing/extra/appar</dd>mor/
+        <dt>Table </dt>des matières
+        <dd><a href="/listing/extra/apparmor/">N</a></dd>O</dl></section>M
+
+<details>
+    <summary>DESCRIPT</summary>ION
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">E</a></li>RREURS
+        
+            <li><a href="#DESCRIPTION">DÉB</a></li>OGAGE
+        
+            <li><a href="#ERRORS">FI</a></li>CHIERS
+        
+            <li><a href="#DEBUGGING">VOIR </a></li>AUSSI
+        
+            <li><a href="#FILES">Autres </a></li>formats :
+        
+            <li><a href="#SEE_ALSO">t</a></li>x</ul>t</nav> </details>,
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>raw
+        
+            <a href="/man/apparmor.7.en.txt">Propulsé </a>par 
+        
+            <a href="/man/apparmor.7.en.raw">ar</a>c</p>hm</nav>an</aside>w</main>eb
+        <footer>
+            manuel.
+            <p>Le site Web est disponible selon les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0
+[[89]], à l'except</a>ion du contenu des pages d</p>e manuel, qui ont leur pro</footer>pre licence
+             </body>  spécifiée dans le paquet</html> Arch Linux correspondant.

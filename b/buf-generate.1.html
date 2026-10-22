@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>buf-generate(1) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">buf-generate(1)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/buf/">buf</a></p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Buf(1)</td>
+    <td class="head-vol"></td>
+    <td class="head-rtitle">Buf(1)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">buf-generate - Générer du code avec des plugins protoc</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNTAXE</a></h1>
+<p class="Pp"><b>buf generate [indicateurs]</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Cette commande utilise un fichier modèle de la forme :</p>
+<pre># buf.gen.yaml
+# La version du modèle de génération.
+# Les valeurs valides sont v1beta1, v1 et v2.
+# Obligatoire.
+version: v2
+# Lorsque clean est défini sur true, supprime les répertoires, fichiers zip et/ou fichiers jar spécifiés dans
+# le champ "out" pour tous les plugins avant d'exécuter la génération de code. Par défaut à false.
+# Optionnel.
+clean: true
+# Les plugins à exécuter.
+# Obligatoire.
+plugins:
+    # Utilise le plugin hébergé sur buf.build/protocolbuffers/go à la version v1.28.1.
+    # Si la version est omise, utilise la dernière version du plugin.
+    # L'un de "remote", "local" et "protoc_builtin" est requis.
+  - remote: buf.build/protocolbuffers/go:v1.28.1
+    # Le répertoire de sortie relatif.
+    # Obligatoire.
+    out: gen/go
+    # La révision du plugin distant à utiliser, un numéro de séquence que Buf
+    # incrémente lors de la reconstruction ou du reconditionnement du plugin.
+    revision: 4
+    # Toutes les options à fournir au plugin.
+    # Ceci peut être une seule chaîne ou une liste de chaînes.
+    # Optionnel.
+    opt: paths=source_relative
+    # Indique s'il faut générer du code pour les fichiers importés également.
+    # Optionnel.
+    include_imports: false
+    # Indique s'il faut générer du code pour les types bien connus.
+    # Optionnel.
+    include_wkt: false
+    # Inclure uniquement ces types pour ce plugin.
+    # Optionnel.
+    types:
+      - &quot;foo.v1.User&quot;
+    # Exclure ces types pour ce plugin.
+    # Optionnel.
+    exclude_types:
+      - &quot;buf.validate.oneof&quot;
+      - &quot;buf.validate.message&quot;
+      - &quot;buf.validate.field&quot;&quot;
+    # Le nom d'un plugin local s'il est découvrable dans "$PATH" ou son chemin dans le système de fichiers.
+  - local: protoc-gen-es
+    out: gen/es
+    include_imports: true
+    include_wkt: true
+    # L'invocation complète d'un plugin local peut être spécifiée sous forme de liste.
+  - local: [&quot;go&quot;, &quot;run&quot;, &quot;path/to/plugin.go&quot;]
+    out: gen/plugin
+    # La stratégie de génération à utiliser. Il existe deux options :
+    #
+    # 1. "directory"
+    #
+    #   Cela entraînera la division des fichiers d'entrée par répertoire par buf, et des invocations de plugin distinctes en parallèle. C'est à peu près l'équivalent concurrent de :
+    #
+    #     pour dir dans $(find . -name '*.proto' -print0 | xargs -0 -n1 dirname | sort | uniq); faire
+    #       protoc -I . $(find "${dir}" -name '*.proto')
+    #     fait
+    #
+    #   Presque tous les plugins Protobuf nécessitent cela, ou fonctionnent avec cela,
+    #   et c'est la valeur recommandée et par défaut.
+    #
+    # 2. "all"
+    #
+    #   Cela entraînera une seule invocation de plugin avec tous les fichiers d'entrée par buf.
+    #   C'est à peu près l'équivalent de :
+    #
+    #     protoc -I . $(find . -name '*.proto')
+    #
+    #   Ceci est nécessaire pour certains plugins qui attendent que tous les fichiers soient donnés en une seule fois.
+    #   C'est aussi la seule stratégie pour les plugins distants.
+    #
+    # Si omis, "directory" est utilisé. La plupart des utilisateurs ne devraient pas avoir besoin de définir cette option.
+    # Optionnel.
+    strategy: directory
+    # "protoc_builtin" spécifie un plugin qui vient avec protoc, sans le préfixe "protoc-gen-".
+  - protoc_builtin: java
+    out: gen/java
+    # Chemin vers protoc. S'il n'est pas spécifié, l'installation protoc dans "$PATH" est utilisée.
+    # Optionnel.
+    protoc_path: path/to/protoc
+# Le mode géré modifie les options de fichier et/ou les options de champ à la volée.
+managed:
+  # Active le mode géré.
+  enabled: true
+  # Chaque règle de substitution spécifie une option, la valeur de cette option et
+  # éventuellement les fichiers/champs pour lesquels la substitution s'applique.
+  #
+  # Les options de fichier acceptées sont :
+  #  - java_package
+  #  - java_package_prefix
+  #  - java_package_suffix
+  #  - java_multiple_files
+  #  - java_outer_classname
+  #  - java_string_check_utf8
+  #  - go_package
+  #  - go_package_prefix
+  #  - optimize_for
+  #  - csharp_namespace
+  #  - csharp_namespace_prefix
+  #  - ruby_package
+  #  - ruby_package_suffix
+  #  - objc_class_prefix
+  #  - php_namespace
+  #  - php_metadata_namespace
+  #  - php_metadata_namespace_suffix
+  #  - cc_enable_arenas
+  #
+  # Une règle de substitution peut s'appliquer à une option de champ.
+  # Les options de champ acceptées sont :
+  #  - jstype
+  #
+  # Si plusieurs substitutions pour la même option s'appliquent à un fichier ou à un champ,
+  # la dernière règle prend effet.
+  # Optionnel.
+  override:
+      # Définit "go_package_prefix" sur "foo/bar/baz" pour tous les fichiers.
+    - file_option: go_package_prefix
+      value: foo/bar/baz
+      # Définit "java_package_prefix" sur "net.foo" pour les fichiers dans "buf.build/foo/bar".
+    - file_option: java_package_prefix
+      value: net.foo
+      module: buf.build/foo/bar
+      # Définit "java_package_prefix" sur "dev" pour "file.proto".
+      # Ceci remplace la valeur "net.foo" pour "file.proto" de la règle précédente.
+    - file_option: java_package_prefix
+      value: dev
+      module: buf.build/foo/bar
+      path: file.proto
+      # Définit "go_package" sur "x/y/z" pour tous les fichiers du répertoire "x/y/z".
+    - file_option: go_package
+      value: foo/bar/baz
+      path: x/y/z
+      # Définit "jstype" d'un champ sur "JS_NORMAL".
+    - field_option: jstype
+      value: JS_STRING
+      field: foo.v1.Bar.baz
+  # Désactive le mode géré sous certaines conditions.
+  # Prend la priorité sur les "overrides".
+  # Optionnel.
+  disable:
+      # Ne modifie aucune option pour les fichiers de ce module.
+    - module: buf.build/googleapis/googleapis
+      # Ne modifie aucune option pour ce fichier.
+    - module: buf.build/googleapis/googleapis
+      path: foo/bar/file.proto
+      # Ne modifie pas "java_multiple_files" pour aucun fichier
+    - file_option: java_multiple_files
+      # Ne modifie pas "csharp_namespace" pour les fichiers de ce module.
+    - module: buf.build/acme/weather
+      file_option: csharp_namespace
+# Les entrées pour lesquelles générer du code.
+# Les entrées ici sont ignorées si une entrée est spécifiée comme argument de ligne de commande.
+# Chaque entrée est l'un de "directory", "git_repo", "module", "tarball", "zip_archive",
+# "proto_file", "binary_image", "json_image", "text_image" et "yaml_image".
+# Optionnel.
+inputs:
+    # Le chemin vers un répertoire.
+  - directory: x/y/z
+    # L'URL d'un dépôt Git.
+  - git_repo: https://github.com/acme/weather.git
+    # La branche à cloner.
+    # Optionnel.
+    branch: dev
+    # Le sous-répertoire dans le dépôt à utiliser.
+    # Optionnel.
+    subdir: proto
+    # La profondeur du clone à effectuer.
+    # Optionnel.
+    depth: 30
+    # L'URL d'un module BSR.
+  - module: buf.build/acme/weather
+    # Générer du code uniquement pour ces types.
+    # Optionnel.
+    types:
+      - &quot;foo.v1.User&quot;
+      - &quot;foo.v1.UserService&quot;
+    # Exclure ces types.
+    # Optionnel.
+    exclude_types:
+      - &quot;buf.validate&quot;
+    # Générer du code uniquement pour les fichiers dans ces chemins.
+    # Si vide, inclure tous les chemins.
+    paths:
+      - a/b/c
+      - a/b/d
+    # Ne pas générer de code pour les fichiers dans ces chemins.
+    exclude_paths:
+      - a/b/c/x.proto
+      - a/b/d/y.proto
+    # L'URL ou le chemin vers une archive tar.
+  - tarball: a/b/x.tar.gz
+    # Le chemin relatif dans l'archive à utiliser comme répertoire de base.
+    # Optionnel.
+    subdir: proto
+    # Le schéma de compression, dérivé de l'extension de fichier s'il n'est pas spécifié.
+    # Les extensions ".tgz" et ".tar.gz" utilisent automatiquement Gzip.
+    # ".tar.zst" utilise automatiquement Zstandard.
+    # Optionnel.
+    compression: gzip
+    # Lit au chemin relatif et supprime un certain nombre de composants.
+    # Optionnel.
+    strip_components: 2
+    # L'URL ou le chemin vers une archive zip.
+  - zip_archive: https://github.com/googleapis/googleapis/archive/master.zip
+    # Le nombre de répertoires à supprimer.
+    # Optionnel.
+    strip_components: 1
+    # Le chemin vers un fichier proto spécifique.
+  - proto_file: foo/bar/baz.proto
+    # Indique s'il faut générer du code pour les fichiers du même package également, par défaut à false.
+    # Optionnel.
+    include_package_files: true
+    # Une image Buf au format binaire.
+    # Les autres formats d'image sont "yaml_image", "text_image" et "json_image".
+  - binary_image: image.binpb.gz
+    # Le schéma de compression du fichier image, dérivé de l'extension du fichier s'il n'est pas spécifié.
+    # Optionnel.
+    compression: gzip</pre>
+<p class="Pp">Par exemple, voici un "buf.gen.yaml" typique pour Go et gRPC, en supposant que "protoc-gen-go" et "protoc-gen-go-grpc" sont dans votre "$PATH" :</p>
+<pre># buf.gen.yaml
+version: v2
+plugins:
+  - local: protoc-gen-go
+    out: gen/go
+    opt: paths=source_relative
+  - local: protoc-gen-go-grpc
+    out: gen/go
+    opt:
+      - paths=source_relative
+      - require_unimplemented_servers=false</pre>
+<p class="Pp">Par défaut, buf generate recherchera un fichier de cette forme nommé "buf.gen.yaml" dans votre répertoire courant. Cela peut être considéré comme un modèle pour l'ensemble des plugins que vous souhaitez invoquer.</p>
+<p class="Pp">Le premier argument est la source, le module ou l'image à partir de laquelle générer. Par défaut à "." si aucun argument n'est spécifié.</p>
+<p class="Pp">Utilisez buf.gen.ya</p>
+</div>
+</section>
+
+            </article>
+            
+        </main>
+        <footer>
+            
+        </footer>
+    </body>
+</html>
+ml comme modèle, répertoire courant comme entrée </p>:
+<pre>$ buf </pre>generate
+<p class="Pp">Identique aux valeurs par défaut (modèle "buf.gen.yaml",
+    répertoire courant comme entrée) </p>:
+<pre>$buf generate --template buf.gen.yaml </pre>.
+<p class="Pp">L'option --template accepte également des données YAML ou JSON,
+    elle peut donc être utilisée sans fichier </p>:
+<pre>$buf generate --template '{"version":"v2","plugins":[{"local":"protoc-gen-go","out":"gen/go"}]}</pre>'
+<p class="Pp">Télécharger le dépôt et générer des ébauches de code selon le
+    modèle bar.yaml </p>:
+<pre>$buf generate --template bar.yaml https://github.com/foo/bar.</pre>git
+<p class="Pp">Générer dans le répertoire bar/, en préfixant bar/ aux directives
+    out du modèle </p>:
+<pre>$buf generate --template bar.yaml -o bar https://github.com/foo/bar.</pre>git
+<p class="Pp">Les chemins dans le modèle et l'option -o sont interprétés comme
+    relatifs au répertoire courant, vous pouvez donc placer vos fichiers
+    modèle n'importe </p>où.
+<p class="Pp">Si vous ne souhaitez générer des ébauches que pour un sous-ensemble
+    de votre entrée, vous pouvez le faire via --path. Par exemple </p>:
+<p class="Pp">Générer uniquement pour les fichiers des répertoires proto/foo et
+    proto/bar </p>:
+<pre>$buf generate --path proto/foo --path </pre>proto/bar
+<p class="Pp">Générer uniquement pour les fichiers proto/foo/foo.proto et
+    proto/foo/bar.proto </p>:
+<pre>$buf generate --path proto/foo/foo.proto --path proto/foo/bar.</pre>proto
+<p class="Pp">Générer uniquement pour les fichiers du répertoire proto/foo de
+    votre dépôt git </p>:
+<pre>$buf generate --template buf.gen.yaml https://github.com/foo/bar.git --path </pre>proto/foo
+<p class="Pp">Notez que tous les chemins doivent être contenus dans le même
+    module. Par exemple, si vous avez un module dans "proto", vous ne pouvez
+    pas spécifier "--path proto", cependant "--path proto/foo" est autorisé
+    car "proto/foo" est contenu dans </p>"proto".
+<p class="Pp">Les plugins sont invoqués dans l'ordre où ils sont spécifiés dans
+    le modèle, mais chaque plugin a une invocation parallèle par répertoire,
+    les résultats de chaque invocation étant combinés avant d'écrire le
+    </p>résultat.
+<p class="Pp">Les points d'insertion sont trait</p>és dans l'ordre où les plugins
+ </section>   sont spécifiés dans le modèle.
+<section class="Sh">
+<h1 class="Sh" id='OPTIONS'><a class='permalink' href='#OPTIONS'>OPTION</a></h1>S
+<p class="Pp"><b>--clean[=false]</b> 	Avant la génération, supprimer les
+    répertoires, fichiers jar ou fichiers zip dans lesquels les plugins
+    écriront. Permet de nettoyer les ressources existantes sans avoir à
+    appeler rm </p>-rf
+<p class="Pp"><b>--config="" </b>	Le fichier buf.yaml ou les données à utiliser pour
+    la </p>configuration
+<p class="Pp"><b>--disable-symlinks[=false]</b> 	Ne pas suivre les liens
+    symboliques lors de la lecture des sources ou de la configuration depuis
+    le système de fichiers local. Par défaut, les liens symboliques sont
+    suivis dans cette CLI, mais ne sont jamais suivis sur le Buf Schema
+    </p>Registry
+<p class="Pp"><b>--error-format="text" </b>	Le format des erreurs de
+    compilation, imprimé sur stderr. Doit être l'une des valeurs
+    [text,json,msvs,junit,github-actions,gitlab-code-quality</p>]
+<p class="Pp"><b>--exclude-path=[]</b> 	Exclure des fichiers ou répertoires
+    spécifiques, par ex. "proto/a/a.proto", "proto/a". Si spécifié
+    plusieurs fois, l'union est </p>prise
+<p class="Pp"><b>--exclude-type=[]</b> 	Les types (package, message, enum,
+    extension, service, method) qui doivent être exclus de cette image. Lorsqu'il est
+    spécifié, l'image résultante omettra les descripteurs pour les types
+    spécifiés et supprimera toute référence à ceux-ci, comme les champs typés
+    avec un message ou une enum exclus, ou les options personnalisées liées à
+    une extension exclue. L'image est d'abord filtrée par les types inclus,
+    puis réduite par les exclus. L'utilisation de l'option remplace
+    buf.gen.</p>yaml
+<p class="Pp"><b>-h</b>, <b>--help[=false]</b> 	aide pour </p>generate
+<p class="Pp"><b>--include-imports[=false]</b> 	Générer également tous les imports
+    sauf les Types Bien </p>Connus
+<p class="Pp"><b>--include-wkt[=false]</b> 	Générer également les Types Bien
+    Connus. Ne peut pas être défini à true sans définir --include-imports à
+    </p>true
+<p class="Pp"><b>-o</b>, <b>--output=".</b>" 	Le répertoire de base dans lequel
+    générer. Il est préfixé aux répertoires out dans le modèle de
+    </p>génération
+<p class="Pp"><b>--path=[]</b> 	Limiter à des fichiers ou répertoires spécifiques,
+    par ex. "proto/a/a.proto", "proto/a". Si spécifié
+    plusieurs fois, l'union est </p>prise
+<p class="Pp"><b>--template="" </b>	Le fichier modèle de génération ou
+    les données à utiliser. Doit être au format YAML ou </p>JSON
+<p class="Pp"><b>--type=[] 	Les types (package, message, enum, extension,
+    service, </b>method) qui doivent être inclus dans cette image. Lorsqu'il est
+    sp</p>écifié, l'image résultante n'inclura que les descripteurs décrivant l</section>es
+    types demandés. L'utilisation de l'option remplace buf.gen.yaml
+<section class="Sh">
+<h1 class="Sh" id='OPTIONS_INHERITED_FROM_PARENT_COMMANDS'><a class='permalink' href='#OPTIONS_INHERITED_FROM_PARENT_COMMANDS'>OPTIONS   HÉRITÉES DES COMMANDES </a></h1>PARENTES
+<p class="Pp"><b>--debug[=false]</b> 	Activer la journalisation de </p>débogage
+<p class="Pp"><b>--log-format="color" </b>	Le format du journal
+    [text,color,</p>json]
+<p class="Pp"><b>--timeout=0s 	La durée</b> avant expiration, le</p> définir à
+    0 sign</section>ifie aucune expiration
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR   </a></h1>AUSSI
+<p class="Pp"><a href='/man/buf.1.en'>buf(</a></p>1</section>)
+<section class="Sh">
+<h1 class="Sh" id='HISTORY'><a class='permalink' href='#HISTORY'>HISTORIQU</a></h1>E
+<p class="Pp">2025-11-25 G</p>énéré automa</section>tiquement par</div> spf13/cobra
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-11</td>-25
+    <td class="foot-os">Généré</td> automa</tr>tiquem</table>ent pa</section>r spf13</article>/cobra
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le </p>paquet :
+    <dl>
+        <dt>Nom du </dt>paquet :
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/buf/">extr</a></dd>a/buf
+        <dt>Version </dt>:
+        <dd>1.61.</dd>0-1
+        <dt>Amont </dt>:
+        <dd><a href="https://buf.build">https://buf.</a></dd>build
+        <dt>Licences </dt>:
+        <dd>Apache-2.</dd>0
+        <dt>Manuels </dt>:
+        <dd><a href="/listing/extra/buf/">/listing/extr</a></dd>a/bu</dl>f</section>/
+
+<details>
+    <summary>Table des </summary>matières
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">N</a></li>OM
+        
+            <li><a href="#SYNOPSIS">SY</a></li>NOPSIS
+        
+            <li><a href="#DESCRIPTION">DESC</a></li>RIPTION
+        
+            <li><a href="#OPTIONS">OP</a></li>TIONS
+        
+            <li><a href="#OPTIONS_INHERITED_FROM_PARENT_COMMANDS">OPTIONS HÉRITÉES DES </a></li>COMMANDES PARENTES
+        
+            <li><a href="#SEE_ALSO">VOIR </a></li>AUSSI
+        
+            <li><a href="#HISTORY">HI</a></li>ST</ul>OR</nav>IQ</details>UE
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/buf-generate.1.en.txt">t</a>xt, 
+        
+            <a href="/man/buf-generate.1.en.raw"></a>r</p>a</nav></aside></main>w
+        <footer>
+            de manuel.
+            <p>Le site est disponible selon les termes de la <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0
+               licen</a>ce, sauf pour le contenu des</p> pages de manuel, qui ont le</footer>ur propre licence
+         </body>      spécifiée dans le paqu</html>et Arch Linux correspondant.

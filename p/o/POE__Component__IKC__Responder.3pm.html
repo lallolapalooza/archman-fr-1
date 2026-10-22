@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>POE::Component::IKC::Responder(3) — Pages man Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">POE__Component__IKC__Responder(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-poe-component-ikc/">perl-poe-component-ikc</a></p>
+<p class="lic">Licences: GPL, PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">IKC::Responder(3)</td>
+    <td class="head-vol">Documentation Perl soumise par les utilisateurs</td>
+    <td class="head-rtitle">IKC::Responder(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NOM</a></h1>
+<p class="Pp">POE::Component::IKC::Responder - Gestionnaire d'état pour POE IKC</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPIS</a></h1>
+<pre>use POE;
+use POE::Component::IKC::Responder;
+create_ikc_responder();
+...
+$kernel-&gt;post('IKC', 'post', $to_state, $state);
+$ikc-&gt;publish('my_name', [qw(state1 state2 state3)]);</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">Ce module implémente le traitement d'état pour POE IKC. Le gestionnaire
+    envoie des états à des noyaux externes et appelle des états dans le noyau local
+    à la demande des noyaux externes.</p>
+<p class="Pp">Il y a deux interfaces pour le gestionnaire. Soit en envoyant des états à la
+    session 'IKC', soit via l'interface objet. Bien que la seconde soit plus rapide,
+    la plus bien élevée, puisque POE est un système coopératif.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STATES/METHODS"><a class="permalink" href="#STATES/METHODS">ÉTATS/MÉTHODES</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;spawn&amp;quot;'><a class="permalink" href='#&amp;quot;spawn&amp;quot;'>&quot;spawn&quot;</a></h2>
+<pre>POE::Component::IKC::Responder-&gt;spawn();</pre>
+<p class="Pp">Cette fonction crée la session du gestionnaire et l'objet. Normalement,
+    POE::Component::IKC::Client ou POE::Component::IKC::Server le fait pour
+    vous. Cependant, dans certaines applications, vous voulez vous assurer que le
+    gestionnaire est actif avant qu'il ne le fasse.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;post&amp;quot;'><a class="permalink" href='#&amp;quot;post&amp;quot;'>&quot;post&quot;</a></h2>
+<p class="Pp">Envoie une requête d'état à un noyau externe. Renvoie une valeur booléenne
+    si l'état a été envoyé et une autre booléenne si la requête n'a pas pu être
+    envoyée au noyau externe. Cela ne signifie pas nécessairement que le noyau
+    externe a pu publier l'état, bien que ce soit le cas. Les paramètres sont les
+    suivants :</p>
+<dl class="Bl-tag">
+  <dt>&quot;foreign_state&quot;</dt>
+  <dd>Miroir pour l'état du noyau externe. Voir POE::Component::IKC::Specifier.</dd>
+  <dt>&quot;parameters&quot;</dt>
+  <dd>Une référence à tout ce que vous voulez que l'état externe obtienne en tant qu'ARG0. Si
+      vous voulez spécifier plusieurs paramètres, utilisez une référence de tableau
+      et laissez l'état externe les déréférencer.
+        <pre>$kernel-&gt;post('IKC', 'post',
+    {kernel=&gt;'Syslog', session=&gt;'logger', state=&gt;'log'},
+    [$faculty, $priority, $message];
+</pre>
+    <p class="Pp">ou</p>
+        <pre>$ikc-&gt;post('poe://Syslog/logger/log', [$faculty, $priority, $message]);
+</pre>
+    <p class="Pp">Ceci enregistre un état avec un logger hypothétique.</p>
+  </dd>
+</dl>
+<p class="Pp">Voir le &quot;PROXY SENDER&quot; ci-dessous.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;call&amp;quot;'><a class="permalink" href='#&amp;quot;call&amp;quot;'>&quot;call&quot;</a></h2>
+<p class="Pp">Ceci est identique à &quot;post&quot;, sauf qu'il a un troisième paramètre qui décrit
+    quel état recevra la valeur retournée par le noyau externe.</p>
+<pre>$kernel-&gt;post('IKC', 'call',
+            'poe://Pulse/timeserver/time', '',
+            'poe:get_time');</pre>
+<p class="Pp">ou</p>
+<pre>$ikc-&gt;call({kernel=&gt;'Pulse', session=&gt;'timeserver', state=&gt;'time'},
+            '', 'poe://me/get_time');</pre>
+<p class="Pp">Ceci interroge le noyau externe 'Pulse' pour connaître l'heure. L'état
+    'get_time' de la session actuelle est publié avec ce que le noyau externe a
+    retourné.</p>
+<p class="Pp">Vous n'avez pas à publier les messages de retour, car ils sont publiés
+    temporairement. Combien de temps ? Ils ne peuvent être publiés qu'une seule fois
+    par un noyau externe. C'est, bien sûr, un problème car quelqu'un pourrait
+    publier avant le retour. C'est la vie.</p>
+<dl class="Bl-tag">
+  <dt>&quot;foreign_state&quot;</dt>
+  <dd>Identique au paramètre &quot;post&quot;.</dd>
+  <dt>&quot;parameters&quot;</dt>
+  <dd>Identique au paramètre &quot;post&quot;.</dd>
+  <dt>&quot;rsvp&quot;</dt>
+  <dd>Identifiant d'événement pour le retour. C'est-à-dire, cet état sera appelé avec la
+      valeur retournée par l'état externe. Il peut s'agir d'un miroir de
+      &quot;foreign_state&quot; ou simplement du nom d'un état dans la session
+      actuelle.</dd>
+</dl>
+<pre>$kernel-&gt;call('IKC', 'post',
+    {kernel=&gt;'e-comm', session=&gt;'CC', state=&gt;'check'},
+    {CC=&gt;$cc, expiry=&gt;$expiry}, folder=&gt;$holder},
+    'is_valid');
+# ou
+$ikc-&gt;call('poe://e-comm/CC/check',
+    {CC=&gt;$cc, expiry=&gt;$expiry}, folder=&gt;$holder},
+    'poe://me/is_valid');</pre>
+<p class="Pp">Ceci demande au serveur e-comm de vérifier si un numéro de carte de crédit
+    est &quot;valide&quot;. Oui, ce serait probablement un abus d'utilisation.</p>
+<p class="Pp">L'état &quot;rsvp&quot; n'a pas besoin d'être publié. IKC s'occupe d'enregistrer
+    l'état &quot; rsvp&quot; et permet au noyau externe de publier dessus.</p>
+<p class="Pp">Voir le &quot;PROXY SENDER&quot; ci-dessous.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;default&amp;quot;'><a class="permalink" href='#&amp;quot;default&amp;quot;'>&quot;default&quot;</a></h2>
+<p class="Pp">Définit le noyau externe par défaut. Vous devez d'abord être connecté au noyau
+    externe.</p>
+<p class="Pp">Le seul paramètre est le nom du noyau externe.</p>
+<p class="Pp">Renvoie une valeur booléenne en cas de succès.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;register&amp;quot;'><a class="permalink" href='#&amp;quot;register&amp;quot;'>&quot;register&quot;</a></h2>
+<p class="Pp">Enregistre les noms de noyaux externes auprès du gestionnaire. Ceci est fait
+    pendant la phase de négociation d'IKC et est normalement géré par
+    POE::Component::IKC::Channel. Il définira le noyau par défaut s'il n'y en a
+    pas de précédent.</p>
+<p class="Pp">Le premier paramètre est un nom de noyau unique. Le second paramètre est une
+    référence de tableau d'alias de noyau à enregistrer.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;unregister&amp;quot;'><a class="permalink" href='#&amp;quot;unregister&amp;quot;'>&quot;unregister&quot;</a></h2>
+<p class="Pp">Désenregistre les noms de noyaux externes auprès du gestionnaire. Ceci est fait
+    lorsque le noyau externe se déconnecte par POE::Component::IKC::Channel. S'il
+    s'agit du noyau par défaut, il n'y a plus de noyau par défaut.</p>
+<p class="Pp">Le premier paramètre est un nom de noyau ou un alias. Le second paramètre est une
+    référence de tableau d'alias de noyau à désenregistrer. Le second paramètre
+    est un peu stupide, car si vous désenregistrez un noyau distant, tous ses alias
+    sont également désenregistrés.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;register_local&amp;quot;'><a class="permalink" href='#&amp;quot;register_local&amp;quot;'>&quot;register_local&quot;</a></h2>
+<p class="Pp">Enregistre de nouveaux alias locaux auprès du gestionnaire. Ceci est fait
+    interne par POE::Component::IKC::Server et POE::Component::IKC::Client. Il ne
+    définira pas le noyau par défaut.</p>
+<p class="Pp">Le premier et unique paramètre est une référence de tableau d'alias de noyau à
+    enregistrer.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;publish&amp;quot;'><a class="permalink" href='#&amp;quot;publish&amp;quot;'>&quot;publish&quot;</a></h2>
+<p class="Pp">Indique à IKC que certains états de la session actuelle sont disponibles pour être
+    utilisés par des sessions externes.</p>
+<dl class="Bl-tag">
+  <dt>&quot;session&quot;</dt>
+  <dd>Un alias de session par lequel les sessions externes appelleront. L'alias doit
+      déjà être enregistré auprès du noyau local.</dd>
+  <dt>&quot;states&quot;</dt>
+  <dd>Référence de tableau des états qui peuvent être publiés par des sessions externes.
+        <pre>$kernel-&gt;post('IKC', 'publish', 'me', [qw(foo bar baz)]);
+# ou
+$ikc-&gt;publish('me', [qw(foo bar baz)]);
+</pre>
+  </dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;retract&amp;quot;'><a class="permalink" href='#&amp;quot;retract&amp;quot;'>&quot;retract&quot;</a></h2>
+<p class="Pp">Indique à IKC que certains états ne doivent plus être utilisés par des sessions
+    externes. Vous n'avez pas à désactiver tous les états publiés.</p>
+<dl class="Bl-tag">
+  <dt>&quot;session&quot;</dt>
+  <dd>Identique au paramètre &quot;session&quot; dans &quot;publish&quot;</dd>
+  <dt>&quot;states&quot;</dt>
+  <dd>Identique au paramètre &quot;states&quot; dans &quot;publish&quot;. S'il n'est pas spécifié,
+      *tous* les états publiés sont retirés.
+        <pre>$kernel-&gt;post('IKC', 'retract', 'me', [qw(foo mibble dot)]);
+# ou
+$ikc-&gt;retract('me', [qw(foo)]);
+</pre>
+  </dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;published&amp;quot;'><a class="permalink" href='#&amp;quot;published&amp;quot;'>&quot;published&quot;</a></h2>
+<pre>$list=$kernel-&gt;call(IKC=&gt;'published', $session);</pre>
+<p class="Pp">Renvoie une liste de tous les états publiés.</p>
+<pre>$hash=$kernel-&gt;call(IKC=&gt;'published');</pre>
+<p class="Pp">Renvoie une référence de hachage, indexée par les identifiants de session. Les
+    valeurs sont des références de tableau des états publiés par cette session.</p>
+<dl class="Bl-tag">
+  <dt>&quot;session&quot;</dt>
+  <dd>Un alias de session pour lequel vous souhaitez obtenir la liste des états.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;subscribe&amp;quot;'><a class="permalink" href='#&amp;quot;subscribe&amp;quot;'>&quot;subscribe&quot;</a></h2>
+<p class="Pp">S'abonne aux sessions ou états externes.</p>
+</section>
+</article>
+</main>
+</body>
+</html>
+<section class="Ss">
+<h2 class="Ss" id='&quot;unsubscribe&quot;'><a class='permalink' href='#&quot;unsubscribe&quot;'>&quot;unsubscribe&quot;</a></h2>
+<p class="Pp">L'inverse de la méthodologie de souscription. Cependant, elle n'est pas bien documentée actuellement.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&quot;ping&quot;'><a class='permalink' href='#&quot;ping&quot;'>&quot;ping&quot;</a></h2>
+<p class="Pp">Répond avec 'PONG'. Elle est auto-publiée, donc elle peut être appelée à partir de noyaux distants pour voir si le noyau local est toujours actif. En fait, je ne vois pas d'autre utilité à cela.</p>
+<pre>$kernel-&gt;post('poe://remote/IKC', 'ping', 'some_state');
+$kernel-&gt;delay('some_state', 60);   # timeout
+
+sub some_state
+{
+    my($pong)=$_[ARG0];
+    return if $pong;            # todo todo todo
+
+    # YOW! Le noyau distant a expiré. COURREZ EN CRIANT!
+}</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&quot;shutdown&quot;'><a class='permalink' href='#&quot;shutdown&quot;'>&quot;shutdown&quot;</a></h2>
+<p class="Pp">On s'attend à ce que cela provoque le dépérissement d'IKC et de toutes les sessions périphériques dans un nuage de fumée. Au pire, toute session restante sera sans rapport avec IKC ou à peine vivante (c'est-à-dire qu'elle n'aura que des alias pour éviter la collecte de miettes).</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&quot;monitor&quot;'><a class='permalink' href='#&quot;monitor&quot;'>&quot;monitor&quot;</a></h2>
+<p class="Pp">Permet à une session de surveiller l'état des noyaux distants. Actuellement, une session est informée lorsqu'un noyau distant s'enregistre, se désenregistre, s'abonne ou se désabonne. Vous devez vous assurer que l'alias IKC existe avant de surveiller. Cela peut être fait en appelant POE::Component::IKC::Responder-&gt;spawn ou dans un callback on_connect.</p>
+<pre>$kernel-&gt;post('IKC', 'monitor', $remote_kernel_id, $states);</pre>
+<dl class="Bl-tag">
+  <dt>$remote_kernel_id</dt>
+  <dd>Nom ou alias ou spécificateur IKC du noyau distant que vous souhaitez surveiller. Vous pouvez également spécifier *&* pour surveiller tous les noyaux distants. Si vous le faites, votre moniteur sera appelé plusieurs fois pour un noyau donné. En effet, un noyau a un ID unique et plusieurs alias. Par exemple, un noyau distant aura un ID unique au sein du noyau local, un nom (passé à ou généré par create_ikc_{kernel,client}) et un ID global attribué par le noyau distant via $kernel-&gt;ID. Cela surprend certains, mais consultez la note courte après l'explication des paramètres des callbacks.</dd>
+  <dt>$states</dt>
+  <dd>Un hashref spécifiant quels callbacks appeler lorsque quelque chose d'intéressant se produit. Si $state est vide ou undef, la session cessera de surveiller le noyau distant donné.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Callback_states'><a class='permalink' href='#Callback_states'>États des callbacks</a></h2>
+<p class="Pp">Les états suivants peuvent être surveillés :</p>
+<dl class="Bl-tag">
+  <dt>&quot;channel&quot;</dt>
+  <dd>Appelé lorsqu'un canal devient prêt ou se ferme. ARG3 est soit &quot;ready&quot;, soit &quot;close&quot;. ARG4 est l'ID de session numérique du canal. Voir &quot;CHANNELS&quot; ci-dessous.</dd>
+  <dt>&quot;register&quot;</dt>
+  <dd>Appelé lorsqu'un noyau ou un alias est enregistré. Ceci est équivalent à la fin de la phase de connexion.</dd>
+  <dt>&quot;unregister&quot;</dt>
+  <dd>Appelé lorsqu'un noyau ou un alias est désenregistré. Ceci est équivalent à la déconnexion du noyau distant.</dd>
+  <dt>&quot;subscribe&quot;</dt>
+  <dd>Appelé lorsque IKC réussit à s'abonner à une session distante. ARG3 est un IKC::Specifier de ce à quoi il s'est abonné. Utilisez-le pour publier sur la session proxy.</dd>
+  <dt>&quot;unsubscribe&quot;</dt>
+  <dd>Appelé lorsque IKC réussit à se désabonner d'une session distante.</dd>
+  <dt>&quot;shutdown&quot;</dt>
+  <dd>Signalé lorsqu'une tentative de fermeture normale d'IKC et de toutes les sessions périphériques est effectuée. Ceci n'est appelé qu'une seule fois, après que quelqu'un ait publié un événement IKC/shutdown.</dd>
+  <dt>&quot;error&quot;</dt>
+  <dd>Les erreurs sur les noyaux locaux et distants sont signalées. ARG3 est l'opération qui a échoué. ARG4 est le message d'erreur. Voir &quot;ERRORS&quot; ci-dessous.</dd>
+  <dt>&quot;data&quot;</dt>
+  <dd>Une donnée (peut être scalaire ou une référence) qui est passée au callback. Cela permet plus de magie.</dd>
+</dl>
+<p class="Pp">Les états de callback sont appelés avec les paramètres suivants :</p>
+<dl class="Bl-tag">
+  <dt>&quot;ARG0&quot;</dt>
+  <dd>Nom du noyau qui a été passé à poe://*/IKC/monitor</dd>
+  <dt>&quot;ARG1&quot;</dt>
+  <dd>ID ou alias du noyau distant du point de vue d'IKC.</dd>
+  <dt>&quot;ARG2&quot;</dt>
+  <dd>Un drapeau. S'il est vrai, alors ARG1 est l'ID unique du noyau distant, s'il est faux, alors ARG1 est un alias. Ceci est principalement utile lorsque vous surveillez *&*, et c'est en fait un peu un point d'achoppement.</dd>
+  <dt>&quot;ARG3&quot;</dt>
+  <dd>&quot;$state-&gt;{data}&quot; c'est-à-dire toute donnée que vous souhaitez.</dd>
+  <dt>&quot;ARG4&quot; ... &quot;ARGN&quot;</dt>
+  <dd>Paramètres spécifiques au callback. Voir ci-dessus.</dd>
+</dl>
+<p class="Pp">La plupart du temps, ARG0 et ARG1 seront identiques. Les exceptions sont si vous surveillez *&* ou si vous avez fourni un spécificateur d'événement IKC complet à IKC/monitor au lieu d'un simple nom de noyau.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Short_note_about_monitoring_all_kernels_with_&quot;*&quot;'><a class='permalink' href='#Short_note_about_monitoring_all_kernels_with_&quot;*&quot;'>Note courte sur la surveillance de tous les noyaux avec &quot;*&quot;</a></h2>
+<p class="Pp">Il y a deux raisons pour lesquelles vous pourriez vouloir surveiller tous les noyaux distants : connaître les noms à l'avance et ne pas connaître les noms à l'avance.</p>
+<p class="Pp">Si vous connaissez les noms des noyaux à l'avance, vous pourriez préférer surveiller un nom donné. Cependant, vous pourriez préférer faire une comparaison similaire avec ARG1 (en utilisant des regex, par exemple). Ce serait utile pour le clustering, où plusieurs noyaux redondants pourraient suivre une convention de nommage comme [application]-[hôte], de sorte que vous pourriez comparer &quot;ARG1&quot; avec &quot;/^credit-/&quot; pour voir si vous voulez configurer des choses spécifiques pour ce noyau.</p>
+<p class="Pp">Sans connaître le nom d'un noyau à l'avance, vous pourriez effectuer une sorte de découverte automatique ou simplement surveiller pour le débogage, la journalisation ou la comptabilité. Vous ne voudrez clairement pas effectuer une découverte automatique pour chaque alias de chaque noyau, mais uniquement pour le nom canonique, d'où la nécessité d'ARG2.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Short_note_the_second'><a class='permalink' href='#Short_note_the_second'>Note courte la deuxième</a></h2>
+<p class="Pp">Vous pouvez utiliser les mêmes états de callback lorsque vous surveillez plusieurs noyaux. Dans ce cas, vous trouverez ARG0 utile pour les différencier.</p>
+<pre>$kernel-&gt;post('IKC', 'monitor', '*', 
+                {register=&gt;'remote_register',
+                 unregister=&gt;'remote_unregister',
+                 subscribe=&gt;'remote_subscribe',
+                 unsubscribe=&gt;'remote_unsubscribe',
+                 data=&gt;'magic box'});</pre>
+<p class="Pp">Maintenant, remote_{register,unregister,subscribe,unsubscribe} sera appelé pour n'importe quel noyau distant.</p>
+<pre>$kernel-&gt;post('IKC', 'monitor', 'Pulse', {register=&gt;'pulse_connected'});</pre>
+<p class="Pp">&quot;pulse_connected&quot; sera appelé dans la session actuelle lorsque vous vous serez connecté avec succès à un noyau nommé 'Pulse'.</p>
+<pre>$kernel-&gt;post('IKC', 'monitor', '*');</pre>
+<p class="Pp">La session ne surveille plus tous les noyaux, mais seulement 'Pulse'.</p>
+<pre>$kernel-&gt;post('IKC', 'monitor', 'Pulse', {});</pre>
+<p class="Pp">Maintenant, nous ne nous soucions plus de 'Pulse' ;</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CHANNELS'><a class='permalink' href='#CHANNELS'>CANAUX</a></h1>
+<p class="Pp">Une version antérieure d'IKC ne permettait pas de contrôler correctement une connexion. Avec la version 0.2400, une fonctionnalité très nécessaire a été ajoutée.</p>
+<p class="Pp">Chaque connexion à un noyau distant est gérée par une session de canal. Vous pouvez déterminer l'ID de session en surveillant les opérations &quot;channel&quot;. Vous pouvez fermer un canal et la connexion correspondante au noyau distant en envoyant un événement &quot;shutdown&quot;.</p>
+<pre>sub _start {
+    # configurer le moniteur
+    $poe_kernel-&gt;call( IKC =&gt; monitor =&gt; '*' =&gt; { channel =&gt; 'channel' } );
+}
+sub channel {
+    my( $self, $rid, $rkernel, $real, $data, $op, $channel ) = @_[ OBJECT, ARG0..$#_ ];
+    return unless $real;    # seulement intéressé par l'ID réel du noyau
+    if( $op eq 'ready' ) {  # nouveau canal prêt
+        $self-&gt;{channel}{ $rkernel } = $channel;
+    }
+    elsif( $op eq 'close' ) {   # canal n'est plus là
+        delete $self-&gt;{cha</pre>
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>POE::Component::IKC::Responder(3pm) — Arch manual pages</title>
+        <link rel="stylesheet" href="/css/style.css">
+        <link rel="stylesheet" href="/css/man.css">
+    </head>
+    <body>
+        <main>
+            <article>
+
+
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NAME</a></h1>
+<p class="Nm">POE::Component::IKC::Responder - an IKC responder</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>    use POE::Component::IKC::Responder;
+    
+    my $responder = POE::Component::IKC::Responder-&gt;spawn(
+        Alias =&gt; 'my_responder',
+        Remote =&gt; 'poe://remote_kernel/some/state',
+        Args =&gt; [ $arg1, $arg2 ],
+        Callback =&gt; sub { ... },
+    );
+    
+    # or if you want to spawn a responder for a remote kernel that
+    # does not use aliases
+    my $responder = POE::Component::IKC::Responder-&gt;spawn(
+        Remote =&gt; 'poe://192.168.1.1:1234/some/state',
+        Args =&gt; [ $arg1, $arg2 ],
+        Callback =&gt; sub { ... },
+    );
+    
+    # or if you want to spawn a responder for a remote kernel that
+    # knows about you
+    my $responder = POE::Component::IKC::Responder-&gt;spawn(
+        Remote =&gt; 'poe://remote_kernel_id',
+        Args =&gt; [ $arg1, $arg2 ],
+        Callback =&gt; sub { ... },
+    );
+    
+    # you can also specify the port and protocol
+    my $responder = POE::Component::IKC::Responder-&gt;spawn(
+        Remote =&gt; 'poe://remote_kernel/some/state',
+        Port =&gt; 1234,
+        Protocol =&gt; 'tcp',
+        Args =&gt; [ $arg1, $arg2 ],
+        Callback =&gt; sub { ... },
+    );
+    
+    # you can also make the responder listen for incoming connections
+    my $responder = POE::Component::IKC::Responder-&gt;spawn(
+        Listen =&gt; 1,
+        Port =&gt; 1234,
+        Protocol =&gt; 'tcp',
+        Alias =&gt; 'my_responder',
+        Args =&gt; [ $arg1, $arg2 ],
+        Callback =&gt; sub { ... },
+    );</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">POE::Component::IKC::Responder is used to respond to requests
+    from remote POE kernels. Normally a kernel will make a request to another
+    kernel via the POE::Component::IKC::Client interface. This component allows
+    you to implement the code that runs on the other side.</p>
+<p class="Pp">The responder listens for incoming connections, or makes a
+    connection to a remote kernel. It then waits for a request to arrive. When
+    a request arrives, it calls the code that you specified in the Callback
+    parameter.</p>
+<p class="Pp">The Callback will be called with arguments that are passed to it
+    by the remote kernel. The Callback is also passed a reference to the current
+    POE::Component::IKC::Responder object.</p>
+<p class="Pp">The remote kernel will be waiting for a response. The response
+    can be sent back via the Responder object's <code class="Li">post_response</code>
+    method.</p>
+<p class="Pp">You can also use the Responder to post events that are not
+    directly tied to a request. This is done by setting the <code class="Li">Args</code>
+    parameter to undef and calling <code class="Li">post_response</code> with
+    no arguments.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='STATES/METHODS'><a class='permalink' href='#STATES/METHODS'>STATES/METHODS</a></h1>
+<p class="Pp">All arguments to <code class="Li">spawn</code> are session state
+    variables. See POE::Component for more information.</p>
+<dl class="Bl-tag">
+  <dt id="Alias"><a class="permalink" href="#Alias">Alias</a></dt>
+  <dd>The alias that this responder will register itself with in the
+      local kernel.</dd>
+  <dt id="Remote"><a class="permalink" href="#Remote">Remote</a></dt>
+  <dd>The destination kernel and state. This can be a hostname, an IP address,
+      or an alias that the kernel has registered itself with.</dd>
+  <dt id="Port"><a class="permalink" href="#Port">Port</a></dt>
+  <dd>The port number to connect to or listen on. Defaults to POE::Component::IKC::default_port.</dd>
+  <dt id="Protocol"><a class="permalink" href="#Protocol">Protocol</a></dt>
+  <dd>The protocol to use, ie. <code class="Li">tcp</code> or <code class="Li">udp</code>.
+      Defaults to <code class="Li">tcp</code>.</dd>
+  <dt id="Args"><a class="permalink" href="#Args">Args</a></dt>
+  <dd>An array reference of arguments to send along with the request. If this
+      is undef, then no arguments will be sent, and the responder will be
+      listening for incoming requests rather than making a request.</dd>
+  <dt id="Callback"><a class="permalink" href="#Callback">Callback</a></dt>
+  <dd>The coderef to call when a request is received. The coderef will be
+      called with the Responder object as the first argument, followed by any
+      arguments sent with the request.</dd>
+  <dt id="Listen"><a class="permalink" href="#Listen">Listen</a></dt>
+  <dd>A boolean value indicating whether the responder should listen for
+      incoming connections. Defaults to false.</dd>
+  <dt id="post_response"><a class="permalink" href="#post_response">post_response</a></dt>
+  <dd></dd>
+</dl>
+<p class="Pp">The <code class="Li">post_response</code> method is used to send a
+    response back to the remote kernel. It takes a list of arguments to send
+    back.</p>
+<pre>sub post_response {
+    my( $self, @args ) = @_;
+    $poe_kernel-&gt;post( $self-&gt;{SENDER}, 'response', @args );
+}</pre>
+<p class="Pp">If the <code class="Li">Args</code> parameter was set to undef when
+    spawning the responder, then <code class="Li">post_response</code> can be
+    called with no arguments. In this case, it will simply acknowledge receipt
+    of the request.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CHANNELS'><a class='permalink' href='#CHANNELS'>CHANNELS</a></h1>
+<p class="Pp">IKC uses POE::Component::IKC::Channel to manage the underlying
+    network connections. Each channel is managed by a POE::Component::IKC::Channel
+    object.</p>
+<p class="Pp">The Responder object holds a hash of channels, keyed by the
+    remote kernel's kernel ID. You can access these channels via the <code class="Li">channel</code>
+    method:</p>
+<pre>my $channel = $responder-&gt;channel( $rkernel );</pre>
+<p class="Pp">The channel object has a <code class="Li">close</code> method:</p>
+<pre>sub close_channel {
+    my( $self, $rkernel ) = @_[ OBJECT, ARG0 ];
+    # tell the channel to close
+    $poe_kernel-&gt;post( $self-&gt;{channel}{ $rkernel } =&gt; 'shutdown' );
+}</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ERRORS'><a class='permalink' href='#ERRORS'>ERRORS</a></h1>
+<p class="Pp">Previous versions of IKC did not adequately allow you to monitor
+    for errors on a connection. With 0.2400 we started monitoring errors.</p>
+<p class="Pp">There are 2 step during which you can have errors: when opening
+    the connection and during message exchange. These 2 steps are handled
+    diffrently.</p>
+<p class="Pp">You use &quot;on_error&quot; in POE::Component::IKC::Client and
+    &quot;on_error&quot; in POE::Component::IKC::Server to receive errors while
+    a connection is being opened. Note that this includes the initial IKC
+    handshake.</p>
+<pre>sub on_error 
+{
+    my( $op, $errnum, $errstr ) = @_;
+    # Handle this like you would any POE socket error
+    # But remember you can't rely on your session being active
+}</pre>
+<p class="Pp">You use &quot;monitor&quot; on error to receive errors during
+    message exchange. ARG3 is the name of the operation. ARG4 is the error
+    message. Current operations are:</p>
+<dl class="Bl-tag">
+  <dt id="remote"><a class="permalink" href="#remote">remote-request</a></dt>
+  <dd>Remote kernel was unable to parse a request that was sent from the local
+      kernel.</dd>
+  <dt id="remote~2"><a class="permalink" href="#remote~2">remote-check</a></dt>
+  <dd>Remote kernel has not published an event that was sent from the local
+      kernel.</dd>
+  <dt id="remote~3"><a class="permalink" href="#remote~3">remote-resolve</a></dt>
+  <dd>Remote kernel could not find a session that could handle the request.</dd>
+  <dt id="remote~4"><a class="permalink" href="#remote~4">remote-invocation</a></dt>
+  <dd>Remote kernel had an error when it tried to invoke the request handler.
+      Please note this will not catch errors in the request handler, but only
+      errors in the thunk.</dd>
+  <dt id="local"><a class="permalink" href="#local">local-request</a></dt>
+  <dd></dd>
+  <dt id="local~2"><a class="permalink" href="#local~2">local-check</a></dt>
+  <dd></dd>
+  <dt id="local~3"><a class="permalink" href="#local~3">local-resolve</a></dt>
+  <dd></dd>
+  <dt id="local~4"><a class="permalink" href="#local~4">local-invocation</a></dt>
+  <dd>These 4 operations are the local equivalent of the previous 4. They are
+      intented for logging. In general no actions are required.
+    <p class="Pp">Note that 'local' and 'remote' refer to where the operation
+        happened, not where the request originated. As an example, kernel A
+        sends a poe://B/foo/bar request to kernel B. Kernel B has not published
+        that event. Monitors on kernel A will see remote-check. Monitors on
+        kernel B will see local-check.</p>
+  </dd>
+  <dt id="channel"><a class="permalink" href="#channel">channel-error</a></dt>
+  <dd>Receive channel errors during message exchange. Channel errors are
+      equivalent to POE wheel errors. The message will be
+      <span class="Li">&quot;[$errnum] $errstr&quot;</span>.</dd>
+  <dt id="subscribe"><a class="permalink" href="#subscribe">subscribe</a></dt>
+  <dd>Failure to subscribe to a remote session.</dd>
+  <dt id="fork"><a class="permalink" href="#fork">fork</a></dt>
+  <dd>POE::Component::IKC::Server failed to fork.</dd>
+  <dt id="resolve"><a class="permalink" href="#resolve">resolve</a></dt>
+  <dd>Error when trying to find a remote kernel or session.</dd>
+</dl>
+<p class="Pp">Example monitor for error events:</p>
+<pre>sub monitor_error
+{   
+    my( $self, $rid, $kernel, $real, $data, $op, $message ) = 
+            @_[ OBJECT, ARG0 ... $#_ ];
+    if( $op =~ /^channel-/ and $message =~ /\[(\d+)\] (.*)/ ) {
+        return unless $real;
+        my( $errnum, $errstr ) = ( $1, $2 );
+        if( $op eq 'channel-read' and $errnum == 0 ) {
+            warn &quot;Connection closed&quot;;
+            return;
+        }
+    }
+    warn &quot;Error during $op: $message&quot;;
+}</pre>
+<p class="Pp">In particular, you will note we don't do anything when we detect
+    the channel closed. Instead, it is recommended to attempt reconnection in
+    the &quot;unregister&quot; event.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXPORTED_FUNCTIONS'><a class='permalink' href='#EXPORTED_FUNCTIONS'>EXPORTED   FUNCTIONS</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;create_ikc_responder&amp;quot;'><a class='permalink' href='#&amp;quot;create_ikc_responder&amp;quot;'>&quot;create_ikc_responder&quot;</a></h2>
+<p class="Pp">DEPRECATED. Please use</p>
+<pre>POE::Compontent::IKC::Responder-&gt;spawn();</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PROXY_SENDER'><a class='permalink' href='#PROXY_SENDER'>PROXY   SENDER</a></h1>
+<p class="Pp">Event handlers invoked via IKC will have a proxy SENDER session.
+    You may use it to post back to the remote session.</p>
+<pre>$poe_kernel-&gt;post( $_[SENDER], 'response', @args );</pre>
+<p class="Pp">Normally this proxy session is available during the invocation of
+    the event handler. You may claim it for longer by setting an external
+    reference:</p>
+<pre>$heap-&gt;{remote} = $_[SENDER]-&gt;ID;
+$poe_kernel-&gt;refcount_increment( $heap-&gt;{remote}, 'MINE' );</pre>
+<p class="Pp">POE::Component::IKC will detect this and create a new proxy
+    session for future calls. It will then be UP TO YOU to free the session:</p>
+<pre>$poe_kernel-&gt;refcount_decrement( $heap-&gt;{remote}, 'MINE' );</pre>
+<p class="Pp">Note that you will have to publish any events that will be posted
+    back.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BUGS'><a class='permalink' href='#BUGS'>BUGS</a></h1>
+<p class="Pp">Sending session references and coderefs to a foreign kernel is a
+    bad idea. At some point it would be desirable to recurse through the
+    paramerters and and turn any session references into state specifiers.</p>
+<p class="Pp">The <span class="Li">&quot;rsvp&quot;</span> state in call is a
+    bit problematic. IKC allows it to be posted to once, but doesn't check to
+    see if the foreign kernel is the right one.</p>
+<p class="Pp"><span class="Li">&quot;retract&quot;</span> does not currently
+    tell foreign kernels that have subscribed to a session/state about the
+    retraction.</p>
+<p class="Pp"><span class="Li">call()</span>ing a state in a proxied foreign
+    session doesn't work, for obvious reasons.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTHOR</a></h1>
+<p class="Pp">Philip Gwyn, &lt;perl-ikc at pied.nu&gt;</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT_AND_LICENSE'><a class='permalink' href='#COPYRIGHT_AND_LICENSE'>COPYRIGHT   AND LICENSE</a></h1>
+<p class="Pp">Copyright 1999-2014 by Philip Gwyn. All rights reserved.</p>
+<p class="Pp">This library is free software; you can redistribute it and/or
+    modify it under the same terms as Perl itself.</p>
+<p class="Pp">See <a href='http://www.perl.com/language/misc/Artistic.html'>http://www.perl.com/language/misc/Artistic.html</a></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>SEE   ALSO</a></h1>
+<p class="Pp">POE, POE::Component::IKC::Server, POE::Component::IKC::Client,
+    POE::Component::IKC::ClientLite, POE::Component::IKC::Channel,
+    POE::Component::IKC::Proxy, POE::Component::IKC::Freezer,
+    POE::Component::IKC::Specifier.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Package information:</p>
+    <dl>
+        <dt>Package name:</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-poe-component-ikc/">extra/perl-poe-component-ikc</a></dd>
+        <dt>Version:</dt>
+        <dd>0.2402-12</dd>
+        <dt>Upstream:</dt>
+        <dd><a href="https://search.cpan.org/dist/POE-Component-IKC/">https://search.cpan.org/dist/POE-Component-IKC/</a></dd>
+        <dt>Licenses:</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuals:</dt>
+        <dd><a href="/listing/extra/perl-poe-component-ikc/">/listing/extra/perl-poe-component-ikc/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table of contents</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NAME</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#STATES/METHODS">STATES/METHODS</a></li>
+        
+            <li><a href="#CHANNELS">CHANNELS</a></li>
+        
+            <li><a href="#ERRORS">ERRORS</a></li>
+        
+            <li><a href="#EXPORTED_FUNCTIONS">EXPORTED FUNCTIONS</a></li>
+        
+            <li><a href="#PROXY_SENDER">PROXY SENDER</a></li>
+        
+            <li><a href="#BUGS">BUGS</a></li>
+        
+            <li><a href="#AUTHOR">AUTHOR</a></li>
+        
+            <li><a href="#COPYRIGHT_AND_LICENSE">COPYRIGHT AND LICENSE</a></li>
+        
+            <li><a href="#SEE_ALSO">SEE ALSO</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Other formats:
+        
+            <a href="/man/POE::Component::IKC::Responder.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/POE::Component::IKC::Responder.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>The website is available under the terms of the <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               license, except for the contents of the manual pages, which have their own license
+               specified in the corresponding Arch Linux package.
+            </p>
+        </footer>
+    </body>
+</html>

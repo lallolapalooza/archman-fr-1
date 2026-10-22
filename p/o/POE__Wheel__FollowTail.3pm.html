@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>POE::Wheel::FollowTail(3) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">POE__Wheel__FollowTail(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-poe/">perl-poe</a></p>
+<p class="lic">Licences: GPL, PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">POE::Wheel::FollowTail(3)</td>
+    <td class="head-vol">Documentation des paquets contribués Perl</td>
+    <td class="head-rtitle">POE::Wheel::FollowTail(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">POE::Wheel::FollowTail - suivre la fin d'un fichier qui s'agrandit constamment</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPIS</a></h1>
+<pre>#!perl
+use POE qw(Wheel::FollowTail);
+POE::Session-&gt;create(
+  inline_states =&gt; {
+    _start =&gt; sub {
+      $_[HEAP]{tailor} = POE::Wheel::FollowTail-&gt;new(
+        Filename =&gt; &quot;/var/log/system.log&quot;,
+        InputEvent =&gt; &quot;got_log_line&quot;,
+        ResetEvent =&gt; &quot;got_log_rollover&quot;,
+      );
+    },
+    got_log_line =&gt; sub {
+      print &quot;Log: $_[ARG0]\n&quot;;
+    },
+    got_log_rollover =&gt; sub {
+      print &quot;Log permuté.\n&quot;;
+    },
+  }
+);
+POE::Kernel-&gt;run();
+exit;</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">POE::Wheel::FollowTail surveille les nouvelles données à la fin d'un fichier et déclenche de nouveaux événements lorsque des changements se produisent dans le fichier. Son paramètre <span class="Li">&quot;Filter&quot;</span> définit comment analyser les données d'un fichier surveillé. Chaque nouvel élément est envoyé à la session créatrice sous forme d'événement <span class="Li">&quot;InputEvent&quot;</span>. Le changement de permutation de fichier déclenche un événement <span class="Li">&quot;ResetEvent&quot;</span>.</p>
+<p class="Pp">POE::Wheel::FollowTail ne lit qu'un seul fichier, il n'implémente donc pas de méthode <b>put()</b>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PUBLIC_METHODS'><a class='permalink' href='#PUBLIC_METHODS'>MÉTHODES PUBLIQUES</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='new'><a class='permalink' href='#new'>new</a></h2>
+<p class="Pp"><b>new()</b> retourne un nouvel objet POE::Wheel::FollowTail. Tant que cet objet existera, il déclenchera des événements lorsque l'état correspondant du fichier sera modifié.</p>
+<p class="Pp"><b>new()</b> accepte un petit ensemble de paramètres nommés :</p>
+<p class="Pp"><i>Driver</i></p>
+<p class="Pp">Le paramètre optionnel <span class="Li">&quot;Driver&quot;</span> spécifie quel driver utiliser lors de la lecture du fichier surveillé. S'il n'est pas spécifié, POE::Wheel::FollowTail utilisera POE::Driver::SysRW. C'est presque toujours le bon choix.</p>
+<p class="Pp"><i>Filter</i></p>
+<p class="Pp"><span class="Li">&quot;Filter&quot;</span> est un paramètre optionnel qui spécifie comment analyser les données du fichier surveillé. Par défaut, POE::Wheel::FollowTail utilisera POE::Filter::Line pour analyser les fichiers comme du texte brut, séparé par des lignes.</p>
+<pre>$_[HEAP]{tailor} = POE::Wheel::FollowTail-&gt;new(
+  Filename =&gt; &quot;/var/log/snort/alert&quot;,
+  Filter =&gt; POE::Filter::Snort-&gt;new(),
+  InputEvent =&gt; &quot;got_snort_alert&quot;,
+);</pre>
+<p class="Pp"><i>PollInterval</i></p>
+<p class="Pp">POE::Wheel::FollowTail doit vérifier périodiquement les nouvelles données dans le fichier surveillé. <span class="Li">&quot;PollInterval&quot;</span> spécifie le nombre de secondes à attendre entre chaque vérification. Les applications qui doivent vérifier une fois par seconde peuvent omettre <span class="Li">&quot;PollInterval&quot;</span>, car la valeur par défaut est de 1.</p>
+<p class="Pp">Des intervalles de polling plus longs peuvent être utilisés pour réduire la surcharge de polling sur les fichiers à faible taux de mise à jour.</p>
+<pre>$_[HEAP]{tailor} = POE::Wheel::FollowTail-&gt;new(
+  ...,
+  PollInterval =&gt; 10,
+);</pre>
+<p class="Pp"><i>Seek</i></p>
+<p class="Pp">S'il est spécifié, <span class="Li">&quot;Seek&quot;</span> demande à POE::Wheel::FollowTail de se repositionner à un endroit spécifique dans le fichier surveillé avant de commencer à lire à partir de celui-ci. Une valeur positive de <span class="Li">&quot;Seek&quot;</span> est interprétée comme le nombre d'octets à rechercher depuis le début du fichier. Une valeur négative de <span class="Li">&quot;Seek&quot;</span> se comporte comme un index négatif dans un tableau. Une valeur de zéro pour <span class="Li">&quot;Seek&quot;</span> commence la lecture depuis le début du fichier.</p>
+<p class="Pp">Il faut être prudent lors de l'utilisation de <span class="Li">&quot;Seek&quot;</span>, car il est très facile de se positionner au milieu d'un enregistrement. En cas de doute, et lors du démarrage depuis la fin du fichier, omettez complètement <span class="Li">&quot;Seek&quot;</span>. POE::Wheel::FollowTail recherchera 4 kilo-octets avant la fin du fichier, puis analysera et rejettera tous les enregistrements jusqu'à la fin du fichier. Tant que les enregistrements du fichier sont inférieurs à 4 kilo-octets, cela garantira que le premier enregistrement renvoyé sera complet.</p>
+<p class="Pp"><span class="Li">&quot;Seek&quot;</span> peut également être utilisé avec la méthode <b>tell()</b> de la roue pour restaurer la position du fichier après un redémarrage du programme. Sauvegardez la valeur de <b>tell()</b> avant de quitter, puis rechargez et <span class="Li">&quot;Seek&quot;</span> à cette valeur au démarrage de chaque redémarrage.</p>
+<p class="Pp"><i>SeekBack</i></p>
+<p class="Pp"><span class="Li">&quot;SeekBack&quot;</span> se comporte comme l'inverse de <span class="Li">&quot;Seek&quot;</span>. Une valeur positive agit comme une valeur négative de <span class="Li">&quot;Seek&quot;</span>. Une valeur négative agit comme une valeur positive de <span class="Li">&quot;Seek&quot;</span>. Une valeur de zéro pour <span class="Li">&quot;SeekBack&quot;</span> demande à POE::Wheel::FollowTail de commencer depuis la fin du fichier.</p>
+<p class="Pp"><span class="Li">&quot;Seek&quot;</span> et <span class="Li">&quot;SeekBack&quot;</span> s'excluent mutuellement. Voir &quot;Seek&quot; pour les avertissements, les techniques et une explication de la magie qui se produit lorsque <span class="Li">&quot;Seek&quot;</span> et <span class="Li">&quot;SeekBack&quot;</span> ne sont pas spécifiés.</p>
+<p class="Pp"><i>Handle</i></p>
+<p class="Pp">POE::Wheel::FollowTail peut suivre un fichier qui a déjà été ouvert avec <span class="Li">&quot;Handle&quot;</span>. Cependant, il ne peut pas suivre les permutations de fichiers ainsi, car il ne pourra pas rouvrir le fichier une fois qu'il aura été permuté. Les applications qui doivent suivre les permutations doivent utiliser <span class="Li">&quot;Filename&quot;</span> à la place.</p>
+<p class="Pp"><span class="Li">&quot;Handle&quot;</span> est utile pour les fichiers qui ne seront jamais permutés, ou pour les périphériques qui nécessitent une configuration en dehors de la portée de POE::Wheel::FollowTail.</p>
+<p class="Pp"><span class="Li">&quot;Handle&quot;</span> et <span class="Li">&quot;Filename&quot;</span> s'excluent mutuellement. L'un d'eux est requis, même s'il n'est pas présent.</p>
+<p class="Pp"><i>Filename</i></p>
+<p class="Pp">Spécifie le <span class="Li">&quot;Filename&quot;</span> à suivre. POE::Wheel::FollowTail attendra que le fichier existe s'il ne le trouve pas. La roue rouvrira également le fichier s'il disparaît, comme lorsqu'il a été permuté ou que le fichier a été corrompu. Dans le cas d'une permutation, POE::Wheel::FollowTail déclenchera également un événement <span class="Li">&quot;ResetEvent&quot;</span>, s'il a été demandé.</p>
+<p class="Pp"><span class="Li">&quot;Handle&quot;</span> et <span class="Li">&quot;Filename&quot;</span> s'excluent mutuellement. L'un d'eux est requis, même s'il n'est pas présent.</p>
+<p class="Pp">Voir l'exemple dans &quot;SYNOPIS&quot;.</p>
+<p class="Pp"><i>IdleEvent</i></p>
+<p class="Pp"><span class="Li">&quot;IdleEvent&quot;</span> est un événement optionnel. S'il est spécifié, il sera déclenché chaque fois que POE::Wheel::FollowTail vérifie l'activité mais ne trouve rien. Il a été ajouté dans POE 1.362 comme moyen de faire avancer certains programmes de test sans avoir à attendre de manière conservatrice de longues périodes.</p>
+<p class="Pp"><span class="Li">&quot;IdleEvent&quot;</span> est décrit dans &quot;PUBLIC EVENTS&quot;.</p>
+<p class="Pp"><i>InputEvent</i></p>
+<p class="Pp"><span class="Li">&quot;InputEvent&quot;</span> est un paramètre obligatoire et spécifie l'événement à déclencher lorsque de nouvelles données arrivent dans le fichier surveillé. <span class="Li">&quot;InputEvent&quot;</span> est décrit en détail dans &quot;PUBLIC EVENTS&quot;.</p>
+<p class="Pp"><i>ResetEvent</i></p>
+<p class="Pp"><span class="Li">&quot;ResetEvent&quot;</span> est un événement optionnel. Il spécifie le nom de l'événement qui indique la permutation ou la réinitialisation d'un fichier. Veuillez voir &quot;PUBLIC EVENTS&quot; pour plus de détails.</p>
+<p class="Pp"><i>ErrorEvent</i></p>
+<p class="Pp">POE::Wheel::FollowTail peut déclencher des événements optionnels <span class="Li">&quot;ErrorEvent&quot;</span> lorsqu'il rencontre un problème. Les données accompagnant cet événement sont expliquées dans &quot;PUBLIC EVENTS&quot;.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='event'><a class='permalink' href='#event'>event</a></h2>
+<p class="Pp"><b>event()</b> permet à une session de changer les événements déclenchés par une roue sans détruire et reconstruire l'objet. Il accepte un ou plusieurs des événements mentionnés dans &quot;PUBLIC EVENTS&quot;. Les noms d'événements indéfinis désactivent ces événements.</p>
+<p class="Pp">Arrêter de surveiller les permutations de logs :</p>
+<pre>sub some_event_handler {
+  $_[HEAP]{tailor}-&gt;event( ResetEvent =&gt; undef );
+}</pre>
+<p class="Pp">Les événements sont décrits plus en détail dans &quot;PUBLIC EVENTS&quot;.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='ID'><a class='permalink' href='#ID'>ID</a></h2>
+<p class="Pp">La méthode <b>ID()</b> retourne l'identifiant unique de la roue. Il est utile pour stocker la roue dans un hash. Tous les événements de POE::Wheel doivent être accompagnés d'un identifiant de roue, ce qui permet de référencer la roue dans ses gestionnaires d'événements.</p>
+<pre>sub setup_tailor {
+  my $wheel = POE::Wheel::FollowTail-&gt;new(... incomplete ...);
+  $_[HEAP]{tailors}{$wheel-&gt;ID} = $wheel;
+}</pre>
+<p class="Pp">Voir l'exemple dans &quot;ErrorEvent&quot; pour un gestionnaire qui retrouvera cette roue.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='tell'><a class='permalink' href='#tell'>tell</a></h2>
+</section>
+</article>
+</main>
+</body>
+</html>
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>POE::Wheel::FollowTail(3pm) - Arch Linux Man Pages</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <section class="section">
+        <div class="container">
+            <nav class="breadcrumb" aria-label="breadcrumbs">
+                <ul>
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/listing/extra/perl-poe/">perl-poe</a></li>
+                    <li><a href="/man/POE::Wheel::FollowTail.3pm.en.html">POE::Wheel::FollowTail</a></li>
+                </ul>
+            </nav>
+            <article id="main">
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NAME</a></h1>
+<p class="Pp">POE::Wheel::FollowTail - POE wheel for watching files for changes</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>    use POE::Wheel::FollowTail;
+
+    # In your session's main handler:
+    sub POE::Session::my_session_name::event_handler {
+      my ($heap, $input) = @_[HEAP, ARG0];
+
+      # ... process input ...
+    }
+
+    # When creating the wheel:
+    $heap-&gt;{tailor} = POE::Wheel::FollowTail-&gt;new(
+      Filename =&gt; '/path/to/some/file',
+      InputEvent =&gt; 'event_handler', # The name of the handler in this session
+      # Other options ...
+    );
+</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">POE::Wheel::FollowTail is a POE wheel that will watch a file for
+    changes. It's like the command-line <span class="Nm">tail</span> command,
+    but it emits POE events when data is found.</p>
+<p class="Pp">It can be configured to watch a file by name, or to follow an
+    already-opened file descriptor.</p>
+<p class="Pp">It also has support for files that are rotated, though this
+    requires that the wheel be watching the file by name.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PUBLIC_METHODS'><a class='permalink' href='#PUBLIC_METHODS'>PUBLIC METHODS</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='new'><a class='permalink' href='#new'>new</a></h2>
+<p class="Pp">A POE::Wheel::FollowTail object is created with
+    <span class="Nm">POE::Wheel::FollowTail-&gt;new()</span>. It takes the
+    following parameters:</p>
+<ul>
+<li class="Li"><span class="Ix">Filename</span>: The name of the file to
+    watch.</li>
+<li class="Li"><span class="Ix">Handle</span>: An already-opened file handle. If
+    this is specified, <span class="Ix">Filename</span> will be ignored.</li>
+<li class="Li"><span class="Ix">InputEvent</span>: The name of the event that
+    will be emitted when new data is read from the file. (Default:
+    <span class="Li">&quot;InputEvent&quot;</span>)</li>
+<li class="Li"><span class="Ix">IdleEvent</span>: The name of the event that will
+    be emitted when no data is read from the file for a period of time. (Default:
+    <span class="Li">&quot;IdleEvent&quot;</span>)</li>
+<li class="Li"><span class="Ix">ResetEvent</span>: The name of the event that will
+    be emitted when the file is detected to have been reset. (Default:
+    <span class="Li">&quot;ResetEvent&quot;</span>)</li>
+<li class="Li"><span class="Ix">ErrorEvent</span>: The name of the event that will
+    be emitted when an error occurs. (Default: <span class="Li">&quot;ErrorEvent&quot;</span>)</li>
+<li class="Li"><span class="Ix">Filter</span>: A filter object, which is expected
+    to have a <span class="Li">filter()</span> method. This method will be called
+    with the data read from the file, and its return value will be emitted in
+    the <span class="Ix">InputEvent</span>.</li>
+<li class="Li"><span class="Ix">Seek</span>: A file offset. The wheel will start
+    reading the file from this offset.</li>
+</ul>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='tell'><a class='permalink' href='#tell'>tell()</a></h2>
+<p class="Pp"><b>tell()</b> returns the current position for the file being
+    watched by POE::Wheel::FollowTail. It may be useful for saving the position
+    program termination. <b>new()</b>'s <span class="Li">&quot;Seek&quot;</span>
+    parameter may be used to resume watching the file where <b>tell()</b> left
+    off.</p>
+<pre>sub handle_shutdown {
+  # Not robust.  Do better in production.
+  open my $save, "&gt;", "position.save" or die $!;
+  print $save $_[HEAP]{tailor}-&gt;tell(), "\n";
+  close $save;
+}
+sub handle_startup {
+  open my $save, "&lt;", "position.save" or die $!;
+  chomp(my $seek = &lt;$save&gt;);
+  $_[HEAP]{tailor} = POE::Wheel::FollowTail-&gt;new(
+    ...,
+    Seek =&gt; $seek,
+  );
+}</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PUBLIC_EVENTS'><a class='permalink' href='#PUBLIC_EVENTS'>PUBLIC EVENTS</a></h1>
+<p class="Pp">POE::Wheel::FollowTail emits a small number of events.</p>
+<section class="Ss">
+<h2 class="Ss" id='IdleEvent'><a class='permalink' href='#IdleEvent'>IdleEvent</a></h2>
+<p class="Pp"><span class="Li">&quot;IdleEvent&quot;</span> specifies the name
+    of an event to be fired when POE::Wheel::FollowTail doesn't detect activity
+    on the watched file.</p>
+<p class="Pp"><span class="Li">$_[ARG0]</span> contains the ID of the
+    POE::Wheel::FollowTail object that fired the event.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='InputEvent'><a class='permalink' href='#InputEvent'>InputEvent</a></h2>
+<p class="Pp"><span class="Li">&quot;InputEvent&quot;</span> sets the name of
+    the event to emit when new data arrives into the tailed file. The event will
+    be accompanied by two parameters:</p>
+<p class="Pp"><span class="Li">$_[ARG0]</span> contains the data that was read
+    from the file, after being parsed by the current
+    <span class="Li">&quot;Filter&quot;</span>.</p>
+<p class="Pp"><span class="Li">$_[ARG1]</span> contains the wheel's ID, which
+    may be used as a key into a data structure tracking multiple wheels. No
+    assumption should be made about the nature or format of this ID, as it may
+    change at any time. Therefore, track your wheels in a hash.</p>
+<p class="Pp">See the &quot;SYNOPSIS&quot; for an example.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='ResetEvent'><a class='permalink' href='#ResetEvent'>ResetEvent</a></h2>
+<p class="Pp"><span class="Li">&quot;ResetEvent&quot;</span> names the event to
+    be emitted whenever the wheel detects that the followed file has been reset.
+    It's only available when watching files by name, as POE::Wheel::FollowTail
+    must reopen the file after it has been reset.</p>
+<p class="Pp"><span class="Li">&quot;ResetEvent&quot;</span> comes with only one
+    parameter, <span class="Li">$_[ARG0]</span>, which contains the wheel's ID.
+    See &quot;InputEvent&quot; for some notes about what may be done with wheel
+    IDs.</p>
+<p class="Pp">See the &quot;SYNOPSIS&quot; for an example.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='ErrorEvent'><a class='permalink' href='#ErrorEvent'>ErrorEvent</a></h2>
+<p class="Pp"><span class="Li">&quot;ErrorEvent&quot;</span> names the event
+    emitted when POE::Wheel::FollowTail encounters a problem. Every
+    <span class="Li">&quot;ErrorEvent&quot;</span> comes with four parameters
+    that describe the error and its situation:</p>
+<p class="Pp"><span class="Li">$_[ARG0]</span> describes the operation that
+    failed. This is usually &quot;read&quot;, since POE::Wheel::FollowTail
+    spends most of its time reading from a file.</p>
+<p class="Pp"><span class="Li">$_[ARG1]</span> and
+    <span class="Li">$_[ARG2]</span> contain the numeric and stringified values
+    of <span class="Li">$!</span>, respectively. They will never contain EAGAIN
+    (or its local equivalent) since POE::Wheel::FollowTail handles that error
+    itself.</p>
+<p class="Pp"><span class="Li">$_[ARG3]</span> contains the wheel's ID, which
+    has been discussed in &quot;InputEvent&quot;.</p>
+<p class="Pp">This error handler logs a message to STDERR and then shuts down
+    the wheel. It assumes that the session is watching multiple files.</p>
+<pre>sub handle_tail_error {
+  my ($operation, $errnum, $errstr, $wheel_id) = @_[ARG0..ARG3];
+  warn "Wheel $wheel_id: $operation error $errnum: $errstr\n";
+  delete $_[HEAP]{tailors}{$wheel_id};
+}</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>SEE ALSO</a></h1>
+<p class="Pp">POE::Wheel describes the basic operations of all wheels in more
+    depth. You need to know this.</p>
+<p class="Pp">The SEE ALSO section in POE contains a table of contents covering
+    the entire POE distribution.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BUGS'><a class='permalink' href='#BUGS'>BUGS</a></h1>
+<p class="Pp">This wheel can't tail pipes and consoles on some operating
+    systems.</p>
+<p class="Pp">POE::Wheel::FollowTail generally reads ahead of the data it
+    returns, so the <b>tell()</b> position may be later in the file than the
+    data an application has already received.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHORS_&amp;amp;_COPYRIGHTS'><a class='permalink' href='#AUTHORS_&amp;amp;_COPYRIGHTS'>AUTHORS   &amp; COPYRIGHTS</a></h1>
+<p class="Pp">Please see POE for more information about authors and
+    contributors.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2024-07-13</td>
+    <td class="foot-os">perl v5.38.2</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Package information:</p>
+    <dl>
+        <dt>Package name:</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-poe/">extra/perl-poe</a></dd>
+        <dt>Version:</dt>
+        <dd>1.370-2</dd>
+        <dt>Upstream:</dt>
+        <dd><a href="https://search.cpan.org/dist/POE">https://search.cpan.org/dist/POE</a></dd>
+        <dt>Licenses:</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuals:</dt>
+        <dd><a href="/listing/extra/perl-poe/">/listing/extra/perl-poe/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table of contents</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NAME</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#PUBLIC_METHODS">PUBLIC METHODS</a></li>
+        
+            <li><a href="#PUBLIC_EVENTS">PUBLIC EVENTS</a></li>
+        
+            <li><a href="#SEE_ALSO">SEE ALSO</a></li>
+        
+            <li><a href="#BUGS">BUGS</a></li>
+        
+            <li><a href="#AUTHORS_&amp;amp;_COPYRIGHTS">AUTHORS &amp; COPYRIGHTS</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Other formats:
+        
+            <a href="/man/POE::Wheel::FollowTail.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/POE::Wheel::FollowTail.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>The website is available under the terms of the <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               license, except for the contents of the manual pages, which have their own license
+               specified in the corresponding Arch Linux package.
+            </p>
+        </footer>
+    </body>
+</html>
+```
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>POE::Wheel::FollowTail(3pm) - Pages de manuel Arch Linux</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <section class="section">
+        <div class="container">
+            <nav class="breadcrumb" aria-label="breadcrumbs">
+                <ul>
+                    <li><a href="/">Accueil</a></li>
+                    <li><a href="/listing/extra/perl-poe/">perl-poe</a></li>
+                    <li><a href="/man/POE::Wheel::FollowTail.3pm.fr.html">POE::Wheel::FollowTail</a></li>
+                </ul>
+            </nav>
+            <article id="main">
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">POE::Wheel::FollowTail - Roue POE pour surveiller les fichiers pour les changements</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<pre>    use POE::Wheel::FollowTail;
+
+    # Dans le gestionnaire principal de votre session :
+    sub POE::Session::my_session_name::event_handler {
+      my ($heap, $input) = @_[HEAP, ARG0];
+
+      # ... traiter l'entrée ...
+    }
+
+    # Lors de la création de la roue :
+    $heap-&gt;{tailor} = POE::Wheel::FollowTail-&gt;new(
+      Filename =&gt; '/chemin/vers/un/fichier',
+      InputEvent =&gt; 'event_handler', # Le nom du gestionnaire dans cette session
+      # Autres options ...
+    );
+</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">POE::Wheel::FollowTail est une roue POE qui surveillera un fichier
+    pour détecter les changements. C'est comme la commande <span class="Nm">tail</span>
+    en ligne de commande, mais elle émet des événements POE lorsque des données
+    sont trouvées.</p>
+<p class="Pp">Elle peut être configurée pour surveiller un fichier par son nom,
+    ou pour suivre un descripteur de fichier déjà ouvert.</p>
+<p class="Pp">Elle prend également en charge les fichiers qui sont pivotés, bien
+    que cela nécessite que la roue surveille le fichier par son nom.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_PUBLIQUES'><a class='permalink' href='#MÉTHODES_PUBLIQUES'>MÉTHODES PUBLIQUES</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='new'><a class='permalink' href='#new'>new</a></h2>
+<p class="Pp">Un objet POE::Wheel::FollowTail est créé avec
+    <span class="Nm">POE::Wheel::FollowTail-&gt;new()</span>. Il prend les
+    paramètres suivants :</p>
+<ul>
+<li class="Li"><span class="Ix">Filename</span>: Le nom du fichier à
+    surveiller.</li>
+<li class="Li"><span class="Ix">Handle</span>: Une poignée de fichier déjà ouverte. Si
+    celle-ci est spécifiée, <span class="Ix">Filename</span> sera ignoré.</li>
+<li class="Li"><span class="Ix">InputEvent</span>: Le nom de l'événement qui sera
+    émis lorsque de nouvelles données seront lues du fichier. (Défaut :
+    <span class="Li">&quot;InputEvent&quot;</span>)</li>
+<li class="Li"><span class="Ix">IdleEvent</span>: Le nom de l'événement qui sera
+    émis lorsqu'aucune donnée ne sera lue du fichier pendant un certain temps.
+    (Défaut : <span class="Li">&quot;IdleEvent&quot;</span>)</li>
+<li class="Li"><span class="Ix">ResetEvent</span>: Le nom de l'événement qui sera
+    émis lorsque le fichier sera détecté comme ayant été réinitialisé. (Défaut :
+    <span class="Li">&quot;ResetEvent&quot;</span>)</li>
+<li class="Li"><span class="Ix">ErrorEvent</span>: Le nom de l'événement qui sera
+    émis lorsqu'une erreur se produira. (Défaut : <span class="Li">&quot;ErrorEvent&quot;</span>)</li>
+<li class="Li"><span class="Ix">Filter</span>: Un objet filtre, qui est censé avoir
+    une méthode <span class="Li">filter()</span>. Cette méthode sera appelée avec les
+    données lues du fichier, et sa valeur de retour sera émise dans l'
+    <span class="Ix">InputEvent</span>.</li>
+<li class="Li"><span class="Ix">Seek</span>: Un décalage de fichier. La roue commencera
+    à lire le fichier à partir de ce décalage.</li>
+</ul>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='tell'><a class='permalink' href='#tell'>tell()</a></h2>
+<p class="Pp"><b>tell()</b> renvoie la position actuelle du fichier surveillé par
+    POE::Wheel::FollowTail. Cela peut être utile pour sauvegarder la position à
+    la terminaison du programme. Le paramètre <span class="Li">&quot;Seek&quot;</span>
+    de <b>new()</b> peut être utilisé pour reprendre la surveillance du fichier
+    là où <b>tell()</b> s'est arrêté.</p>
+<pre>sub handle_shutdown {
+  # Pas robuste. Faites mieux en production.
+  open my $save, "&gt;", "position.save" or die $!;
+  print $save $_[HEAP]{tailor}-&gt;tell(), "\n";
+  close $save;
+}
+sub handle_startup {
+  open my $save, "&lt;", "position.save" or die $!;
+  chomp(my $seek = &lt;$save&gt;);
+  $_[HEAP]{tailor} = POE::Wheel::FollowTail-&gt;new(
+    ...,
+    Seek =&gt; $seek,
+  );
+}</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ÉVÉNEMENTS_PUBLICS'><a class='permalink' href='#ÉVÉNEMENTS_PUBLICS'>ÉVÉNEMENTS PUBLICS</a></h1>
+<p class="Pp">POE::Wheel::FollowTail émet un petit nombre d'événements.</p>
+<section class="Ss">
+<h2 class="Ss" id='IdleEvent'><a class='permalink' href='#IdleEvent'>IdleEvent</a></h2>
+<p class="Pp"><span class="Li">&quot;IdleEvent&quot;</span> spécifie le nom
+    d'un événement à déclencher lorsque POE::Wheel::FollowTail ne détecte aucune
+    activité sur le fichier surveillé.</p>
+<p class="Pp"><span class="Li">$_[ARG0]</span> contient l'identifiant de l'objet
+    POE::Wheel::FollowTail qui a déclenché l'événement.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='InputEvent'><a class='permalink' href='#InputEvent'>InputEvent</a></h2>
+<p class="Pp"><span class="Li">&quot;InputEvent&quot;</span> définit le nom de
+    l'événement à émettre lorsque de nouvelles données arrivent dans le fichier
+    suivi. L'événement sera accompagné de deux paramètres :</p>
+<p class="Pp"><span class="Li">$_[ARG0]</span> contient les données qui ont été
+    lues du fichier, après avoir été analysées par le
+    <span class="Li">&quot;Filter&quot;</span> actuel.</p>
+<p class="Pp"><span class="Li">$_[ARG1]</span> contient l'identifiant de la roue,
+    qui peut être utilisé comme clé dans une structure de données suivant plusieurs
+    roues. Aucune supposition ne doit être faite quant à la nature ou au format de
+    cet identifiant, car il peut changer à tout moment. Par conséquent, suivez vos
+    roues dans une table de hachage.</p>
+<p class="Pp">Voir le &quot;SYNTAXE&quot; pour un exemple.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='ResetEvent'><a class='permalink' href='#ResetEvent'>ResetEvent</a></h2>
+<p class="Pp"><span class="Li">&quot;ResetEvent&quot;</span> nomme l'événement à
+    émettre chaque fois que la roue détecte que le fichier suivi a été réinitialisé.
+    Il n'est disponible que lorsque l'on surveille des fichiers par nom, car
+    POE::Wheel::FollowTail doit rouvrir le fichier après sa réinitialisation.</p>
+<p class="Pp"><span class="Li">&quot;ResetEvent&quot;</span> ne comporte qu'un seul
+    paramètre, <span class="Li">$_[ARG0]</span>, qui contient l'identifiant de la
+    roue. Voir &quot;InputEvent&quot; pour quelques notes sur ce qui peut être fait
+    avec les identifiants de roue.</p>
+<p class="Pp">Voir le &quot;SYNTAXE&quot; pour un exemple.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='ErrorEvent'><a class='permalink' href='#ErrorEvent'>ErrorEvent</a></h2>
+<p class="Pp"><span class="Li">&quot;ErrorEvent&quot;</span> nomme l'événement émis
+    lorsque POE::Wheel::FollowTail rencontre un problème. Chaque
+    <span class="Li">&quot;ErrorEvent&quot;</span> est accompagné de quatre paramètres
+    qui décrivent l'erreur et sa situation :</p>
+<p class="Pp"><span class="Li">$_[ARG0]</span> décrit l'opération qui a échoué. Il
+    s'agit généralement de &quot;read&quot;, car POE::Wheel::FollowTail passe la
+    plupart de son temps à lire dans un fichier.</p>
+<p class="Pp"><span class="Li">$_[ARG1]</span> et
+    <span class="Li">$_[ARG2]</span> contiennent les valeurs numérique et sous forme
+    de chaîne de <span class="Li">$!</span>, respectivement. Ils ne contiendront jamais
+    EAGAIN (ou son équivalent local) car POE::Wheel::FollowTail gère lui-même cette
+    erreur.</p>
+<p class="Pp"><span class="Li">$_[ARG3]</span> contient l'identifiant de la roue,
+    qui a été discuté dans &quot;InputEvent&quot;.</p>
+<p class="Pp">Ce gestionnaire d'erreurs enregistre un message dans STDERR puis arrête
+    la roue. Il suppose que la session surveille plusieurs fichiers.</p>
+<pre>sub handle_tail_error {
+  my ($operation, $errnum, $errstr, $wheel_id) = @_[ARG0..ARG3];
+  warn "Roue $wheel_id: erreur d'opération $errnum : $errstr\n";
+  delete $_[HEAP]{tailors}{$wheel_id};
+}</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR AUSSI</a></h1>
+<p class="Pp">POE::Wheel décrit les opérations de base de toutes les roues plus en
+    profondeur. Vous devez connaître cela.</p>
+<p class="Pp">La section VOIR AUSSI dans POE contient une table des matières couvrant
+    l'ensemble de la distribution POE.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BOGUES'><a class='permalink' href='#BOGUES'>BOGUES</a></h1>
+<p class="Pp">Cette roue ne peut pas suivre les tubes et les consoles sur certains
+    systèmes d'exploitation.</p>
+<p class="Pp">POE::Wheel::FollowTail lit généralement en avance par rapport aux
+    données qu'il renvoie, de sorte que la position de <b>tell()</b> peut être plus
+    loin dans le fichier que les données qu'une application a déjà reçues.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEURS_&amp;amp;_DROITS_D_AUTEUR'><a class='permalink' href='#AUTEURS_&amp;amp;_DROITS_D_AUTEUR'>AUTEURS   &amp; DROITS D'AUTEUR</a></h1>
+<p class="Pp">Veuillez consulter POE pour plus d'informations sur les auteurs et les
+    contributeurs.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2024-07-13</td>
+    <td class="foot-os">perl v5.38.2</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher une page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-poe/">extra/perl-poe</a></dd>
+        <dt>Version :</dt>
+        <dd>1.370-2</dd>
+        <dt>En amont :</dt>
+        <dd><a href="https://search.cpan.org/dist/POE">https://search.cpan.org/dist/POE</a></dd>
+        <dt>Licences :</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-poe/">/listing/extra/perl-poe/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#SYNTAXE">SYNTAXE</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#MÉTHODES_PUBLIQUES">MÉTHODES PUBLIQUES</a></li>
+        
+            <li><a href="#ÉVÉNEMENTS_PUBLICS">ÉVÉNEMENTS PUBLICS</a></li>
+        
+            <li><a href="#VOIR_AUSSI">VOIR AUSSI</a></li>
+        
+            <li><a href="#BOGUES">BOGUES</a></li>
+        
+            <li><a href="#AUTEURS_&amp;amp;_DROITS_D_AUTEUR">AUTEURS &amp; DROITS D'AUTEUR</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/POE::Wheel::FollowTail.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/POE::Wheel::FollowTail.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

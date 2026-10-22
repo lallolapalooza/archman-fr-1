@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Sub::Override(3pm) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Sub__Override(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-sub-override/">perl-sub-override</a></p>
+<p class="lic">Licences: Artistic-1.0-Perl</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Sub::Override(3)</td>
+    <td class="head-vol">Documentation Perl Contribuée par l'Utilisateur</td>
+    <td class="head-rtitle">Sub::Override(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">Sub::Override - Extension Perl pour outrepasser facilement des sous-routines</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VERSION'><a class='permalink' href='#VERSION'>VERSION</a></h1>
+<p class="Pp">0.12</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>use Sub::Override;
+sub foo { 'sous-routine originale' };
+print foo(); # affiche 'sous-routine originale'
+my $override = Sub::Override-&gt;new( foo =&gt; sub { 'sous-routine outrepassée' } );
+print foo(); # affiche 'sous-routine outrepassée'
+$override-&gt;restore;
+print foo(); # affiche 'sous-routine originale'</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='Le_problème'><a class='permalink' href='#Le_problème'>Le problème</a></h2>
+<p class="Pp">Parfois, des sous-routines doivent être outrepassées. En fait, votre auteur le fait fréquemment pour les tests. En particulier lors des tests, l'utilisation d'un objet mock peut être excessive lorsqu'il s'agit simplement d'outrepasser une petite fonction.</p>
+<p class="Pp">Outrepasser une sous-routine est souvent fait avec une syntaxe similaire à ce qui suit.</p>
+<pre>{
+  local *Some::sub = sub {'comportement quelconque'};
+  # faire quelque chose
+}
+# comportement de sous-routine original restauré</pre>
+<p class="Pp">Cela présente quelques problèmes.</p>
+<pre>{
+  local *Get::some_feild = { 'comportement quelconque' };
+  # faire quelque chose
+}</pre>
+<p class="Pp">Dans l'exemple ci-dessus, non seulement nous avons probablement mal orthographié le nom de la sous-routine, mais même s'il y avait eu une sous-routine de ce nom, nous ne l'avons pas outrepassée. Ces deux erreurs peuvent être subtiles à détecter.</p>
+<p class="Pp">De plus, si nous tentons de localiser l'effet en plaçant ce code dans un bloc, toute la construction est fastidieuse.</p>
+<p class="Pp">Hook::LexWrap nous permet également d'outrepasser le comportement des sous-routines, mais je n'arrive jamais à me souvenir de la syntaxe exacte.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Une_manière_plus_facile_de_remplacer_des_sous-routines'><a class='permalink' href='#Une_manière_plus_facile_de_remplacer_des_sous-routines'>Une manière plus facile de remplacer des sous-routines</a></h2>
+<p class="Pp">Au lieu de cela, <span class="Li">&quot;Sub::Override&quot;</span> permet au programmeur de simplement nommer la sous-routine à remplacer et de fournir une sous-routine pour la remplacer.</p>
+<pre>my $override = Sub::Override-&gt;new('Some::sub', sub {'nouvelles données'});
+# ce qui est équivalent à :
+my $override = Sub::Override-&gt;new;
+$override-&gt;replace('Some::sub', sub { 'nouvelles données' });</pre>
+<p class="Pp">Vous pouvez remplacer plusieurs sous-routines, si nécessaire :</p>
+<pre>$override-&gt;replace('Some::sub1', sub { 'nouvelles données1' });
+$override-&gt;replace('Some::sub2', sub { 'nouvelles données2' });
+$override-&gt;replace('Some::sub3', sub { 'nouvelles données3' });</pre>
+<p class="Pp">Si le remplacement de la sous-routine réussit, l'objet est retourné. Cela permet au programmeur de chaîner les appels, si ce style de programmation est préféré :</p>
+<pre>$override-&gt;replace('Some::sub1', sub { 'nouvelles données1' })
+         -&gt;replace('Some::sub2', sub { 'nouvelles données2' })
+         -&gt;replace('Some::sub3', sub { 'nouvelles données3' });</pre>
+<p class="Pp">Si la sous-routine a un prototype, la nouvelle sous-routine doit être déclarée avec le même prototype que l'originale :</p>
+<pre>$override-&gt;replace('Some::sub_with_proto', sub ($$) { ($_[0], $_ [1]) });</pre>
+<p class="Pp">Une sous-routine peut être remplacée autant de fois que désiré. Ceci est surtout utile pour tester le comportement du code avec plusieurs conditions.</p>
+<pre>$override-&gt;replace('Some::thing', sub { 0 });
+is($object-&gt;foo, 'wibble', 'wibble est retourné si Some::thing est faux');
+$override-&gt;replace('Some::thing', sub { 1 });
+is($object-&gt;foo, 'puppies', 'des chiots sont retournés si Some::thing est vrai');</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Injection_dune_sous-routine'><a class='permalink' href='#Injection_dune_sous-routine'>Injection d'une sous-routine</a></h2>
+<p class="Pp">Si vous souhaitez injecter une sous-routine dans un paquet, vous pouvez utiliser la méthode <span class="Li">inject()</span>. Ceci est identique à <span class="Li">replace()</span>, sauf qu'elle exige que la sous-routine n'existe pas :</p>
+<pre>$override-&gt;inject('Some::sub', sub {'nouvelles données'});</pre>
+<p class="Pp">Ceci est utile si vous souhaitez ajouter une sous-routine à un paquet qui n'en a pas déjà.</p>
+<p class="Pp">Si vous tentez d'injecter une sous-routine qui existe déjà, une exception sera levée.</p>
+<pre>$override-&gt;inject('Some::sub', sub {'nouvelles données'}); # fonctionne
+$override-&gt;inject('Some::sub', sub {'nouvelles données'}); # lève une exception</pre>
+<p class="Pp">Appeler <span class="Li">restore()</span> ou laisser <span class="Li">$override</span> sortir de portée supprimera la sous-routine injectée.</p>
+<pre>$override-&gt;inject('Some::sub', sub {'nouvelles données'});
+$override-&gt;restore('Some::sub'); # supprime la sous-routine injectée</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Héritage_dune_sous-routine'><a class='permalink' href='#Héritage_dune_sous-routine'>Héritage d'une sous-routine</a></h2>
+<p class="Pp">Similaire à 'inject', 'inherit' vous permettra uniquement de créer une nouvelle sous-routine sur un objet enfant qui hérite de la routine du parent, et qui n'existe pas dans l'enfant :</p>
+<pre>package Parent;
+sub foo {}
+sub bar {}
+package Child;
+use parent 'Parent';
+sub foo {}</pre>
+<p class="Pp">'Inherit' vous permettra de configurer une nouvelle sous-routine 'Child::bar' car elle est héritée de Parent. Tenter d' 'inherit' 'Child::foo' lèvera une exception car 'foo' existe déjà dans Child. De même, tenter d' 'inherit' une nouvelle sous-routine 'something' dans Child lèvera également une exception car elle n'existe pas dans Parent et ne sera pas héritée par Child.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Enveloppement_dune_sous-routine'><a class='permalink' href='#Enveloppement_dune_sous-routine'>Enveloppement d'une sous-routine</a></h2>
+<p class="Pp">Il peut arriver que vous souhaitiez remplacer une sous-routine de manière 'conditionnelle' - par exemple, pour outrepasser la sous-routine originale uniquement si certains arguments sont passés. Pour cela, vous pouvez spécifier <span class="Li">&quot;wrap&quot;</span> au lieu de <span class="Li">&quot;replace&quot;</span>. <span class="Li">&quot;wrap&quot;</span> est identique à <span class="Li">&quot;replace&quot;</span>, sauf que la sous-routine originale est passée comme premier argument à votre nouvelle sous-routine. Vous pouvez appeler la sous-routine originale via 'shift-&gt;(@_)' :</p>
+<pre>$override-&gt;wrap('Some::sub',
+  sub {
+    my ($old_sub, @args) = @_;
+    return 1 if $args[0];
+    return $old_sub-&gt;(@args);
+  }
+);</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Restauration_des_sous-routines'><a class='permalink' href='#Restauration_des_sous-routines'>Restauration des sous-routines</a></h2>
+<p class="Pp">Si l'objet sort de portée, les sous-routines originales sont restaurées. Cependant, si vous avez besoin de restaurer une sous-routine plus tôt, utilisez simplement la méthode <span class="Li">restore()</span> :</p>
+<pre>my $override = Sub::Override-&gt;new('Some::sub', sub {'nouvelles données'});
+# faire des choses
+$override-&gt;restore;</pre>
+<p class="Pp">Ce qui est en quelque sorte équivalent à :</p>
+<pre>{
+  my $override = Sub::Override-&gt;new('Some::sub', sub {'nouvelles données'});
+  # faire des choses
+}</pre>
+<p class="Pp">Si vous avez outrepassé plusieurs sous-routines avec un objet d'outrepassation, vous devrez explicitement nommer la sous-routine que vous souhaitez restaurer :</p>
+<pre>$override-&gt;restore('This::sub');</pre>
+<p class="Pp">Notez que <span class="Li">restore()</span> restaurera toujours le comportement original de la sous-routine, peu importe le nombre de fois où vous l'avez outrepassée.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Dans_quel_paquet_se_trouve_la_sous-routine?'><a class='permalink' href='#Dans_quel_paquet_se_trouve_la_sous-routine?'>Dans quel paquet se trouve la sous-routine ?</a></h2>
+<p class="Pp">Habituellement, vous voulez qualifier complètement la sous-routine en incluant le nom du paquet. Cependant, l'absence de qualification complète du nom de la sous-routine suppose le paquet courant.</p>
+<pre>package Foo;
+use Sub::Override;
+sub foo { 23 };
+my $override = Sub::Override-&gt;new( foo =&gt; sub { 42 } ); # suppose Foo::foo
+print foo(); # affiche 42
+$override-&gt;restore;
+print foo(); # affiche 23</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='METHODES'><a class='permalink' href='#METHODES'>MÉTHODES</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='new'><a class='permalink' href='#new'>new</a></h2>
+<pre>my $sub = Sub::Override-&gt;new;
+my $sub = Sub::Override-&gt;new($nom_sous_routine, $ref_sous_routine);</pre>
+<p class="Pp">Crée une nouvelle instance de <span class="Li">&quot;Sub::Override&quot;</span>. Optionnellement, vous pouvez outrepasser une sous-routine lors de la création d'un nouvel objet.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='replace'><a class='permalink' href='#replace'>replace</a></h2>
+<pre>$sub-&gt;replace($nom_sous_routine, $corps_sous_routine);</pre>
+<p class="Pp">Remplace temporairement une sous-routine par une autre. Retourne l'instance, de sorte que chaîner la méthode est autorisé :</p>
+<pre>$sub-&gt;replace($nom_sous_routine, $corps_sous_routine)
+    -&gt;replace($autre_sous_routine, $autre_corps_sous_routine);</pre>
+<p class="Pp">Cette méthode va <span class="Li">&quot;croak&quot;</span> si la sous-routine à remplacer n'existe pas.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='override'><a class='permalink' href='#override'>override</a></h2>
+<pre>my $sub = Sub::Override-&gt;new;
+$sub-&gt;override($nom_sous_routine, $corps_sous_routine);</pre>
+<p class="Pp"><span class="Li">&quot;override&quot;</span> est un nom alternatif pour <span class="Li">&quot;replace&quot;</span>. Ce sont la même méthode.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='inject'><a cl
+<section class="Ss">
+<h2 class="Ss" id='inject'><a class='permalink' href='#inject'>inject</a></h2>
+<pre>$sub-&gt;inject($nom_sub, $corps_sub);</pre>
+<p class="Pp">Injecte temporairement une sous-routine dans un package. Retourne
+    l'instance, donc le chaînage de la méthode est autorisé :</p>
+<pre>$sub-&gt;inject($nom_sub, $corps_sub)
+    -&gt;inject($autre_sub, $autre_corps);</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='inherit'><a class='permalink' href='#inherit'>inherit</a></h2>
+<pre>$sub-&gt;inherit($nom_sub, $corps_sub);</pre>
+<p class="Pp">Vérifie que la sous-routine existe dans une classe parente, mais pas
+    dans la classe actuelle, et l'injecte dans la classe actuelle pour hériter de
+    la version du parent.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='restore'><a class='permalink' href='#restore'>restore</a></h2>
+<pre>$sub-&gt;restore($nom_sub);</pre>
+<p class="Pp">Restaure le comportement précédent de la sous-routine. Cela se
+    produira automatiquement si l'objet <span class="Li">&quot;Sub::Override&quot;</span>
+    sort de la portée.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='wrap'><a class='permalink' href='#wrap'>wrap</a></h2>
+<pre>$sub-&gt;wrap($nom_sub, $corps_sub);</pre>
+<p class="Pp">Enveloppe temporairement une sous-routine avec une autre
+    sous-routine. La sous-routine originale est passée comme premier argument à
+    la nouvelle sous-routine.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXPORT'><a class='permalink' href='#EXPORT'>EXPORT</a></h1>
+<p class="Pp">Aucun par défaut.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CAVEATS'><a class='permalink' href='#CAVEATS'>CAVEATS</a></h1>
+<p class="Pp">Si vous avez besoin de remplacer la même sub plusieurs fois, ne
+    créez pas un nouvel objet <span class="Li">&quot;Sub::Override&quot;</span>,
+    mais réutilisez toujours celui existant et appelez
+    <span class="Li">&quot;replace&quot;</span> dessus. Créer un nouvel objet pour
+    remplacer la même sub entraînera un comportement étrange.</p>
+<pre># Ne faites pas ça !
+my $sub_premier = Sub::Override-&gt;new( 'Foo:bar' =&gt; sub { 'premier' } );
+my $sub_second = Sub::Override-&gt;new( 'Foo::bar' =&gt; sub { 'second' } );
+# Ne faites pas ça non plus !
+my $sub = Sub::Override-&gt;new( 'Foo::bar' =&gt; sub { 'premier' } );
+$sub = Sub::Override-&gt;new( 'Foo::bar' =&gt; sub { 'second' } );</pre>
+<p class="Pp">Ces deux utilisations pourraient entraîner la perte de vos subs,
+    selon l'ordre dans lequel vous les restaurez.</p>
+<p class="Pp">Au lieu de cela, appelez <span class="Li">&quot;replace&quot;</span>
+    sur le <span class="Li">$sub</span> existant.</p>
+<pre>my $sub = Sub::Override-&gt;new( 'Foo::bar' =&gt; sub { 'premier' } );
+$sub-&gt;replace( 'Foo::bar' =&gt; sub { 'second' } );</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BUGS'><a class='permalink' href='#BUGS'>BUGS</a></h1>
+<p class="Pp">Probablement. Parlez-m'en.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR AUSSI</a></h1>
+<ul class="Bl-bullet">
+  <li>Hook::LexWrap -- peut également remplacer des subs, mais avec des
+    capacités différentes</li>
+  <li>Test::MockObject -- utilisez ceci si vous avez besoin de modifier une classe
+    entière</li>
+</ul>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MAINTAINER'><a class='permalink' href='#MAINTAINER'>MAINTENEUR</a></h1>
+<p class="Pp">Robin Murray (mvsjes2 sur github)</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTEUR</a></h1>
+<p class="Pp">Curtis &quot;Ovid&quot; Poe, <span class="Li">&quot;&lt;ovid [at]
+    cpan [dot] org&gt;&quot;</span></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT_AND_LICENSE'><a class='permalink' href='#COPYRIGHT_AND_LICENSE'>COPYRIGHT ET LICENCE</a></h1>
+<p class="Pp">Copyright (C) 2004-2013 par Curtis &quot;Ovid&quot; Poe</p>
+<p class="Pp">Cette bibliothèque est un logiciel libre ; vous pouvez la redistribuer et/ou la modifier selon les mêmes termes que Perl lui-même, soit la version 5.8.2 de Perl, soit, à votre choix, toute version ultérieure de Perl 5 que vous pourriez avoir à disposition.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-sub-override/">extra/perl-sub-override</a></dd>
+        <dt>Version :</dt>
+        <dd>0.12-2</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://metacpan.org/dist/Sub-Override">https://metacpan.org/dist/Sub-Override</a></dd>
+        <dt>Licences :</dt>
+        <dd>Artistic-1.0-Perl</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-sub-override/">/listing/extra/perl-sub-override/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#VERSION">VERSION</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#METHODS">MÉTHODES</a></li>
+        
+            <li><a href="#EXPORT">EXPORT</a></li>
+        
+            <li><a href="#CAVEATS">CAVEATS</a></li>
+        
+            <li><a href="#BUGS">BUGS</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+            <li><a href="#MAINTAINER">MAINTENEUR</a></li>
+        
+            <li><a href="#AUTHOR">AUTEUR</a></li>
+        
+            <li><a href="#COPYRIGHT_AND_LICENSE">COPYRIGHT ET LICENCE</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Sub::Override.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/Sub::Override.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

@@ -1,0 +1,327 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>IO::Socket::SSL::Intercept(3pm) — Pages man d'Arch
+</title>Arch Linux
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">IO__Socket__SSL__Intercept(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-io-socket-ssl/">perl-io-socket-ssl</a></p>
+
+         Perl
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">contribuée par les utilisateurs
+IO::</td>Socket:
+    <td class="head-vol">:SSL::Intercept(3)
+NOM
+IO::Socket:</td>:SSL:
+    <td class="head-rtitle">:Intercep</td>t -- Inte</tr>rception</table> SSL (man
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>i</a></h1>n
+<p class="Pp">the
+  middle)
+SYNOPSIS
+us</p>e IO::Socket::SSL::Interc</section>ept;
+# create interceptor
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>wit</a></h1>h
+<pre>proxy certificates
+my $mitm = IO::Socket::SSL::Intercept-&gt;new(
+    proxy_cert_file =&gt; 'proxy_cert.pem',
+    proxy_key_file  =&gt; 'proxy_key.pem',
+    ...
+);
+my $listen = IO::Socket::INET-&gt;new( LocalAddr =&gt; .., Listen =&gt; .. );
+while (1) {
+    # TCP accept new client
+    my $client = $listen-&gt;accept or next;
+    # SSL connect to server
+    </pre>my $server = IO::Socket::SSL-&gt;new(
+        PeerAddr =&gt; ..,
+        SSL_verify_mode =&gt; ...,
+        ...
+    ) or die "ssl connect failed: $!,$SSL_ERROR";
+    # clone server certificate
+    my ($cert,$key) = $mitm-&gt;clone_cert( $server-&gt;peer_certificate );
+    # and upgrade client side to SSL with cloned certificate
+    IO::Socket::SSL-&gt;s</section>tart_SSL($client,
+        SSL_server =&gt; 1,
+        SSL_cert =&gt; $cert,
+        SSL_key =&gt; $key
+    ) or die "upgrade failed: $SSL_ERROR";
+    # now transfer data between $client and $server and analyze
+    # the unencrypted data
+    ...
+}
+DESCRIPTION
+Ce module fournit des fonctionnalités pour cloner des certificats et les
+    signer avec
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>un </a></h1>certificat
+<p class="Pp">proxy, ce qui facilite l'interception des
+    connexions SSL (man in the middle</p>). Il gère également un cache des
+    certificats générés.
+Comment fonctionne </section>l'interception SSL
+L'interception des connexions SSL est utile pour analyser le
+<section class="Sh">
+<h1 class="Sh" id='How_Intercepting_SSL_Works'><a class='permalink' href='#How_Intercepting_SSL_Works'>trafic
+    chiffré à des fins </a></h1>de
+<p class="Pp">sécurité ou de test. Elle ne rompt pas la sécurité
+    de bout en bout de SSL, c'est-à-dire qu'un client correctement écrit
+    détectera l'interception, sauf si vous configurez explicitement le client
+    pour faire confiance à votre intercepteur. L'interception SSL fonctionne
+    de la manière suivante :
+Créer un nouveau certificat CA, qui sera utilisé </p>pour
+<ul class="Bl-bullet">
+  <li>signer les
+      certificats clonés. Ce certificat CA proxy doit être approuvé par le
+      client, sinon (un client correctement écrit) affichera des messages
+      d'erreur ou refusera les connexions car il aura détecté une attaque man
+      in the middle. En raison du fonctionnement de l'interception, la prise
+      en charge des certificats côté client n'est pas possible.
+Avec openssl, un tel certificat CA
+    <p class="Pp">proxy et sa clé privée peuvent
+        être créés avec :
+openssl genrsa -out proxy_key.</p>pem 1024
+        <pre>openssl req -new -x509 -extensions v3_ca -key proxy_key.pem -out proxy_cert.pem
+# expor</pre>t as PKCS12 for import into browser
+openssl pkcs12 -export -in proxy_cert.pem -inkey pro</li>xy_key.pem -out proxy_cert.p12
+Configurer le client pour qu'il se connecte via le proxy
+  <li>d'interception
+      ou rediriger d'une manière ou d'une autre les connexions du client vers
+      le proxy (par exemple redirections de paquets, usurpation ARP ou DNS,
+      etc.).
+</li>Accepter
+  <li>la connexion TCP du client, c'est-à-dire ne pas effectuer
+      encore de négociation SSL avec le </li>client.
+  <li>Établir la connexion SSL vers le serveur et vérifier le certificat du
+      serveur comme d'habitude. Puis créer un nouveau certificat basé sur le
+      certificat original du serveur, mais signé par votre CA proxy. C'est à
+      cette étape que IO::Socket::SSL::Intercept </li>intervient.
+  <li>Mettre à niveau la connexion TCP avec le client vers SSL en utilisant le
+      certificat cloné du serveur. Si le client fait confiance à votre CA
+      proxy, il acceptera la </li>mise
+  <li>à niveau vers SSL.
+Transférer les données entre le</li> client et le serveur. Bien que les
+      connexion</ul>s au client et au serveur soient toutes deux chiffr</section>ées avec
+      SSL, vous lirez/écrirez les données
+<section class="Sh">
+<h1 class="Sh" id='METHODS'><a class='permalink' href='#METHODS'>no</a></h1>n
+<p class="Pp">chiffrées dans votre application
+      proxy.
+MÉTHODES
+IO::Socket::SSL::Intercept aide à créer </p>le
+<dl class="Bl-tag">
+  <dt><b>certificat</b><b> cloné
+    avec les méthodes suivantes :
+</b></dt>$mitm
+  <dd>= IO::Socket::SSL::Intercept-&gt;new(%args) <span class="Li">Cela </span>crée </dd>un n</dl>ouvel
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="proxy_cert"><a class="permalink" href="#proxy_cert">objet intercepteur.
+%args
+      doit être
+</a></dt>proxy_cert
+  <dd>X509 |
+    proxy_cert_file filename
+Il s'agit du certificat proxy. Il peut être donné soit par un objet X509
+      de la représentation interne de Net::SSLeay, </dd>soit
+  <dt id="proxy_key"><a class="permalink" href="#proxy_key">en utilisant un fichier
+    au format PEM.
+</a></dt>proxy_key
+  <dd>EVP_PKEY |
+    proxy_key_file filename
+Il s'agit de la clé du certificat proxy. Elle peut être donnée soit par
+      un objet EVP_PKEY de la représentation interne de Net::SSLeay, soit en
+      utilisant un fichier </dd>au
+  <dt id="pubkey"><a class="permalink" href="#pubkey">format PEM. La clé ne doit pas avoir de </a></dt>phrase
+  <dd>secrète.
+pubkey EVP_PKEY |
+    pubkey_file filename
+Cet argument facultatif spécifie la clé publique utilisée pour le
+      certificat cloné. Elle peut être donnée soit par un objet EVP_PKEY de la
+      représentation interne de Net::SSLeay, soit en utilisant un fichier au
+      format PEM.
+      <span class="Li">Si</span> el</dd>le
+  <dt id="serial"><a class="permalink" href="#serial">n'est pas donnée, une </a></dt>nouvelle
+  <dd>clé publique sera
+      créée à chaque appel de
+"new".
+serial
+    INTEGER|CODE
+Cet argument facultatif donne le point de départ pour les numéros de
+      série des certificats nouvellement créés. S'il n'est pas défini, le
+      numéro de série sera créé à partir du résumé du
+      <span class="Li">certificat original. Si
+      la valeur est du </span>code, il sera appelé avec
+"serial(original_ce</dd>rt,
+  <dt id="cache"><a class="permalink" href="#cache">CERT_asHash(original_cert))"
+      et </a></dt>doit
+  <dd>retourner le nouveau numéro de série.
+cache HASH |
+    SUBROUTINE
+Cet argument facultatif donne un moyen de mettre en cache les
+      certificats créés, afin qu'ils ne soient pas recréés lors des accès
+      ultérieurs
+    <p class="Pp">au même hôte. Si l'argument n'est pas donné, un HASH interne
+      est utilisé.
+Si l'argument est un hash, il
+        <span class="Li">stockera </span>pour chaque
+        <span class="Li">certificat </span>généré
+        une
+        <span class="Li">référence </span>de hash avec
+"cert" et
+"atime" dans le hash, où
+"atime" est l'heure du <span class="Li">dernier </span>accès (pour
+        expirer les entrées inutilisées) et
+"cert" est
+        le certificat. Veuillez noter que le certificat est au format X509
+        interne de Net::SSLeay et ne peut donc pas être <span class="Li">simplement </span>sauvegardé
+        et <span class="Li">restauré. La </span>clé du hash est un
+"ident" soit
+        donné à
+</p>"clone_cert"
+    <p class="Pp">soit généré
+        à partir du certificat original.
+Si l'argument
+        <span class="Li">est une sous-routine,</span> elle sera appelée comme
+"$cache-&gt;(ident,sub)". Cet appel
+        doit
+        <span class="Li">retourner </span>soit un (certificat
+        <span class="Li">en </span>cache)
+"(cert,key)" existant, soit appeler <span class="Li">"sub" sans </span>arguments pour créer un
+        nouveau
+"(cert,key)", <span class="Li">le stocker et le
+        retourner. Si a</span>ppelé avec
+$cache-&gt;('type') la
+        f</p>onction doit simplement retourner 1 pour</dd> signaler qu'elle prend en
+        charge</dl> le type de cache actuel. Si elle ne ret</div>ourne rien, l'ancienne
+        interface
+<dl class="Bl-tag">
+  <dt><b>de cache est supposée</b>
+    <b>pour</b><b>des raisons de compatibilité.</b> <b>($clone_cert,</b><b>
+    $key</b></dt>)
+  <dd>=
+$mitm
+-&gt;clone_cert($original_cert,[
+$ident
+[[64 ]])
+Cela clone le certificat donné. Un ident <span class="Li">comme clé </span>du cache peut être
+      donné (comme
+"host:port"), sinon il
+      sera créé à partir des propriétés du certificat original. Elle retourne
+      le certificat cloné et sa clé (qui est la même pour tous </dd>les
+  <dt><b>$string</b><b> c</b> <b>ertificats</b><b>créés)</b></dt>.
+  <dd>$string
+=
+$mitm
+-&gt;serialize
+Cela crée une version sérialisée de l'objet (par exemple une chaîne)
+      qui peut ensuite être utilisée pour stocker de manière persistante les
+      certificats créés au-delà des redémarrages de l'application. Le cache ne
+      sera sérialisé que s'il s'agit
+      <span class="Li">d'un HASH. Pour </span>fonctionner avec Storable, la
+fonction <span class="Li">"STORABLE_fr</span>ee</dd>ze"
+  <dt><b>e</b><b> st définie pour
+      appeler
+"serialize".
+$mitm
+=
+    </b></dt>IO::
+  <dd>Socket::SSL::Intercept-&gt;unserialize($string)
+Cela restaure un objet Intercept à partir d'une chaîne sérialisée.
+      <span class="Li">Pour
+      </span>fonctionner avec Storable, la
+fonction <span class="Li">"STO</span>RABL</dd>E_t</dl>haw"</section> est
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>défini</a></h1>e
+<p class="Pp">pour</p>
+    </section>  app</div>eler
+<table class="foot">
+  <tr>
+    <td class="foot-date">"unserial</td>ize".
+    <td class="foot-os">AUTEUR
+S</td>teffen </tr>Ullrich
+</table>2025-09-</section>27
+perl</article> v5.42.0
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le </p>paquet :
+    <dl>
+        <dt>Nom du </dt>paquet :
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-io-socket-ssl/">extra/perl-io-soc</a></dd>ket-ssl
+        <dt>Version </dt>:
+        <dd>2.</dd>095-1
+        <dt>Amont </dt>:
+        <dd><a href="https://search.cpan.org/dist/IO-Socket-SSL/">https://search.cpan.org/dist/IO-Sock</a></dd>et-SSL/
+        <dt>Licences </dt>:
+        <dd>GPL, </dd>PerlArtistic
+        <dt>Manuels </dt>:
+        <dd><a href="/listing/extra/perl-io-socket-ssl/">/listing</a></dd>/extra/pe</dl>rl-io-soc</section>ket-ssl/
+
+<details>
+    <summary>Table des </summary>matières
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">N</a></li>OM
+        
+            <li><a href="#SYNOPSIS">SY</a></li>NOPSIS
+        
+            <li><a href="#DESCRIPTION">DESC</a></li>RIPTION
+        
+            <li><a href="#How_Intercepting_SSL_Works">Fonctionnement de </a></li>l'interception SSL
+        
+            <li><a href="#METHODS">MÉ</a></li>THODES
+        
+            <li><a href="#AUTHOR">A</a></li>U</ul>TE</nav>U</details>R
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/IO::Socket::SSL::Intercept.3pm.en.txt">t</a>xt, 
+        
+            <a href="/man/IO::Socket::SSL::Intercept.3pm.en.raw">b</a></p>r</nav>u</aside></main>t
+        <footer>
+            de manuel.
+            <p>Le site web est disponible selon les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0
+               , à l</a>'exception du contenu des p</p>ages de manuel, qui possède </footer>sa propre licence
+          </body>     spécifiée dans le paqu</html>et Arch Linux correspondant.

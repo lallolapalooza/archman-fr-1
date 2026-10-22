@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>PublicInbox::Import(3pm) — Pages man Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">PublicInbox__Import(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-publicinbox/">perl-publicinbox</a></p>
+<p class="lic">Licences: AGPL</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">PublicInbox::Import(3)</td>
+    <td class="head-vol">Documentation Perl fournie par la communauté</td>
+    <td class="head-rtitle">PublicInbox::Import(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">PublicInbox::Import - importateur de messages pour les boîtes aux lettres de
+    public-inbox v1</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VERSION'><a class='permalink' href='#VERSION'>VERSION</a></h1>
+<p class="Pp">version 1.0</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPIS'><a class='permalink' href='#SYNOPIS'>SYNOPIS</a></h1>
+<pre>use PublicInbox::Eml;
+# PublicInbox::Eml existe depuis public-inbox 1.5.0,
+# Email::MIME était utilisé dans les anciennes versions
+use PublicInbox::Git;
+use PublicInbox::Import;
+chomp(my $git_dir = `git rev-parse --git-dir`);
+$git_dir or die &quot;GIT_DIR= doit être spécifié\n&quot;;
+my $git = PublicInbox::Git-&gt;new($git_dir);
+my @committer = ('inbox', 'inbox@example.org');
+my $im = PublicInbox::Import-&gt;new($git, @committer);
+# pour ajouter un message :
+my $message = &quot;From: &lt;u\@example.org&gt;\n&quot;.
+        &quot;Subject: message de test \n&quot; .
+        &quot;Date: Thu, 01 Jan 1970 00:00:00 +0000\n&quot; .
+        &quot;Message-ID: &lt;m\@example.org&gt;\n&quot;.
+        &quot;\nmessage de test&quot;;
+my $parsed = PublicInbox::Eml-&gt;new($message);
+my $ret = $im-&gt;add($parsed);
+if (!defined $ret) {
+        warn &quot;doublon : &quot;, $parsed-&gt;header_raw('Message-ID'), &quot;\n&quot;;
+} else {
+        print &quot;importé à la marque $ret\n&quot;;
+}
+$im-&gt;done;
+# pour supprimer un message
+my $junk = PublicInbox::Eml-&gt;new($message);
+my ($mark, $orig) = $im-&gt;remove($junk);
+if ($mark eq 'MISSING') {
+        print &quot;non trouvé\n&quot;;
+} elsif ($mark eq 'MISMATCH') {
+        print &quot;Le message existe mais ne correspond pas\n\n&quot;,
+                $orig-&gt;as_string, &quot;\n\n&quot;;
+} else {
+        print &quot;supprimé à la marque $mark\n\n&quot;,
+                $orig-&gt;as_string, &quot;\n&quot;;
+}
+$im-&gt;done;</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Un importateur et suppresseur pour les boîtes aux lettres de public-inbox qui prend
+    des messages de type <span class="Li">&quot;PublicInbox::Eml&quot;</span> ou Email::MIME
+    en entrée et les stocke dans un dépôt git comme documenté dans
+    <a href='https://public-inbox.org/public-inbox-v1-format.txt'>https://public-inbox.org/public-inbox-v1-format.txt</a>, sauf qu'il n'autorise pas les Message-ID
+    dupliqués.</p>
+<p class="Pp">Il nécessite que <a href='/man/git.1.en'>git(1)</a> et <a href='/man/git-fast-import.1.en'>git-fast-import(1)</a> soient
+    installés.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='METHODES'><a class='permalink' href='#METHODES'>MÉTHODES</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='new'><a class='permalink' href='#new'>new</a></h2>
+<pre>my $im = PublicInbox::Import-&gt;new($git, @committer);</pre>
+<p class="Pp">Initialise un nouvel objet PublicInbox::Import.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='add'><a class='permalink' href='#add'>add</a></h2>
+<pre>my $parsed = PublicInbox::Eml-&gt;new($message);
+$im-&gt;add($parsed);</pre>
+<p class="Pp">Ajoute un message au dépôt git. Cela acquerra
+    <span class="Li">&quot;$GIT_DIR/ssoma.lock&quot;</span> et démarrera
+    <a href='/man/git-fast-import.1.en'>git-fast-import(1)</a> si nécessaire.</p>
+<p class="Pp">Les messages ajoutés ne seront pas visibles par d'autres processus avant
+    que &quot;done&quot; ne soit appelé, mais &quot;remove&quot; peut être appelé sur
+  eux.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='remove'><a class='permalink' href='#remove'>remove</a></h2>
+<pre>my $junk = PublicInbox::Eml-&gt;new($message);
+my ($code, $orig) = $im-&gt;remove($junk);</pre>
+<p class="Pp">Supprime un message du dépôt. En cas de succès, il renvoie un code
+    numérique préfixé par ':' représentant la marque de git-fast-import et le
+    message original sous forme d'objet PublicInbox::Eml (ou Email::MIME). Si le
+    message n'a pas pu être trouvé, le code est &quot;MISSING&quot; et le message
+    original est undef. S'il y a une divergence où le &quot;Message-ID&quot; correspond
+    mais que l'objet et le corps ne correspondent pas, le code renvoyé est
+    &quot;MISMATCH&quot; et le message conflictuel est renvoyé sous forme de orig.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='done'><a class='permalink' href='#done'>done</a></h2>
+<p class="Pp">Finalise la commande <a href='/man/git-fast-import.1.en'>git-fast-import(1)</a> et déverrouille le
+    dépôt. Appeler cette méthode est nécessaire pour finaliser les changements apportés
+    au dépôt.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR AUSSI</a></h1>
+<p class="Pp">Email::MIME</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CONTACT'><a class='permalink' href='#CONTACT'>CONTACT</a></h1>
+<p class="Pp">Tous les commentaires sont les bienvenus par courrier électronique en texte brut à
+    &lt;mailto:meta@public-inbox.org&gt;</p>
+<p class="Pp">Les archives de courrier sont hébergées à
+    <a href='https://public-inbox.org/meta/'>https://public-inbox.org/meta/</a></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROIT_DAUTELR'><a class='permalink' href='#DROIT_DAUTELR'>DROIT D'AUTEUR</a></h1>
+<p class="Pp">Copyright (C) 2016-2020 tous les contributeurs
+    &lt;mailto:meta@public-inbox.org&gt;</p>
+<p class="Pp">Licence : AGPL-3.0+
+    <a href='http://www.gnu.org/licenses/agpl-3.0.txt'>http://www.gnu.org/licenses/agpl-3.0.txt</a></p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-11-11</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher une page man" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-publicinbox/">extra/perl-publicinbox</a></dd>
+        <dt>Version :</dt>
+        <dd>2.0.0-1</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://public-inbox.org">https://public-inbox.org</a></dd>
+        <dt>Licences :</dt>
+        <dd>AGPL</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-publicinbox/">/listing/extra/perl-publicinbox/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#VERSION">VERSION</a></li>
+        
+            <li><a href="#SYNOPIS">SYNOPIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#METHODES">MÉTHODES</a></li>
+        
+            <li><a href="#VOIR_AUSSI">VOIR AUSSI</a></li>
+        
+            <li><a href="#CONTACT">CONTACT</a></li>
+        
+            <li><a href="#DROIT_DAUTELR">DROIT D'AUTEUR</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/PublicInbox::Import.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/PublicInbox::Import.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages man, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

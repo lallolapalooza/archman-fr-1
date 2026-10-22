@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Pegex::Tutorial::JSON(3) — Pages du manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Pegex__Tutorial__JSON(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-pegex/">perl-pegex</a></p>
+<p class="lic">Licences: PerlArtistic, GPL</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Pegex::Tutorial::JSON(3)</td>
+    <td class="head-vol">Documentation soumise par Perl</td>
+    <td class="head-rtitle">Pegex::Tutorial::JSON(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='Comment_écrire_un_parser_JSON_en_Pegex'><a class='permalink' href='#Comment_écrire_un_parser_JSON_en_Pegex'>Comment écrire un parser JSON en Pegex</a></h1>
+<p class="Pp">Ce document détaille la création du module CPAN : Pegex::JSON, qui est un parser/décodeur JSON écrit en Perl à l'aide du framework de parsing Pegex. Le code est sur GitHub ici :</p>
+<p class="Pp">https://github.com/ingydotnet/pegex-json-pm</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Tester_d_abord'><a class='permalink' href='#Tester_d_abord'>Tester d'abord</a></h1>
+<p class="Pp">Regardez l'exemple de test :</p>
+<p class="Pp">https://github.com/ingydotnet/pegex-json-pm/blob/master/test/test.t</p>
+<p class="Pp">Ce test simple contient de nombreuses parties JSON et leurs équivalents YAML. Il est supposé que lors du décodage du JSON, cela correspondra au YAML.</p>
+<p class="Pp">Le test est écrit dans un langage de test connu sous le nom de TestML. TestML n'utilise que Pegex dans son compilateur. TestML et Pegex sont tous deux des frameworks <b>Acmeist</b>, c'est-à-dire qu'ils sont censés fonctionner dans plusieurs langages de programmation.</p>
+<p class="Pp">Vous pouvez exécuter le test normalement :</p>
+<pre>&gt; prove -lv t/test.t</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='La_grammaire_Pegex_JSON'><a class='permalink' href='#La_grammaire_Pegex_JSON'>La grammaire Pegex JSON</a></h1>
+<p class="Pp">La prochaine étape consiste à écrire la grammaire JSON dans le langage de grammaire Pegex. L'écriture de grammaires est le cœur et l'âme de l'utilisation de Pegex. Une grammaire est simplement une définition d'un langage qui spécifie ce qu'est quoi, et comment il doit être structuré.</p>
+<p class="Pp">Comme Pegex est Acmeist, j'ai placé la grammaire JSON dans son propre dépôt afin qu'elle puisse être partagée par de nombreux projets dans différents langages de programmation. Le fichier de grammaire est ici :</p>
+<p class="Pp">https://github.com/ingydotnet/json-pgx/blob/master/json.pgx</p>
+<p class="Pp">Examinons cette définition de langage petite mais complète en détail.</p>
+<p class="Pp">Le fichier commence par quelques commentaires. Les commentaires peuvent être utilisés librement dans Pegex et vont d'un '#' jusqu'à la fin d'une ligne. Comme on pourrait s'y attendre.</p>
+<pre># Une grammaire simple pour le langage de données JSON.
+# Pour les implémentations de parser utilisant cette grammaire, voir :
+# * https://github.com/ingydotnet/pegex-json-pm</pre>
+<p class="Pp">Ensuite, nous avons ce qu'on appelle la section méta de la grammaire.</p>
+<pre>%grammar json
+%version 0.0.1</pre>
+<p class="Pp">Les lignes de section méta ont le format :</p>
+<pre>%clé valeur</pre>
+<p class="Pp">Votre grammaire doit avoir au moins un nom et une version.</p>
+<p class="Pp">Tout le reste dans la grammaire est un ensemble de choses appelées « règles ». Une règle a un nom et une définition. La première règle d'un langage est spéciale. Lorsque le parser commence à la parser, la règle numéro un est utilisée par défaut comme règle de départ (bien que cela puisse être remplacé).</p>
+<p class="Pp">Nous commençons par cette règle :</p>
+<pre>json: map | seq</pre>
+<p class="Pp">Le nom de cette règle est « json ». Lorsque nous commençons à parser le JSON, nous disons que tout le texte doit correspondre à la règle « json ». Cela a beaucoup de sens.</p>
+<p class="Pp">Ce style de parsing est connu sous le nom de Top Down et de Recursive Descent. Pegex est les deux. Il faut noter que Pegex ne tokenise pas un texte avant de le parser. Les règles elles-mêmes forment une sorte de tokenizer, extrayant les segments de données souhaités au besoin.</p>
+<p class="Pp">Dans cette règle, nous disons qu'un document « json » est soit une « map » (aka mapping ou hash), soit une « seq » (aka sequence ou array), ce qui, en supposant que vous connaissez le JSON (autour de presque tout le monde), est la seule chose autorisée au niveau supérieur.</p>
+<p class="Pp">Dans cette règle, « map » et « seq » sont appelées « références de règles ». Elles pointent vers d'autres règles nommées que l'on s'attend à trouver dans la grammaire. Les références sont généralement juste le nom de la sous-règle, mais elles peuvent aussi être entourées d'accolades (bien que parfois nécessaires). Ainsi, la règle ci-dessus pourrait également être écrite comme ceci :</p>
+<pre>json: map | seq</pre>
+<p class="Pp">On introduit également le OU, qui est un simple caractère Pipe. Il faut aussi noter qu'un DEUX-POINTS sépare le nom de la règle et sa définition.</p>
+<p class="Pp">La ligne suivante définit une nouvelle règle nommée « node » :</p>
+<pre>node: map | seq | scalar</pre>
+<p class="Pp">Nous appelons « node » les types de structures générales que tout point de l'arbre de données JSON peut être. C'est simplement un mapping, une séquence ou un scalaire.</p>
+<p class="Pp">Ensuite, nous devons définir les règles décrivant « map », « seq » et « scalar ». Une grammaire est complète lorsque toutes ses références de règles sont définies.</p>
+<p class="Pp">Commençons par « map » :</p>
+<pre>map:
+    /- LCURLY -/
+    pair* % /- COMMA -/
+    /- RCURLY -/</pre>
+<p class="Pp">Cela ressemble à un peu plus compliqué, mais nous allons le décomposer, un par un. Ce que nous découvrirons, c'est que cette règle signifie qu'une map est '{' suivie de zéro ou plusieurs (paires clé/valeur) séparées par une virgule, puis terminée par '}'. Pendant ce processus, il peut également y avoir des espaces blancs intermittents. Le caractère '-'
+    indique des espaces blancs, mais nous le verrons plus tard.</p>
+<p class="Pp">La première chose que nous remarquons, c'est qu'une définition de règle peut s'étendre sur plusieurs lignes. Une définition de règle se termine lorsque la règle suivante commence. Pegex permet effectivement plusieurs règles sur une ligne, mais elles doivent être séparées par un point-virgule, comme ceci :</p>
+<pre>rule1: a|b; rule2: c|d; rule3: e|f</pre>
+<p class="Pp">La prochaine chose que je vois sont les caractères de barre oblique inverse. Tout comme en Perl et JavaScript, une paire de barres obliques inverses indique une expression régulière. Dans cette règle, nous avons trois expressions régulières.</p>
+<p class="Pp">C'est le bon moment pour signaler que les grammaires Pegex sont compilées dans une structure simple que vous pouvez exprimer en JSON ou en YAML. En fait, le dépôt contenant la grammaire Pegex que nous discutons contient également les formes compilées correspondantes. Voir :</p>
+<p class="Pp">https://github.com/ingydotnet/json-pgx/blob/master/json.pgx.yaml</p> <p class="Pp">Un coup d'œil rapide à ce fichier montre les mêmes définitions de règles, mais les expressions régulières sont très différentes.</p>
+<p class="Pp">C'est parce que Pegex essaie de rendre les expressions régulières lisibles et composables. Cela signifie que des expressions régulières complexes peuvent être définies comme de petites parties qui composent des parties plus grandes. Au moment de la compilation, elles peuvent être difficiles à comprendre.</p>
+<p class="Pp">Par exemple, si nous avions cette grammaire Pegex :</p>
+<pre>greeting: / hello COMMA - world /
+hello: / (:'O' SPACE 'HAI' | 'Hey' SPACE 'there') /
+world: / (:Earth|Mars|Venus) /</pre>
+<p class="Pp">cela compilerait en :</p>
+<pre>greeting:
+  .rgx: (?:O\ HAI|Hey\ there),\s*(?:Earth|Mars|Venus)</pre>
+<p class="Pp">Remarque : les règles 'hello' et 'world' ont été supprimées, mais leurs définitions ont été incorporées dans la grande expression régulière pour 'greeting'.</p>
+<p class="Pp">Il y a également des références à des choses comme COMMA et SPACE. Ce sont des <b>ATOMS</b> Pegex, et il y a des atomes pour tous les caractères de ponctuation, les caractères d'espace et autres. La liste complète se trouve ici : Pegex::Grammar::Atoms.</p>
+<p class="Pp">Écrire 'SEMI' au lieu de ';' semble étrange au début, mais c'est ainsi que Pegex sépare facilement la métasyntaxe de ce qui doit être correspondant. Une fois que vous vous y habituez, c'est très lisible.</p>
+<p class="Pp">Les espaces blancs (et les commentaires) à l'intérieur d'une expression régulière sont complètement ignorés par Pegex. C'est pareil que le flag 'x' de Perl.</p>
+<p class="Pp">Le '-' est l'indicateur d'espace blanc de Pegex, et il se développe généralement en <span class="Li">&quot;\s*&quot;</span>. En fait, il se développe en <span class="Li">&quot;ws1&quot;</span>, qui se développe en <span class="Li">&quot;ws*&quot;</span>, qui se développe en <span class="Li">&quot;WS*&quot;</span>, qui se développe en <span class="Li">&quot;\s*&quot;</span> (à moins que vous ne remplaciez l'une de ces règles).</p>
+<p class="Pp">Revenons au JSON...</p>
+<p class="Pp">La règle que nous avons définie pour 'map' devrait maintenant être plus lisible. Regardons-la à nouveau, mais cette fois dans un format plus compact :</p>
+<pre>map: /- LCURLY -/   (pair* % /- COMMA -/)   /- RCURLY -/</pre>
+<p class="Pp">J'ai compacté les expressions régulières (puisqu'elles ne signifient que des accolades et des virgules avec des espaces blancs), et j'ai ajouté des parenthèses au milieu pour indiquer que l'opérateur '%' a une liaison plus forte.</p>
+<p class="Pp">Qu'est-ce que l'opérateur '%' ? Il a été emprunté au langage de règles de Perl 6. Considérez :</p>
+<pre>a+ % b</pre>
+<p class="Pp">Cela signifie une ou plusieurs 'a', séparées par 'b'. Simple. L'opérateur %% signifie la même chose, sauf qu'il indique qu'un 'b' final est acceptable.</p>
+<p class="Pp">Cette notation est utile pour les listes séparées par des virgules. (Exactement ce que nous utilisons ici.)</p>
+<p class="Pp">La règle ci-dessus signifie zéro ou plusieurs 'pair' séparés par des virgules. (Pas de virgule finale autorisée, ce qui est strictement correct en JSON).</p>
+<p class="Pp">C'est le bon moment pour mentionner les 'quantificateurs de règles'. Un quantificateur de règle est un suffixe à une référence de règle, et peut être l'un de ?, * ou +. Ces suffixes signifient la même chose qu'en expressions régulières.</p>
+<p class="Pp">Il existe deux autres suffixes de quantificateurs. '2+' est équivalent à la syntaxe d'expression régulière {2,} et 2-5 est équivalent à {2,5}. Lorsque vous utilisez l'un de ces deux formats, vous devez mettre la référence de règle entre crochets, sinon le nombre apparaît comme faisant partie du nom de la règle. Par exemple :</p>
+<pre>rule1: &lt;rule2&gt;5</pre>
+</section>
+</article>
+</main>
+</body>
+</html>-9 &lt;règle3&gt;29+</pre>
+<p class="Pp">pas :</p>
+<pre>règle1: règle25-9 règle329+</pre>
+<p class="Pp">Regardons cette règle après compilation par Pegex :</p>
+<pre>map:
+  .all:
+  - .rgx: \s*\{\s*
+  - +min: 0
+    .ref: pair
+    .sep:
+      .rgx: \s*,\s*
+  - .rgx: \s*\}\s*</pre>
+<p class="Pp">La règle pour 'map' indique que le texte doit correspondre à 3
+    choses : une expression régulière (une accolade ouvrante), zéro ou plusieurs
+    occurrences d'une règle nommée 'pair' séparées par une expression
+    régulière (une virgule), et enfin une autre expression régulière (une
+    accolade fermante).</p>
+<p class="Pp">Une chose que nous avons implicitement couverte est l'opérateur
+    ET. C'est parce qu'il n'y a pas de symbole d'opérateur pour cela. Considérons
+    les règles :</p>
+<pre>a: b c+ /d/
+b: c | d
+c: d e | f % g</pre>
+<p class="Pp">Le caractère PIPE entre 2 choses signifie OU. Aucun symbole entre 2
+    choses signifie ET. Un POURCENT signifie ALTERNATION. L'ALTERNATION est
+    la plus prioritaire et le OU est le moins prioritaire, avec le ET au
+    milieu. La précédence peut être désambiguïsée avec des parenthèses. Ainsi,
+    la règle pour 'c' peut être reformulée :</p>
+<pre>c: ((d e) | (f % g))</pre>
+<p class="Pp">OK. Je pense que nous avons couvert à peu près tout ce qui est
+    nécessaire jusqu'à présent. C'était beaucoup d'apprentissage pour une seule
+    règle, mais maintenant vous connaissez la plupart de Pegex !</p>
+<p class="Pp">Les trois règles suivantes ne nécessitent aucune nouvelle
+    connaissance. Jetez un œil à celles-ci et voyez si vous pouvez les
+    comprendre.</p>
+<pre>pair:
+    string
+    /- COLON -/
+    node
+seq:
+    /- LSQUARE -/
+    node* % /- COMMA -/
+    /- RSQUARE -/
+scalar:
+    string |
+    number |
+    boolean |
+    null</pre>
+<p class="Pp">Une paire (vous savez... une clé/valeur de hachage), est une chaîne,
+    deux points et un nœud. Une séquence est zéro ou plusieurs nœuds séparés par
+    des virgules entre crochets. Un scalaire peut être l'une des 4 formes.
+    Simple.</p>
+<p class="Pp">Un point intéressant qui vient d'être soulevé ici est
+    l'utilisation de la récursion. Les règles pour 'pair' et 'seq' font toutes
+    deux référence à la règle pour 'node'. Ainsi, la grammaire est une descente
+    récursive. Elle commence par la règle de l'ensemble (c'est-à-dire 'json') et
+    descend (récursivement) jusqu'à ce qu'elle corresponde à tous les caractères
+    spécifiques.</p>
+<section class="Ss">
+<h2 class="Ss" id='Expressions_Régulières_Pegex_en_plus_de_détail'><a class='permalink' href='#Expressions_Régulières_Pegex_en_plus_de_détail'>Expressions Régulières Pegex en plus de détail</a></h2>
+<p class="Pp">Ensuite, nous avons la définition d'une chaîne JSON :</p>
+<pre># string et number sont des interprétations de http://www.json.org/
+string: /
+    DOUBLE
+        (
+            (:
+                BACK (:       # Échappements par barre oblique inverse
+                    [
+                        DOUBLE      # Guillemet double
+                        BACK        # Barre oblique inverse
+                        SLASH       # Barre oblique
+                        b           # Retour arrière
+                        f           # Saut de page
+                        n           # Nouvelle ligne
+                        r           # Retour chariot
+                        t           # Tabulation horizontale
+                    ]
+                |
+                    u HEX{4}        # Paire d'octets Unicode
+                )
+            |
+                [^ DOUBLE CONTROLS ]  # Tout le reste
+            )*
+        )
+    DOUBLE
+/</pre>
+<p class="Pp">que Pegex compile en cette expression régulière (simple et évidente
+    ;) :</p>
+<pre>/&quot;((?:\\(?:[&quot;\\/bfnrt]|u[0-9a-fA-F]{4})|[^&quot;\x00-\x1f])*)&quot;/</pre>
+<p class="Pp">Voyons ce qu'il y a de nouveau ici...</p>
+<p class="Pp">Tout d'abord, nous avons beaucoup d'espaces blancs et de commentaires.
+    Cela devrait rendre assez facile d'avoir au moins une idée générale de ce qui
+    est accompli.</p>
+<p class="Pp">Comprendre comment le texte entre une paire de caractères '/'
+    est transformé en une vraie expression régulière est la clé pour vraiment
+    comprendre Pegex.</p>
+<p class="Pp">Remarquez le '*', le '{4}', le '|', le '(...)', et le '^...'.
+    Toute cette ponctuation est transmise telle quelle dans l'expression
+    régulière compilée. Il n'y a que quelques exceptions. Couvrons-les en
+    détail.</p>
+<p class="Pp">Tout ce qui se trouve à l'intérieur de
+    <span class="Li">&quot;&lt;quelque_référence_de_règle&gt;&quot;</span> est
+    remplacé par l'expression régulière à laquelle la référence pointe. Les
+    références de règles à l'intérieur d'une expression régulière <b>doivent</b>
+    pointer directement vers une autre référence, bien que ces règles puissent
+    pointer vers encore plus de parties d'expression régulière.</p>
+<p class="Pp">Les caractères <span class="Li">&quot;-&quot;</span> sont
+    remplacés par 'ws1', qui est ensuite remplacé par sa définition de règle.
+    <span class="Li">&quot;+&quot;</span> est remplacé par
+    <span class="Li">&quot;ws2&quot;</span> (qui se résout par défaut en
+    <span class="Li">&quot;\s+&quot;</span>).</p>
+<p class="Pp">Enfin, '(:' est remplacé par '(?:)'. C'est simplement pour rendre
+    votre syntaxe de parenthèses non capturantes un peu plus jolie. En général,
+    vous pouvez omettre '?' après un '(' et Pegex les ajoutera pour vous.</p>
+<p class="Pp">C'est tout. Tout le reste que vous mettez entre des barres obliques
+    ira tel quel dans l'expression régulière.</p>
+<p class="Pp">Dans un certain sens, Pegex est juste une façon très bien organisée
+    d'écrire un analyseur à partir d'expressions régulières. Pour être vraiment bon
+    en Pegex, il faut une compréhension assez solide du fonctionnement des
+    expressions régulières, mais étant donné que les expressions régulières sont
+    si courantes, Pegex rend la tâche de les transformer en analyseur assez
+    simple.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Capture_de_données'><a class='permalink' href='#Capture_de_données'>Capture de données</a></h2>
+<p class="Pp">La prochaine chose à couvrir est la <i>capture</i> d'expressions
+    régulières. Lorsque vous analysez des données, il est généralement important
+    d'extraire certains morceaux de texte afin de pouvoir faire quelque chose
+    avec eux.</p>
+<p class="Pp">Pegex a une seule façon très simple, directe et évidente de faire
+    cela : toute parenthèse de capture dans n'importe quelle expression
+    régulière capturera des données et les transmettra à l'objet
+    <i>receveur</i>. Puisque Pegex est basé sur des expressions régulières, cela
+    a du sens.</p>
+<p class="Pp">Nous parlerons des objets receveurs dans la section suivante. Pour
+    l'instant, sachez simplement qu'un objet receveur est ce qui crée quelque
+    chose à partir des données et des événements trouvés lors d'une analyse. Dans
+    notre cas JSON ici, notre receveur créera une structure de données Perl qui
+    correspond au JSON que nous analysons. Évident !</p>
+<p class="Pp">Dans la règle pour 'string' ci-dessus, nous capturons les
+    caractères entre les guillemets doubles. Ce sont les données brutes qui
+    seront transformées en un scalaire Perl.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Finaliser_la_grammaire_JSON'><a class='permalink' href='#Finaliser_la_grammaire_JSON'>Finaliser la grammaire JSON</a></h2>
+<p class="Pp">Il ne reste que 5 règles simples nécessaires pour compléter la
+    grammaire JSON Pegex :</p>
+<pre>number: /(
+    DASH?
+    (: 0 | [1-9] DIGIT* )
+    (: DOT DIGIT* )?
+    (: [eE] [ DASH PLUS ]? DIGIT+ )?
+)/
+boolean: true | false
+true: /true/
+false: /false/
+null: /null/</pre>
+<p class="Pp">Notez que la règle pour 'number' capture des données, mais les
+    autres règles ne le font pas. C'est parce que tant que le receveur sait qu'une
+    règle 'null' a été trouvée, il peut la transformer en un
+    <span class="Li">&quot;undef&quot;</span> Perl. L'important n'est pas le
+    texte correspondant réel (même si dans ce cas, il doit être exactement la
+    chaîne 'null').</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Pegex::JSON::Grammar_-_La_classe_de_grammaire_Pegex'><a class='permalink' href='#Pegex::JSON::Grammar_-_La_classe_de_grammaire_Pegex'>Pegex::JSON::Grammar - La classe de grammaire Pegex</a></h1>
+<p class="Pp">La grammaire JSON Pegex que nous venons d'examiner en détail
+    excrémentiel est compilée en une structure de données Perl puis intégrée dans
+    une classe de grammaire. Un objet Pegex::Parser (ce qui fait l'analyse)
+    nécessite un objet grammaire (ce qu'il faut chercher) et un objet receveur
+    (ce qu'il faut faire quand on le trouve).</p>
+<p class="Pp">Il convient de noter que Pegex utilise Pegex pour analyser les
+    grammaires Pegex. C'est-à-dire que cette grammaire :
+    <a href='https://github.com/ingydotnet/pegex-pgx/blob/master/pegex.pgx'>https://github.com/ingydotnet/pegex-pgx/blob/master/pegex.pgx</a> est
+    utilisée par Pegex pour analyser notre grammaire json.pgx (et oui, elle peut
+    aussi analyser pegex.pgx).</p>
+<p class="Pp">On peut concevoir que chaque fois que nous voudrions analyser du
+    JSON, nous pourrions d'abord analyser la grammaire json.pgx, mais ce serait
+    une perte de temps. Nous mettons donc en cache le grand arbre de grammaire
+    sous forme de structure de données Perl pure à l'intérieur de Pegex::JSON::Grammar.</p>
+<p class="Pp">Si pour une raison quelconque nous avions besoin de changer json.pgx,
+    nous devrions la recompiler en Perl et la copier/coller dans notre module. Ce
+    serait une corvée, il y a donc une commande spéciale pour le faire pour nous.
+    Exécutez simplement ceci :</p>
+<pre>perl -Ilib -MPegex::JSON:Grammar=compile</pre>
+<p class="Pp">Si vous êtes en mode développement intensif et que vous changez
+    fréquemment la grammaire, vous pouvez simplement définir une variable
+    d'environnement comme ceci :</p>
+<pre>export PERL_PEGEX_AUTO_COMPILE=Pegex::JSON::Grammar</pre>
+<p class="Pp">et la recompilation se fera automatiquement. Ceci est possible grâce
+    à cette ligne dans le module de grammaire :</p>
+<pre>use constant file =&gt; '../json-pgx/json.pgx';</pre>
+<p class="Pp">Cette ligne n'est utilisée que pendant le développement et nécessite
+    que le fichier de grammaire se trouve à cet endroit.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Pegex::JSON::Data_-_La_classe_receveur_Pegex'><a class='permalink' href='#Pegex::JSON::Data_-_La_classe_receveur_Pegex'>Pegex::JSON::Data - La classe receveur Pegex</a></h1>
+<p class="Pp">Chaque analyse Pegex nécessite un objet grammaire (la grammaire
+    JSON), un objet d'entrée (le JSON analysé) et un objet receveur (le constructeur
+    Perl).</p>
+<p class="Pp">L'un des traits marquants de Pegex est qu'il sépare la grammaire
+    du code (receveur), ainsi</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page man" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-pegex/">extra/perl-pegex</a></dd>
+        <dt>Version :</dt>
+        <dd>0.75-7</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://metacpan.org/release/Pegex">https://metacpan.org/release/Pegex</a></dd>
+        <dt>Licences :</dt>
+        <dd>PerlArtistic, GPL</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-pegex/">/listing/extra/perl-pegex/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#Comment_écrire_un_analyseur_JSON_en_Pegex">Comment écrire un analyseur JSON en Pegex</a></li>
+        
+            <li><a href="#Tester_dabord">Tester d'abord</a></li>
+        
+            <li><a href="#La_grammaire_JSON_Pegex">La grammaire JSON Pegex</a></li>
+        
+            <li><a href="#Pegex::JSON::Grammar_-_La_classe_de_grammaire_Pegex">Pegex::JSON::Grammar - La classe de grammaire Pegex</a></li>
+        
+            <li><a href="#Pegex::JSON::Data_-_La_classe_receveur_Pegex">Pegex::JSON::Data - La classe receveur Pegex</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Pegex::Tutorial::JSON.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/Pegex::Tutorial::JSON.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous la licence</p>
+<!DOCTYPE html>
+<html lang="fr">
+    <head>
+        <meta charset="utf-8">
+        <title>Page de licence</title>
+    </head>
+    <body>
+        <footer>
+            <p>
+               sous licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>, à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquetage Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

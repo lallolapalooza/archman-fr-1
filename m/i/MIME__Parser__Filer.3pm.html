@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>MIME::Parser::Filer(3pm) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">MIME__Parser__Filer(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-mime-tools/">perl-mime-tools</a></p>
+<p class="lic">Licences: GPL, PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">MIME::Parser::Filer(3)</td>
+    <td class="head-vol">Documentation des paquets contribués Perl</td>
+    <td class="head-rtitle">MIME::Parser::Filer(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">MIME::Parser::Filer - gérer le fichier de sortie du parseur</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPIS</a></h1>
+<p class="Pp">Avant de continuer, vous devriez regarder MIME::Parser pour vous assurer que vous comprenez où ce module s'intègre dans le schéma général des choses. Allez-y, faites-le maintenant. Je vais attendre.</p>
+<p class="Pp">Prêt ? Ok... maintenant lisez &quot;DESCRIPTION&quot; ci-dessous, et tout le reste devrait avoir du sens.</p>
+<section class="Ss">
+<h2 class="Ss" id='Public_interface'><a class='permalink' href='#Public_interface'>Interface publique</a></h2>
+<pre>### Crée un "filer" de la classe souhaitée :
+my $filer = MIME::Parser::FileInto-&gt;new($dir);
+my $filer = MIME::Parser::FileUnder-&gt;new($basedir);
+...
+### Pour ajouter une sécurité, ne laissez pas les externes nommer vos fichiers :
+$filer-&gt;ignore_filename(1);
+### Préparez-vous pour le parsing d'un nouveau message de haut niveau :
+$filer-&gt;init_parse;
+### Renvoie le chemin où les données de ce message devraient aller :
+$path = $filer-&gt;output_path($head);</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Semi-public_interface'><a class='permalink' href='#Semi-public_interface'>Interface semi-publique</a></h2>
+<p class="Pp">Ces méthodes peuvent être écrasées ou ignorées dans certaines sous-classes, donc elles ne sont pas toujours valides dans tous les cas :</p>
+<pre>### Ajustez la correspondance type de contenu vers extension :
+$emap = $filer-&gt;output_extension_map;
+$emap-&gt;{&quot;text/html&quot;} = &quot;.htm&quot;;</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='How_this_class_is_used_when_parsing'><a class='permalink' href='#How_this_class_is_used_when_parsing'>Comment cette classe est utilisée lors du parsing</a></h2>
+<p class="Pp">Quand un MIME::Parser décide qu'il veut écrire un fichier sur disque, il utilise son objet &quot;Filer&quot; - une instance d'une classe sous-classe de MIME::Parser::Filer - pour déterminer où placer le fichier.</p>
+<p class="Pp">Chaque parseur a un objet Filer unique, qu'il utilise pour tout le parsing. Vous pouvez obtenir le Filer pour un <span class="Li">$parser</span> comme ceci :</p>
+<pre>$filer = $parser-&gt;filer;</pre>
+<p class="Pp">Au début de chaque <span class="Li">parse()</span>, l'état interne du filer est réinitialisé par le parseur :</p>
+<pre>$parser-&gt;filer-&gt;init_parse;</pre>
+<p class="Pp">Ensuite, le parseur peut obtenir un chemin pour chaque entité dans le message en remettant l'en-tête (un MIME::Head) au filer, et en le faisant travailler, comme ceci :</p>
+<pre>$new_file = $parser-&gt;filer-&gt;output_path($head);</pre>
+<p class="Pp">Puisqu'il est agréable de pouvoir nettoyer après un parse (surtout un parse raté), le parseur dit au filer quand il a effectivement utilisé un chemin :</p>
+<pre>$parser-&gt;filer-&gt;purgeable($new_file);</pre>
+<p class="Pp">Ensuite, si vous voulez nettoyer les fichiers qui ont été créés pour un parse particulier (et aussi tous les répertoires que le Filer a créés), vous feriez ceci :</p>
+<pre>$parser-&gt;filer-&gt;purge;</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Writing_your_own_subclasses'><a class='permalink' href='#Writing_your_own_subclasses'>Écrire vos propres sous-classes</a></h2>
+<p class="Pp">Il existe deux classes &quot;Filer&quot; standard (voir ci-dessous) : <b>MIME::Parser::FileInto</b>, qui lance tous les fichiers de tous les parses dans un même répertoire, et <b>MIME::Parser::FileUnder</b> (préféré), qui crée un sous-répertoire pour chaque message. Nous espérons qu'ils suffiront pour la plupart des usages, mais juste au cas où vous auriez besoin...</p>
+<p class="Pp">La seule méthode que vous devez écraser est <b>output_path()</b> :</p>
+<pre>$filer-&gt;output_path($head);</pre>
+<p class="Pp">Cette méthode est appelée par MIME::Parser quand il veut mettre le corps d'un message décrypté dans un fichier de sortie. Elle doit renvoyer un chemin pour créer le fichier. L'échec est indiqué en lançant une exception.</p>
+<p class="Pp">Le chemin renvoyé par <span class="Li">output_path()</span> doit être &quot;prêt pour open()&quot; : tous les répertoires parents nécessaires doivent exister à ce moment. Ces répertoires peuvent être créés par le Filer, si vous le souhaitez, et doivent être marqués comme <b>purgeable()</b> s'ils doivent être supprimés.</p>
+<p class="Pp">En fait, si votre problème est plus <i>où</i> vont les fichiers que <i>comment</i> ils s'appellent, vous pouvez utiliser la méthode par défaut <b>output_path()</b> et juste écraser une de ses parties :</p>
+<pre>$dir  = $filer-&gt;output_dir($head);
+$name = $filer-&gt;output_filename($head);
+...</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PUBLIC_INTERFACE'><a class='permalink' href='#PUBLIC_INTERFACE'>INTERFACE PUBLIQUE</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='MIME::Parser::Filer'><a class='permalink' href='#MIME::Parser::Filer'>MIME::Parser::Filer</a></h2>
+<p class="Pp">C'est la super-classe abstraite de tous les objets &quot;filer&quot;.</p>
+<dl class="Bl-tag">
+  <dt id="new"><a class="permalink" href="#new">new INITARGS...</a></dt>
+  <dd><i>Méthode de classe, constructeur.</i> Crée un nouveauuteur de sortie pour le parseur donné. Tous les arguments suivants sont transmis à <b>init()</b>, que les sous-classes doivent écraser pour leur propre usage (l'init par défaut ne fait rien).</dd>
+  <dt id="results"><a class="permalink" href="#results">results RESULTS</a></dt>
+  <dd><i>Méthode d'instance.</i> Connecte ce filer à un objet MIME::Parser::Results qui va quantifier les messages. Notez que nous évitons de le connecter au parseur pour éviter une référence circulaire !</dd>
+  <dt id="init_parse"><a class="permalink" href="#init_parse">init_parse</a></dt>
+  <dd><i>Méthode d'instance.</i> Prépare le début du parsing d'un nouveau message. Les sous-classes doivent s'assurer d'appeler la méthode héritée.</dd>
+  <dt id="evil_filename"><a class="permalink" href="#evil_filename">evil_filename NOM_FICHIER</a></dt>
+  <dd><i>Méthode d'instance.</i> Est-ce un nom de fichier indésirable ; c'est-à-dire un qui ne devrait pas être utilisé comme nom de fichier sur disque ? Si l'un des éléments suivants est vrai :
+        <pre>* il est vide ou seulement composé d'espaces
+* il contient des espaces au début ou à la fin
+* c'est une chaîne de points : &quot;.&quot;, &quot;..&quot;, etc.
+* il contient des caractères non présents dans l'ensemble : &quot;A&quot; - &quot;Z&quot;, &quot;a&quot; - &quot;z&quot;,
+  &quot;0&quot; - &quot;9&quot;, &quot;-&quot;, &quot;_&quot;, &quot;+&quot;, &quot;=&quot;, &quot;.&quot;, &quot;,&quot;, &quot;@&quot;, &quot;#&quot;,
+  &quot;$&quot;, et &quot; &quot;.
+* il est trop long
+</pre>
+    <p class="Pp">Si vous voulez changer ce comportement, vous devriez écraser cette méthode dans la sous-classe de MIME::Parser::Filer que vous utilisez.</p>
+    <p class="Pp"><b>Note :</b> Les sous-classes de MIME::Parser::Filer qui écrasent <b>output_path()</b> pourraient ne pas appeler cette méthode ; cependant, notez que les substituts internes appellent cette méthode.</p>
+    <p class="Pp"><i>Merci à Andrew Pimlott pour avoir trouvé un véritable bug dans la version originale.</i> <i>Merci à Nickolay Saukh pour avoir noté que le mal est dans l'œil de celui qui regarde.</i></p>
+  </dd>
+  <dt id="exorcise_filename"><a class="permalink" href="#exorcise_filename">exorcise_filename NOM_FICHIER</a></dt>
+  <dd><i>Méthode d'instance.</i> Si un nom donné est indésirable (voir &quot;evil_filename&quot;), nous essayons de le sauver en effectuant quelques opérations basiques : tronquer le nom, supprimer les caractères indésirables, etc., et en vérifiant chacun contre <b>evil_filename()</b>.
+    <p class="Pp">Renvoie le nom sauvé (qui est garanti de ne pas être indésirable), ou undef s'il n'a pas pu être sauvé.</p>
+    <p class="Pp"><b>Avertissement :</b> au moment où cette méthode est appelée, le NOM_FICHIER a déjà été décrypté dans l'ensemble de caractères locaux. Si vous utilisez un ensemble de caractères autre que ASCII, ISO-8859-*, ou UTF-8, l'interprétation des caractères de &quot;chemin&quot; peut être très différente, et vous devrez écraser cette méthode. Voir &quot;unmime&quot; dans MIME::WordDecoder pour plus de détails.</p>
+  </dd>
+  <dt id="find_unused_path"><a class="permalink" href="#find_unused_path">find_unused_path DIR, NOM_FICHIER</a></dt>
+  <dd><i>Méthode d'instance, pour les sous-classes uniquement.</i> Nous avons décidé d'un répertoire de sortie et d'un nom de fichier provisoire, mais il y a une chance qu'il existe déjà. Ajoute un suffixe numérique &quot;-1&quot;, &quot;-2&quot;, etc., au nom jusqu'à ce que nous trouvions un chemin inutilisé, puis renvoie ce chemin.
+    <p class="Pp">Le suffixe est ajouté avant le premier &quot;.&quot; dans le nom s'il y en a un ; par exemple :</p>
+        <pre>picture.gif       archive.tar.gz      readme
+picture-1.gif     archive-1.tar.gz    readme-1
+picture-2.gif     archive-2.tar.gz    readme-2
+...               ...                 ...
+picture-10.gif
+...
+</pre>
+    <p class="Pp">Cela peut être une opération coûteuse et risquée si vous ne voulez pas renommer les fichiers, il est donc dans votre meilleur intérêt de minimiser les situations où ces collisions se produisent. Cependant, si un message multipartite donne à toutes ses parties...</p>
+  </dd>
+  </dl>
+</section>
+</section>
+</article>
+</main>
+</body>
+</html>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">MIME::Parser::Filer - le classe de base pour le dépôt de fichiers</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>    use MIME::Parser;
+    $parser = MIME::Parser-&gt;new();
+    $parser-&gt;filer( 'MIME::Parser::FileInto' =&gt; '/tmp/foo' );
+    # ou
+    $parser-&gt;filer( 'MIME::Parser::FileUnder' =&gt; '/tmp/foo' );
+    # ou
+    $parser-&gt;filer( 'MonFiler' =&gt; &amp;ma_fonction_de_choix_du_chemin );
+    # ou
+    $parser-&gt;filer( 'MonFiler' ); # si MonFiler est une sous-classe de MIME::Parser::Filer
+    
+    # ... plus tard ...
+    
+    $head = $parser-&gt;parse_open($msg);
+    if ($head) {
+        print "saved to: ", $head-&gt;output_path, "\n";
+    }</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Un objet <span class="Li">MIME::Parser::Filer</span> est responsable de
+    décider où et sous quel nom les parties de corps des messages MIME sont
+    enregistrées. Le comportement par défaut est d'enregistrer les fichiers dans
+    le répertoire courant, en utilisant le nom de fichier recommandé dans
+    l'en-tête de la partie, en s'assurant qu'il n'y a pas de collision avec des
+    fichiers existants.</p>
+<p class="Pp">Vous pouvez remplacer le classe de filer utilisée par le parser en
+    appelant la méthode <span class="Li">filer()</span> sur l'objet parser.
+    Ceci peut être fait soit avec une chaîne indiquant le nom de la classe de
+    filer à utiliser (elle doit être une sous-classe de
+    <span class="Li">MIME::Parser::Filer</span>), soit avec une chaîne représentant
+    le nom de la classe et une fonction qui sera appelée pour déterminer le chemin
+    de sortie, soit avec une chaîne représentant le nom de la classe et des
+    arguments pour son initialiseur.</p>
+<p class="Pp">Vous n'avez probablement pas besoin de vous soucier de ces classes
+    à moins que vous n'utilisiez pas les classes par défaut
+    <span class="Li">MIME::Parser::FileInto</span> ou
+    <span class="Li">MIME::Parser::FileUnder</span>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INTERFACE_PUBLIQUE'><a class='permalink' href='#INTERFACE_PUBLIQUE'>INTERFACE PUBLIQUE</a></h1>
+<p class="Pp">Les classes de filtres implémentent les méthodes suivantes:</p>
+<dl class="Bl-tag">
+  <dt id="evil_filename"><a class="permalink" href="#evil_filename">evil_filename
+    FILENAME</a></dt>
+  <dd><i>Méthode d'instance.</i> Retourne vrai si FILENAME est jugé comme étant
+      "mauvais" (par exemple, s'il contient des caractères non autorisés, ou s'il
+      est vide, ou s'il est une séquence de points, ou s'il est trop long, etc.).
+      Avec un argument, définit cette valeur. La valeur par défaut est de
+      considérer comme mauvais les noms de fichier contenant des caractères
+      non-ASCII ou des caractères de contrôle.</dd>
+  <dt id="find_unused_path"><a class="permalink" href="#find_unused_path">find_unused_path
+    DIRECTORY, FILENAME</a></dt>
+  <dd><i>Méthode d'instance.</i> Trouve un nom de fichier inutilisé dans
+      DIRECTORY, en utilisant FILENAME comme base. S'il n'y a pas de collision,
+      il retourne DIRECTORY/FILENAME. Sinon, il essaie DIRECTORY/FILENAME.1,
+      puis DIRECTORY/FILENAME.2, etc., jusqu'à ce qu'il en trouve un inutilisé.
+      Retourne le chemin complet du fichier.</dd>
+  <dt id="output_dir"><a class="permalink" href="#output_dir">output_dir
+    HEAD</a></dt>
+  <dd><i>Méthode d'instance.</i> Retourne le répertoire de sortie pour l'en-tête
+      donné. La méthode par défaut retourne &quot;.&quot;.
+    <p class="Pp"><b>Note:</b> Si vous vous attendez à ce que les noms de
+        fichiers recommandés soient les mêmes pour chaque message, et que vous
+        les placez tous dans le même répertoire, cette méthode pourrait être
+        inévitable.</p>
+  </dd>
+  <dt id="ignore_filename"><a class="permalink" href="#ignore_filename">ignore_filename
+    [YESNO]</a></dt>
+  <dd><i>Méthode d'instance.</i> Retourne vrai si nous devons toujours ignorer
+      les noms de fichiers recommandés dans les messages, en choisissant plutôt
+      de générer toujours nos propres noms de fichiers. Avec un argument, définit
+      cette valeur.
+    <p class="Pp"><b>Note:</b> les sous-classes de MIME::Parser::Filer qui
+        redéfinissent <b>output_path()</b> pourraient ne pas honorer ce
+        paramètre ; notez cependant que les sous-classes intégrées l'honorent.</p>
+  </dd>
+  <dt id="output_dir"><a class="permalink" href="#output_dir">output_dir
+    HEAD</a></dt>
+  <dd><i>Méthode d'instance.</i> Retourne le répertoire de sortie pour l'en-tête
+      donné. La méthode par défaut retourne &quot;.&quot;.</dd>
+  <dt id="output_filename"><a class="permalink" href="#output_filename">output_filename
+    HEAD</a></dt>
+  <dd><i>Méthode d'instance, sous-classes uniquement.</i> Un nom de fichier
+      recommandé donné n'a pas été fourni, ou il a été jugé comme étant mauvais.
+      Retourne un nom bidon, utilisant éventuellement des informations de l'en-tête
+      du message HEAD. Notez qu'il s'agit juste du nom du fichier, pas du chemin
+      complet.
+    <p class="Pp">Utilisé par <b>output_path()</b>. Si vous utilisez la valeur
+        par défaut de <span class="Li">output_path()</span>, vous n'avez
+        probablement pas à vous soucier d'éviter les collisions avec des fichiers
+        existants ; nous nous en chargeons dans
+        <b>find_unused_path()</b>.</p>
+  </dd>
+  <dt id="output_prefix"><a class="permalink" href="#output_prefix">output_prefix
+    [PREFIX]</a></dt>
+  <dd><i>Méthode d'instance.</i> Obtient la courte chaîne par laquelle tous les
+      noms de fichiers pour les parties de corps extraites commenceront (en supposant
+      qu'il n'y ait pas de meilleur &quot;nom de fichier recommandé&quot;). La
+      valeur par défaut est <i>&quot;msg&quot;</i>.
+    <p class="Pp">Si PREFIX <i>n'est pas</i> donné, le préfixe de sortie actuel
+        est retourné. Si PREFIX <i>est</i> donné, le préfixe de sortie est défini
+        à la nouvelle valeur, et la valeur précédente est retournée.</p>
+    <p class="Pp">Utilisé par <b>output_filename()</b>.</p>
+    <p class="Pp"><b>Note:</b> les sous-classes de MIME::Parser::Filer qui
+        redéfinissent <b>output_path()</b> ou <b>output_filename()</b>
+        pourraient ne pas honorer ce paramètre ; notez cependant que les
+        sous-classes intégrées l'honorent.</p>
+  </dd>
+  <dt id="output_type_ext"><a class="permalink" href="#output_type_ext">output_type_ext</a></dt>
+  <dd><i>Méthode d'instance.</i> Retourne une référence au hash utilisé par la
+      valeur par défaut de <b>output_filename()</b> pour mapper les types de
+      contenu aux extensions lorsqu'il n'y a pas d'extension par défaut à utiliser.
+        <pre>$emap = $filer-&gt;output_typemap;
+$emap-&gt;{'text/plain'} = '.txt';
+$emap-&gt;{'text/html'}  = '.html';
+$emap-&gt;{'text/*'}     = '.txt';
+$emap-&gt;{'*/*'}        = '.dat';
+</pre>
+    <p class="Pp"><b>Note:</b> les sous-classes de MIME::Parser::Filer qui
+        redéfinissent <b>output_path()</b> ou <b>output_filename()</b>
+        pourraient ne pas consulter ce hash ; notez cependant que les sous-classes
+        intégrées le consultent.</p>
+  </dd>
+  <dt id="output_path"><a class="permalink" href="#output_path">output_path
+    HEAD</a></dt>
+  <dd><i>Méthode d'instance, sous-classes uniquement.</i> Étant donné un en-tête
+      MIME d'un fichier à extraire, trouvez un bon chemin de sortie pour le
+      fichier extrait. C'est la seule méthode dont vous devez vous soucier si vous
+      créez un filtre personnalisé.
+    <p class="Pp">L'implémentation par défaut effectue beaucoup de travail ; les
+        implémenteurs de sous-classes devraient <i>vraiment</i> essayer de
+        simplement redéfinir ses composants au lieu de l'ensemble.</p>
+        <pre>$directory = $self-&gt;output_dir($head);
+$filename = $head-&gt;recommended_filename();
+if (!$filename or
+     $self-&gt;ignore_filename() or
+     $self-&gt;evil_filename($filename)) {
+    $filename = $self-&gt;output_filename($head);
+}
+return $self-&gt;find_unused_path($directory, $filename);
+</pre>
+    <p class="Pp"><b>Note:</b> Il existe de nombreuses façons dont vous pourriez
+        vouloir contrôler la dénomination des fichiers, en fonction de votre
+        application. Si le comportement de cette fonction ne vous plaît pas,
+        vous pouvez facilement définir votre propre sous-classe de
+        MIME::Parser::Filer et la redéfinir là.</p>
+    <p class="Pp"><b>Note:</b> Nickolay Saukh a souligné que, compte tenu de la
+        nature subjective de ce qui est &quot;mauvais&quot;, cette fonction ne
+        devrait pas réellement <i>avertir</i> d'un nom de fichier mauvais,
+        mais peut-être émettre seulement un message de <i>débogage</i>. J'y ai
+        réfléchi, mais ensuite j'ai pensé : si le débogage était désactivé, les
+        gens ne sauraient pas pourquoi (ni même si) un nom de fichier donné a été
+        ignoré. Dans les robots de messagerie qui dépendent des noms de fichiers
+        fournis extérieurement, cela pourrait causer des problèmes difficiles à
+        diagnostiquer. Le message reste donc un avertissement.</p>
+    <p class="Pp"><i>Merci à Laurent Amon d'avoir signalé des problèmes avec
+        l'implémentation originale et d'avoir fait de bonnes suggestions. Merci
+        également à Achim Bohnet d'avoir souligné qu'il devrait y avoir un moyen
+        purement orienté objet de redéfinir le chemin de sortie.</i></p>
+  </dd>
+  <dt id="purge"><a class="permalink" href="#purge">purge</a></dt>
+  <dd><i>Méthode d'instance, finale.</i> Nettoie tous les fichiers/répertoires
+      créés par la dernière analyse. Cette méthode parcourt simplement la liste
+      des fichiers/répertoires à nettoyer dans l'ordre inverse (voir
+      &quot;purgeable&quot;) et supprime tous les fichiers/répertoires existants
+      qui y figurent. Vous ne devriez pas avoir besoin de redéfinir cette méthode.</dd>
+  <dt id="purgeable"><a class="permalink" href="#purgeable">purgeable
+    [FILE]</a></dt>
+  <dd><i>Méthode d'instance, finale.</i> Ajoute FILE à la liste des fichiers/répertoires
+      &quot;à nettoyer&quot; (ceux qui seront supprimés si vous appelez
+      <span class="Li">purge()</span>). Vous ne devriez pas avoir besoin de
+      redéfinir cette méthode.
+    <p class="Pp">Si FILE n'est pas donné, la liste &quot;à nettoyer&quot; est
+        retournée. Ceci peut être utilisé pour un nettoyage plus sophistiqué.</p>
+    <p class="Pp">À titre de cas spécial, l'invocation de cette méthode avec un
+        FILE qui est un ref d'array remplacera la liste à nettoyer par une copie
+        du contenu de l'array, ainsi [] peut être utilisé pour vider la liste.</p>
+    <p class="Pp">Notez que la liste &quot;à nettoyer&quot; est vidée lorsqu'un
+        parser commence une nouvelle analyse ; par conséquent, si vous voulez
+        utiliser <b>purge()</b> pour le nettoyage, vous <i>devez</i> le faire
+        <i>avant</i> de commencer une nouvelle analyse !</p>
+  </dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='MIME::Parser::FileInto'><a class='permalink' href='#MIME::Parser::FileInto'>MIME::Parser::FileInto</a></h2>
+<p class="Pp">Cette sous-classe concrète de MIME::Parser::Filer prend en charge le
+    dépôt dans un répertoire donné.</p>
+<dl class="Bl-tag">
+  <dt id="init"><a class="permalink" href="#init">init DIRECTORY</a></dt>
+  <dd><i>Méthode d'instance, initialiseur.</i> Définit le répertoire où tous les
+      fichiers iront.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='MIME::Parser::FileUnder'><a class='permalink' href='#MIME::Parser::FileUnder'>MIME::Parser::FileUnder</a></h2>
+<p class="Pp">Cette sous-classe concrète de MIME::Parser::Filer prend en charge le
+    dépôt sous un répertoire donné, en utilisant un sous-répertoire par message,
+    mais avec toutes les parties du message dans le même répertoire.</p>
+<dl class="Bl-tag">
+  <dt id="init~2"><a class="permalink" href="#init~2">init BASEDIR,
+    OPTSHASH...</a></dt>
+  <dd><i>Méthode d'instance, initialiseur.</i> Définit le répertoire de base qui
+      contiendra les répertoires des messages. Si utilisé, chaque analyse commence
+      par la création d'un nouveau sous-répertoire de BASEDIR où les parties
+      réelles du message sont placées. OPTSHASH peut contenir les éléments
+      suivants :</dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="DirName"><a class="permalink" href="#DirName">DirName</a></dt>
+  <dd>Définit explicitement le nom du sous-répertoire créé. La valeur par défaut
+      est d'utiliser l'heure, l'ID du processus et un numéro de séquence, mais vous
+      pourriez vouloir un répertoire prévisible.</dd>
+  <dt id="Purge"><a class="permalink" href="#Purge">Purge</a></dt>
+  <dd>Nettoie automatiquement le contenu du répertoire (y compris tous les
+      sous-répertoires) avant chaque analyse. Ceci n'est vraiment nécessaire que si
+      vous utilisez un DirName explicite, et est fourni comme une simple
+      commodité. Actuellement, nous utilisons la forme à 1 argument de
+      File::Path::rmtree ; vous devriez vous familiariser avec les mises en garde
+      qui y sont associées.</dd>
+</dl>
+</div>
+<div class="Bd-indent">
+<p class="Pp">La méthode <b>output_dir()</b> retournera le chemin vers ce
+    répertoire spécifique au message jusqu'à ce que la prochaine analyse ne soit
+    commencée, vous pouvez donc faire ceci :</p>
+<pre>use File::Path;
+$parser-&gt;output_under(&quot;/tmp&quot;);
+$ent = eval { $parser-&gt;parse_open($msg); };   ### analyse
+if (!$ent) {         ### échec de l'analyse
+    rmtree($parser-&gt;output_dir);
+    die &quot;l'analyse a échoué : $@&quot;;
+}
+else {               ### succès de l'analyse
+    ...faire des choses...
+}</pre>
+</div>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR AUSSI</a></h1>
+<p class="Pp">MIME::Tools, MIME::Parser</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Eryq (<i>eryq@zeegee.com</i>), ZeeGee Software Inc
+    (<a href='http://www.zeegee.com'>http://www.zeegee.com</a>).</p>
+<p class="Pp">Tous droits réservés. Ce programme est un logiciel libre ; vous pouvez
+    le redistribuer et/ou le modifier sous les mêmes conditions que Perl lui-même.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-13</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page man" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-mime-tools/">extra/perl-mime-tools</a></dd>
+        <dt>Version :</dt>
+        <dd>5.515-3</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://metacpan.org/pod/MIME::Tools">https://metacpan.org/pod/MIME::Tools</a></dd>
+        <dt>Licences :</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-mime-tools/">/listing/extra/perl-mime-tools/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#INTERFACE_PUBLIQUE">INTERFACE PUBLIQUE</a></li>
+        
+            <li><a href="#VOIR_AUSSI">VOIR AUSSI</a></li>
+        
+            <li><a href="#AUTEUR">AUTEUR</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/MIME::Parser::Filer.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/MIME::Parser::Filer.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages man, qui ont leur propre licence spécifiée
+               dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>
+</footer>
+    </body>
+</html>

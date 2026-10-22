@@ -1,0 +1,398 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>autodie::hints(3perl) — Pages manuelles </title>d'Arch
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">autodie__hints.3perl</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/core/x86_64/perl/">perl</a></p>
+
+        nt
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">autodie::</td>hints(3perl)
+    <td class="head-vol">Guide de référence des programmeurs </td>Perl
+    <td class="head-rtitle">autod</td>ie::h</tr>ints(3</table>perl)
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NO</a></h1>M
+<p class="Pp">autodie::hints - Fournit des </p>indications sur les sous-rou</section>tines
+  utilisateur à autodie
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSI</a></h1>S
+<pre>package Your::Module;
+our %DOES = ( 'autodie::hints::provider' =&gt; 1 );
+sub AUTODIE_HINTS {
+    return {
+        foo =&gt; { scalar =&gt; HINTS, list =&gt; SOME_HINTS },
+        bar =&gt; { scalar =&gt; HINTS, list =&gt; MORE_HINTS },
+    }
+}
+# Plus tard, dans votre programme principa</pre>l...
+use Your::Module qw(foo bar);
+use autodie      qw(:default foo bar);
+foo();         # réussit ou meurt en fonction des indications scalaires
+# Alternativement, des indications peuvent être définies sur les
+# sous-routines que nous avons importées.
+use autodie::h</section>ints;
+use Some::Module qw(think_positive);
+BEGIN {
+    autodie::hints-&gt;set_hints_for(
+        \&amp;think_positive,
+        {
+            fail =&gt; sub { $_[0] &lt;= 0 }
+        }
+    )
+}
+use autodie qw(think_positive);
+think_positive(...);    # Retourne un positif ou meurt.
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTIO</a></h1>N
+<section class="Ss">
+<h2 class="Ss" id='Introduction'><a class='permalink' href='#Introduction'>Introductio</a></h2>n
+<p class="Pp">Le pragma autodie est très intelligent lorsqu'il s'agit de travailler avec
+    les fonctions intégrées de Perl. Le comportement de ces fonctions est fixe, et
+    <span class="Li">"autodie" </span>sait exactement comment elles tentent de
+    signaler un </p>échec.
+<p class="Pp">Mais qu'en est-il des sous-routines définies par l'utilisateur dans les modules ? Si vous utilisez
+    <span class="Li">"autodie" </span>sur une sous-routine définie par l'utilisateur,
+    alors il suppose le comportement suivant pour démontrer un échec </p>:
+<ul class="Bl-bullet">
+  <li>Une valeur fausse, en contexte </li>scalaire
+  <li>Une liste vide, en contexte </li>liste
+  <li>Une liste contena</li>nt un seul undef, </ul>en contexte liste
+<p class="Pp">Toutes les autres valeurs de retour (y compris la liste contenant le seul zéro,
+    et la liste contenant une seule chaîne vide) sont considérées comme des succès.
+    Cependant, le code du monde réel n'est pas toujours aussi simple. Peut-être que le code avec
+    lequel vous travaillez retourne une chaîne contenant le mot "FAIL" lors d'un
+    échec, ou une liste de deux éléments contenant <span class="Li">"(undef,
+    "message d'erreur humain")".</span> Pour faire fonctionner autodie avec
+    ces sortes de sous-routines, nous avons l' <i>interfac</i>e d'indi</p>cations.
+<p class="Pp">L'interface d'indications permet de <i>fournir </i>des indications à
+    <span class="Li">"autodie" </span>sur la manière dont il doit détecter l'échec
+    des sous-routines définies par l'utilisateur. Bien que ces <i>puissent </i>être fournies par
+    l'utilisateur final de <span class="Li">"autodie",</span> elles sont idéalement
+    écrites dans le module lui-même, ou dans un module auxiliaire ou une sous-classe de
+    <span class="Li">"auto</span>die" </p>lui-</section>même.
+<section class="Ss">
+<h2 class="Ss" id='What_are_hints?'><a class='permalink' href='#What_are_hints?'>Que   sont les indications </a></h2>?
+<p class="Pp">Une <i>indication </i>est une sous-routine ou une valeur qui est comparée à la
+    valeur de retour d'une sous-routine soumise à autodie. Si la correspondance retourne vrai,
+    <span class="Li">"autodie" </span>considère que la sous-routine a
+    </p>échoué.
+<p class="Pp">Si l'indication fournie est une sous-routine, alors
+    <span class="Li">"autodie" </span>passera la valeur de retour
+    complète à cette sous-routine. Si l'indication est un objet regexp, alors
+    <span class="Li">"autodie" </span>le fera correspondre à la valeur
+    de retour. Si l'indication est undef, la valeur de retour doit être undef. Sur les versions
+    de Perl 5.10 et plus récentes, toute autre valeur peut être fournie et elle sera
+    appariée intelligemment à la valeur fournie. Cependant, les valeurs appariées intelligemment comme
+    celles-ci sont </p>dépréciées.
+<p class="Pp">Des indications peuvent être fournies pour les contextes scalaire et liste. Notez que
+    une sous-routine soumise à autodie ne verra jamais un contexte void, car
+    <span class="Li">"autodie" a toujours besoin de capturer la
+    valeur de retour pour l</span>'examiner. Les sous-routines soumises à autodie appelées en contexte vo</p>id
+    se comportent comme si elles étaient appelées en contexte scalai</section>re, mais leur valeur de retour est
+    jetée après avoir été vérifiée.
+<section class="Ss">
+<h2 class="Ss" id='Example_hints'><a class='permalink' href='#Example_hints'>Exemples   </a></h2>d'indications
+<p class="Pp">Les indications peuvent consister en des références de sous-routines, des objets surchargeant
+    l'appariement intelligent, des expressions régulières, et selon la version de Perl peut-être
+    d'autres choses. Vous pouvez spécifier des indications différentes pour la manière dont l'échec doit être
+    identifié dans les contextes scalaire et </p>liste.
+<p class="Pp">Ces exemples s'appliquent pour une utilisation dans la
+    <span class="Li">sous-routine </span>"AUTODIE_HINTS" et lors de l'appel de
+    <span class="Li">"autodie::h</span>ints-&gt;set_hi</p>nts_for()".
+<p class="Pp">Les indications spécifiques au contexte les plus courantes sont </p>:
+<pre># Les échecs scalaires retournent toujours undef :
+    {  scalar =&gt; sub { !defined($_[0]) }  }
+# Les échecs scalaires retournent toute valeur fausse [attente par défaut] :
+    {  scalar =&gt; sub { ! $_[0] }  }
+# Les échecs scalaires retournent toujours zéro explicitement :
+    {  scalar =&gt; sub { defined($_[0]) &amp;&amp; $_[0] eq '0' }  }
+# Les échecs en liste retournent toujours une liste vide :
+    {  list =&gt; sub { !@_ }  }
+# Les échecs en liste retournent () ou (undef) [attente par défaut] :
+    {  list =&gt; sub { ! @_ || @_ == 1 &amp;&amp; !defined $_[0] }  }
+# Les échecs en liste retournent () ou une seule valeur fausse :
+    {  list =&gt; sub { ! @_ || @_ == 1 &amp;&amp; !$_[0] }  }
+# Les échecs en liste retournent (undef, "une certaine chaîne")
+    {  list =&gt; sub { @_ == 2 &amp;&amp; !defined $_[0] }  }
+# foo() infructueux retourne 'FAIL' ou '_FAIL' en contexte scalaire,
+#                    retourne (-1) en contexte liste...
+autodie::hints-&gt;set_hints_for(
+    \&amp;foo,
+    {
+        scalar =&gt; qr/^ _? FAIL $/xms,
+        list   =&gt; sub { @_ == 1 &amp;&amp; $_[0] eq -1 },
+    }
+);
+# foo() infructueux retourne 0 dans tous les contextes...
+autodie::hints-&gt;set_hints_for(
+    \&amp;foo,
+    {
+        scalar =&gt; sub { defined($_[0]) &amp;&amp; $_[0] == 0 },
+        list   =&gt; sub { @_ == 1 &amp;&amp; defined($_[0]) &amp;&amp; $_[0] == 0 },
+    }
+)</pre>;
+<p class="Pp">Cette construction « dans tous les contextes » est très courante et
+    peut être abrégée en utilisant la clé 'fail'. Cela définit à la fois les
+    <span class="Li">indic</span>ations
+    <span class="Li">"scalar" </span>et
+    "list" à la même valeur </p>:
+<pre># foo() infructueux retourne 0 dans tous les contextes...
+autodie::hints-&gt;set_hints_for(
+    \&amp;foo,
+    {
+        fail =&gt; sub { @_ == 1 and defined $_[0] and $_[0] == 0 }
+    }
+);
+# think_positive() infructueux retourne un nombre négatif en cas d'échec...
+autodie::hints-&gt;set_hints_for(
+    \&amp;think_positive,
+    {
+        fail =&gt; sub { $_[0] &lt; 0 }
+    }
+);
+# my_system() infructueux retourne non-zéro en cas d'échec...
+autodie::hints-&gt;set_hints_for(
+    \&amp;my_system,
+    {
+        fail =&gt; sub { $_[0] != 0 }
+    }</pre>
+</section>)</section>;
+<section class="Sh">
+<h1 class="Sh" id='Manually_setting_hints_from_within_your_program'><a class='permalink' href='#Manually_setting_hints_from_within_your_program'>Définir   manuellement les indications depuis votre </a></h1>programme
+<p class="Pp">Si vous utilisez un module qui retourne quelque chose de spécial en
+    cas d'échec, alors vous pouvez créer manuellement des indications pour chacune des sous-routines
+    souhaitées. Une fois les indications spécifiées, elles sont disponibles pour tous les fichiers
+    et modules chargés par la suite, ainsi vous pouvez déplacer ce travail dans un module et
+    il fonctionnera </p>toujours.
+<pre>use Some::Module qw(foo bar);
+use autodie::hints;
+autodie::hints-&gt;set_hints_for(
+        \&amp;foo,
+        {
+                scalar =&gt; SCALAR_HINT,
+                list   =&gt; LIST_HINT,
+        }
+);
+autodie::hints-&gt;set_hints_for(
+        \&amp;bar,
+        { fail =&gt; SOME_HINT, }
+)</pre>;
+<p class="Pp">Il est possible de passer soit une référence de sous-routine (recommandée)
+    soit un nom de sous-routine entièrement qualifié comme premier argument. Cela signifie que vous
+    pouvez définir des indications sur des modules qui <i>pourraient </i>être chargés </p>:
+<pre>use autodie::hints;
+autodie::hints-&gt;set_hints_for(
+        'Some::Module:bar', { fail =&gt; SCALAR_HINT, }
+)</pre>;
+<p class="Pp">Cette technique est la plus utile lorsque vous avez un projet qui utilise
+    beaucoup de modules tiers. Vous pouvez définir toutes vos indications possibles en
+    un seul endroit. Cela peut même être dans une sous-classe de autodie. Par exemple </p>:
+<pre>package my::autodie;
+use parent qw(autodie);
+use autodie::hints;
+autodie::hints-&gt;set_hints_for(...);
+</pre>1;
+<p class="Pp">Vous pouvez maintenant <span class="Li">"use my::autodie",</span>
+    qui fonctionnera exactement comme le
+    <span class="Li">"autodie" standard, mais s</span>era maintenant conscient d</p>e toutes les indications
+ </section>   que vous avez définies.
+<section class="Sh">
+<h1 class="Sh" id='Adding_hints_to_your_module'><a class='permalink' href='#Adding_hints_to_your_module'>Ajouter   des indications à votre </a></h1>module
+<p class="Pp"><span class="Li">"autodie" </span>fournit une interface passive
+    pour vous permettre de déclarer des indications pour votre module. Ces indications seront
+    trouvées et utilisées par <span class="Li">"autodie" </span>s'il est
+    chargé, mais sinon n'ont aucun effet (ou dépendances) sans autodie. Pour
+    les définir, votre module doit déclarer qu'il <i>fait </i>le
+    <span class="Li">rôle "autodie::hints::provider".</span> Cela peut
+    être fait en écrivant votre propre <span class="Li">méthode </span>"DOES",
+    en utilisant un système tel que <span class="Li">"Class::DOES" </span>pour
+    gérer le gros du travail pour vous, ou en déclarant une
+    <span class="Li">%DOESpan&gt; variable de paquet avec une
+    <span class="Li">clé "autodie::hints::provider" </span>et une
+    valeur vraie </p>correspondante.
+<p class="Pp">Notez que la vérification d'un <span class="Li">hash </span>%DOES est un
+    <span class="Li">raccourci </span>spécifique à "autodie". Les autres modules n'utilisent pas ce mécanisme pour vérifier les rôles, bien que vous puissiez utiliser le
+    <span class="Li">module "Class:</span>:DOES" depuis le CPAN pour
+    </p>l'autoriser.
+<p class="Pp">De plus, vous devez définir une
+    <span class="Li">sous-routine </span>"AUTODIE_HINTS" qui renvoie une
+    référence de hash contenant les indices pour vos sous-routines </p>:
+<pre>package Your::Module;
+# Nous pouvons utiliser Class::DOES depuis le CPAN pour déclarer l'adhésion
+# à un rôle.
+use Class::DOES 'autodie::hints::provider' =&gt; 1;
+# Alternativement, nous pouvons déclarer le rôle dans %DOES. Notez que
+# ceci est une optimisation spécifique à autodie, bien que Class::DOES
+# puisse être utilisé pour promouvoir ceci en une véritable déclaration de rôle.
+our %DOES = ( 'autodie::hints::provider' =&gt; 1 );
+# Enfin, nous devons définir les indices eux-mêmes.
+sub AUTODIE_HINTS {
+    return {
+        foo =&gt; { scalar =&gt; HINTS, list =&gt; SOME_HINTS },
+        bar =&gt; { scalar =&gt; HINTS, list =&gt; MORE_HINTS },
+        baz =&gt; { fail =&gt; HINTS },
+    }
+</pre>}
+<p class="Pp">Cela permet à votre code de définir des indices sans dépendre de
+    <span class="Li">"autodie" </span>et
+    <span class="Li">"autodie::hints" </span>étant chargés, ou même
+    installés. De cette façon, votre code peut faire la bonne chose lorsque
+    <span class="Li">"autodie" est insta</span>llé, mais n'a pas b</p>esoin d'en dépendr</section>e pour fonctionner.
+<section class="Sh">
+<h1 class="Sh" id='Insisting_on_hints'><a class='permalink' href='#Insisting_on_hints'>Insister sur les </a></h1>indices
+<p class="Pp">Lorsqu'une sous-routine définie par l'utilisateur est enveloppée par
+    <span class="Li">"autodie",</span> elle utilisera les indices s'ils sont
+    disponibles, et sinon reviendra au <i>comportement par </i>défaut décrit
+    dans l'introduction de ce document. Cela peut être problématique si nous nous attendons à ce qu'un indice existe, mais que (pour une raison quelconque) il n'a pas été </p>chargé.
+<p class="Pp">Nous pouvons demander à autodie de <i>exiger </i>qu'un indice soit utilisé en
+    préfixant un point d'exclamation au début du nom de la sous-routine. Un point d'exclamation seul indique que <i>toutes </i>les sous-routines après lui doivent avoir des indices </p>déclarés.
+<pre># foo() et bar() doivent avoir leurs indices définis
+use autodie qw( !foo !bar baz );
+# Tout doit avoir des indices (recommandé).
+use autodie qw( ! foo bar baz );
+# bar() et baz() doivent avoir leurs indices définis
+use autodie qw( foo ! bar baz );
+# Activer autodie pour toutes les fonctions intégrées prises en charge par Perl,
+# ainsi que pour foo(), bar() et baz(). Tout doit
+# avoir des indices.
+use autodie qw( ! :all foo bar baz )</pre>;
+<p class="Pp">Si des indices ne sont pas disponibles pour les sous-routines spécifiées, cela
+    provoquera une erreur à la compilation. Insister sur les indices pour les fonctions intégrées de Perl (par ex., <span class="Li">"open" </span>et
+    <span class="Li">"close")</span> est toujours </p>réussi.
+<p class="Pp">Insister sur les indices est <i>forte</i>ment </p>recomm</section>andé.
+<section class="Sh">
+<h1 class="Sh" id='Diagnostics'><a class='permalink' href='#Diagnostics'>Diagnostic</a></h1>s
+<dl class="Bl-tag">
+  <dt id="Attempts"><a class="permalink" href="#Attempts">Tentatives de
+    set_hints_for sur une sous-routine non </a></dt>identifiable
+  <dd>Vous avez appelé
+      <span class="Li">"autodie::hints-&gt;set_hints_for()"
+  </span>    en utilisant une référence de sous-routine, mais cette référence n'a pas pu être résolue en nom de sous-routine. Il peut s'agir d'une sous-routine anonyme (qui ne peut pas être rendue autodying), ou elle peut manquer de nom pour d'autres raisons.
+    <p class="Pp">Si vous recevez cette erreur avec une sous-routine qui a un nom </p>réel, alors vous avez peut-être trouvé un bogue dans autodie. V</dd>oir "BUGS" dans
+        autodie pour savoir comment le signaler.
+  <dt id="fail"><a class="permalink" href="#fail">Les indices de fail ne peuvent pas être fournis
+    avec des indices scalar ou list pour </a></dt>%s
+  <dd>Lors de la définition des indices, vous pouvez soit fournir à la fois les mots-clés
+      <span class="Li">"list" </span>et
+      <span class="Li">"sca</span>lar", <i>soit </i>vous pouvez
+      fournir un seul <span class="Li">mot-clé </span>"fail". Vous
+      ne pouvez pas les </dd>mélanger.
+  <dt>Indice %s manquant pour </dt>%s
+  <dd>Vous avez fourni soit un <span class="Li">indice </span>"scalar"
+      sans fournir un <span class="Li">indice </span>"list", ou
+      l'inverse. Vous <i>devez </i>fournir à la fois les indices
+      <span class="Li">"scalar" </span>et
+      <span class="Li">"li</span>st", <i>ou </i>un seul
+      <span class="Li">ind</span>ice</dd> "</dl>fai</section>l".
+<section class="Sh">
+<h1 class="Sh" id='ACKNOWLEDGEMENTS'><a class='permalink' href='#ACKNOWLEDGEMENTS'>REMERCIEMENT</a></h1>S
+<ul class="Bl-bullet">
+  <li>Dr Damian Conway pour avoir suggéré l'interface d'indices et fourni l'exemple </li>d'utilisation.
+  <li>Jacinta Richardson pour a</li>voir traduit une grande p</ul>artie de mes idées dans c</section>ette
+      documentation.
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTEU</a></h1>R
+<p class="Pp">Copyright 2009, Pa</p>ul Fenwick &lt;pjf@pe</section>rltraining.com.au&gt;
+<section class="Sh">
+<h1 class="Sh" id='LICENSE'><a class='permalink' href='#LICENSE'>LICENC</a></h1>E
+<p class="Pp">Ce module est un logiciel libre. Vou</p>s pouvez le distribuer selon les mêm</section>es
+    conditions que Perl lui-même.
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR   </a></h1>AUSSI
+<p class="Pp">autod</p>ie, C</section>lass:</div>:DOES
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07</td>-13
+    <td class="foot-os">pe</td>rl</tr> v</table>5.</section>42</article>.0
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le </p>paquet :
+    <dl>
+        <dt>Nom du </dt>paquet :
+        <dd><a href="https://www.archlinux.org/packages/core/x86_64/perl/">core</a></dd>/perl
+        <dt>Version </dt>:
+        <dd>5.42.</dd>0-1
+        <dt>Amont </dt>:
+        <dd><a href="https://www.perl.org">https://www.</a></dd>perl.org
+        <dt>Licences </dt>:
+        <dd>Artistic-1.0-Perl OR GPL-1.</dd>0-or-later
+        <dt>Manuels </dt>:
+        <dd><a href="/listing/core/perl/">/listing/core</a></dd>/per</dl>l</section>/
+
+<details>
+    <summary>Table des </summary>matières
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">N</a></li>OM
+        
+            <li><a href="#SYNOPSIS">RÉ</a></li>SUMÉ
+        
+            <li><a href="#DESCRIPTION">DESC</a></li>RIPTION
+        
+            <li><a href="#Manually_setting_hints_from_within_your_program">Définir manuellement les indices depuis </a></li>votre programme
+        
+            <li><a href="#Adding_hints_to_your_module">Ajouter des indices </a></li>à votre module
+        
+            <li><a href="#Insisting_on_hints">Insister </a></li>sur les indices
+        
+            <li><a href="#Diagnostics">Diag</a></li>nostics
+        
+            <li><a href="#ACKNOWLEDGEMENTS">REMER</a></li>CIEMENTS
+        
+            <li><a href="#AUTHOR">A</a></li>UTEUR
+        
+            <li><a href="#LICENSE">LI</a></li>CENCE
+        
+            <li><a href="#SEE_ALSO">VO</a></li>IR</ul> A</nav>US</details>SI
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/autodie::hints.3perl.en.txt">t</a>xt, 
+        
+            <a href="/man/autodie::hints.3perl.en.raw"></a>r</p>a</nav></aside></main>w
+        <footer>
+            de manuel.
+            <p>Le site web est disponible selon les termes de la <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">licence GPL-3.0
+          </a>     , à l'exception du co</p>ntenu des pages de manuel,</footer> qui ont leur propre licenc</body>e spécifiée dans le paquet</html> Arch Linux correspondant.

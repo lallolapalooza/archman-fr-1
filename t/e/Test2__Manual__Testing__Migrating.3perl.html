@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Test2::Manual::Testing::Migrating(3perl) — Pages du manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Test2__Manual__Testing__Migrating.3perl</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/core/x86_64/perl/">perl</a></p>
+<p class="lic">Licences: Artistic-1.0-Perl OR GPL-1.0-or-later</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Test2::Manual::Testing::Migrating(3perl)</td>
+    <td class="head-vol">Guide de référence des programmeurs Perl</td>
+    <td class="head-rtitle">Test2::Manual::Testing::Migrating(3perl)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Test2::Manual::Testing::Migrating - Comment migrer des tests existants
+    de Test::More vers Test2.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Ce tutoriel couvre la conversion d'un test existant. Ce tutoriel
+    suppose que vous avez un test écrit en utilisant Test::More.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='TEST_LEGACY'><a class='permalink' href='#TEST_LEGACY'>TEST   LEGACY</a></h1>
+<p class="Pp">Ce tutoriel convertira cet exemple de test section par section :</p>
+<p class="Pp"><span class="Li">&quot;t/example.t&quot;</span> :</p>
+<pre>#####################
+# Boilerplate
+use strict;
+use warnings;
+use Test::More tests =&gt; 14;
+use_ok 'Scalar::Util';
+require_ok 'Exporter';
+#####################
+# Assertions simples (pas de changements)
+ok(1, &quot;pass&quot;);
+is(&quot;apple&quot;, &quot;apple&quot;, &quot;Comparaison de chaînes simple&quot;);
+like(&quot;foo bar baz&quot;, qr/bar/, &quot;Correspondance d'expression régulière&quot;);
+#####################
+# Todo
+{
+    local $TODO = &quot;Ceux-ci sont en attente&quot;;
+    ok(0, &quot;oops&quot;);
+}
+#####################
+# Comparaisons profondes
+is_deeply([1, 2, 3], [1, 2, 3], &quot;Comparaison profonde&quot;);
+#####################
+# Comparaison de références
+my $ref = [1];
+is($ref, $ref, &quot;Vérifier que nous avons la même référence les deux fois&quot;);
+#####################
+# Éléments qui ont disparu
+ok(eq_array([1], [1]), &quot;comparaison de tableaux&quot;);
+ok(eq_hash({a =&gt; 1}, {a =&gt; 1}), &quot;comparaison de hachages&quot;);
+ok(eq_set([1, 3, 2], [1, 2, 3]), &quot;comparaison d'ensembles&quot;);
+note explain([1, 2, 3]);
+{
+    package THING;
+    sub new { bless({}, shift) }
+}
+my $thing = new_ok('THING');
+#####################
+# Outils qui ont changé
+isa_ok($thing, 'THING', '$thing');
+can_ok(__PACKAGE__, qw/ok is/);</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BOILERPLATE-1'><a class='permalink' href='#BOILERPLATE-1'>BOILERPLATE</a></h1>
+<p class="Pp">AVANT :</p>
+<pre>use strict;
+use warnings;
+use Test::More tests =&gt; 14;
+use_ok 'Scalar::Util';
+require_ok 'Exporter';</pre>
+<p class="Pp">APRÈS :</p>
+<pre>use Test2::V0;
+plan(11);
+use Scalar::Util;
+require Exporter;</pre>
+<dl class="Bl-tag">
+  <dt id="Replace"><a class="permalink" href="#Replace">Remplacer Test::More par
+    Test2::V0</a></dt>
+  <dd>Test2::V0 est le paquet recommandé. Dans une migration complète, vous voudrez
+      remplacer Test::More par le paquet Test2::V0.
+    <p class="Pp"><b>Note :</b> Vous devez toujours vérifier la dernière version
+        de Test2 pour voir s'il existe un nouveau paquet recommandé. Lors de
+        l'écriture d'un nouveau test, vous devriez toujours utiliser le module
+        Test::V# le plus récent. Des nombres plus élevés indiquent une version
+        plus récente.</p>
+  </dd>
+  <dt id="NOTE:-srand"><a class="permalink" href="#NOTE:-srand">NOTE : srand</a></dt>
+  <dd>Lorsque srand est activé (par défaut), il peut causer des problèmes avec
+      des éléments tels que File::Temp, qui finiront par tenter d'utiliser les
+      mêmes noms de fichiers « aléatoires » pour chaque processus de test lancé
+      un jour donné (ou partageant la même graine).
+    <p class="Pp">Si cela vous pose problème, veuillez désactiver srand lors du
+        chargement de Test2::V0 :</p>
+        <pre>use Test2::V0 -no_srand =&gt; 1;
+</pre>
+  </dd>
+  <dt id="Stop-using-use_ok"><a class="permalink" href="#Stop-using-use_ok">Arrêter
+    d'utiliser <b>use_ok()</b></a></dt>
+  <dd><span class="Li">use_ok()</span> a été supprimé. Une instruction
+      <span class="Li">&quot;use MODULE&quot;</span> lèvera une exception en cas
+      d'échec, empêchant ainsi le test de passer.
+    <p class="Pp">Si vous voulez/devez *VRAIMENT* vous assurer que le fichier a été
+        chargé, vous pouvez utiliser le module ok :</p>
+        <pre>use ok 'Scalar::Util';
+</pre>
+    <p class="Pp">La principale différence ici est qu'il y a un espace au lieu d'un
+        soulignement.</p>
+  </dd>
+  <dt id="Stop-using-require_ok"><a class="permalink" href="#Stop-using-require_ok">Arrêter
+    d'utiliser <b>require_ok()</b></a></dt>
+  <dd><span class="Li">&quot;require_ok&quot;</span> a été supprimé, tout comme
+      <span class="Li">&quot;use_ok&quot;</span>. Il n'y a pas d'équivalent de
+      module ok ici. Utilisez simplement
+      <span class="Li">&quot;require&quot;</span>.</dd>
+  <dt id="Remove-strictwarnings-optional"><a class="permalink" href="#Remove-strictwarnings-optional">Supprimer
+    strict/warnings (facultatif)</a></dt>
+  <dd>Le paquet Test2::V0 active strict et warnings pour vous.</dd>
+  <dt id="Change-where-the-plan-is-set"><a class="permalink" href="#Change-where-the-plan-is-set">Changer
+    l'endroit où le plan est défini</a></dt>
+  <dd>Test2 ne vous permet pas de définir le plan lors de l'importation. Dans l'ancien
+      code, vous passiez <span class="Li">&quot;tests =&gt; 11&quot;</span> comme
+      argument d'importation. Dans Test2, vous devez soit utiliser la fonction
+      <span class="Li">plan()</span> pour définir le plan, soit utiliser
+      <span class="Li">done_testing()</span> à la fin du test.
+    <p class="Pp">Si votre test utilise déjà
+        <span class="Li">done_testing()</span>, vous pouvez le conserver et aucun
+        changement de plan n'est nécessaire.</p>
+    <p class="Pp"><b>Note :</b> Nous changeons également le plan de 14 à 11, car
+        nous avons supprimé <span class="Li">&quot;use_ok&quot;</span>,
+        <span class="Li">&quot;require_ok&quot;</span>, et nous en supprimerons
+        un autre plus tard. C'est pourquoi <span class="Li">done_testing()</span>
+        est recommandé plutôt qu'un plan défini.</p>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ASSERTIONS-SIMPLES'><a class='permalink' href='#ASSERTIONS-SIMPLES'>ASSERTIONS   SIMPLES</a></h1>
+<p class="Pp">La grande majorité des assertions n'aura pas besoin de modifications
+    :</p>
+<pre>#####################
+# Assertions simples (pas de changements)
+ok(1, &quot;pass&quot;);
+is(&quot;apple&quot;, &quot;apple&quot;, &quot;Comparaison de chaînes simple&quot;);
+like(&quot;foo bar baz&quot;, qr/bar/, &quot;Correspondance d'expression régulière&quot;);</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='TODO-1'><a class='permalink' href='#TODO-1'>TODO</a></h1>
+<pre>{
+    local $TODO = &quot;Ceux-ci sont en attente&quot;;
+    ok(0, &quot;oops&quot;);
+}</pre>
+<p class="Pp">La variable de paquet <span class="Li">$TODO</span> a disparu. Vous
+    avez maintenant une fonction <span class="Li">todo()</span>.</p>
+<p class="Pp">Il existe 2 façons de l'utiliser :</p>
+<dl class="Bl-tag">
+  <dt id="todo-"><a class="permalink" href="#todo-">todo $raison =&gt; sub { ...
+    }</a></dt>
+  <dd>
+    <pre>todo &quot;Ceux-ci sont en attente&quot; =&gt; sub {
+    ok(0, &quot;oops&quot;);
+};
+</pre>
+    <p class="Pp">C'est la façon la plus propre de faire un todo. Cela rendra
+        toutes les assertions à l'intérieur du bloc de code des assertions TODO.</p>
+  </dd>
+  <dt>{ my $TODO = todo $raison; ... } <a class="permalink" href="#%7B-my-%24TODO-=-todo-%24raison%3B-..-..-%7D"></a></dt>
+  <dd>
+    <pre>{
+    my $TODO = todo &quot;Ceux-ci sont en attente&quot;;
+    ok(0, &quot;oops&quot;);
+}
+</pre>
+    <p class="Pp">C'est un système qui émule l'ancienne méthode. Au lieu de
+        modifier une variable globale <span class="Li">$TODO</span>, vous créez
+        un objet todo avec la fonction <span class="Li">todo()</span> et l'assignez
+        à une variable lexicale. Une fois que l'objet todo sort de la portée, le
+        TODO se termine.</p>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COMPARAISONS-PROFONDES'><a class='permalink' href='#COMPARAISONS-PROFONDES'>COMPARAISONS   PROFONDES</a></h1>
+<pre>is_deeply([1, 2, 3], [1, 2, 3], &quot;Comparaison profonde&quot;);</pre>
+<p class="Pp">Les comparaisons profondes sont faciles, remplacez simplement
+    <span class="Li">is_deeply()</span> par <span class="Li">is()</span>.</p>
+<pre>is([1, 2, 3], [1, 2, 3], &quot;Comparaison profonde&quot;);</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COMPARAISON-DE-REFERENCES'><a class='permalink' href='#COMPARAISON-DE-REFERENCES'>COMPARAISON   DE REFERENCES</a></h1>
+<pre>my $ref = [1];
+is($ref, $ref, &quot;Vérifier que nous avons la même référence les deux fois&quot;);</pre>
+<p class="Pp">La fonction <span class="Li">is()</span> fournie par Test::More
+    force les deux arguments en chaînes de caractères, ce qui en fait une
+    comparaison des adresses de référence. La fonction <span class="Li">is()</span>
+    de Test2 est une comparaison profonde, donc cela passera toujours, mais ne
+    parvient pas réellement à tester ce que nous voulons (que les deux références
+    soient la même référence exacte, pas seulement des structures identiques.)</p>
+<p class="Pp">Nous avons maintenant la fonction <span class="Li">ref_is()</span>
+    qui fait ce que nous voulons vraiment, elle s'assure que les deux références
+    sont la même référence. Cette fonction fait mieux le travail que l'original,
+    qui pouvait être perturbé par la surcharge de chaînes.</p>
+<pre>my $ref = [1];
+ref_is($ref, $ref, &quot;Vérifier que nous avons la même référence les deux fois&quot;);</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='OUTILS-QUI-ONT-DISPARU'><a class='permalink' href='#OUTILS-QUI-ONT-DISPARU'>OUTILS   QUI ONT DISPARU</a></h1>
+<pre>ok(eq_array([1], [1]), &quot;comparaison de tableaux&quot;);
+ok(eq_hash({a =&gt; 1}, {a =&gt; 1}), &quot;comparaison de hachages&quot;);
+ok(eq_set([1, 3, 2], [1, 2, 3]), &quot;comparaison d'ensembles&quot;);
+note explain([1, 2, 3]);
+{
+    package THING;
+    sub new { bless({}, shift) }
+}
+my $thing = new_ok('THING');</pre>
+<p class="Pp"><span class="Li">&quot;eq_array&quot;</span>,
+    <span class="Li">&quot;eq_hash&quot;</span> et
+    <span class="Li">&quot;eq_set&quot;</span> sont considérés comme obsolètes depuis
+    très longtemps, Test2 ne les fournit pas du tout. À la place, vous pouvez
+    simplement utiliser <span class="Li">is()</span> :</p>
+<pre>is([1], [1], &quot;comparaison de tableaux&quot;);
+is({a =&gt; 1}, {a =&gt; 1}, &quot;comparaison de hachages&quot;);</pre>
+<p class="Pp"><span class="Li">&quot;eq_set&quot;</span> est un peu plus
+    compliqué, voir Test2::Tools::Compare pour une explication :</p>
+<pre>is([1, 3, 2], bag { item 1; item 2; item 3; end }, &quot;comparaison d'ensembles&quot;);</pre>
+<p class="Pp"><span class="Li">explain()</span> a une histoire mouvementée. Il y a
+    eu des arguments sur la façon dont il devrait fonctionner.</p>
+</section>
+</div>
+</section>
+                
+            </article>
+        </main>
+    </body>
+</html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Test2::Manual::Testing::Migrating(3perl) — Perldoc Browser</title>
+        <link rel="stylesheet" href="/css/normalize.css">
+        <link rel="stylesheet" href="/css/layout.css">
+        <link rel="stylesheet" href="/css/manual.css">
+        <link rel="stylesheet" href="/css/github.css">
+        <link rel="stylesheet" href="/css/theme.css">
+    </head>
+    <body>
+        
+        <main>
+            <article>
+                <section class="Sh">
+                    <h1 class="Sh" id="NAME">NAME</h1>
+                    <p class="Nd">Test2::Manual::Testing::Migrating - Migrating from Test::More to Test2</p>
+                </section>
+                <section class="Sh">
+                    <h1 class="Sh" id="DESCRIPTION">DESCRIPTION</h1>
+                    <p class="Pp">This document will help you migrate your tests from Test::More to Test2.</p>
+                </section>
+                <section class="Sh">
+                    <h1 class="Sh" id="LEGACY_TEST">LEGACY TEST</h1>
+                    <p class="Pp">Most tests from Test::More are compatible with Test2. This is because Test2 is designed to be backwards compatible with Test::More.</p>
+                    <pre>use Test::More;
+plan(1);
+ok(1);</pre>
+                    <p class="Pp">Becomes:</p>
+                    <pre>use Test2::V0;
+plan(1);
+ok(1);</pre>
+                    <p class="Pp">You can also use Test2::Bundle::More to get Test::More compatibility.</p>
+                    <pre>use Test2::Bundle::More;
+plan(1);
+ok(1);</pre>
+                </section>
+                <section class="Sh">
+                    <h1 class="Sh" id="BOILERPLATE">BOILERPLATE</h1>
+                    <p class="Pp">Test2 does not require any boilerplate.</p>
+                    <pre>use Test::More;</pre>
+                    <p class="Pp">Becomes:</p>
+                    <pre>use Test2::V0;</pre>
+                    <p class="Pp">Or:</p>
+                    <pre>use Test2::Suite;</pre>
+                    <p class="Pp">Or:</p>
+                    <pre>use Test2::API;</pre>
+                    <p class="Pp">Or:</p>
+                    <pre>use Test2::Tools::Generic;</pre>
+                    <p class="Pp">If you need the features from Test::More, you can use:</p>
+                    <pre>use Test2::Bundle::More;</pre>
+                    <p class="Pp">Test2::V0 is generally recommended.</p>
+                </section>
+                <section class="Sh">
+                    <h1 class="Sh" id="SIMPLE_ASSERTIONS">SIMPLE ASSERTIONS</h1>
+                    <p class="Pp">The simple assertions like <span class="Li">ok()</span>, <span class="Li">is()</span>, <span class="Li">unlike()</span>, <span class="Li">like()</span>, <span class="Li">cmp_ok()</span>, <span class="Li">ok_or_diag()</span>, <span class="Li">is_deeply()</span>, <span class="Li">unlike_or_diag()</span>, <span class="Li">like_or_diag()</span>, <span class="Li">fail()</span>, <span class="Li">skip()</span>, <span class="Li">skip_all()</span>, and <span class="Li">done_testing()</span> are all compatible.</p>
+                    <pre>is([1], [1], &quot;array comparison&quot;);
+is({a =&gt; 1}, {a =&gt; 1}, &quot;hash comparison&quot;);
+is([1, 3, 2], bag { item 1; item 2; item 3; end }, &quot;set comparison&quot;);</pre>
+                </section>
+                <section class="Sh">
+                    <h1 class="Sh" id="TODO">TODO</h1>
+                    <p class="Pp">The <span class="Li">todo()</span> block is compatible.</p>
+                    <pre>todo &quot;This is a todo&quot; =&gt; sub {
+    ok(0, &quot;this should fail&quot;);
+};</pre>
+                </section>
+                <section class="Sh">
+                    <h1 class="Sh" id="DEEP_COMPARISONS">DEEP COMPARISONS</h1>
+                    <p class="Pp"><span class="Li">is_deeply()</span> is gone. Use <span class="Li">is()</span> instead.</p>
+                    <pre>use Test::More;
+is_deeply([1, 2, {a =&gt; 1}], [1, 2, {a =&gt; 1}]);</pre>
+                    <p class="Pp">Becomes:</p>
+                    <pre>use Test2::V0;
+is([1, 2, {a =&gt; 1}], [1, 2, {a =&gt; 1}]);</pre>
+                </section>
+                <section class="Sh">
+                    <h1 class="Sh" id="COMPARING_REFERENCES">COMPARING REFERENCES</h1>
+                    <p class="Pp"><span class="Li">ref_is()</span> is gone. Use <span class="Li">is()</span> instead.</p>
+                    <pre>use Test::More;
+my $array = [1];
+ref_is($array, $array);</pre>
+                    <p class="Pp">Becomes:</p>
+                    <pre>use Test2::V0;
+my $array = [1];
+is($array, $array);</pre>
+                </section>
+                <section class="Sh">
+                    <h1 class="Sh" id="TOOLS_THAT_ARE_GONE">TOOLS THAT ARE GONE</h1>
+                    <p class="Pp">Test2 decided to simply not include <span class="Li">explain()</span> to avoid the arguments. You can instead directly use Data::Dumper:</p>
+                    <pre>use Data::Dumper;
+note Dumper([1, 2, 3]);</pre>
+                    <p class="Pp"><span class="Li">new_ok()</span> is gone. The implementation was complicated, and did not add much value:</p>
+                    <pre>{
+    package THING;
+    sub new { bless({}, shift) }
+}
+my $thing = THING-&gt;new;
+ok($thing, &quot;made a new thing&quot;);</pre>
+                    <p class="Pp">The complete section after the conversion is:</p>
+                    <pre>is([1], [1], &quot;array comparison&quot;);
+is({a =&gt; 1}, {a =&gt; 1}, &quot;hash comparison&quot;);
+is([1, 3, 2], bag { item 1; item 2; item 3; end }, &quot;set comparison&quot;);
+use Data::Dumper;
+note Dumper([1, 2, 3]);
+{
+    package THING;
+    sub new { bless({}, shift) }
+}
+my $thing = THING-&gt;new;
+ok($thing, &quot;made a new thing&quot;);</pre>
+                </section>
+                <section class="Sh">
+                    <h1 class="Sh" id="TOOLS_THAT_HAVE_CHANGED"><a class='permalink' href='#TOOLS_THAT_HAVE_CHANGED'>TOOLS THAT HAVE CHANGED</a></h1>
+                    <pre>isa_ok($thing, 'THING', '$thing');
+can_ok(__PACKAGE__, qw/ok is/);</pre>
+                    <p class="Pp">In Test::More these functions are very confusing, and most people use them wrong!</p>
+                    <p class="Pp"><span class="Li">isa_ok()</span> from Test::More takes a thing, a class/reftype to check, and then uses the third argument as an alternative display name for the first argument (NOT a test name!).</p>
+                    <p class="Pp"><span class="Li">can_ok()</span> from Test::More is not consistent with <span class="Li">&quot;isa_ok&quot;</span> as all arguments after the first are subroutine names.</p>
+                    <p class="Pp">Test2 fixes this by making both functions consistent and obvious:</p>
+                    <pre>isa_ok($thing, ['THING'], 'got a THING');
+can_ok(__PACKAGE__, [qw/ok is/], &quot;have expected subs&quot;);</pre>
+                    <p class="Pp">You will note that both functions take a thing, an arrayref as the second argument, then a test name as the third argument.</p>
+                </section>
+                <section class="Sh">
+                    <h1 class="Sh" id="FINAL_VERSION">FINAL VERSION</h1>
+                    <pre>#####################
+# Boilerplate
+use Test2::V0;
+plan(11);
+use Scalar::Util;
+require Exporter;
+#####################
+# Simple assertions (no changes)
+ok(1, &quot;pass&quot;);
+is(&quot;apple&quot;, &quot;apple&quot;, &quot;Simple string compare&quot;);
+like(&quot;foo bar baz&quot;, qr/bar/, &quot;Regex match&quot;);
+#####################
+# Todo
+todo &quot;These are todo&quot; =&gt; sub {
+    ok(0, &quot;oops&quot;);
+};
+#####################
+# Deep comparisons
+is([1, 2, 3], [1, 2, 3], &quot;Deep comparison&quot;);
+#####################
+# Comparing references
+my $ref = [1];
+ref_is($ref, $ref, &quot;Check that we have the same ref both times&quot;);
+#####################
+# Things that are gone
+is([1], [1], &quot;array comparison&quot;);
+is({a =&gt; 1}, {a =&gt; 1}, &quot;hash comparison&quot;);
+is([1, 3, 2], bag { item 1; item 2; item 3; end }, &quot;set comparison&quot;);
+use Data::Dumper;
+note Dumper([1, 2, 3]);
+{
+    package THING;
+    sub new { bless({}, shift) }
+}
+my $thing = THING-&gt;new;
+#####################
+# Tools that changed
+isa_ok($thing, ['THING'], 'got a THING');
+can_ok(__PACKAGE__, [qw/ok is/], &quot;have expected subs&quot;);</pre>
+                </section>
+                <section class="Sh">
+                    <h1 class="Sh" id="SEE_ALSO"><a class='permalink' href='#SEE_ALSO'>SEE ALSO</a></h1>
+                    <p class="Pp">Test2::Manual - Primary index of the manual.</p>
+                </section>
+                <section class="Sh">
+                    <h1 class="Sh" id="SOURCE"><a class='permalink' href='#SOURCE'>SOURCE</a></h1>
+                    <p class="Pp">The source code repository for Test2-Manual can be found at <a href='https://github.com/Test-More/test-more/'>https://github.com/Test-More/test-more/</a>.</p>
+                </section>
+                <section class="Sh">
+                    <h1 class="Sh" id="MAINTAINERS"><a class='permalink' href='#MAINTAINERS'>MAINTAINERS</a></h1>
+                    <dl class="Bl-tag">
+                        <dt id="Chad"><a class="permalink" href="#Chad">Chad Granum
+                            &lt;exodist@cpan.org&gt;</a></dt>
+                        <dd></dd>
+                    </dl>
+                </section>
+                <section class="Sh">
+                    <h1 class="Sh" id="AUTHORS"><a class='permalink' href='#AUTHORS'>AUTHORS</a></h1>
+                    <dl class="Bl-tag">
+                        <dt id="Chad~2"><a class="permalink" href="#Chad~2">Chad Granum
+                            &lt;exodist@cpan.org&gt;</a></dt>
+                        <dd></dd>
+                    </dl>
+                </section>
+                <section class="Sh">
+                    <h1 class="Sh" id="COPYRIGHT"><a class='permalink' href='#COPYRIGHT'>COPYRIGHT</a></h1>
+                    <p class="Pp">Copyright Chad Granum &lt;exodist@cpan.org&gt;.</p>
+                    <p class="Pp">This program is free software; you can redistribute it and/or modify it under the same terms as Perl itself.</p>
+                    <p class="Pp">See <a href='http://dev.perl.org/licenses/'>http://dev.perl.org/licenses/</a></p>
+                </section>
+            </article>
+            <aside id="sidebar">
+                <section class="search">
+                    <form action="/search" class="search direct-search" role="search">
+                        <input type="search" placeholder="Search manual page" name="q" value="" />
+                        <input type="submit" name="go" value="Go" />
+                    </form>
+                </section>
+                <section class="package-info">
+                    <p>Package information:</p>
+                    <dl>
+                        <dt>Package name:</dt>
+                        <dd><a href="https://www.archlinux.org/packages/core/x86_64/perl/">core/perl</a></dd>
+                        <dt>Version:</dt>
+                        <dd>5.42.0-1</dd>
+                        <dt>Upstream:</dt>
+                        <dd><a href="https://www.perl.org">https://www.perl.org</a></dd>
+                        <dt>Licenses:</dt>
+                        <dd>Artistic-1.0-Perl OR GPL-1.0-or-later</dd>
+                        <dt>Manuals:</dt>
+                        <dd><a href="/listing/core/perl/">/listing/core/perl/</a></dd>
+                    </dl>
+                </section>
+                <details>
+                    <summary>Table of contents</summary>
+                    <nav class="toc">
+                        <ul>
+                            <li><a href="#NAME">NAME</a></li>
+                            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+                            <li><a href="#LEGACY_TEST">LEGACY TEST</a></li>
+                            <li><a href="#BOILERPLATE">BOILERPLATE</a></li>
+                            <li><a href="#SIMPLE_ASSERTIONS">SIMPLE ASSERTIONS</a></li>
+                            <li><a href="#TODO">TODO</a></li>
+                            <li><a href="#DEEP_COMPARISONS">DEEP COMPARISONS</a></li>
+                            <li><a href="#COMPARING_REFERENCES">COMPARING REFERENCES</a></li>
+                            <li><a href="#TOOLS_THAT_ARE_GONE">TOOLS THAT ARE GONE</a></li>
+                            <li><a href="#TOOLS_THAT_HAVE_CHANGED">TOOLS THAT HAVE CHANGED</a></li>
+                            <li><a href="#FINAL_VERSION">FINAL VERSION</a></li>
+                            <li><a href="#SEE_ALSO">SEE ALSO</a></li>
+                            <li><a href="#SOURCE">SOURCE</a></li>
+                            <li><a href="#MAINTAINERS">MAINTAINERS</a></li>
+                            <li><a href="#AUTHORS">AUTHORS</a></li>
+                            <li><a href="#COPYRIGHT">COPYRIGHT</a></li>
+                        </ul>
+                    </nav>
+                </details>
+                <nav class="other-formats">
+                    <p>Other formats:</p>
+                    <ul>
+                        <li><a href="/man/Test2::Manual::Testing::Migrating.3perl.en.txt">txt</a></li>
+                        <li><a href="/man/Test2::Manual::Testing::Migrating.3perl.en.raw">raw</a></li>
+                    </ul>
+                </nav>
+            </aside>
+        </main>
+        <footer>
+            
+            <p>The website is available under the terms of the <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               license, except for the contents of the manual pages, which have their own license
+               specified in the corresponding Arch Linux package.
+            </p>
+        </footer>
+    </body>
+</html>

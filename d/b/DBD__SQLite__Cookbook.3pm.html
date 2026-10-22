@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>DBD::SQLite::Cookbook(3pm) — Pages man Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">DBD__SQLite__Cookbook(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/perl-dbd-sqlite/">perl-dbd-sqlite</a></p>
+<p class="lic">Licences: GPL, PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">DBD::SQLite::Cookbook(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">DBD::SQLite::Cookbook(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">DBD::SQLite::Cookbook - Le cookbook DBD::SQLite</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Ceci est le cookbook DBD::SQLite.</p>
+<p class="Pp">Il est destiné à servir de lieu de stockage pour diverses fonctions
+    et formules à utiliser dans les API de rappel de DBD::SQLite.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='FONCTIONS_AGREGÉES'><a class='permalink' href='#FONCTIONS_AGREGÉES'>FONCTIONS   AGREGÉES</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='Variance'><a class='permalink' href='#Variance'>Variance</a></h2>
+<p class="Pp">Ceci est une fonction d'agrégation simple qui retourne une variance.
+    Elle est adaptée d'un exemple d'implémentation dans pysqlite.</p>
+<pre>package variance;
+
+sub new { bless [], shift; }
+
+sub step {
+    my ( $self, $value ) = @_;
+
+    push @$self, $value;
+}
+
+sub finalize {
+    my $self = $_[0];
+
+    my $n = @$self;
+
+    # La variance est NULL sauf s'il y a plus d'une ligne
+    return undef unless $n || $n == 1;
+
+    my $mu = 0;
+    foreach my $v ( @$self ) {
+        $mu += $v;
+    }
+    $mu /= $n;
+
+    my $sigma = 0;
+    foreach my $v ( @$self ) {
+        $sigma += ($v - $mu)**2;
+    }
+    $sigma = $sigma / ($n - 1);
+
+    return $sigma;
+}
+
+# NOTE : Si vous utilisez un ancien DBI (&lt; 1.608),
+# utilisez $dbh-&gt;func(..., &quot;create_aggregate&quot;) à la place.
+$dbh-&gt;sqlite_create_aggregate( &quot;variance&quot;, 1, 'variance' );</pre>
+<p class="Pp">La fonction peut ensuite être utilisée ainsi :</p>
+<pre>SELECT group_name, variance(score)
+FROM results
+GROUP BY group_name;</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Variance_(économe_en_mémoire)'><a class='permalink' href='#Variance_(économe_en_mémoire)'>Variance   (économe en mémoire)</a></h2>
+<p class="Pp">Une fonction de variance plus efficace, optimisée pour l'utilisation
+    de la mémoire au détriment de la précision :</p>
+<pre>package variance2;
+
+sub new { bless {sum =&gt; 0, count=&gt;0, hash=&gt; {} }, shift; }
+
+sub step {
+    my ( $self, $value ) = @_;
+    my $hash = $self-&gt;{hash};
+
+    # en tronquant et en hachant, nous pouvons traiter beaucoup plus de points de données
+    $value = int($value); # changer selon le besoin de précision
+                          # utiliser sprintf pour la précision en virgule flottante arbitraire
+    if (exists $hash-&gt;{$value}) {
+        $hash-&gt;{$value}++;
+    } else {
+        $hash-&gt;{$value} = 1;
+    }
+    $self-&gt;{sum} += $value;
+    $self-&gt;{count}++;
+}
+
+sub finalize {
+    my $self = $_[0];
+
+    # La variance est NULL sauf s'il y a plus d'une ligne
+    return undef unless $self-&gt;{count} &gt; 1;
+
+    # calculer la moyenne
+    my $mu = $self-&gt;{sum} / $self-&gt;{count};
+
+    my $sigma = 0;
+    while (my ($h, $v) = each %{$self-&gt;{hash}}) {
+        $sigma += (($h - $mu)**2) * $v;
+    }
+    $sigma = $sigma / ($self-&gt;{count} - 1);
+
+    return $sigma;
+}</pre>
+<p class="Pp">La fonction peut ensuite être utilisée ainsi :</p>
+<pre>SELECT group_name, variance2(score)
+FROM results
+GROUP BY group_name;</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Variance_(très_évolutive)'><a class='permalink' href='#Variance_(très_évolutive)'>Variance   (très évolutive)</a></h2>
+<p class="Pp">Une troisième implémentation de variance, conçue pour des ensembles
+    de données arbitrairement grands :</p>
+<pre>package variance3;
+
+sub new { bless {mu=&gt;0, count=&gt;0, S=&gt;0}, shift; }
+
+sub step {
+    my ( $self, $value ) = @_;
+    $self-&gt;{count}++;
+    my $delta = $value - $self-&gt;{mu};
+    $self-&gt;{mu} += $delta/$self-&gt;{count};
+    $self-&gt;{S} += $delta*($value - $self-&gt;{mu});
+}
+
+sub finalize {
+    my $self = $_[0];
+    return $self-&gt;{S} / ($self-&gt;{count} - 1);
+}</pre>
+<p class="Pp">La fonction peut ensuite être utilisée ainsi :</p>
+<pre>SELECT group_name, variance3(score)
+FROM results
+GROUP BY group_name;</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SUPPORT'><a class='permalink' href='#SUPPORT'>SUPPORT</a></h1>
+<p class="Pp">Les bogues doivent être signalés via le traqueur de bogues CPAN à
+    l'adresse :</p>
+<p class="Pp"><a href='http://rt.cpan.org/NoAuth/ReportBug.html?Queue=DBD-SQLite'>http://rt.cpan.org/NoAuth/ReportBug.html?Queue=DBD-SQLite</a></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='À_FAIRE'><a class='permalink' href='#À_FAIRE'>À FAIRE</a></h1>
+<ul class="Bl-bullet">
+  <li>Ajouter plus de recettes de cookbook variées, jusqu'à ce que nous en ayons
+      assez pour les transformer en une distribution CPAN séparée.</li>
+  <li>Créer une série de scripts de test qui valident les recettes du cookbook.</li>
+</ul>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Adam Kennedy &lt;adamk@cpan.org&gt;</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR'><a class='permalink' href='#DROITS_D_AUTEUR'>DROITS D'AUTEUR</a></h1>
+<p class="Pp">Copyright 2009 - 2012 Adam Kennedy.</p>
+<p class="Pp">Ce programme est un logiciel libre ; vous pouvez le redistribuer et/ou
+    le modifier sous les mêmes conditions que Perl lui-même.</p>
+<p class="Pp">Le texte intégral de la licence se trouve dans le fichier LICENSE
+    inclus avec ce module.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher une page man" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/perl-dbd-sqlite/">extra/perl-dbd-sqlite</a></dd>
+        <dt>Version :</dt>
+        <dd>1.76-2</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://search.cpan.org/dist/DBD-SQLite">https://search.cpan.org/dist/DBD-SQLite</a></dd>
+        <dt>Licences :</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-dbd-sqlite/">/listing/extra/perl-dbd-sqlite/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#FONCTIONS_AGREGÉES">FONCTIONS AGRÉGÉES</a></li>
+        
+            <li><a href="#SUPPORT">SUPPORT</a></li>
+        
+            <li><a href="#À_FAIRE">À FAIRE</a></li>
+        
+            <li><a href="#AUTEUR">AUTEUR</a></li>
+        
+            <li><a href="#DROITS_D_AUTEUR">DROITS D'AUTEUR</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/DBD::SQLite::Cookbook.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/DBD::SQLite::Cookbook.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages man, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

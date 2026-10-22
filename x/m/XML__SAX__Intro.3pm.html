@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>XML::SAX::Intro(3pm) — Pages man Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">XML__SAX__Intro(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-xml-sax/">perl-xml-sax</a></p>
+<p class="lic">Licences: Artistic-1.0-Perl, GPL-1.0-or-later</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">XML::SAX::Intro(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">XML::SAX::Intro(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">XML::SAX::Intro - Une Introduction à l'analyse SAX avec Perl</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Introduction'><a class='permalink' href='#Introduction'>Introduction</a></h1>
+<p class="Pp">XML::SAX est une nouvelle façon de travailler avec les analyseurs XML
+    sous Perl. Dans cet article, nous discuterons pourquoi vous devriez utiliser
+    SAX, pourquoi vous devriez utiliser XML::SAX, et nous examinerons certains
+    détails fins de l'implémentation. Le texte ci-dessous suppose une certaine
+    familiarité avec l'analyse basée sur les rappels (callback) ou le flux
+    (push), mais si vous n'êtes pas familier avec ces techniques, un bon point de
+    départ est la série d'articles de Kip Hampton sur XML.com.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Remplacer_XML::Parser'><a class='permalink' href='#Remplacer_XML::Parser'>Remplacer   XML::Parser</a></h1>
+<p class="Pp">La méthode de facto pour analyser le XML sous Perl est d'utiliser
+    XML::Parser de Larry Wall et Clark Cooper. Ce module est un wrapper Perl et XS
+    autour de la bibliothèque d'analyse XML expat de James Clark. Ce fut un
+    projet d'un succès immense, mais il souffre de quelques défauts plutôt
+    majeurs. Premièrement, c'est une API propriétaire, conçue avant que l'API SAX
+    ne soit conçue, ce qui signifie qu'elle n'est pas facilement remplaçable par
+    d'autres analyseurs de flux. Deuxièmement, ses rappels sont des références à
+    des sous-routines. Cela ne semble pas être un gros problème, mais conduit
+    malheureusement à du code comme ceci :</p>
+<pre>sub handle_start {
+  my ($e, $el, %attrs) = @_;
+  if ($el eq 'foo') {
+    $e-&gt;{inside_foo}++; # MAUVAIS ! $e est un objet XML::Parser::Expat.
+  }
+}</pre>
+<p class="Pp">Comme vous pouvez le voir, nous utilisons l'objet <span class="Li">$e</span>
+    pour conserver nos informations d'état, ce qui est une mauvaise idée car nous
+    ne possédons pas cet objet - nous ne l'avons pas créé. C'est un objet interne
+    de XML::Parser, qui se trouve être une référence de hachage. Nous pourrions
+    trop facilement écraser les variables d'état internes de XML::Parser en
+    utilisant cela, ou Clark pourrait le changer en une référence de tableau (pas
+    qu'il le ferait, car cela casserait tellement de code, mais il le pourrait).</p>
+<p class="Pp">La seule façon actuelle avec XML::Parser de maintenir l'état en
+    toute sécurité est d'utiliser une fermeture (closure):</p>
+<pre>my $state = MyState-&gt;new();
+$parser-&gt;setHandlers(Start =&gt; sub { handle_start($state, @_) });</pre>
+<p class="Pp">Cette fermeture capture la variable <span class="Li">$state</span>,
+    qui est maintenant passée comme premier paramètre à votre rappel. Malheureusement,
+    très peu de gens utilisent cette technique, car elle n'est pas documentée dans
+    les fichiers POD de XML::Parser.</p>
+<p class="Pp">Une autre raison pour laquelle vous pourriez ne pas vouloir
+    utiliser XML::Parser est que vous avez besoin d'une fonctionnalité qu'il ne
+    fournit pas (comme la validation), ou vous pourriez avoir besoin d'utiliser
+    une bibliothèque qui n'utilise pas expat, parce qu'elle n'est pas installée
+    sur votre système, ou à cause d'un fournisseur d'accès à Internet restrictif.
+    L'utilisation de SAX vous permet de contourner ces restrictions.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Introduction_à_SAX'><a class='permalink' href='#Introduction_à_SAX'>Introduction   à SAX</a></h1>
+<p class="Pp">SAX signifie Simple API for XML. Et simple, ça l'est vraiment.
+    Construire un analyseur SAX et passer des événements aux gestionnaires se fait
+    aussi simplement que :</p>
+<pre>use XML::SAX;
+use MySAXHandler;
+
+my $parser = XML::SAX::ParserFactory-&gt;parser(
+      Handler =&gt; MySAXHandler-&gt;new
+);
+
+$parser-&gt;parse_uri(&quot;foo.xml&quot;);</pre>
+<p class="Pp">Le concept important à saisir ici est que SAX utilise une classe
+    fabrique appelée XML::SAX::ParserFactory pour créer une nouvelle instance
+    d'analyseur. La raison en est que vous pouvez prendre en charge d'autres
+    implémentations d'analyse sous-jacentes pour différents ensembles de
+    fonctionnalités. C'est une chose qui a toujours cruellement manqué à
+    XML::Parser.</p>
+<p class="Pp">Dans le code ci-dessus, nous voyons la méthode parse_uri utilisée,
+    mais nous aurions tout aussi bien pu appeler parse_file, parse_string, ou
+    <b>parse()</b>. Veuillez consulter XML::SAX::Base pour savoir ce que ces
+    méthodes prennent comme paramètres, mais ne vous laissez pas berner en croyant
+    que parse_file prend un nom de fichier. Non, il prend un descripteur de fichier,
+    un glob, ou une sous-classe de IO::Handle. Attention.</p>
+<p class="Pp">SAX fonctionne de manière très similaire à la méthode de rappel
+    par défaut de XML::Parser, sauf qu'il y a une différence majeure : plutôt que
+    de définir des rappels individuels, vous créez une nouvelle classe dans
+    laquelle recevoir les rappels. Chaque rappel est appelé comme un appel de
+    méthode sur une instance de cette classe de gestionnaire. Un exemple
+    démontrera mieux cela :</p>
+<pre>package MySAXHandler;
+use base qw(XML::SAX::Base);
+
+sub start_document {
+  my ($self, $doc) = @_;
+  # traite l'événement de début de document
+}
+
+sub start_element {
+  my ($self, $el) = @_;
+  # traite l'événement de début d'élément
+}</pre>
+<p class="Pp">Maintenant, lorsque nous instancions cela comme ci-dessus, et que
+    nous analysons du XML avec ceci comme gestionnaire, les méthodes
+    start_document et start_element seront appelées comme des appels de méthode,
+    donc ce serait l'équivalent d'appeler directement :</p>
+<pre>$object-&gt;start_element($el);</pre>
+<p class="Pp">Notez la différence avec le style d'appel de XML::Parser, qui
+    appelle :</p>
+<pre>start_element($e, $name, %attribs);</pre>
+<p class="Pp">C'est la différence entre les appels de fonction et les appels de
+    méthode qui vous permet de créer des sous-classes de gestionnaires SAX, ce
+    qui contribue à faire de SAX une solution puissante.</p>
+<p class="Pp">Comme vous pouvez le voir, contrairement à XML::Parser, nous devons
+    définir un nouveau package pour faire notre traitement (il existe des astuces
+    que vous pouvez utiliser pour rendre cela inutile, mais je laisserai les
+    experts découvrir cela). Le plus grand avantage est que vous maintenez votre
+    propre variable d'état (<span class="Li">$self</span> dans l'exemple ci-dessus),
+    vous libérant ainsi des préoccupations énumérées ci-dessus. C'est également une
+    amélioration en termes de maintenance - vous pouvez placer le code dans un
+    fichier séparé si vous le souhaitez, et vos méthodes de rappel sont toujours
+    appelées de la même manière, plutôt que d'avoir à choisir un nom approprié
+    pour elles comme vous deviez le faire avec XML::Parser. C'est un avantage
+    évident.</p>
+<p class="Pp">Les analyseurs SAX sont également très flexibles quant à la manière
+    dont vous leur passez un gestionnaire. Vous pouvez utiliser un paramètre de
+    constructeur comme nous l'avons vu ci-dessus, ou nous pouvons passer le
+    gestionnaire directement dans l'appel à l'une des méthodes de parse :</p>
+<pre>$parser-&gt;parse(Handler =&gt; $handler, 
+               Source =&gt; { SystemId =&gt; &quot;foo.xml&quot; });
+# ou...
+$parser-&gt;parse_file($fh, Handler =&gt; $handler);</pre>
+<p class="Pp">Cette flexibilité permet d'utiliser un analyseur dans de nombreux
+    scénarios différents tout au long de votre script (bien qu'il ne faille pas
+    ressentir la pression d'utiliser cette méthode, car la construction de
+    l'analyseur n'est généralement pas un processus coûteux en temps).</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Paramètres_des_rappels'><a class='permalink' href='#Paramètres_des_rappels'>Paramètres   des rappels</a></h1>
+<p class="Pp">La seule autre chose que vous devez savoir pour comprendre le SAX
+    de base est la structure des paramètres passés à chacun des rappels. Dans
+    XML::Parser, tous les paramètres sont passés comme options multiples aux
+    rappels, donc par exemple le rappel Start serait appelé comme
+    my_start($e, <span class="Li">$name</span>, <span class="Li">%attributes</span>),
+    et le rappel PI serait appelé comme my_processing_instruction($e,
+    <span class="Li">$target</span>, <span class="Li">$data</span>). En SAX,
+    chaque rappel reçoit une référence de hachage, contenant des entrées qui
+    définissent notre &quot;nœud&quot;. Les rappels clés et les structures qu'ils
+    reçoivent sont :</p>
+<section class="Ss">
+<h2 class="Ss" id='start_element'><a class='permalink' href='#start_element'>start_element</a></h2>
+<p class="Pp">Le gestionnaire start_element est appelé chaque fois qu'un analyseur
+    rencontre une balise ouvrante. Il reçoit une structure d'élément composée de
+    :</p>
+<dl class="Bl-tag">
+  <dt id="LocalName"><a class="permalink" href="#LocalName">LocalName</a></dt>
+  <dd>Le nom de l'élément moins tout préfixe d'espace de noms avec lequel il peut
+      être venu dans le document.</dd>
+  <dt id="NamespaceURI"><a class="permalink" href="#NamespaceURI">NamespaceURI</a></dt>
+  <dd>L'URI de l'espace de noms associé à cet élément, ou la chaîne vide pour
+      aucun.</dd>
+  <dt id="Attributes"><a class="permalink" href="#Attributes">Attributes</a></dt>
+  <dd>Un ensemble d'attributs tel que décrit ci-dessous.</dd>
+  <dt id="Name"><a class="permalink" href="#Name">Name</a></dt>
+  <dd>Le nom de l'élément tel qu'il a été vu dans le document (c'est-à-dire en
+      incluant tout préfixe qui lui est associé)</dd>
+  <dt id="Prefix"><a class="permalink" href="#Prefix">Prefix</a></dt>
+  <dd>Le préfixe utilisé pour qualifier l'espace de noms de cet élément, ou la
+      chaîne vide si aucun.</dd>
+</dl>
+<p class="Pp">Les <b>Attributes</b> sont une référence de hachage, indexée par ce
+    que nous avons appelé la notation &quot;James Clark&quot;. Cela signifie que
+    le nom de l'attribut a été étendu pour inclure l'URI de l'espace de noms associé,
+    et combiné comme {ns}name, où &quot;ns&quot; est l'URI de l'espace de noms étendu
+    de l'attribut si et seulement si l'attribut avait un préfixe, et &quot;name&quot;
+    est le LocalName de l'attribut.</p>
+<p class="Pp">La valeur de chaque entrée dans le hachage des attributs est une
+    autre structure de hachage composée de :</p>
+<dl class="Bl-tag">
+  <dt id="LocalName~2"><a class="permalink" href="#LocalName~2">LocalName</a></dt>
+  <dd>Le nom de l'attribut moins tout préfixe d'espace de noms avec lequel il peut
+      être venu dans le document.</dd>
+  <dt id="NamespaceURI~2"><a class="permalink" href="#NamespaceURI~2">NamespaceURI</a></dt>
+  <dd>L'URI de l'espace de noms associé à cet attribut. Si l'attribut n'avait pas
+      de préfixe, alors cela consiste uniquement en la chaîne vide.</dd>
+  <dt id="Name~2"><a class="permalink" href="#Name~2">Name</a></dt>
+  <dd>Le nom de l'attribut tel qu'il est apparu dans le document, inclu</dd>
+</dl>
+</section>
+</div>
+</section>
+            </article>
+            
+        </main>
+    </body>
+</html>
+      aucun préfixe d'espace de noms.</dd>
+  <dt id="Prefix~2"><a class="permalink" href="#Prefix~2">Prefix</a></dt>
+  <dd>Le préfixe utilisé pour qualifier l'espace de noms de cet attribut, ou la chaîne vide
+      si aucun.</dd>
+  <dt id="Value"><a class="permalink" href="#Value">Value</a></dt>
+  <dd>La valeur de l'attribut.</dd>
+</dl>
+<p class="Pp">Ainsi, un exemple complet, tel que produit par Data::Dumper, pourrait être :</p>
+<pre>....</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='end_element'><a class='permalink' href='#end_element'>end_element</a></h2>
+<p class="Pp">Le gestionnaire <code class="Nm">end_element</code> est appelé soit lorsqu'un analyseur rencontre une balise fermante, soit après que <code class="Nm">start_element</code> ait été appelé pour un élément vide (notez toutefois qu'un analyseur peut, s'il le souhaite, appeler <code class="Nm">characters</code> avec une chaîne vide lorsqu'il rencontre un élément vide. Il n'y a aucun moyen simple en SAX de déterminer si l'analyseur a effectivement vu un élément vide, un début et une fin d'élément sans contenu).</p>
+<p class="Pp">Le gestionnaire <code class="Nm">end_element</code> reçoit exactement la même structure que <code class="Nm">start_element</code>, moins l'entrée <code class="Cm">Attributes</code>. Il faut cependant noter qu'il ne doit pas s'agir d'une référence aux mêmes données que celles reçues par <code class="Nm">start_element</code>, vous pouvez donc modifier les valeurs dans <code class="Nm">start_element</code>, mais cela n'affectera pas les valeurs vues plus tard par <code class="Nm">end_element</code>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='characters'><a class='permalink' href='#characters'>characters</a></h2>
+<p class="Pp">La devolución de <code class="Nm">characters</code> peut être appelée dans plusieurs circonstances.
+    La plus évidente est lorsqu'on voit des données de caractères ordinaires dans le balisage.
+    Mais elle est également appelée pour le texte dans une section CDATA, et est aussi appelée dans d'autres situations. Un analyseur SAX ne fait aucune garantie quant au nombre de fois où il peut appeler <code class="Nm">characters</code> pour une étendue de texte dans un document XML - il peut appeler une fois, ou une fois pour chaque caractère du texte. Afin de contourner cela, il est souvent important pour le développeur SAX d'utiliser une technique de regroupement, où le texte est collecté et traité dans l'une des autres callbacks. Ce n'est pas toujours nécessaire, mais c'est une technique qui vaut la peine d'être apprise, que nous aborderons dans <a href="/man/XML/SAX/Advanced.3pm.html">XML::SAX::Advanced</a> (quand j'aurai le temps de l'écrire).</p>
+<p class="Pp">Le gestionnaire <code class="Nm">characters</code> est appelé avec une structure très simple - une référence de hachage composée d'une seule entrée :</p>
+<dl class="Bl-tag">
+  <dt id="Data"><a class="permalink" href="#Data">Data</a></dt>
+  <dd>Les données textuelles qui ont été reçues.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='comment'><a class='permalink' href='#comment'>comment</a></h2>
+<p class="Pp">La callback <code class="Nm">comment</code> est appelée pour le texte des commentaires. Contrairement à <span class="Li">characters()</span>, la callback <code class="Nm">comment</code> *doit* être invoquée une seule fois pour une chaîne de commentaire entière. Elle reçoit une seule structure simple - une référence de hachage contenant une seule entrée :</p>
+<dl class="Bl-tag">
+  <dt id="Data~2"><a class="permalink" href="#Data~2">Data</a></dt>
+  <dd>Le texte du commentaire.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='processing_instruction'><a class='permalink' href='#processing_instruction'>processing_instruction</a></h2>
+<p class="Pp">Le gestionnaire d'instructions de traitement est appelé pour toutes les instructions de traitement du document. Notez que ces instructions de traitement peuvent apparaître avant l'élément racine du document, ou après celui-ci, ou n'importe où où le texte et les éléments apparaîtraient normalement dans le document, conformément à la spécification XML.</p>
+<p class="Pp">Le gestionnaire reçoit une structure contenant seulement deux entrées :</p>
+<dl class="Bl-tag">
+  <dt id="Target"><a class="permalink" href="#Target">Target</a></dt>
+  <dd>La cible de l'instruction de traitement</dd>
+  <dt id="Data~3"><a class="permalink" href="#Data~3">Data</a></dt>
+  <dd>Les données textuelles de l'instruction de traitement. Peut être une chaîne vide pour une instruction de traitement qui n'a pas d'élément de données. Par exemple, &lt;?wiggle?&gt; est une instruction de traitement parfaitement valide.</dd>
+</dl>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Tip_of_the_iceberg'><a class='permalink' href='#Tip_of_the_iceberg'>Le bout de l'iceberg</a></h1>
+<p class="Pp">Ce que nous avons discuté ci-dessus est vraiment le bout de l'iceberg SAX.
+    Et jusqu'à présent, il semble qu'il n'y ait pas grand-chose d'intéressant dans SAX au-delà de ce que nous avons vu avec XML::Parser. Mais cela va beaucoup plus loin, je vous assure.</p>
+<p class="Pp">Ceux qui détestent le code orienté objet pour le plaisir de le faire pourraient penser ici que la création d'un nouveau paquet juste pour analyser quelque chose est une perte de temps alors qu'ils analysent des choses très bien jusqu'à présent en utilisant du code procédural.
+    Mais il y a une raison à toute cette folie. Et cette raison, ce sont les filtres SAX.</p>
+<p class="Pp">Comme vous l'avez vu tout au début, pour informer l'analyseur de notre classe, nous lui passons une instance de notre classe comme Handler à l'analyseur.
+    Mais imaginez maintenant ce qui se passerait si notre classe pouvait également accepter une option Handler, et simplement effectuer un traitement puis transmettre nos données plus loin ? C'est en quelques mots comment fonctionnent les filtres SAX. Ce sont des pipes Unix pour le 21ème siècle !</p>
+<p class="Pp">Il y a deux inconvénients à cela. Numéro 1 - écrire des filtres SAX peut être délicat. Si vous regardez dans le futur et lisez le tutoriel avancé que j'écris, vous verrez que Handler peut avoir plusieurs formes et tailles.
+    Donc, s'assurer que votre filtre fait la bonne chose peut être délicat. Deuxièmement, la construction de chaînes de filtres complexes peut être difficile, et une simple réflexion nous dit que nous n'avons qu'une seule passe sur notre document, alors que nous en aurons souvent besoin de plus.</p>
+<p class="Pp">Heureusement, ces inconvénients ont été résolus avec la sortie de deux modules très intéressants. Ce qui est encore mieux, c'est que je n'ai écrit aucun d'entre eux !</p>
+<p class="Pp">Le premier module est <a href="/man/XML/SAX/Base.3pm.html">XML::SAX::Base</a>. C'est un module SAX VITAL qui sert de classe de base pour tous les analyseurs et filtres SAX. Il fournit une abstraction par rapport à l'appel des méthodes de gestionnaire, ce qui garantit que votre filtre ou analyseur fait la bonne chose, et il le fait RAPIDEMENT. Donc, si vous avez jamais besoin d'écrire un filtre SAX, ce qui est probablement le cas si vous traitez XML -> XML, ou XML -> HTML, alors vous devez l'écrire comme une sous-classe de <a href="/man/XML/SAX/Base.3pm.html">XML::SAX::Base</a>. Vraiment - c'est un conseil à ne pas négliger à la légère. Je n'entrerai pas dans les détails de l'écriture d'un filtre SAX ici. Kip Hampton, l'auteur de <a href="/man/XML/SAX/Base.3pm.html">XML::SAX::Base</a>, l'a bien couvert dans son article sur XML.com ici &lt;URI&gt;.</p>
+<p class="Pp">Pour construire des pipelines SAX, Barrie Slaymaker, un ancien hacker Perl dont vous avez probablement entendu parler ou utilisé les modules, a écrit un module très astucieux appelé <a href="/man/XML/SAX/Machines.3pm.html">XML::SAX::Machines</a>. Celui-ci combine des modules de type filtre SAX vraiment astucieux avec une boîte à outils de construction de filtres qui facilite la création de pipelines. Mais avant de voir comment il facilite les choses, voyons d'abord à quel point il semble difficile de construire des pipelines de filtres SAX complexes.</p>
+<pre>use XML::SAX::ParserFactory;
+use XML::Filter::Filter1;
+use XML::Filter::Filter2;
+use XML::SAX::Writer;
+
+my $output_string;
+my $writer = XML::SAX::Writer-&gt;new(Output =&gt; \$output_string);
+my $filter2 = XML::SAX::Filter2-&gt;new(Handler =&gt; $writer);
+my $filter1 = XML::SAX::Filter1-&gt;new(Handler =&gt; $filter2);
+my $parser = XML::SAX::ParserFactory-&gt;parser(Handler =&gt; $filter1);
+
+$parser-&gt;parse_uri("foo.xml");</pre>
+<p class="Pp">C'est beaucoup plus facile avec <a href="/man/XML/SAX/Machines.3pm.html">XML::SAX::Machines</a> :</p>
+<pre>use XML::SAX::Machines qw(Pipeline);
+
+my $output_string;
+my $parser = Pipeline(
+      XML::SAX::Filter1 =&gt; XML::SAX::Filter2 =&gt; \$output_string
+      );
+
+$parser-&gt;parse_uri("foo.xml");</pre>
+<p class="Pp">L'un des principaux avantages de <a href="/man/XML/SAX/Machines.3pm.html">XML::SAX::Machines</a> est que les pipelines sont construits dans l'ordre naturel, plutôt que dans l'ordre inverse que nous avons vu avec la construction manuelle de pipelines. <a href="/man/XML/SAX/Machines.3pm.html">XML::SAX::Machines</a> s'occupe de tous les détails internes de la construction de pipelines, vous fournissant à la fin juste un analyseur que vous pouvez utiliser (et vous pouvez réutiliser le même analyseur autant de fois que vous en avez besoin).</p>
+<p class="Pp">Juste un dernier conseil. Si jamais vous êtes bloqué et confus quant à ce qui est passé d'un filtre ou analyseur SAX à l'autre, alors <a href="/man/Devel/TraceSAX.3pm.html">Devel::TraceSAX</a> vous viendra en aide. Ce plugin de débogueur Perl vous permettra de vider le flux d'événements SAX au fur et à mesure. L'utilisation est vraiment très simple, il suffit d'appeler votre script Perl qui utilise SAX comme suit :</p>
+<pre>$ perl -d:TraceSAX &lt;scriptname&gt;</pre>
+<p class="Pp">Et de préférence redirigez la sortie vers un paginateur, tel que more ou less. La sortie est extrêmement verbeuse, mais devrait aider à éclaircir certains problèmes.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTEUR</a></h1>
+<p class="Pp">Matt Sergeant, matt@sergeant.org</p>
+<p class="Pp"><span class="Li">$Id</span>$</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2024-05-10</td>
+    <td class="foot-os">perl v5.38.2</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page man" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-xml-sax/">extra/perl-xml-sax</a></dd>
+        <dt>Version :</dt>
+        <dd>1.02-2</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://search.cpan.org/dist/XML-SAX">https://search.cpan.org/dist/XML-SAX</a></dd>
+        <dt>Licences :</dt>
+        <dd>Artistic-1.0-Perl, GPL-1.0-or-later</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-xml-sax/">/listing/extra/perl-xml-sax/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#Introduction">Introduction</a></li>
+        
+            <li><a href="#Replacing_XML::Parser">Remplacement de XML::Parser</a></li>
+        
+            <li><a href="#Introducing_SAX">Introduction à SAX</a></li>
+        
+            <li><a href="#Callback_Parameters">Paramètres de Callback</a></li>
+        
+            <li><a href="#Tip_of_the_iceberg">Le bout de l'iceberg</a></li>
+        
+            <li><a href="#AUTHOR">AUTEUR</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/XML::SAX::Intro.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/XML::SAX::Intro.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages man, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

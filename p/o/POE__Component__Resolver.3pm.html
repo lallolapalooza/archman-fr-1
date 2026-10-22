@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>POE::Component::Resolver(3pm) — Pages man Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">POE__Component__Resolver(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-poe-component-resolver/">perl-poe-component-resolver</a></p>
+<p class="lic">Licences: GPL, PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">POE::Component::Resolver(3)</td>
+    <td class="head-vol">Documentation Perl contribuée par les utilisateurs</td>
+    <td class="head-rtitle">POE::Component::Resolver(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">POE::Component::Resolver - Un résolveur <b>getaddrinfo()</b> non bloquant</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VERSION'><a class='permalink' href='#VERSION'>VERSION</a></h1>
+<p class="Pp">version 0.921</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>#!/usr/bin/perl
+use warnings;
+use strict;
+use POE;
+use POE::Component::Resolver qw( AF_INET AF_INET6 );
+my $r = POE::Component::Resolver-&gt;new(
+        max_resolvers =&gt; 8,
+        idle_timeout  =&gt; 5,
+        af_order      =&gt; [ AF_INET6, AF_INET ],
+        # sidecar_program =&gt; $path_to_program,
+);
+my @hosts = qw( ipv6-test.com );
+my $tcp   = getprotobyname(&quot;tcp&quot;);
+POE::Session-&gt;create(
+        inline_states =&gt; {
+                _start =&gt; sub {
+                        foreach my $host (@hosts) {
+                                $r-&gt;resolve(
+                                        host    =&gt; $host,
+                                        service =&gt; &quot;http&quot;,
+                                        event   =&gt; &quot;got_response&quot;,
+                                        hints   =&gt; { protocol =&gt; $tcp },
+                                ) or die $!;
+                        }
+                },
+                _stop =&gt; sub { print &quot;client session stopped\n&quot; },
+                got_response =&gt; sub {
+                        my ($error, $addresses, $request) = @_[ARG0..ARG2];
+                        use YAML; print YAML::Dump(
+                                {
+                                        error =&gt; $error,
+                                        addr =&gt; $addresses,
+                                        req =&gt; $request,
+                                }
+                        );
+                },
+        }
+);
+POE::Kernel-&gt;run();</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">POE::Component::Resolver effectue des appels à <b>Socket::getaddrinfo()</b>
+    dans des sous-processus où ils sont autorisés à bloquer aussi longtemps que
+    nécessaire.</p>
+<p class="Pp">Par défaut, il exécutera huit sous-processus et préférera les
+    familles d'adresses dans l'ordre de retour par <b>getaddrinfo()</b>. Ces
+    paramètres par défaut peuvent être remplacés par des paramètres du
+    constructeur. <b>getaddrinfo()</b> délègue au résolveur du système
+    d'exploitation, qui peut être reconfiguré selon les conventions habituelles.</p>
+<section class="Ss">
+<h2 class="Ss" id='PUBLIC_METHODS'><a class='permalink' href='#PUBLIC_METHODS'>MÉTHODES PUBLIQUES</a></h2>
+<p class="Pp"><i>new</i></p>
+<p class="Pp">Crée un nouveau résolveur. Renvoie un objet qui doit être conservé
+    et utilisé pour effectuer des requêtes. Voir le synopsis.</p>
+<p class="Pp">Accepte jusqu'à quatre paramètres nommés optionnels.</p>
+<p class="Pp">&quot;af_order&quot; peut contenir un <i>arrayref</i> avec les
+    familles d'adresses à autoriser, dans l'ordre de préférence. Sans
+    &quot;af_order&quot;, le composant préférera les adresses IPv4 aux adresses
+    IPv6 pour des raisons de compatibilité héritée. Cela pourrait changer à l'avenir
+    à mesure que l'IPv6 gagne en acceptation. Voir &quot;VARIABLES
+    D'ENVIRONNEMENT&quot; pour une façon de remplacer la valeur par défaut sans
+    modifier les modules.</p>
+<pre># Préférer les adresses IPv6, mais aussi renvoyer les adresses IPv4.
+my $r1 = POE::Component::Resolver-&gt;new(
+        af_order =&gt; [ AF_INET6, AF_INET ]
+);
+# Ne renvoyer que les adresses IPv6,
+# ou rien dans les cas où seules des adresses IPv4 existent.
+my $r2 = POE::Component::Resolver-&gt;new(
+        af_order =&gt; [ AF_INET6 ]
+);</pre>
+<p class="Pp">&quot;idle_timeout&quot; détermine combien de temps conserver les
+    sous-processus de résolveur inactifs avant de les nettoyer, en secondes. La
+    valeur par défaut est de 15.0 secondes.</p>
+<p class="Pp">&quot;max_resolvers&quot; contrôle le parallélisme du composant en
+    définissant le nombre maximum de processus secondaires à gérer. La valeur par
+    défaut est de 8, mais moins ou plus de processus peuvent être configurés en
+    fonction des ressources dont vous disposez et du degré de parallélisme requis.</p>
+<pre># Un à la fois, mais sans le blocage gênant.
+my $r3 = POE::Component::Resolver-&gt;new( max_resolvers =&gt; 1 );</pre>
+<p class="Pp">&quot;sidecar_program&quot; contient l'emplacement sur disque d'un
+    programme qui effectuera des recherches bloquantes sur l'entrée standard et
+    imprimera les résultats sur la sortie standard. Le programme secondaire n'est
+    nécessaire que dans des environnements spéciaux où le regroupement et
+    l'exécution d'utilitaires supplémentaires sont délicats. PAR est un tel
+    environnement.</p>
+<p class="Pp">Le programme secondaire doit contenir au moins deux instructions:</p>
+<pre>use POE::Component::Resolver::Sidecar;
+POE::Component::Resover::Sidecar-&gt;main();</pre>
+<p class="Pp"><i>resolve</i></p>
+<p class="Pp"><b>resolve()</b> lance une nouvelle requête pour résoudre un
+    domaine. La requête sera mise en file d'attente dans le composant jusqu'à
+    ce qu'un processus secondaire puisse la traiter. <b>resolve()</b> renvoie un
+    ID de requête qui peut être utilisé pour <b>cancel()</b> une requête avant
+    sa complétion (ou undef si la requête n'a pas pu démarrer, par exemple lors
+    de l'arrêt). Resolve nécessite deux paramètres et accepte certains paramètres
+    optionnels supplémentaires.</p>
+<p class="Pp">&quot;host&quot; et &quot;service&quot; sont obligatoires et contiennent
+    l'hôte (nom ou adresse Internet) et le service (nom ou port numérique) qui
+    seront passés tels quels à <b>getaddrinfo()</b>. Voir Socket pour plus de
+    détails.</p>
+<p class="Pp">&quot;event&quot; est optionnel ; il contient le nom de l'événement
+    qui contiendra la réponse du résolveur. S'il est omis, il sera par défaut
+    &quot;resolver_response&quot;; vous pourriez vouloir spécifier un nom d'événement
+    plus court.</p>
+<p class="Pp">&quot;hints&quot; est optionnel. S'il est spécifié, il doit contenir un
+    <i>hashref</i> d'indices exactement comme <b>getaddrinfo()</b> les attend.
+    Voir Socket pour plus de détails.</p>
+<p class="Pp">&quot;misc&quot; est une donnée de continuation optionnelle qui sera
+    renvoyée dans la réponse. Elle peut contenir tout type de données requis par
+    l'application.</p>
+<p class="Pp"><i>cancel</i></p>
+<p class="Pp">Annule une requête, étant donné l'ID de la requête.</p>
+<pre>my $request_id = $resolver-&gt;resolve(&quot;poe.dyndns.org&quot;, &quot;http&quot;);
+$resolver-&gt;cancel($request_id);</pre>
+<p class="Pp"><i>shutdown</i></p>
+<p class="Pp">Arrête le résolveur. POE::Component::Resolver conserve les
+    ressources, y compris les processus enfants, pendant jusqu'à
+    &quot;idle_timeout&quot; secondes. Cela peut faire fonctionner les programmes
+    jusqu'à &quot;idle_timeout&quot; secondes de plus qu'ils ne le devraient.</p>
+<p class="Pp">POE::Component::Resolver libérera ses ressources (y compris les
+    processus enfants) lorsque sa méthode <b>shutdown()</b> sera appelée.</p>
+<p class="Pp"><i>unpack_addr</i></p>
+<p class="Pp">En contexte scalaire, unpack_addr($response_addr_hashref) renvoie
+    l'élément <i>addr</i> de <span class="Li">$response_addr_hashref</span> sous
+    une forme numérique appropriée pour la famille d'adresses.</p>
+<pre>sub handle_resolver_response {
+        my ($error, $addresses, $request) = @_[ARG0..ARG2];
+        foreach my $a (@$addresses) {
+                my $numeric_addr = $resolver-&gt;unpack_addr($a);
+                print &quot;$request-&gt;{host} = $numeric_addr\n&quot;;
+        }
+}</pre>
+<p class="Pp">En contexte de liste, il renvoie le port et l'adresse numériques.</p>
+<pre>sub handle_resolver_response {
+        my ($error, $addresses, $request) = @_[ARG0..ARG2];
+        foreach my $a (@$addresses) {
+                my ($$numeric_addr, $port) = $resolver-&gt;unpack_addr($a);
+                print &quot;$request-&gt;{host} = $numeric_addr\n&quot;;
+        }
+}</pre>
+<p class="Pp"><b>unpack_addr()</b> est un wrapper pratique autour de
+    <b>getnameinfo()</b> de Socket. Vous êtes certainement invité à utiliser la
+    fonction discrète à la place.</p>
+<p class="Pp"><b>unpack_addr()</b> renvoie une absence regrettable en cas
+    d'échec, quel que soit le contexte. Vous pouvez vérifier le retour <i>undef</i>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='PUBLIC_EVENTS'><a class='permalink' href='#PUBLIC_EVENTS'>ÉVÉNEMENTS PUBLICS</a></h2>
+<p class="Pp"><i>resolver_response</i></p>
+<p class="Pp">L'événement de réponse du résolveur comprend trois paramètres.</p>
+<p class="Pp"><span class="Li">$_</span>[ARG0] et <span class="Li">$_</span>[ARG1]
+    contiennent les valeurs de retour de l'appel <b>getaddrinfo()</b> de Socket.
+    Il s'agit d'un message d'erreur (si l'appel a échoué) et d'un <i>arrayref</i>
+    de structures d'adresses si l'appel a réussi.</p>
+<p class="Pp">Le composant fournit son propre message d'erreur, 'component shut
+    down'. Cette réponse est donnée pour chaque requête en attente au moment où
+    l'utilisateur arrête le composant.</p>
+<p class="Pp"><span class="Li">$_</span>[ARG2] contient un <i>hashref</i>
+    d'informations fournies à la méthode <b>resolve()</b>. Spécifiquement, les
+    valeurs des paramètres &quot;host&quot;, &quot;service&quot; et
+    &quot;misc&quot; de <b>resolve()</b>.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ENVIRONMENT_VARIABLES'><a class='permalink' href='#ENVIRONMENT_VARIABLES'>VARIABLES D'ENVIRONNEMENT</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='POCO_RESOLVER_IPV'><a class='permalink' href='#POCO_RESOLVER_IPV'>POCO_RESOLVER_IPV</a></h2>
+<p class="Pp">La variable d'environnement POCO_RESOLVER_IPV définit l'ordre de
+    recherche de protocole Internet par défaut de ce composant. Si la variable
+    existe, elle doit contenir une chaîne avec les chiffres 4 et/ou 6.
+    POE::Component::Resolver les traitera comme des versions de protocole Internet
+    à considérer, dans l'ordre de préférence.</p>
+<p class="Pp">La méthode <b>new()</b> de POE::Component::Resolver accepte un
+    paramètre &quot;af_order&quot; qui remplace</p>
+</section>
+</section>
+</div>
+</section>
+                
+            </article>
+        </main>
+    </body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link rel="stylesheet" type="text/css" href="../../style.css" />
+        <link rel="stylesheet" type="text/css" href="../../style-site.css" />
+        <title>POE::Component::Resolver(3pm) - Perl manual page</title>
+    </head>
+    <body>
+        <main>
+            <article>
+<div class="manual-page">
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NAME</a></h1>
+<p class="Pp">POE::Component::Resolver - A POE component for asynchronous DNS
+    resolution</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VERSION'><a class='permalink' href='#VERSION'>VERSION</a></h1>
+<p class="Pp">0.921</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre> use POE::Component::Resolver;
+
+ my $resolver = POE::Component::Resolver-&gt;spawn;
+
+ POE::Kernel-&gt;run;
+
+ # send events to the resolver
+ $poe_kernel-&gt;post( $resolver =&gt; 'resolve', 'www.perl.com' );
+ $poe_kernel-&gt;post( $resolver =&gt; 'lookup', '192.0.2.1' );
+
+ # handle responses from the resolver
+ sub handle_resolved {
+     my ($where, $host) = @_[ARG0, ARG1];
+     # ... process $host ...
+ }
+ sub handle_looked_up {
+     my ($where, $ip) = @_[ARG0, ARG1];
+     # ... process $ip ...
+ }
+
+ $poe_kernel-&gt;subscribe( resolved =&gt; \&handle_resolved );
+ $poe_kernel-&gt;subscribe( looked_up =&gt; \&handle_looked_up );
+
+ # later, when done
+ $resolver-&gt;shutdown;
+</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">POE::Component::Resolver is a POE component that handles DNS
+    resolution via a pool of child processes. This prevents your main POE
+    event loop from blocking during potentially long DNS lookups.</p>
+<p class="Pp">It provides two main methods: <code class="Li">resolve</code> and
+    <code class="Li">lookup</code>.</p>
+<dl class="Bl-tag">
+  <dt id="resolve_hostname_to_ip_address"><a class='permalink' href='#resolve_hostname_to_ip_address'>resolve HOSTNAME to IP_ADDRESS</a></dt>
+  <dd>Resolves a hostname to one or more IP addresses.  Emits a <code class="Li">resolved</code>
+      event with the original request and a list of IP addresses.</dd>
+  <dt id="lookup_ip_address_to_hostname"><a class='permalink' href='#lookup_ip_address_to_hostname'>lookup IP_ADDRESS to HOSTNAME</a></dt>
+  <dd>Looks up an IP address to find its canonical hostname. Emits a <code class="Li">looked_up</code>
+      event with the original request and the hostname.</dd>
+</dl>
+<p class="Pp">The component spawns a pool of child processes to perform the actual
+    DNS lookups. This is configured via the <code class="Li">process_count</code>
+    option during spawning. The default is to spawn as many processes as there
+    are CPUs on the system.</p>
+<p class="Pp">You can also configure the <code class="Li">idle_timeout</code> for
+    the child processes. This is the amount of time a child process will remain
+    idle before exiting. The default is 15.0 seconds.</p>
+<p class="Pp">The component automatically handles signals like <code class="Li">HUP</code>
+    to reload the configuration.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ENVIRONMENT_VARIABLES'><a class='permalink' href='#ENVIRONMENT_VARIABLES'>ENVIRONMENT VARIABLES</a></h1>
+<p class="Pp">The behavior of the resolver can be influenced by the following
+    environment variables:</p>
+<p class="Pp">Default to IPv4 addresses only:</p>
+<pre>export POCO_RESOLVER_IPV=4</pre>
+<p class="Pp">Default to IPv6 addresses only:</p>
+<pre>export POCO_RESOLVER_IPV=6</pre>
+<p class="Pp">Prefer IPv6, but accept IPv4 if needed:</p>
+<pre>export POCO_RESOLVER_IPV=64</pre>
+<p class="Pp">Prefer IPv4, but accept IPv6 if needed:</p>
+<pre>export POCO_RESOLVER_IPV=46</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COMPATIBILITY_ISSUES'><a class='permalink' href='#COMPATIBILITY_ISSUES'>COMPATIBILITY ISSUES</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='Microsoft_Windows'><a class='permalink' href='#Microsoft_Windows'>Microsoft Windows</a></h2>
+<p class="Pp">This module requires &quot;Microsoft TCP/IP version 6&quot; to be
+    installed. Steps for Windows XP Pro (the steps for your particular version
+    of Windows may be subtly or drastically different):</p>
+<ul class="Bl-bullet">
+  <li>Open your Control Panel</li>
+  <li>Open your Network Connections</li>
+  <li>Select your network connection from the available one(s)</li>
+  <li>In the Local Area Connection Status dialog, click the Properties
+    button</li>
+  <li>If &quot;Microsoft TCP/IP version 6&quot; is listed as an item being used,
+      you are done.</li>
+  <li>Otherwise click Install...</li>
+  <li>Choose to add a Protocol</li>
+  <li>And install &quot;Microsoft TCP/IP version 6&quot; from the list of
+      network protocols.</li>
+</ul>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BUGS'><a class='permalink' href='#BUGS'>BUGS</a></h1>
+<p class="Pp">There is no timeout on requests.</p>
+<p class="Pp">There is no way to cancel a pending request.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='TROUBLESHOOTING'><a class='permalink' href='#TROUBLESHOOTING'>TROUBLESHOOTING</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='programs_linger_for_several_seconds_before_exiting'><a class='permalink' href='#programs_linger_for_several_seconds_before_exiting'>programs linger for several seconds before exiting</a></h2>
+<p class="Pp">Programs should <b>shutdown()</b> their POE::Component::Resolver
+    objects when they are through needing asynchronous DNS resolution. Programs
+    should additionally destroy their resolvers if they intend to run awhile and
+    want to reuse the memory they consume.</p>
+<p class="Pp">In some cases, it may be necessary to shutdown components that
+    perform asynchronous DNS using POE::Component::Resolver... such as
+    POE::Component::IRC, POE::Component::Client::Keepalive and
+    POE::Component::Client::HTTP.</p>
+<p class="Pp">By default, the resolver subprocesses hang around for
+    idle_timeout, which defaults to 15.0 seconds. Destroying the Resolver object
+    will clean up the process pool. Assuming only that is keeping the event loop
+    active, the program will then exit cleanly.</p>
+<p class="Pp">Alternatively, reduce idle_timeout to a more manageable number,
+    such as 5.0 seconds.</p>
+<p class="Pp">Otherwise something else may also be keeping the event loop
+    active.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='LICENSE'><a class='permalink' href='#LICENSE'>LICENSE</a></h1>
+<p class="Pp">Except where otherwise noted, this distribution is Copyright 2011
+    by Rocco Caputo. All rights reserved. This distribution is free software;
+    you may redistribute it and/or modify it under the same terms as Perl
+    itself.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Package information:</p>
+    <dl>
+        <dt>Package name:</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-poe-component-resolver/">extra/perl-poe-component-resolver</a></dd>
+        <dt>Version:</dt>
+        <dd>0.921-12</dd>
+        <dt>Upstream:</dt>
+        <dd><a href="https://search.cpan.org/dist/POE-Component-resolver">https://search.cpan.org/dist/POE-Component-resolver</a></dd>
+        <dt>Licenses:</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuals:</dt>
+        <dd><a href="/listing/extra/perl-poe-component-resolver/">/listing/extra/perl-poe-component-resolver/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table of contents</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NAME</a></li>
+        
+            <li><a href="#VERSION">VERSION</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#ENVIRONMENT_VARIABLES">ENVIRONMENT VARIABLES</a></li>
+        
+            <li><a href="#COMPATIBILITY_ISSUES">COMPATIBILITY ISSUES</a></li>
+        
+            <li><a href="#BUGS">BUGS</a></li>
+        
+            <li><a href="#TROUBLESHOOTING">TROUBLESHOOTING</a></li>
+        
+            <li><a href="#LICENSE">LICENSE</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Other formats:
+        
+            <a href="/man/POE::Component::Resolver.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/POE::Component::Resolver.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>The website is available under the terms of the <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               license, except for the contents of the manual pages, which have their own license
+               specified in the corresponding Arch Linux package.
+            </p>
+        </footer>
+    </body>
+</html>
+```
+
+```html
+<!DOCTYPE html>
+<html lang="fr">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link rel="stylesheet" type="text/css" href="../../style.css" />
+        <link rel="stylesheet" type="text/css" href="../../style-site.css" />
+        <title>POE::Component::Resolver(3pm) - Page de manuel Perl</title>
+    </head>
+    <body>
+        <main>
+            <article>
+<div class="manual-page">
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">POE::Component::Resolver - Un composant POE pour la résolution DNS asynchrone</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VERSION'><a class='permalink' href='#VERSION'>VERSION</a></h1>
+<p class="Pp">0.921</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre> use POE::Component::Resolver;
+
+ my $resolver = POE::Component::Resolver-&gt;spawn;
+
+ POE::Kernel-&gt;run;
+
+ # envoyer des événements au résolveur
+ $poe_kernel-&gt;post( $resolver =&gt; 'resolve', 'www.perl.com' );
+ $poe_kernel-&gt;post( $resolver =&gt; 'lookup', '192.0.2.1' );
+
+ # gérer les réponses du résolveur
+ sub handle_resolved {
+     my ($where, $host) = @_[ARG0, ARG1];
+     # ... traiter $host ...
+ }
+ sub handle_looked_up {
+     my ($where, $ip) = @_[ARG0, ARG1];
+     # ... traiter $ip ...
+ }
+
+ $poe_kernel-&gt;subscribe( resolved =&gt; \&handle_resolved );
+ $poe_kernel-&gt;subscribe( looked_up =&gt; \&handle_looked_up );
+
+ # plus tard, quand c'est fini
+ $resolver-&gt;shutdown;
+</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">POE::Component::Resolver est un composant POE qui gère la résolution
+    DNS via un pool de processus enfants. Cela empêche votre boucle d'événements
+    POÉ principale de se bloquer pendant des recherches DNS potentiellement longues.</p>
+<p class="Pp">Il fournit deux méthodes principales : <code class="Li">resolve</code>
+    et <code class="Li">lookup</code>.</p>
+<dl class="Bl-tag">
+  <dt id="resolve_hostname_to_ip_address"><a class='permalink' href='#resolve_hostname_to_ip_address'>resolve NOM_HOTE vers ADRESSE_IP</a></dt>
+  <dd>Résout un nom d'hôte en une ou plusieurs adresses IP. Émet un événement
+      <code class="Li">resolved</code> avec la requête d'origine et une liste
+      d'adresses IP.</dd>
+  <dt id="lookup_ip_address_to_hostname"><a class='permalink' href='#lookup_ip_address_to_hostname'>lookup ADRESSE_IP vers NOM_HOTE</a></dt>
+  <dd>Recherche une adresse IP pour trouver son nom d'hôte canonique. Émet un
+      événement <code class="Li">looked_up</code> avec la requête d'origine et
+      le nom d'hôte.</dd>
+</dl>
+<p class="Pp">Le composant lance un pool de processus enfants pour effectuer les
+    recherches DNS réelles. Ceci est configuré via l'option <code class="Li">process_count</code>
+    lors du lancement. La valeur par défaut est de lancer autant de processus
+    qu'il y a de CPU sur le système.</p>
+<p class="Pp">Vous pouvez également configurer le <code class="Li">idle_timeout</code>
+    pour les processus enfants. C'est le temps pendant lequel un processus enfant
+    restera inactif avant de se terminer. La valeur par défaut est de 15.0
+    secondes.</p>
+<p class="Pp">Le composant gère automatiquement les signaux tels que <code class="Li">HUP</code>
+    pour recharger la configuration.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VARIABLES_D_ENVIRONNEMENT'><a class='permalink' href='#VARIABLES_D_ENVIRONNEMENT'>VARIABLES D'ENVIRONNEMENT</a></h1>
+<p class="Pp">Le comportement du résolveur peut être influencé par les variables
+    d'environnement suivantes :</p>
+<p class="Pp">Par défaut, uniquement les adresses IPv4 :</p>
+<pre>export POCO_RESOLVER_IPV=4</pre>
+<p class="Pp">Par défaut, uniquement les adresses IPv6 :</p>
+<pre>export POCO_RESOLVER_IPV=6</pre>
+<p class="Pp">Préférer IPv6, mais accepter IPv4 si nécessaire :</p>
+<pre>export POCO_RESOLVER_IPV=64</pre>
+<p class="Pp">Préférer IPv4, mais accepter IPv6 si nécessaire :</p>
+<pre>export POCO_RESOLVER_IPV=46</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PROBLEMES_DE_COMPATIBILITE'><a class='permalink' href='#PROBLEMES_DE_COMPATIBILITE'>PROBLEMES DE COMPATIBILITE</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='Microsoft_Windows'><a class='permalink' href='#Microsoft_Windows'>Microsoft Windows</a></h2>
+<p class="Pp">Ce module nécessite que &quot;Microsoft TCP/IP version 6&quot; soit
+    installé. Étapes pour Windows XP Pro (les étapes pour votre version
+    particulière de Windows peuvent être subtilement ou radicalement
+    différentes) :</p>
+<ul class="Bl-bullet">
+  <li>Ouvrez votre Panneau de configuration</li>
+  <li>Ouvrez vos Connexions réseau</li>
+  <li>Sélectionnez votre connexion réseau parmi celles disponibles</li>
+  <li>Dans la boîte de dialogue État de la connexion au réseau local, cliquez
+      sur le bouton Propriétés</li>
+  <li>Si &quot;Microsoft TCP/IP version 6&quot; est listé comme un élément utilisé,
+      vous avez terminé.</li>
+  <li>Sinon, cliquez sur Installer...</li>
+  <li>Choisissez d'ajouter un Protocole</li>
+  <li>Et installez &quot;Microsoft TCP/IP version 6&quot; à partir de la liste des
+      protocoles réseau.</li>
+</ul>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BOGUES'><a class='permalink' href='#BOGUES'>BOGUES</a></h1>
+<p class="Pp">Il n'y a pas de délai d'attente pour les requêtes.</p>
+<p class="Pp">Il n'y a aucun moyen d'annuler une requête en attente.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DEPANNAGE'><a class='permalink' href='#DEPANNAGE'>DEPANNAGE</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='les_programmes_s_attardent_plusieurs_secondes_avant_de_sortir'><a class='permalink' href='#les_programmes_s_attardent_plusieurs_secondes_avant_de_sortir'>les programmes s'attardent plusieurs secondes avant de sortir</a></h2>
+<p class="Pp">Les programmes devraient appeler <b>shutdown()</b> sur leurs objets
+    POE::Component::Resolver lorsqu'ils n'ont plus besoin de résolution DNS
+    asynchrone. Les programmes devraient également détruire leurs résolveurs s'ils
+    ont l'intention de fonctionner longtemps et de réutiliser la mémoire qu'ils
+    consomment.</p>
+<p class="Pp">Dans certains cas, il peut être nécessaire de fermer des composants
+    qui effectuent une résolution DNS asynchrone en utilisant POE::Component::Resolver...
+    tels que POE::Component::IRC, POE::Component::Client::Keepalive et
+    POE::Component::Client::HTTP.</p>
+<p class="Pp">Par défaut, les sous-processus du résolveur restent actifs pendant
+    la durée de <code class="Li">idle_timeout</code>, qui est de 15.0 secondes par
+    défaut. La destruction de l'objet Resolver nettoiera le pool de processus. En
+    supposant que ce soit la seule chose qui maintient la boucle d'événements
+    active, le programme se terminera alors proprement.</p>
+<p class="Pp">Alternativement, réduisez <code class="Li">idle_timeout</code> à un
+    nombre plus gérable, tel que 5.0 secondes.</p>
+<p class="Pp">Sinon, quelque chose d'autre pourrait également maintenir la boucle
+    d'événements active.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='LICENCE'><a class='permalink' href='#LICENCE'>LICENCE</a></h1>
+<p class="Pp">Sauf indication contraire, cette distribution est Copyright 2011
+    par Rocco Caputo. Tous droits réservés. Cette distribution est un logiciel libre ;
+    vous pouvez la redistribuer et/ou la modifier sous les mêmes termes que Perl
+    lui-même.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-poe-component-resolver/">extra/perl-poe-component-resolver</a></dd>
+        <dt>Version :</dt>
+        <dd>0.921-12</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://search.cpan.org/dist/POE-Component-resolver">https://search.cpan.org/dist/POE-Component-resolver</a></dd>
+        <dt>Licences :</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-poe-component-resolver/">/listing/extra/perl-poe-component-resolver/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#VERSION">VERSION</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#VARIABLES_D_ENVIRONNEMENT">VARIABLES D'ENVIRONNEMENT</a></li>
+        
+            <li><a href="#PROBLEMES_DE_COMPATIBILITE">PROBLEMES DE COMPATIBILITE</a></li>
+        
+            <li><a href="#BOGUES">BOGUES</a></li>
+        
+            <li><a href="#DEPANNAGE">DEPANNAGE</a></li>
+        
+            <li><a href="#LICENCE">LICENCE</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/POE::Component::Resolver.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/POE::Component::Resolver.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

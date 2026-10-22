@@ -1,0 +1,557 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>alienfile(3pm) — Pages manuelles </title>d'Arch
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">alienfile(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-alien-build/">perl-alien-build</a></p>
+<p class="lic">Licences: PerlArtistic</p>
+
+        nt
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">alienfil</td>e(3)
+    <td class="head-vol">Documentation Perl contribuée par les </td>utilisateurs
+    <td class="head-rtitle">ali</td>enf</tr>ile</table>(3)
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NO</a></h1>M
+<p class="Pp">alienfile - Spécification</p> pour définir une dépenda</section>nce externe pour
+    CPAN
+<section class="Sh">
+<h1 class="Sh" id='VERSION'><a class='permalink' href='#VERSION'>VERSIO</a></h1>N
+<p class="Pp">vers</p>ion </section>2.84
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>RÉSUM</a></h1>É
+<p class="Pp">Approche faites-le-vous-même </p>:
+<pre>use alienfile;
+
+probe [ 'pkg-config --exists libarchive' ];
+
+share {
+
+  start_url 'http://libarchive.org/downloads/libarchive-3.2.2.tar.gz';
+
+  # le premier qui réussit sera utilisé
+  download [ 'wget %{.meta.start_url}' ];
+  download [ 'curl -o %{.meta.start_url}' ];
+
+  extract [ 'tar xf %{.install.download}' ];
+
+  build [
+    # Remarque : ne fonctionnera pas sur Windows, mieux vaut utiliser le plugin Build::Autoconf
+    # si vous avez besoin de la prise en charge de Windows
+    './configure --prefix=%{.install.prefix} --disable-shared',
+    '%{make}',
+    '%{make} install',
+  ];
+}
+
+gather [
+  [ 'pkg-config', '--modversion', 'libarchive', \'%{.runtime.version}' ],
+  [ 'pkg-config', '--cflags',     'libarchive', \'%{.runtime.cflags}'  ],
+  [ 'pkg-config', '--libs',       'libarchive', \'%{.runtime.libs}'    ],
+]</pre>;
+<p class="Pp">Avec des plugins (mieux) </p>:
+<pre>use alienfile;
+
+plugin 'PkgConfig' =&gt; 'libarchive';
+
+share {
+  start_url 'http://libarchive.org/downloads/';
+  plugin Download =&gt; (
+    filter =&gt; qr/^libarchive-.*\.tar\.gz$/,
+    version =&gt; qr/([0-9\.]+)/,
+  );
+  plugin Extract =&gt; 'tar.gz';
+  plugin 'Build::Autoconf';
+  plugin 'Gather::IsolateDynamic';
+  build [
+    '%{configure}',
+    '%{make}',
+    '%{make} install',
+  ];
+</pre>}</section>;
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTIO</a></h1>N
+<p class="Pp">Un alienfile est une recette utilisée par Alien::Build pour rechercher
+    des bibliothèques système ou télécharger depuis Internet, et compiler le
+    code source de ces bibliothèques. Ce document sert de référence pour le
+    système alienfile, mais si vous commencez à écrire votre propre Alien,
+    vous devriez lire Alien::Build::Manual::AlienAuthor, qui vous apprendra
+    comment écrire votre propre Alien complet en utilisant alienfile +
+    Alien::Build + ExtUtils::MakeMaker. Une attention particulière doit être
+    portée à la section « a note about dynamic vs. static libraries </p>»</section>.
+<section class="Sh">
+<h1 class="Sh" id='DIRECTIVES'><a class='permalink' href='#DIRECTIVES'>DIRECTIVE</a></h1>S
+<section class="Ss">
+<h2 class="Ss" id='requires'><a class='permalink' href='#requires'>require</a></h2>s
+<p class="Pp">Exigence « any » (soit share, soit system) </p>:
+<pre>requires $module;
+requires $module =&gt; </pre>$version;
+<p class="Pp">Exigence au moment de la configuration </p>:
+<pre>configure {
+  requires $module;
+  requires $module =&gt; $version;
+}</pre>;
+<p class="Pp">Exigence système </p>:
+<pre>sys {
+  requires $module;
+  requires $module =&gt; $version;
+}</pre>;
+<p class="Pp">Exigence share </p>:
+<pre>share {
+  requires $module;
+  requires $module =&gt; $version;
+}</pre>;
+<p class="Pp">spécifie une exigence. Alien::Build tire parti des exigences
+    dynamiques, afin que seuls les modules nécessaires pour le type
+    d'installation spécifique aient besoin d'être chargés. Voici les
+    différents types d'exigences </p>:
+<dl class="Bl-tag">
+  <dt id="configure"><a class="permalink" href="#configure">configu</a></dt>re
+  <dd>Les exigences de configuration devraient déjà être installées avant le
+      chargement de </dd>l'alienfile.
+  <dt id="any"><a class="permalink" href="#any">an</a></dt>y
+  <dd>Les exigences « any » sont celles qui sont nécessaires soit pour l'étape
+      de recherche, soit pour l'installation system, soit pour l'installation
+      </dd>share.
+  <dt id="share"><a class="permalink" href="#share">sha</a></dt>re
+  <dd>Les exigences share sont les modules nécessaires lors du téléchargement
+      et de la compilation à partir du code </dd>source.
+  <dt id="system"><a class="permalink" href="#system">syst</a></dt>em
+  <dd>Les exigences system sont le</dd>s modules nécessaires lorsq</dl>ue le système
+      fournit</section> la bibliothèque ou l'outil.
+<section class="Ss">
+<h2 class="Ss" id='plugin'><a class='permalink' href='#plugin'>plugi</a></h2>n
+<pre>plugin $name =&gt; (%args);
+plugin $name =&gt; </pre>$arg;
+<p class="Pp">Charge le plugin donné. Si vous préfixez le nom du plugin avec un
+    <span class="Li">signe </span>« = », il sera considéré comme un chemin de fichier entièrement
+    qualifié. Sinon, le plugin sera supposé se trouver dans l'espace de noms <span class="Li">« Alien::Build::Plugin </span>». S'il existe un plugin de négociation
+    approprié, celui-ci sera chargé.
+  Exemples </p>:
+<pre># Charge Alien::Build::Plugin::Fetch::Negotiate
+# qui choisira le meilleur plugin Alien::Build::Plugin::Fetch
+# en fonction de l'URL et de la configuration du système
+plugin 'Fetch' =&gt; 'http://ftp.gnu.org/gnu/gcc';
+
+# charge le plugin avec la classe mal nommée !
+plugin '=Badly::Named::Plugin::Not::In::Alien::Build::Namespace';
+
+# charge explicitement Alien::Build::Plugin::Prefer::SortVersions
+plugin 'Prefer::SortVersions' =&gt; (
+  filter =&gt; qr/^gcc-.*\.tar\.gz$/,
+  version =&gt; qr/([0-9\.]+)/,
+</pre>)</section>;
+<section class="Ss">
+<h2 class="Ss" id='probe'><a class='permalink' href='#probe'>prob</a></h2>e
+<pre>probe \&
+probe </pre>\@commandlist;
+<p class="Pp">Instructions pour l'étape de recherche. Peut être soit une référence de
+    code, soit une liste de commandes. Plusieurs recherches et </p>plugins de
+    recherche peuvent être donnés. Ceux-ci seront utilisés en séquence, en
+    s'arrêtant au premier qui détecte une instal</section>lation système. Alien::Build
+    utilisera une installation share si aucune installation système n'est
+    détectée par les recherches.
+<section class="Ss">
+<h2 class="Ss" id='configure'><a class='permalink' href='#configure'>configur</a></h2>e
+<pre>configure {
+  ...
+}</pre>;
+<p class="Pp">Bloc de configuration. La seule</p> directive autorisée dans un b</section>loc
+    configure est requires.
+<section class="Ss">
+<h2 class="Ss" id='sys'><a class='permalink' href='#sys'>sy</a></h2>s
+<pre>sys {
+  ...
+}</pre>;
+<p class="Pp">Bloc système. Les dire</p>ctives autorisées sont</section> : requires et gather.
+<section class="Ss">
+<h2 class="Ss" id='share'><a class='permalink' href='#share'>shar</a></h2>e
+<pre>share {
+  ...
+}</pre>;
+<p class="Pp">Bloc système. Les directives autoris</p>ées sont : download, fetch, decode,</section>
+    prefer, extract, build, gather.
+<section class="Ss">
+<h2 class="Ss" id='start_url'><a class='permalink' href='#start_url'>start_ur</a></h2>l
+<pre>share {
+  start_url $url;
+}</pre>;
+<p class="Pp">Définit l'URL de départ pour le téléchargement</p>. Cela devrait être l'URL
+    d'une page d'inde</section>x, ou l'archive tarball réelle du code source.
+<section class="Ss">
+<h2 class="Ss" id='digest'><a class='permalink' href='#digest'>diges</a></h2>t
+<p class="Pp">[expérimental</p>]
+<pre>share {
+  digest $algorithm, $digest;
+}</pre>;
+<p class="Pp">Vérifie les fichiers récupérés et téléchargés par rapp</p>ort à l'algorithme
+    et au digest donnés. Typiqueme</section>nt, vous voudrez utiliser SHA256 comme
+    algorithme.
+<section class="Ss">
+<h2 class="Ss" id='download'><a class='permalink' href='#download'>downloa</a></h2>d
+<pre>share {
+  download \&
+  download \@commandlist;
+}</pre>;
+<p class="Pp">Instructions pour l'étape de télécharg</p>ement. Peut être soit une
+    référence</section> de code, soit une liste de commandes.
+<section class="Ss">
+<h2 class="Ss" id='fetch'><a class='permalink' href='#fetch'>fetc</a></h2>h
+<pre>share {
+  fetch \&
+  fetch \@commandlist;
+}</pre>;
+<p class="Pp">Instructions pour l'étape de récupérat</p>ion. Peut être soit une référence
+   </section> de code, soit une liste de commandes.
+<section class="Ss">
+<h2 class="Ss" id='decode'><a class='permalink' href='#decode'>decod</a></h2>e
+<pre>share {
+  decode \&
+  decode \@commandlist;
+}</pre>;
+<p class="Pp">Instructions pour l'étape de décodag</p>e. Peut être soit une référence de
+  </section>  code, soit une liste de commandes.
+<section class="Ss">
+<h2 class="Ss" id='prefer'><a class='permalink' href='#prefer'>prefe</a></h2>r
+<pre>share {
+  prefer \&
+  prefer \@commandlist;
+}</pre>;
+<p class="Pp">Instructions pour l'étape de préféren</p>ce. Peut être soit une référence
+    </section>de code, soit une liste de commandes.
+<section class="Ss">
+<h2 class="Ss" id='extract'><a class='permalink' href='#extract'>extrac</a></h2>t
+<pre>share {
+  extract \&
+  extract \@commandlist;
+}</pre>;
+<p class="Pp">Instructions pour l'étape d'extractio</p>n. Peut être soit une référence
+    </section>de code, soit une liste de commandes.
+<section class="Ss">
+<h2 class="Ss" id='patch'><a class='permalink' href='#patch'>patc</a></h2>h
+<pre>share {
+  patch \&
+  patch \@commandlist;
+}</pre>;
+<p class="Pp">Instructions pour l'étape de patch.</p> Peut être soit une référence de
+   </section> code, soit une liste de commandes.
+<section class="Ss">
+<h2 class="Ss" id='patch_ffi'><a class='permalink' href='#patch_ffi'>patch_ff</a></h2>i
+<pre>share {
+  patch_ffi \&
+  patch_ffi \@commandlist;
+}</pre>;
+<p class="Pp">[OBSOLÈTE</p>]
+<p class="Pp">Instructions pour l'étape patch_ffi.</p> Peut être soit une référence de
+  </section>  code, soit une liste de commandes.
+<section class="Ss">
+<h2 class="Ss" id='build'><a class='permalink' href='#build'>buil</a></h2>d
+<pre>share {
+  build \&
+  build \@commandlist;
+}</pre>;
+<p class="Pp">Instructions pour l'étape de compilat</p>ion. Peut être soit une référence
+    </section>de code, soit une liste de commandes.
+<section class="Ss">
+<h2 class="Ss" id='build_ffi'><a class='permalink' href='#build_ffi'>build_ff</a></h2>i
+<pre>share {
+  build \&
+  build \@commandlist;
+}</pre>;
+<p class="Pp">[OBSOLÈTE</p>]
+<p class="Pp">Instructions pour l'étape de compilation FFI. Compile des bibliothèques
+    partagées au lieu de bibliothèques statiques. C'est facultatif, et
+    seulement nécessaire si une fresh et
+    une compilation distincte doit être faite pour FFI.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='gather'><a class='permalink' href='#gather'>gather</a></h2>
+<pre>gather \&amp;code;
+gather \@commandlist;
+
+share {
+  gather \&amp;code;
+  gather \@commandlist;
+};
+
+sys {
+  gather \&amp;code;
+  gather \@commandlist;
+};</pre>
+<p class="Pp">Instructions pour l'étape de regroupement. Peut être soit une référence de code,
+    soit une liste de commandes. Dans le bloc racine du fichier alien, cela se déclenchera à la fois pour la compilation partagée et système. Dans le bloc partagé ou système, cela ne se déclenchera que dans la compilation correspondante.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='gather_ffi'><a class='permalink' href='#gather_ffi'>gather_ffi</a></h2>
+<pre>share {
+  gather_ffi \&amp;code;
+  gather_ffi \@commandlist;
+}</pre>
+<p class="Pp">[OBSOLÈTE]</p>
+<p class="Pp">Regroupement spécifique à <span class="Li">&quot;build_ffi&quot;</span>.
+    Généralement pas nécessaire.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='ffi'><a class='permalink' href='#ffi'>ffi</a></h2>
+<pre>share {
+  ffi {
+    patch \&amp;code;
+    patch \@commandlist;
+    build \&amp;code;
+    build \@commandlist;
+    gather \&amp;code;
+    gather \@commandlist;
+  }
+}</pre>
+<p class="Pp">Spécifie les étapes de patch, build ou gather relatives au FFI.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='meta_prop'><a class='permalink' href='#meta_prop'>meta_prop</a></h2>
+<pre>my $hash = meta_prop;</pre>
+<p class="Pp">Obtient la référence de hachage meta_prop.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='meta'><a class='permalink' href='#meta'>meta</a></h2>
+<pre>my $meta = meta;</pre>
+<p class="Pp">Retourne l'objet meta pour votre fichier alien. Pour les méthodes qui peuvent
+    être utilisées sur l'objet meta, voir &quot;MÉTHODES META&quot; dans
+  Alien::Build.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='log'><a class='permalink' href='#log'>log</a></h2>
+<pre>log($message);</pre>
+<p class="Pp">Imprime le message de log donné sur la sortie standard.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='test'><a class='permalink' href='#test'>test</a></h2>
+<pre>share {
+  test \&amp;code;
+  test \@commandlist;
+};
+sys {
+  test \&amp;code;
+  test \@commandlist;
+};</pre>
+<p class="Pp">Exécute les tests.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='before'><a class='permalink' href='#before'>before</a></h2>
+<pre>before $stage =&gt; \&amp;code;</pre>
+<p class="Pp">Exécute le code donné avant l'étape spécifiée. L'étape doit être l'une de
+    <span class="Li">&quot;probe&quot;</span>,
+    <span class="Li">&quot;download&quot;</span>,
+    <span class="Li">&quot;fetch&quot;</span>,
+    <span class="Li">&quot;decode&quot;</span>,
+    <span class="Li">&quot;prefer&quot;</span>,
+    <span class="Li">&quot;extract&quot;</span>,
+    <span class="Li">&quot;patch&quot;</span>,
+    <span class="Li">&quot;build&quot;</span>,
+    <span class="Li">&quot;test&quot;</span>, et
+    <span class="Li">&quot;gather&quot;</span>.</p>
+<p class="Pp">La directive before n'est légale que dans les mêmes blocs que ceux où l'étape
+    serait normalement légale. Par exemple, vous ne pouvez pas faire ceci :</p>
+<pre>use alienfile;
+
+sys {
+  before 'build' =&gt; sub {
+    ...
+  };
+};</pre>
+<p class="Pp">Car un <span class="Li">&quot;build&quot;</span> ne serait pas
+    légal dans un bloc <span class="Li">&quot;sys&quot;</span>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='after'><a class='permalink' href='#after'>after</a></h2>
+<pre>after $stage =&gt; \&amp;code;</pre>
+<p class="Pp">Exécute le code donné après l'étape spécifiée. L'étape doit être l'une de
+    <span class="Li">&quot;probe&quot;</span>,
+    <span class="Li">&quot;download&quot;</span>,
+    <span class="Li">&quot;fetch&quot;</span>,
+    <span class="Li">&quot;decode&quot;</span>,
+    <span class="Li">&quot;prefer&quot;</span>,
+    <span class="Li">&quot;extract&quot;</span>,
+    <span class="Li">&quot;patch&quot;</span>,
+    <span class="Li">&quot;build&quot;</span>,
+    <span class="Li">&quot;test&quot;</span>, et
+    <span class="Li">&quot;gather&quot;</span>.</p>
+<p class="Pp">La directive after n'est légale que dans les mêmes blocs que ceux où l'étape
+    serait normalement légale. Par exemple, vous ne pouvez pas faire ceci :</p>
+<pre>use alienfile;
+
+sys {
+  after 'build' =&gt; sub {
+    ...
+  };
+};</pre>
+<p class="Pp">Car un <span class="Li">&quot;build&quot;</span> ne serait pas
+    légal dans un bloc <span class="Li">&quot;sys&quot;</span>.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR AUSSI</a></h1>
+<dl class="Bl-tag">
+  <dt id="Alien"><a class="permalink" href="#Alien">Alien</a></dt>
+  <dd></dd>
+  <dt id="Alien::Build"><a class="permalink" href="#Alien::Build">Alien::Build</a></dt>
+  <dd></dd>
+  <dt id="Alien::Build::MM"><a class="permalink" href="#Alien::Build::MM">Alien::Build::MM</a></dt>
+  <dd></dd>
+  <dt id="Alien::Base"><a class="permalink" href="#Alien::Base">Alien::Base</a></dt>
+  <dd></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTEUR</a></h1>
+<p class="Pp">Auteur : Graham Ollis &lt;plicease@cpan.org&gt;</p>
+<p class="Pp">Contributeurs :</p>
+<p class="Pp">Diab Jerius (DJERIUS)</p>
+<p class="Pp">Roy Storey (KIWIROY)</p>
+<p class="Pp">Ilya Pavlov</p>
+<p class="Pp">David Mertens (run4flat)</p>
+<p class="Pp">Mark Nunberg (mordy, mnunberg)</p>
+<p class="Pp">Christian Walde (Mithaldu)</p>
+<p class="Pp">Brian Wightman (MidLifeXis)</p>
+<p class="Pp">Zaki Mughal (zmughal)</p>
+<p class="Pp">mohawk (mohawk2, ETJ)</p>
+<p class="Pp">Vikas N Kumar (vikasnkumar)</p>
+<p class="Pp">Flavio Poletti (polettix)</p>
+<p class="Pp">Salvador Fandi&#x00F1;o (salva)</p>
+<p class="Pp">Gianni Ceccarelli (dakkar)</p>
+<p class="Pp">Pavel Shaydo (zwon, trinitum)</p>
+<p class="Pp">Kang-min Liu (&#x5289;&#x5EB7;&#x6C11;, gugod)</p>
+<p class="Pp">Nicholas Shipp (nshp)</p>
+<p class="Pp">Juan Juli&#x00E1;n Merelo Guerv&#x00F3;s (JJ)</p>
+<p class="Pp">Joel Berger (JBERGER)</p>
+<p class="Pp">Petr P&#x00ED;sa&#x0159; (ppisar)</p>
+<p class="Pp">Lance Wicks (LANCEW)</p>
+<p class="Pp">Ahmad Fatoum (a3f, ATHREEF)</p>
+<p class="Pp">Jos&#x00E9; Joaqu&#x00ED;n Atria (JJATRIA)</p>
+<p class="Pp">Duke Leto (LETO)</p>
+<p class="Pp">Shoichi Kaji (SKAJI)</p>
+<p class="Pp">Shawn Laffan (SLAFFAN)</p>
+<p class="Pp">Paul Evans (leonerd, PEVANS)</p>
+<p class="Pp">H&#x00E5;kon H&#x00E6;gland (hakonhagland, HAKONH)</p>
+<p class="Pp">nick nauwelaerts (INPHOBIA)</p>
+<p class="Pp">Florian Weimer</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT_AND_LICENSE'><a class='permalink' href='#COPYRIGHT_AND_LICENSE'>COPYRIGHT ET LICENCE</a></h1>
+<p class="Pp">Ce logiciel est copyright (c) 2011-2022 par Graham Ollis.</p>
+<p class="Pp">Ceci est un logiciel libre ; vous pouvez le redistribuer et/ou le modifier
+    selon les mêmes termes que le système du langage de programmation Perl 5 lui-même.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-alien-build/">extra/perl-alien-build</a></dd>
+        <dt>Version :</dt>
+        <dd>2.84-3</dd>
+        <dt>En amont :</dt>
+        <dd><a href="https://metacpan.org/release/Alien-Build">https://metacpan.org/release/Alien-Build</a></dd>
+        <dt>Licences :</dt>
+        <dd>PerlArtistic</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-alien-build/">/listing/extra/perl-alien-build/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#VERSION">VERSION</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNTAXE</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#DIRECTIVES">DIRECTIVES</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+            <li><a href="#AUTHOR">AUTEUR</a></li>
+        
+            <li><a href="#COPYRIGHT_AND_LICENSE">COPYRIGHT ET LICENCE</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/alienfile.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/alienfile.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Ce site est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

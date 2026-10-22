@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Net::LDAP::Examples(3pm) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Net__LDAP__Examples(3pm)</h1>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Net::LDAP::Examples(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">Net::LDAP::Examples(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">Net::LDAP::Examples - Exemple LDAP en PERL</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Les exemples suivants sont bien sûr du code PERL, conçus pour fonctionner
+    avec les modules Net::LDAP.</p>
+<p class="Pp">L'intention de ce document est de fournir au lecteur un point de départ
+    par copier-coller pour faire fonctionner une application LDAP.</p>
+<p class="Pp">Vous trouverez ci-dessous des extraits de code qui devraient fonctionner tels quels,
+    avec seulement un peu de travail pour corriger les affectations de variables et les
+    spécificités LDAP, par exemple la syntaxe du Distinguished Name, relatives à la propre
+    implémentation de l'utilisateur.</p>
+<p class="Pp">La procédure opérationnelle standard (POS) suivie ici est :</p>
+<dl class="Bl-tag">
+  <dt>1 Package		- use Net::LDAP</dt>
+  <dd></dd>
+  <dt>2 Initialisation	- new</dt>
+  <dd></dd>
+  <dt>3 Liaison		- bind</dt>
+  <dd></dd>
+  <dt>4 Opération	- add modify moddn search</dt>
+  <dd></dd>
+  <dt>4.1 Traitement	- affichage des données d'une recherche</dt>
+  <dd></dd>
+  <dt>5 Erreur		- affichage des informations d'erreur</dt>
+  <dd></dd>
+  <dt>6 Déconnexion	- unbind</dt>
+  <dd></dd>
+</dl>
+<p class="Pp">Consultez chacune de ces sections pour un extrait de code répondant à vos
+    besoins.</p>
+<p class="Pp"><b>Ce qui n'est pas couvert par ces exemples pour le moment :</b></p>
+<dl class="Bl-tag">
+  <dt id="abandon"><a class="permalink" href="#abandon">méthodes <i>abandon</i> et
+    <i>compare</i></a></dt>
+  <dd></dd>
+  <dt id="callback"><a class="permalink" href="#callback">sous-routines de <i>callback</i></a></dt>
+  <dd></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CODE'><a class='permalink' href='#CODE'>CODE</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='PACKAGE_-_Definitions'><a class='permalink' href='#PACKAGE_-_Definitions'>PACKAGE - Définitions</a></h2>
+<pre>use Net::LDAP;</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='INITIALIZING'><a class='permalink' href='#INITIALIZING'>INITIALISATION</a></h2>
+<pre>$ldap = Net::LDAP-&gt;new ( &quot;votreHoteLDAP.votreSociete.com&quot; ) or die &quot;$@&quot;;</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='BINDING'><a class='permalink' href='#BINDING'>LIAISON</a></h2>
+<pre>$mesg = $ldap-&gt;bind ( version =&gt; 3 );          # à utiliser pour les recherches
+$mesg = $ldap-&gt;bind ( &quot;$utilisateurAuthentifié&quot;,
+                      password =&gt; &quot;$motdepasse&quot;,
+                      version =&gt; 3 );          # à utiliser pour les changements/modifications
+# consultez votre administrateur LDAP pour des informations concernant la configuration
+# d'authentification utilisateur sur votre site.</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss">OPERATION - Générer une RECHERCHE</h2>
+<pre>sub LDAPsearch
+{
+  my ($ldap,$chaineRecherche,$attributs,$base) = @_;
+  # s'il ne passe pas de base... on lui en met une
+  if (!$base ) { $base = &quot;o=maSociete, c=monPays&quot;; }
+  # s'il ne passe pas un tableau d'attributs...
+  # on en prépare un pour lui
+  if (!$attributs ) { $attributs = [ 'cn','mail' ]; }
+  my $resultat = $ldap-&gt;search ( base    =&gt; &quot;$base&quot;,
+                               scope   =&gt; &quot;sub&quot;,
+                               filter  =&gt; &quot;$chaineRecherche&quot;,
+                               attrs   =&gt;  $attributs
+                             );</pre>
+<p class="Pp">}</p>
+<pre>my @Attrs = ( );               # demander le retour de tous les attributs disponibles.
+                               # à utiliser.
+my $resultat = LDAPsearch ( $ldap, &quot;sn=*&quot;, \@Attrs );</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='PROCESSING_-_Affichage_des_Résultats_de_RECHERCHE'><a class='permalink' href='#PROCESSING_-_Affichage_des_Résultats_de_RECHERCHE'>TRAITEMENT - Affichage des résultats de RECHERCHE</a></h2>
+<pre>#------------
+#
+# Accéder aux données comme si elles étaient dans une structure
+# c'est-à-dire en utilisant la méthode &quot;as_struct&quot;
+#
+my $href = $resultat-&gt;as_struct;
+# obtenir un tableau des noms DN
+my @DNs  = keys %$href;        # utiliser les hashes DN
+# traiter chaque DN en l'utilisant comme clé
+foreach ( @DNs ) {
+  print $_, &quot;\n&quot;;
+  my $valref = $$href{$_};
+  # obtenir un tableau des noms d'attributs
+  # passés pour ce DN.
+  my @Attrs = sort keys %$valref; #utiliser les hashes d'Attributs
+  my $nomAttr;
+  foreach $nomAttr (@Attrs) {
+    # ignorer les données binaires: berk!
+    next if ( $nomAttr =~ /;binary$/ );
+    # obtenir la valeur de l'attribut (pointeur) en utilisant le
+    # nom de l'attribut comme clé de hash
+    my $valAttr =  @$valref{$nomAttr};
+    print &quot;\t $nomAttr: @$valAttr \n&quot;;
+  }
+  print &quot;#-------------------------------\n&quot;;
+  # Fin de ce DN
+}
+#
+# fin de la méthode as_struct
+#
+#--------
+#------------
+#
+# traiter chaque résultat indépendamment
+# c'est-à-dire en utilisant la méthode de parcours
+#
+my @entrees = $resultat-&gt;entries;
+my $entr;
+foreach $entr ( @entrees ) {
+  print &quot;DN : &quot;, $entr-&gt;dn, &quot;\n&quot;;
+  my $attr;
+  foreach $attr ( sort $entr-&gt;attributes ) {
+    # ignorer les données binaires que nous ne pouvons pas traiter
+    next if ( $attr =~ /;binary$/ );
+    print &quot;  $attr : &quot;, $entr-&gt;get_value ( $attr ) ,&quot;\n&quot;;
+  }
+  print &quot;#-------------------------------\n&quot;;
+}
+#
+# fin de la méthode de parcours
+#------------</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss">OPERATION - Modification des entrées</h2>
+<pre>#
+#   Modification
+#
+#  pour chacune des modifications ci-dessous, vous devrez fournir
+#  un DN complet (Distinguished Name) pour la variable $dn.
+#   exemple :
+#    cn=Jo User,ou=person,o=maSociete,c=monPays
+#
+#   Je recommanderais de faire une recherche (listée ci-dessus)
+#   puis d'utiliser le dn retourné pour peupler la variable $dn.
+#
+#  Seul un résultat a été retourné par la recherche ?
+if ( $resultat-&gt;count != 1 ) { exit; }  # Non.. on sort
+my $dn = $entrees[0]-&gt;dn;         # Oui.. on récupère le DN
+#######################################
+#
+#   MODIFICATION à l'aide d'un HASH
+#
+my %HashRemplacement = ( motclé =&gt; &quot;x&quot;, proxy =&gt; &quot;x&quot; );
+my $resultat = LDAPmodifyUsingHash ( $ldap, $dn, \%HashRemplacement );
+sub LDAPmodifyUsingHash
+{
+  my ($ldap, $dn, $ceQuiDoitChanger ) = @_;
+  my $resultat = $ldap-&gt;modify ( $dn,
+                               replace =&gt; { %$ceQuiDoitChanger }
+                             );
+  return $resultat;
+}
+#######################################
+#
+#   MODIFICATION à l'aide d'une LISTE DE TABLEAUX
+#
+my @ListeTableauRemplacement = [ 'motclé', &quot;xxxxxxxxxx&quot;,
+                         'proxy' , &quot;yyyyyyyyyy&quot;   ];
+my $resultat = LDAPmodifyUsingArrayList ( $ldap, $dn, \@ListeTableauRemplacement );
+sub LDAPmodifyUsingArrayList
+{
+  my ($ldap, $dn, $ceQuiDoitChanger ) = @_;
+  my $resultat = $ldap-&gt;modify ( $dn,
+                               changes =&gt; [
+                                 replace =&gt; @$ceQuiDoitChanger
+                               ]
+                             );
+  return $resultat;
+}
+#######################################
+#
+#   MODIFICATION à l'aide d'un TABLEAU
+#
+my @TableauRemplacement = ( 'motclé', &quot;xxxxxxxxxx&quot; ,
+                     'proxy' , &quot;yyyyyyyyyy&quot;   );
+my $resultat = LDAPmodifyUsingArray ( $ldap, $dn, \@TableauRemplacement );
+sub LDAPmodifyUsingArray
+{
+  my ($ldap, $dn, $ceQuiDoitChanger ) = @_;
+  my $resultat = $ldap-&gt;modify ( $dn,
+                               changes =&gt; [
+                                 replace =&gt; [ @$ceQuiDoitChanger ]
+                               ]
+                             );
+  return $resultat;
+}
+#######################################
+#
+#   MODIFIER un enregistrement existant en utilisant 'Changes'
+#    (ou une combinaison de add/delete/replace)
+#
+my @ceQuiDoitChanger;
+my @TableauRemplacement;
+my @TableauSuppression;
+my @TableauAjout;
+push @TableauAjout, 'cn', &quot;moi-même&quot;;
+push @TableauRemplacement, 'sn', '!@#$%^&amp;*()__+Bonjour Ici';
+push @TableauRemplacement, 'cn', &quot;moi-même Moi&quot;;
+push @TableauSuppression, 'cn', &quot;moi-même&quot;;
+if ( $#TableauRemplacement &gt; 0 ) {
+  push @ceQuiDoitChanger, 'replace';
+  push @ceQuiDoitChanger, \@TableauRemplacement;
+}
+if ( $#TableauSuppression &gt; 0 ) {
+  push @ceQuiDoitChanger, 'delete';
+  push @ceQuiDoitChanger, \@TableauSuppression;
+}
+if ( $#TableauAjout &gt; 0 ) {
+  push @ceQuiDoitChanger, 'add';
+  push @ceQuiDoitChanger, \@TableauAjout;
+}
+$resultat = LDAPmodify ( $ldap, $dn, \@ceQuiDoitChanger );
+sub LDAPmodify
+{
+  my ($ldap, $dn, $ceQuiDoitChanger) = @_;
+  my $resultat = $ldap-&gt;modify ( $dn,
+                               changes =&gt; [
+                                 @$ceQuiDoitChanger
+                               ]
+                             );
+  return $resultat;
+}</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss">OPERATION - Changer le RDN</h2>
+<pre>my $nouveauRDN = &quot;cn=Joseph User&quot;;
+my $resultat = LDAPrdnChange ( $ldap, $dn, $nouveauRDN, &quot;archive&quot; );
+sub LDAPrdnChange
+{
+  my ($ldap,$dn,$ceQuiDoitChanger,$action) = @_;
+  my $branche;
+  #
+  # si l'action d'archivage est sélectionnée, déplacer cette
+  # entrée vers un autre endroit dans l'annuaire.
+  #
+  if ( $action =~ /archive/i )  {
+    $branche = &quot;ou=nouvelleBranche, o=maSociete, c=monPays&quot;;
+  }
+  #
+  # utiliser 'deleteoldrdn' pour éviter d'obtenir
+  # des multivalues dans l'attribut de NOMMAGE.
+  # dans la plupart des cas, il s'agirait de l'attribut 'CN'
+  #
+  my $resultat = $ldap-&gt;moddn ( $dn,
+                              newrdn =&gt; $ceQuiDoitChanger,
+                              deleteoldrdn =&gt; '1',
+                              newsuperior =&gt; $branche
+                            );
+  return $resultat;
+}</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss">OPERATION - Ajouter un nouvel enregistrement</h2>
+<pre>my $brancheDN = &quot;ou=bailiwick, o=maSociete, c=monPays&quot;;
+#
+# vérifiez auprès de votre schéma d'annuaire ou de votre administrateur
+# pour la bonne objectClass... je suis sûr qu'elle sera différente
+#
+my $TableauCreation = [
+  objectClass =&gt; [ &quot;top&quot;, &quot;person&quot;, &quot;organizationalPerson&quot;, &quot;inetOrgPerson&quot; ],</pre>
+</section>
+</div>
+</section>
+            </article>
+            
+        </main>
+    </body>
+</html>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Net::LDAP::Examples</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Ce document décrit un exemple d'utilisation de la bibliothèque Net::LDAP.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CODE'><a class='permalink' href='#CODE'>CODE</a></h1>
+<pre><code class="language-perl">use Net::LDAP;
+
+# Code d'exemple
+my $ldap = Net::LDAP->new;
+my $dn = &quot;cn=Jane User, ou=bailiwick, o=mycompany, c=mycountry&quot;;
+
+# Liaison au serveur d'annuaire
+my $result = $ldap-&gt;bind ($dn);
+
+# Recherche d'entrées
+my $mesg = $ldap-&gt;search ( base =&gt; $dn, scope =&gt; 'subtree' );
+
+# Affichage des résultats
+if ($mesg-&gt;code) {
+    # Gestion des erreurs
+} else {
+    # Recherche réussie
+} </code></pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='LDAP_SCHEMA_RETRIEVAL'><a class='permalink' href='#LDAP_SCHEMA_RETRIEVAL'>LDAP   SCHEMA RETRIEVAL</a></h1>
+<p class="Pp">Le code suivant montre comment récupérer des informations de schéma.</p>
+<p class="Pp">La première procédure consiste à initialiser un nouvel objet LDAP en utilisant les mêmes procédures que celles mentionnées au début du document.</p>
+<p class="Pp">La deuxième procédure consiste à se lier au serveur d'annuaire. Certains serveurs peuvent nécessiter une authentification pour récupérer le schéma du serveur d'annuaire. Cette procédure est mentionnée au début du document.</p>
+<p class="Pp">Après une liaison réussie, vous êtes prêt à récupérer les informations du schéma. Ceci est fait en initialisant un objet de schéma.</p>
+<pre><code class="language-perl">$schema = $ldap-&gt;schema ( ); </code></pre>
+<p class="Pp">Dans ce cas, Net::LDAP tentera de déterminer le DN sous lequel le schéma peut être trouvé. Il recherchera d'abord l'attribut <span class="Li">&quot;subschemaSubentry&quot;</span> dans le DSE racine. S'il n'est pas trouvé, <span class="Li">&quot;cn=schema&quot;</span> sera supposé.</p>
+<p class="Pp">Alternativement, vous pouvez spécifier le DN où le schéma sera trouvé avec:</p>
+<pre><code class="language-perl">$schema = $ldap-&gt;schema ( dn =&gt; $dn ); </code></pre>
+<p class="Pp">Une fois que vous avez un DN à rechercher, Net::LDAP recherchera l'enregistrement de schéma avec:</p>
+<pre><code class="language-perl">$mesg = $self-&gt;search ( base =&gt; $dn, scope =&gt; 'base', filter =&gt; '(objectClass=subschema)' ); </code></pre>
+<p class="Pp">Une fois l'objet de schéma initialisé, des méthodes de schéma sont utilisées pour récupérer les données. Il existe plusieurs façons de procéder. Les informations sur les méthodes de schéma se trouvent dans la documentation de la bibliothèque Net::LDAP::Schema.</p>
+<p class="Pp">Le processus est essentiellement le même pour obtenir les informations d'objectClass. Si schema-&gt;<b>all_attributes()</b> est utilisé, il doit être remplacé par schema-&gt;<b>all_objectclasses()</b>. À partir de ce moment, le processus est le même pour les deux types de données.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BUGS'><a class='permalink' href='#BUGS'>BUGS</a></h1>
+<p class="Pp">Aucun connu, mais il pourrait y en avoir.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR_(of_this_document)'><a class='permalink' href='#AUTHOR_(of_this_document)'>AUTHOR   (de ce document)</a></h1>
+<p class="Pp">Russell Biggs &lt;rgb@ticnet.com&gt;</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT'><a class='permalink' href='#COPYRIGHT'>COPYRIGHT</a></h1>
+<p class="Pp">Tous droits sur ce document cédés à Graham Barr.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-15</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+<section class="Sh">
+<h1 class="Sh" id='OTHER_FORMATS'><a class='permalink' href='#OTHER_FORMATS'>AUTRES   FORMATS</a></h1>
+<p class="Pp">Autres formats :
+        
+            <a href="/man/Net::LDAP::Examples.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/Net::LDAP::Examples.3pm.fr.raw">raw</a>
+        
+    </p>
+</section>
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Net::LDAP::Examples.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/Net::LDAP::Examples.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

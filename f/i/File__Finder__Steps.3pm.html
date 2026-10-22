@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>File::Finder::Steps(3pm) — Pages de manuel Arch Linux</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">File__Finder__Steps(3pm)</h1>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">File::Finder::Steps(3pm)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">File::Finder::Steps(3pm)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">File::Finder::Steps - étapes pour File::Finder</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOP.'><a class='permalink' href='#SYNOP.'>SYNOP.</a></h1>
+<pre>## Voir File::Finder pour une utilisation normale des étapes
+## exemple de sous-classement :
+BEGIN {
+  package My::File::Finder;
+  use base File::Finder;
+  sub _steps_class { &quot;My::File::Finder::Steps&quot; }
+}
+BEGIN {
+  package My::File::Finder::Steps;
+  use base File::Finder::Steps;
+  sub bigger_than { # vrai si plus grand que N octets
+    my $self = shift;
+    my $bytes = shift;
+    return sub {
+      -s &gt; $bytes;
+    }
+  }
+}
+my $over_1k = My::File::Finder-&gt;bigger_than(1024);
+print &quot;Fichiers temporaires de plus de 1 Ko :\n&quot;;
+$over_1k-&gt;ls-&gt;in(&quot;/tmp&quot;);</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp"><span class="Li">&quot;File::Finder::Steps&quot;</span> fournit
+    les prédicats testés pour
+    <span class="Li">&quot;File::Finder&quot;</span>.</p>
+<section class="Ss">
+<h2 class="Ss" id='MÉTHODES_DES_ÉTAPES'><a class='permalink' href='#MÉTHODES_DES_ÉTAPES'>MÉTHODES DES ÉTAPES</a></h2>
+<p class="Pp">Ces méthodes sont appelées sur une classe ou une instance pour ajouter une
+    &quot;étape&quot;. Chaque étape s'ajoute à une liste d'étapes, retournant le
+    nouvel objet. Cela vous permet de chaîner les étapes pour former une formule.</p>
+<p class="Pp">Comme dans <i>find</i>, l'opérateur par défaut est &quot;et&quot;, et
+    une évaluation court-circuitée est effectuée.</p>
+<dl class="Bl-tag">
+  <dt id="or"><a class="permalink" href="#or">or</a></dt>
+  <dd>Comme <span class="Li">&quot;or&quot;</span> de <i>find</i>.</dd>
+  <dt id="left"><a class="permalink" href="#left">left</a></dt>
+  <dd>Comme une parenthèse gauche. Utilisé pour l'imbrication avec
+      <span class="Li">&quot;right&quot;</span>.</dd>
+  <dt id="right"><a class="permalink" href="#right">right</a></dt>
+  <dd>Comme une parenthèse droite. Utilisé pour l'imbrication avec
+      <span class="Li">&quot;left&quot;</span>. Par exemple :
+        <pre>my $big_or_old = File::Finder
+  -&gt;type('f')
+  -&gt;left
+    -&gt;size(&quot;+100&quot;)-&gt;or-&gt;mtime(&quot;+90&quot;)
+  -&gt;right;
+find($big_or_old-&gt;ls, &quot;/tmp&quot;);
+</pre>
+    <p class="Pp">Vous avez besoin de parenthèses car l'opérateur &quot;or&quot; a une priorité plus faible que le &quot;et&quot; implicite, pour la même raison que vous en avez besoin ici :</p>
+        <pre>find /tmp -type f '(' -size +100 -o -mtime +90 ')' -print
+</pre>
+    <p class="Pp">Sans les parenthèses, -type serait lié à -size, et non au choix entre -size ou -mtime.</p>
+    <p class="Pp">Les parenthèses mal appariées ne seront pas trouvées avant que la formule ne soit utilisée, provoquant une erreur fatale.</p>
+  </dd>
+  <dt id="begin"><a class="permalink" href="#begin">begin</a></dt>
+  <dd>Alias pour <span class="Li">&quot;left&quot;</span>.</dd>
+  <dt id="end"><a class="permalink" href="#end">end</a></dt>
+  <dd>Alias pour <span class="Li">&quot;right&quot;</span>.</dd>
+  <dt id="not"><a class="permalink" href="#not">not</a></dt>
+  <dd>Comme le <span class="Li">&quot;!&quot;</span> de <i>find</i>. Opérateur préfixe,
+      peut être placé devant des termes individuels ou des parenthèses ouvertes. Peut être imbriqué, mais quel est l'intérêt ?
+        <pre># liste tous les non-fichiers dans /tmp
+File::Finder-&gt;not-&gt;type('f')-&gt;ls-&gt;in(&quot;/tmp&quot;);
+</pre>
+  </dd>
+  <dt id="true"><a class="permalink" href="#true">true</a></dt>
+  <dd>Retourne toujours vrai. Utile lorsqu'une sous-expression peut échouer, mais que vous ne voulez pas que le code global échoue :
+        <pre>... -&gt;left-&gt; ...[peut retourner faux]... -&gt;or-&gt;true-&gt;right-&gt; ...
+</pre>
+    <p class="Pp">Bien sûr, c'est l'idiome de la commande <i>find</i> :</p>
+        <pre>find .... '(' .... -o -true ')' ...
+</pre>
+  </dd>
+  <dt id="false"><a class="permalink" href="#false">false</a></dt>
+  <dd>Retourne toujours faux.</dd>
+  <dt id="comma"><a class="permalink" href="#comma">comma</a></dt>
+  <dd>Comme la &quot;,&quot; de <i>find</i> GNU. Le résultat de l'expression (ou de la sous-expression si entre parenthèses) jusqu'à ce point est écarté, et l'exécution continue à partir de là. Utile lorsqu'une partie de l'expression est nécessaire pour ses effets secondaires, mais ne doit pas affecter le reste de la chaîne &quot;et&quot;-ée.
+        <pre># liste tous les fichiers et répertoires, mais ne descend pas dans le contenu du répertoire CVS :
+File::Finder-&gt;type('d')-&gt;name('CVS')-&gt;prune-&gt;comma-&gt;ls-&gt;in('.');
+</pre>
+  </dd>
+  <dt id="follow"><a class="permalink" href="#follow">follow</a></dt>
+  <dd>Active le suivi des liens symboliques, et retourne vrai.</dd>
+  <dt id="name(NAME)"><a class="permalink" href="#name(NAME)">name(NOM)</a></dt>
+  <dd>Vrai si le nom de base correspond à NOM, qui peut être donné sous forme de modèle glob ou d'objet d'expression régulière :
+        <pre>my $pm_files = File::Finder-&gt;name('*.pm')-&gt;in('.');
+my $pm_files_too = File::Finder-&gt;name(qr/pm$/)-&gt;in('.');
+</pre>
+  </dd>
+  <dt id="perm(PERMISSION)"><a class="permalink" href="#perm(PERMISSION)">perm(PERMISSION)</a></dt>
+  <dd>Comme le <span class="Li">&quot;-perm&quot;</span> de <i>find</i>. Le signe
+      &quot;-&quot; signifie &quot;tous ces bits&quot;. Le signe &quot;+&quot;
+      signifie &quot;n'importe lequel de ces bits&quot;. La valeur est dés-octalisée si un 0 préfixe est présent, ce qui est probablement seulement si elle est passée sous forme de chaîne.
+        <pre>my $files = File::Finder-&gt;type('f');
+# trouve les fichiers qui ont exactement le mode 644
+my $files_644 = $files-&gt;perm(0644);
+# trouve les fichiers qui sont au moins exécutables par tous :
+my $files_world_exec = $files-&gt;perm(&quot;-1&quot;);
+# trouve les fichiers qui ont un bit d'exécution défini :
+my $files_exec = $files-&gt;perm(&quot;+0111&quot;);
+</pre>
+  </dd>
+  <dt id="type(TYPE)"><a class="permalink" href="#type(TYPE)">type(TYPE)</a></dt>
+  <dd>Comme le <span class="Li">&quot;-type&quot;</span> de <i>find</i>. Tous les types
+      Perl natifs sont supportés. Notez que <span class="Li">&quot;s&quot;</span>
+      est un socket, correspondant à <span class="Li">&quot;-S&quot;</span> de
+      Perl, pour être cohérent avec <i>find</i>. Retourne vrai ou faux, comme
+      approprié.</dd>
+  <dt id="print"><a class="permalink" href="#print">print</a></dt>
+  <dd>Imprime le nom complet sur <span class="Li">&quot;STDOUT&quot;</span>,
+      suivi d'un saut de ligne. Retourne vrai.</dd>
+  <dt id="print0"><a class="permalink" href="#print0">print0</a></dt>
+  <dd>Imprime le nom complet sur <span class="Li">&quot;STDOUT&quot;</span>,
+      suivi d'un caractère NUL. Retourne vrai.</dd>
+  <dt id="fstype"><a class="permalink" href="#fstype">fstype</a></dt>
+  <dd>Pas encore implémenté.</dd>
+  <dt id="user(USERNAME_UID)"><a class="permalink" href="#user(USERNAME_UID)">user(NOM_UTILISATEUR|UID)</a></dt>
+  <dd>Vrai si le propriétaire est NOM_UTILISATEUR ou UID.</dd>
+  <dt id="group(GROUPNAME_GID)"><a class="permalink" href="#group(GROUPNAME_GID)">group(NOM_GROUPE|GID)</a></dt>
+  <dd>Vrai si le groupe est NOM_GROUPE ou GID.</dd>
+  <dt id="nouser"><a class="permalink" href="#nouser">nouser</a></dt>
+  <dd>Vrai si l'entrée n'appartient à aucun utilisateur connu.</dd>
+  <dt id="nogroup"><a class="permalink" href="#nogroup">nogroup</a></dt>
+  <dd>Vrai si l'entrée n'appartient à aucun groupe connu.</dd>
+  <dt id="links("><a class="permalink" href="#links(">links( +/- N )</a></dt>
+  <dd>Comme <span class="Li">&quot;-links N&quot;</span> de <i>find</i>. Le plus préfixe
+      signifie &quot;plus que&quot;, le moins signifie &quot;moins que&quot;.</dd>
+  <dt id="inum("><a class="permalink" href="#inum(">inum( +/- N )</a></dt>
+  <dd>Vrai si le numéro d'inode correspond à la qualification.</dd>
+  <dt id="size("><a class="permalink" href="#size(">size( +/- N [c/k])</a></dt>
+  <dd>Vrai si la taille du fichier correspond à la qualification. Par défaut, N est en blocs de demi-Ko. Ajoutez un &quot;k&quot; à la fin du nombre pour indiquer des blocs de 1 Ko, ou un &quot;c&quot; pour indiquer des caractères (octets).</dd>
+  <dt id="atime("><a class="permalink" href="#atime(">atime( +/- N )</a></dt>
+  <dd>Vrai si le temps d'accès (en jours) correspond à la qualification.</dd>
+  <dt id="mtime("><a class="permalink" href="#mtime(">mtime( +/- N )</a></dt>
+  <dd>Vrai si le temps de modification (en jours) correspond à la qualification.</dd>
+  <dt id="ctime("><a class="permalink" href="#ctime(">ctime( +/- N )</a></dt>
+  <dd>Vrai si le temps de changement d'inode (en jours) correspond à la qualification.</dd>
+  <dt id="exec(@COMMAND)"><a class="permalink" href="#exec(@COMMAND)">exec(@COMMANDE)</a></dt>
+  <dd>Forks le processus enfant via <span class="Li">system()</span>. Toute apparition de
+      <span class="Li">&quot;{}&quot;</span> dans un argument est remplacée par le nom de fichier courant. Retourne vrai si le statut de sortie de l'enfant est 0. La liste est passée directement à
+      <span class="Li">&quot;system&quot;</span>, donc s'il s'agit d'un argument unique, il peut contenir la syntaxe de <span class="Li">&quot;/bin/sh&quot;</span>. Sinon, c'est une commande pré-analysée qui doit se trouver dans le PATH.
+    <p class="Pp">Notez que je n'ai pas réussi à trouver comment manipuler le répertoire courant facilement, j'utilise donc <span class="Li">$_</span> ici au lieu de <span class="Li">&quot;File::Find::name&quot;</span>, plus traditionnel. Cela fonctionne toujours, car nous sommes toujours `chdir` dans le répertoire, mais cela semble étrange lors d'un traçage. Déclenchez <span class="Li">&quot;no_chdir&quot;</span> dans
+        <span class="Li">&quot;find&quot;</span> si vous souhaitez un chemin complet <i>find</i> traditionnel.</p>
+        <pre>my $f = File::Finder-&gt;exec('ls', '-ldg', '{}');
+find({ no_chdir =&gt; 1, wanted =&gt; $f }, @starting_dirs);
+</pre>
+    <p class="Pp">Oui, il me serait trivial d'ajouter une méthode no_chdir.
+      Bientôt.</p>
+  </dd>
+  <dt id="ok(@COMMAND)"><a class="permalink" href="#ok(@COMMAND)">ok(@COMMANDE)</a></dt>
+  <dd>Comme
+</section>
+</section>
+</div>
+</section>
+
+            </article>
+            
+        </main>
+        <footer>
+            
+        </footer>
+    </body>
+</html>
+<html>
+    <head>
+        <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+        <title>File::Finder::Steps(3pm) - Perl</title>
+        <meta name="description" content="File::Finder::Steps(3pm) - custom find methods" />
+        <meta name="keywords" content="File::Finder::Steps, perl, man, manual" />
+        <link rel="stylesheet" type="text/css" href="/man.css" />
+    </head>
+    <body>
+        
+        <main>
+            <section class="Sh">
+                <h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+                <p class="Pp">File::Finder::Steps - custom find methods</p>
+            </section>
+            <section class="Sh">
+                <h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+                <pre>  use File::Finder;
+  my $finder = File::Finder-&gt;new;
+  $finder-&gt;type('f')-&gt;size('+10k')-&gt;exec('rm -f %s');
+  $finder-&gt;in('/tmp')-&gt;ls-&gt;depth-&gt;exec('cpio -dump /backup/%Y%m%d');
+  my @results = $finder-&gt;in('/some/dir');
+</pre>
+            </section>
+            <section class="Sh">
+                <h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+                <p class="Pp">This class provides a set of methods that can be used
+                    to build complex directory traversal predicates.</p>
+                <dl class="Bl-tag">
+                    <dt id="exec(CMD)"><a class="permalink" href="#exec(CMD)">exec(CMD)</a></dt>
+                    <dd>Like <i>find</i>'s <span class="Li">&quot;-exec&quot;</span>,
+                        but prompts for confirmation. If the command fails, or the
+                        response wasn't yes, returns false, otherwise true.</dd>
+                    <dt id="exec_yes(CMD)"><a class="permalink" href="#exec_yes(CMD)">exec_yes(CMD)</a></dt>
+                    <dd>Like <span class="Li">&quot;exec&quot;</span>, but displays the command
+                        line first, and waits for a response. If the response begins with
+                        <span class="Li">&quot;y&quot;</span> or
+                        <span class="Li">&quot;Y&quot;</span>, runs the command. If the command
+                        fails, or the response wasn't yes, returns false, otherwise true.</dd>
+                    <dt id="prune"><a class="permalink" href="#prune">prune</a></dt>
+                    <dd>Sets <span class="Li">$File::Find::prune</span>, and returns true.</dd>
+                    <dt id="xdev"><a class="permalink" href="#xdev">xdev</a></dt>
+                    <dd>Not yet implemented.</dd>
+                    <dt id="newer"><a class="permalink" href="#newer">newer</a></dt>
+                    <dd>Not yet implemented.</dd>
+                    <dt id="eval(CODEREF)"><a class="permalink" href="#eval(CODEREF)">eval(CODEREF)</a></dt>
+                    <dd>Ah yes, the master escape, with extra benefits. Give it a coderef, and it
+                        evaluates that code at the proper time. The return value is noted for
+                        true/false and used accordingly.
+                        <pre>my $blaster = File::Finder-&gt;atime("+30")-&gt;eval(sub { unlink });
+</pre>
+                        <p class="Pp">But wait, there's more. If the parameter is an object that
+                            responds to <span class="Li">&quot;as_wanted&quot;</span>, that method
+                            is automatically called, hoping for a coderef return. This neat feature
+                            allows subroutines to be created and nested:</p>
+                        <pre>my $old = File::Finder-&gt;atime("+30");
+my $big = File::Finder-&gt;size("+100");
+my $old_or_big = File::Finder-&gt;eval($old)-&gt;or-&gt;eval($big);
+my $killer = File::Finder-&gt;eval(sub { unlink });
+my $kill_old_or_big = File::Finder-&gt;eval($old_or_big)-&gt;ls-&gt;eval($killer);
+$kill_old_or_big-&gt;in('/tmp');
+</pre>
+                        <p class="Pp">Almost too cool for words.</p>
+                    </dd>
+                    <dt id="depth"><a class="permalink" href="#depth">depth</a></dt>
+                    <dd>Like <i>find</i>'s <span class="Li">&quot;-depth&quot;</span>. Sets a flag
+                        for <span class="Li">&quot;as_options&quot;</span>, and returns true.</dd>
+                    <dt id="ls"><a class="permalink" href="#ls">ls</a></dt>
+                    <dd>Like <i>find</i>'s <span class="Li">&quot;-ls&quot;</span>. Performs a
+                        <span class="Li">&quot;ls -dils&quot;</span> on the entry to
+                        <span class="Li">&quot;STDOUT&quot;</span> (without forking), and returns
+                        true.</dd>
+                    <dt id="tar"><a class="permalink" href="#tar">tar</a></dt>
+                    <dd>Not yet implemented.</dd>
+                    <dt>[n]cpio</dt>
+                    <dd>Not yet implemented.</dd>
+                    <dt id="ffr($ffr_object)"><a class="permalink" href="#ffr($ffr_object)">ffr($ffr_object)</a></dt>
+                    <dd>Incorporate a <span class="Li">&quot;File::Find::Rule&quot;</span> object
+                        as a step. Note that this must be a rule object, and not a result, so
+                        don't call or pass <span class="Li">&quot;in&quot;</span>. For example,
+                        using <span class="Li">&quot;File::Find::Rule::ImageSize&quot;</span> to
+                        define a predicate for image files that are bigger than a megapixel in my
+                        friends folder, I get:
+                        <pre>require File::Finder;
+require File::Find::Rule;
+require File::Find::Rule::ImageSize;
+my $ffr = File::Find::Rule-&gt;file-&gt;image_x('&gt;1000')-&gt;image_y('&gt;1000');
+my @big_friends = File::Finder-&gt;ffr($ffr)
+  -&gt;in("/Users/merlyn/Pictures/Sorted/Friends");
+</pre>
+                    </dd>
+                    <dt id="contains(pattern)"><a class="permalink" href="#contains(pattern)">contains(pattern)</a></dt>
+                    <dd>True if the file contains <span class="Li">&quot;pattern&quot;</span>
+                        (either a literal string treated as a regex, or a true regex object).
+                        <pre>my $plugh_files = File::Finder-&gt;type('f')-&gt;contains(qr/plugh/);
+</pre>
+                        <p class="Pp">Searching is performed on a line-by-line basis, respecting the
+                            current value of <span class="Li">$/</span>.</p>
+                    </dd>
+                </dl>
+            </section>
+            <section class="Ss">
+                <h2 class="Ss" id='EXTENDING'><a class='permalink' href='#EXTENDING'>EXTENDING</a></h2>
+                <p class="Pp">A step consists of a compile-time and a run-time component.</p>
+                <p class="Pp">During the creation of a
+                    <span class="Li">&quot;File::Finder&quot;</span> object, step methods are
+                    called as if they were methods against the slowly-growing
+                    <span class="Li">&quot;File::Finder&quot;</span> instance, including any
+                    additional parameters as in a normal method call. The step is expected to
+                    return a coderef (possibly a closure) to be executed at run-time.</p>
+                <p class="Pp">When a <span class="Li">&quot;File::Finder&quot;</span> object is
+                    being evaluated as the <span class="Li">&quot;File::Find&quot;</span>
+                    <span class="Li">&quot;wanted&quot;</span> routine, the collected coderefs
+                    are evaluated in sequence, again as method calls against the
+                    <span class="Li">&quot;File::Finder&quot;</span> object. No additional
+                    parameters are passed. However, the normal
+                    <span class="Li">&quot;wanted&quot;</span> values are available, such as
+                    <span class="Li">$_</span>, <span class="Li">$File::Find::name</span>, and
+                    so on. The <span class="Li">&quot;_&quot;</span> pseudo-handle has been set
+                    properly, so you can safely use <span class="Li">&quot;-X&quot;</span>
+                    filetests and <span class="Li">&quot;stat&quot;</span> against the
+                    pseudo-handle. The routine is expected to return a true/false value, which
+                    becomes the value of the step.</p>
+                <p class="Pp">Although a <span class="Li">&quot;File::Finder&quot;</span> object
+                    is passed both to the compile-time invocation and the resulting run-time
+                    invocation, only the <span class="Li">&quot;options&quot;</span> self-hash
+                    element is properly duplicated through the cloning process. Do not be
+                    tempted to add additional self-hash elements without overriding
+                    <span class="Li">&quot;File::Finder&quot;</span>'s
+                    <span class="Li">&quot;_clone&quot;</span>. Instead, pass values from the
+                    compile-time phase to the run-time phase using closure variables, as shown
+                    in the synopsis.</p>
+                <p class="Pp">For simplicity, you can also just mix-in your methods to the
+                    existing <span class="Li">&quot;File::Finder::Steps&quot;</span> class,
+                    rather than subclassing both classes as shown above. However, this may
+                    result in conflicting implementations of a given step name, so beware.</p>
+            </section>
+        </section>
+        <section class="Sh">
+            <h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>SEE   ALSO</a></h1>
+            <p class="Pp">File::Finder</p>
+        </section>
+        <section class="Sh">
+            <h1 class="Sh" id='BUGS'><a class='permalink' href='#BUGS'>BUGS</a></h1>
+            <p class="Pp">None known yet.</p>
+        </section>
+        <section class="Sh">
+            <h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTHOR</a></h1>
+            <p class="Pp">Randal L. Schwartz, &lt;merlyn@stonehenge.com&gt;</p>
+        </section>
+        <section class="Sh">
+            <h1 class="Sh" id='COPYRIGHT_AND_LICENSE'><a class='permalink' href='#COPYRIGHT_AND_LICENSE'>COPYRIGHT   AND LICENSE</a></h1>
+            <p class="Pp">Copyright (C) 2003,2004 by Randal L. Schwartz, Stonehenge
+                Consulting Services, Inc.</p>
+            <p class="Pp">This library is free software; you can redistribute it and/or
+                modify it under the same terms as Perl itself, either Perl version 5.8.2 or,
+                at your option, any later version of Perl 5 you may have available.</p>
+        </section>
+    </main>
+    <footer>
+        <table class="foot">
+            <tr>
+                <td class="foot-date">2024-07-13</td>
+                <td class="foot-os">perl v5.38.2</td>
+            </tr>
+        </table>
+    </footer>
+</html>

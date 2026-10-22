@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>PKCS7_verify(3ssl) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">PKCS7_verify(3ssl)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/core/x86_64/openssl/">openssl</a></p>
+<p class="lic">Licences: Apache-2.0</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">PKCS7_VERIFY(3ssl)</td>
+    <td class="head-vol">OpenSSL</td>
+    <td class="head-rtitle">PKCS7_VERIFY(3ssl)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">PKCS7_verify, PKCS7_get0_signers - vérifier une structure signedData PKCS#7</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>#include &lt;openssl/pkcs7.h&gt;
+int PKCS7_verify(PKCS7 *p7, STACK_OF(X509) *certs, X509_STORE *store,
+                 BIO *indata, BIO *out, int flags);
+STACK_OF(X509) *PKCS7_get0_signers(PKCS7 *p7, STACK_OF(X509) *certs, int flags);</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp"><b>PKCS7_verify()</b> est très similaire à <a href='/man/CMS_verify.3.en'>CMS_verify(3)</a>. Elle vérifie une structure signedData PKCS#7 donnée dans <i>p7</i>. Le paramètre optionnel <i>certs</i> fait référence à un ensemble de certificats dans lequel rechercher les certificats du signataire. Il est également utilisé comme source de certificats d'AC intermédiaires non fiables pour la construction de la chaîne. <i>p7</i> peut contenir des certificats d'AC supplémentaires non fiables qui peuvent être utilisés pour la construction de la chaîne ainsi que des CRL qui peuvent être utilisés pour la validation des certificats. <i>store</i> peut être NULL ou pointer vers le magasin de certificats de confiance à utiliser pour la vérification de la chaîne. <i>indata</i> fait référence aux données signées si le contenu est détaché de <i>p7</i>. Sinon, <i>indata</i> doit être NULL, et alors les données signées doivent être dans <i>p7</i>. Le contenu est écrit dans le BIO <i>out</i> sauf s'il est NULL. <i>flags</i> est un ensemble optionnel d'indicateurs qui peuvent être utilisés pour modifier l'opération.</p>
+<p class="Pp"><b>PKCS7_get0_signers()</b> récupère les certificats du signataire à partir de <i>p7</i>, elle ne vérifie <b>pas</b> leur validité ni si des signatures sont valides. Les paramètres <i>certs</i> et <i>flags</i> ont les mêmes significations que dans <b>PKCS7_verify()</b>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PROCESSUS_DE_VERIFICATION'><a class='permalink' href='#PROCESSUS_DE_VERIFICATION'>PROCESSUS DE VERIFICATION</a></h1>
+<p class="Pp">Normalement, le processus de vérification se déroule comme suit.</p>
+<p class="Pp">Initialement, quelques vérifications de cohérence sont effectuées sur <i>p7</i>. Le type de <i>p7</i> doit être SignedData. Il doit y avoir au moins une signature sur les données et si le contenu est détaché, <i>indata</i> ne peut pas être NULL. Si le contenu n'est pas détaché et que <i>indata</i> n'est pas NULL, alors la structure a un contenu à la fois intégré et externe. Pour traiter cela comme une erreur, utilisez l'indicateur <b>PKCS7_NO_DUAL_CONTENT</b>. Le comportement par défaut le permet, par souci de compatibilité avec les anciennes versions d'OpenSSL.</p>
+<p class="Pp">Une tentative est faite pour localiser tous les certificats du signataire, en cherchant d'abord dans le paramètre <i>certs</i> (s'il n'est pas NULL). Ensuite, ils sont recherchés dans tous les certificats contenus dans la structure <i>p7</i>, à moins que <b>PKCS7_NOINTERN</b> ne soit défini. Si un des certificats du signataire ne peut être localisé, l'opération échoue.</p>
+<p class="Pp">Chaque certificat de signataire est vérifié en chaîne en utilisant le but <b>smimesign</b> et le magasin de certificats de confiance <i>store</i> s'il est fourni. Tous les certificats internes du message, qui peuvent avoir été ajoutés à l'aide de <a href='/man/PKCS7_add_certificate.3.en'>PKCS7_add_certificate(3)</a>, sont utilisés comme AC non fiables, à moins que <b>PKCS7_NOCHAIN</b> ne soit défini. Si la vérification CRL est activée dans <i>store</i> et que <b>PKCS7_NOCRL</b> n'est pas défini, tous les CRL internes, qui peuvent avoir été ajoutés à l'aide de <a href='/man/PKCS7_add_crl.3.en'>PKCS7_add_crl(3)</a>, sont utilisés en plus de tenter de les rechercher dans <i>store</i>. Si <i>store</i> n'est pas NULL et qu'une vérification de chaîne échoue, un code d'erreur est retourné.</p>
+<p class="Pp">Enfin, le contenu signé est lu (et écrit dans <i>out</i> sauf s'il est NULL) et la signature est vérifiée.</p>
+<p class="Pp">Si toutes les signatures sont vérifiées correctement, la fonction réussit.</p>
+<p class="Pp">N'importe lequel des indicateurs suivants (combinés par OU bit à bit) peut être passé dans le paramètre <i>flags</i> pour modifier le comportement de vérification par défaut. Seul l'indicateur <b>PKCS7_NOINTERN</b> est significatif pour <b>PKCS7_get0_signers()</b>.</p>
+<p class="Pp">Si <b>PKCS7_NOINTERN</b> est défini, les certificats dans le message lui-même ne sont pas recherchés lors de la localisation des certificats du signataire. Cela signifie que tous les certificats du signataire doivent être dans le paramètre <i>certs</i>.</p>
+<p class="Pp">Si <b>PKCS7_NOCRL</b> est défini et que la vérification CRL est activée dans <i>store</i>, alors tous les CRL dans le message lui-même sont ignorés.</p>
+<p class="Pp">Si l'indicateur <b>PKCS7_TEXT</b> est défini, les en-têtes MIME de type <span class="Li">&quot;text/plain&quot;</span> sont supprimés du contenu. Si le contenu n'est pas de type <span class="Li">&quot;text/plain&quot;</span>, une erreur est retournée.</p>
+<p class="Pp">Si <b>PKCS7_NOVERIFY</b> est défini, les certificats du signataire ne sont pas vérifiés en chaîne.</p>
+<p class="Pp">Si <b>PKCS7_NOCHAIN</b> est défini, alors les certificats contenus dans le message ne sont pas utilisés comme AC non fiables. Cela signifie que toute la chaîne de vérification (à l'exception des certificats du signataire) doit être contenue dans le magasin de confiance.</p>
+<p class="Pp">Si <b>PKCS7_NOSIGS</b> est défini, alors les signatures sur les données ne sont pas vérifiées.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='NOTES'><a class='permalink' href='#NOTES'>NOTES</a></h1>
+<p class="Pp">Une application de <b>PKCS7_NOINTERN</b> consiste à n'accepter que les messages signés par un petit nombre de certificats. Les certificats acceptables seraient passés dans le paramètre <i>certs</i>. Dans ce cas, si le certificat du signataire n'est pas l'un des certificats fournis dans <i>certs</i>, la vérification échouera car le signataire ne peut pas être trouvé.</p>
+<p class="Pp">Il faut faire attention lors de la modification du comportement de vérification par défaut, par exemple, définir
+    <span class="Li">&quot;PKCS7_NOVERIFY|PKCS7_NOSIGS&quot;</span> désactivera totalement toute vérification et tout message signé sera considéré comme valide. Cette combinaison est cependant utile si l'on souhaite simplement écrire le contenu dans <i>out</i> et que sa validité n'est pas considérée comme importante.</p>
+<p class="Pp">La vérification de chaîne devrait, selon toute vraisemblance, être effectuée en utilisant l'heure de signature plutôt que l'heure actuelle. Cependant, puisque l'heure de signature est fournie par le signataire, elle ne peut pas être fiable sans preuve supplémentaire (comme un horodatage de confiance).</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VALEUR_DE_RETOUR'><a class='permalink' href='#VALEUR_DE_RETOUR'>VALEUR DE RETOUR</a></h1>
+<p class="Pp"><b>PKCS7_verify()</b> retourne 1 en cas de succès de la vérification et 0 si une erreur se produit.</p>
+<p class="Pp"><b>PKCS7_get0_signers()</b> retourne tous les signataires ou NULL si une erreur s'est produite.</p>
+<p class="Pp">L'erreur peut être obtenue à partir de <a href='/man/ERR_get_error.3.en'>ERR_get_error(3)</a>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BOGUES'><a class='permalink' href='#BOGUES'>BOGUES</a></h1>
+<p class="Pp">Le magasin de certificats de confiance n'est pas recherché pour les certificats du signataire. Ceci est principalement dû aux insuffisances de la fonctionnalité actuelle d'<b>X509_STORE</b>.</p>
+<p class="Pp">L'absence de traitement en une seule passe signifie que le contenu signé doit être entièrement conservé en mémoire s'il n'est pas détaché.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR AUSSI</a></h1>
+<p class="Pp"><a href='/man/CMS_verify.3.en'>CMS_verify(3)</a>, <a href='/man/PKCS7_add_certificate.3.en'>PKCS7_add_certificate(3)</a>,
+    <a href='/man/PKCS7_add_crl.3.en'>PKCS7_add_crl(3)</a>, <a href='/man/ERR_get_error.3.en'>ERR_get_error(3)</a>, <a href='/man/PKCS7_sign.3.en'>PKCS7_sign(3)</a></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROIT_DAUTELUR'><a class='permalink' href='#DROIT_DAUTELUR'>DROIT D'AUTELUR</a></h1>
+<p class="Pp">Copyright 2002-2024 The OpenSSL Project Authors. All Rights
+    Reserved.</p>
+<p class="Pp">Autorisé sous la licence Apache License 2.0 (la « Licence »).
+    Vous ne pouvez pas utiliser ce fichier sauf en conformité avec la Licence. Vous pouvez
+    obtenir une copie dans le fichier LICENSE dans la distribution source ou à l'adresse
+    <a href='https://www.openssl.org/source/license.html'>https://www.openssl.org/source/license.html</a>.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-10-01</td>
+    <td class="foot-os">3.6.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/core/x86_64/openssl/">core/openssl</a></dd>
+        <dt>Version :</dt>
+        <dd>3.6.0-1</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://www.openssl.org">https://www.openssl.org</a></dd>
+        <dt>Licences :</dt>
+        <dd>Apache-2.0</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/core/openssl/">/listing/core/openssl/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#PROCESSUS_DE_VERIFICATION">PROCESSUS DE VERIFICATION</a></li>
+        
+            <li><a href="#NOTES">NOTES</a></li>
+        
+            <li><a href="#VALEUR_DE_RETOUR">VALEUR DE RETOUR</a></li>
+   
+        </ul>
+    </nav>
+</details>
+
+            </aside>
+        </main>
+    </body>
+</html>
+<li><a href="#BUGS">BOGUES</a></li>
+        
+<li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+<li><a href="#COPYRIGHT">DROIT D'AUTEUR</a></li>
+        
+</ul>
+</nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/PKCS7_verify.3ssl.en.txt">txt</a>, 
+        
+            <a href="/man/PKCS7_verify.3ssl.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            <p>Ce site est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>, à l'exception du contenu des pages de manuel, qui ont leur propre licence spécifiée dans les paquets Arch Linux correspondants.</p>
+            
+            
+        </footer>
+    </body>
+</html>

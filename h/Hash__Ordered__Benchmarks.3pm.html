@@ -1,0 +1,498 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Hash::Ordered::Benchmarks(3pm) — Pages manuelles </title>d'Arch
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Hash__Ordered__Benchmarks(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-hash-ordered/">perl-hash-ordered</a></p>
+
+        er
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Hash::Ordered::</td>Benchmarks(3)
+    <td class="head-vol">Documentation Perl contribuée par les </td>utilisateurs
+    <td class="head-rtitle">Hash::O</td>rdered:</tr>:Benchm</table>arks(3)
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NO</a></h1>M
+<p class="Pp">Hash::Ordered::Benchm</p>arks - Étalonnage de</section>s hashtables ordonnés
+<section class="Sh">
+<h1 class="Sh" id='VERSION'><a class='permalink' href='#VERSION'>VERSIO</a></h1>N
+<p class="Pp">vers</p>ion 0</section>.014
+<section class="Sh">
+<h1 class="Sh" id='INTRODUCTION'><a class='permalink' href='#INTRODUCTION'>INTRODUCTIO</a></h1>N
+<p class="Pp">Les internes de Hash::Ordered sont simples : un hash de données et un
+    tableau de clés ordonnées. J'ai pensé que cela fonctionnerait bien pour les tâches courantes
+    et surpasserait probablement les implémentations de hashtables ordonnés plus complexes, j'ai donc
+    décidé de faire quelques tests de performance pour le </p>vérifier.
+<p class="Pp"><b>Remarque </b>: depuis l'étalonnage initial,
+    <span class="Li">"Hash::Ordered" a </span>gagné un indexage
+    à la demande (just-in-time) du tableau de clés pour prendre en charge une suppression des tombstones plus rapide, ce qui ajoute
+    certaines structures de données conditionnelles aux internes. Il prend désormais également en charge
+    <span class="Li">"tie".</span> Les tests révisés incluent le
+    <span class="Li">mode "tie" pour comp</span>araison avec d'autre</p>s
+    implémentations</section> de hashtables liés.
+<section class="Sh">
+<h1 class="Sh" id='MODULES_TESTED'><a class='permalink' href='#MODULES_TESTED'>MODULES   </a></h1>TESTÉS
+<p class="Pp">Dans mon examen des alternatives à
+    <span class="Li">"Hash::Ordered",</span> six semblaient suffisamment
+    polyvalents pour mériter un étalonnage. Les modules testés sont listés dans la
+    sortie d'étalonnage en abrégé </p>:
+<ul class="Bl-bullet">
+  <li>Array::AsHash — noté
+    <span class="Li">"a:</span></li>ah"
+  <li>Array::OrdHash — noté
+    <span class="Li">"a:</span></li>oh"
+  <li>Data::XHash — noté <span class="Li">"d:</span></li>xh"
+  <li>Hash::Ordered — noté <span class="Li">"h:</span>o" et
+      marqué d'un </li>"*"
+  <li>Tie::Hash::Indexed — noté
+      <span class="Li">"t:h:</span></li>i"
+  <li>Tie::IxHash — noté <span class="Li">"t:</span></li>ix"
+  <li>Tie::LLHash — noté
+    <span class="Li">"t</span></li>:ll</ul>h"
+<p class="Pp">Notez que Tie::Hash::Indexed est écrit en XS et peut également nécessiter une
+    installation forcée car ses tests échouent souvent pour Perl 5.18+ en raison du
+    changement de randomisation des </p>hashtables.
+<p class="Pp">S'il existe différentes méthodes pour faire qu</p>elque chose avec un module,
+    les variations</section> sont décrites dans chaque section ci-dessous.
+<section class="Sh">
+<h1 class="Sh" id='BENCHMARKS'><a class='permalink' href='#BENCHMARKS'>ÉTALONNAGE</a></h1>S
+<p class="Pp">J'ai effectué l'étalonnage avec le module Benchmark. Le script de test
+    se trouve dans le <span class="Li">répertoire </span>"devel" de la
+    distribution. Les tests ont été exécutés sur Perl 5.20.2 sur un Mac Book Pro
+    (darwin-thread-multi-2level). Chaque test de performance a duré 5 secondes de </p>CPU.
+<p class="Pp">Les tests de performance ont été exécutés à plusieurs échelles différentes pour révéler
+    les différences d'efficacité à mesure que la taille du hash augmente. Les détails sont décrits
+    dans chaque section </p>ci-dessous.
+<p class="Pp">Une liste initiale de clés et de valeurs a été générée à partir d'entiers aléatoires
+    en utilisant Math::Random::MT::Auto. La même liste initiale a été utilisée pour tous les tests de performance,
+    sauf indication </p>contraire.
+<p class="Pp">Je n'ai pas testé les fonctionnalités avancées de ces modules, car une
+    comparaison équitable est difficile. Cependant, les performances sur des mesures courantes et
+    simples pourraient suggérer comment les fonctionnalités combinant ces opérations
+    pourraient se </p>comporter.
+<section class="Ss">
+<h2 class="Ss" id='Ordered_hash_creation'><a class='permalink' href='#Ordered_hash_creation'>Création   de hashtables </a></h2>ordonnés
+<p class="Pp">J'ai testé la création de hashtables pour 10, 100 et 1000 éléments. Pour certains
+    modules, il existait différentes options pour créer un hash </p>:
+<ul class="Bl-bullet">
+  <li><span class="Li">"Array::AsHash" </span>prend une référence de tableau
+      avec une option pour l'utiliser directement ou la cloner. Dans un cas, j'ai fourni la
+      référence de tableau de la liste initiale avec l'option de clonage à vrai
+      ("a:ah_cp"). Dans un autre cas, j'ai créé une nouvelle référence de tableau
+      à partir de la liste initiale et l'ai fournie directement ("a:ah_rf")</li>.
+  <li><span class="Li">"Hash::Ordered" </span>peut être initialisé
+      soit avec <span class="Li">"new" </span>("h:o_oo"),
+      soit via <span class="Li">"tie" </span>("h:o_th")</li>.
+  <li><span class="Li">"Tie::IxHash" </span>peut être initialisé soit
+      avec <span class="Li">"new" </span>("t:ix_oo"), soit via
+      <span class="Li">"tie" </span>("t:ix_th")</li>.
+  <li><span class="Li">"Data::XHash" peut être cr</span>éé avec une liste
+      (</li>"t:xh_ls") ou une référen</ul>ce de tableau ("t:xh_rf").
+<p class="Pp">Comme prévu, lorsque
+    <span class="Li">"Array::AsHash" </span>reçoit une référence de tableau,
+    il est très rapide. <span class="Li">"Tie::Hash::Indexed" </span>fait
+    bien ici aussi. Parmi les choix non-XS, plus proches des hashtables,
+    <span class="Li">"Hash::Ordered" </span>fait </p>bien.
+<pre>Résultats pour la création de hashtables ordonnés pour 10 éléments
+           t:h:i   136030/s
+         a:ah_rf   111411/s
+          h:o_oo   101293/s  *
+          h:o_th    98646/s  *
+         t:ix_oo    61853/s
+         t:ix_th    61715/s
+         a:ah_cp    56375/s
+            a:oh    54337/s
+           t:llh    33553/s
+         d:xh_ls    14068/s
+         d:xh_rf    13926/s
+R</pre>ésultats pour la création de hashtables ordonnés pour 100 éléments
+           t:h:i    16503/s
+         a:ah_rf    15398/s
+          h:o_oo    11226/s  *
+          h:o_th    10793/s  *
+            a:oh     7783/s
+         t:ix_th     7570/s
+         t:ix_oo     7405/s
+         a:ah_cp     7035/s
+           t:llh     3533/s
+         d:xh_ls     1561/s
+         d:xh_rf     1550/s
+</section>Résultats pour la création de hashtables ordonnés pour 1000 éléments
+           t:h:i     1552/s
+         a:ah_rf     1509/s
+          h:o_oo     1160/s  *
+          h:o_th     1158/s  *
+            a:oh      815/s
+         t:ix_th      772/s
+         t:ix_oo      757/s
+         a:ah_cp      684/s
+           t:llh      340/s
+         d:xh_ls      154/s
+         d:xh_rf      152/s
+<section class="Ss">
+<h2 class="Ss" id='Getting_hash_elements'><a class='permalink' href='#Getting_hash_elements'>Accès   aux éléments du </a></h2>hash
+<p class="Pp">J'ai testé la récupération des valeurs pour 10 % des clés, sélectionnées aléatoirement,
+    à partir de hashtables de 10, 100 et 1000 éléments. Le hash a été créé au préalable afin
+    que les tests de performance ne reflètent que l'accès aux </p>éléments.
+<p class="Pp">Certains modules offraient des choix pour récupérer une valeur, généralement
+    entre une méthode (notée "_oo"), l'accès au hash lié
+    ("_th") ou avec un déréférencement ("_rf")</p>.
+<p class="Pp">Généralement, les appels de méthode se sont avérés plus rapides que les autres approches
+    pour un module donné, démontrant l'inefficacité des objets </p>liés.
+<pre>Résultats pour la récupération de ~10 % de 10 éléments
+          h:o_oo  1844781/s  *
+         d:xh_oo  1292883/s
+         t:ix_oo  1187104/s
+           t:h:i   932793/s
+          h:o_th   817346/s  *
+         d:xh_rf   703441/s
+         t:ix_th   649291/s
+            a:oh   560060/s
+           t:llh   514911/s
+            a:ah   260639/s
+R</pre>ésultats pour la récupération de ~10 % de 100 éléments
+          h:o_oo   285983/s  *
+         d:xh_oo   183292/s
+         t:ix_oo   165100/s
+           t:h:i   128713/s
+          h:o_th   107213/s  *
+         d:xh_rf    87049/s
+         t:ix_th    79642/s
+            a:oh    66109/s
+           t:llh    58741/s
+            a:ah    27533/s
+</section>Résultats pour la récupération de ~10 % de 1000 éléments
+          h:o_oo    30342/s  *
+         d:xh_oo    19004/s
+         t:ix_oo    17132/s
+           t:h:i    13269/s
+          h:o_th    11100/s  *
+         d:xh_rf     8919/s
+         t:ix_th     7844/s
+            a:oh     6763/s
+           t:llh     5666/s
+            a:ah     2772/s
+<section class="Ss">
+<h2 class="Ss" id='Setting_hash_elements'><a class='permalink' href='#Setting_hash_elements'>Modification   des éléments du </a></h2>hash
+<p class="Pp">J'ai testé le changement des valeurs pour 10 % des clés, sélectionnées aléatoirement,
+    à partir de hashtables de 10, 100 et 1000 éléments. Le hash a été créé au préalable afin
+    que les tests de performance ne reflètent que la mutation des éléments. Aucune nouvelle clé n'a été </p>ajoutée.
+<p class="Pp">Certains modules offraient des choix pour modifier une valeur, généralement
+    entre une méthode (notée "_oo"), l'accès au hash lié
+    ("_th") ou avec un déréférencement ("_rf")</p>.
+<p class="Pp">Encore une fois, les méthodes ont surpassé les </p>autres.
+<pre>Résultats pour le remplacement de ~10 % de 10 éléments
+          h:o_oo  1378880/s  *
+           t:h:i   945403/s
+         d:xh_oo   941643/s
+         t:ix_oo   887283/s
+          h:o_th   652269/s  *
+           t:llh   590160/s
+         d:xh_rf   537694/s
+            a:oh   530787/s
+         t:ix_th   508001/s
+            a:ah   159258/s
+R</pre>ésultats pour le remplacement de ~10 % de 100 éléments
+          h:o_oo   192769/s  *
+           t:h:i   126284/s
+         d:xh_oo   119845/s
+         t:ix_oo   113992/s
+          h:o_th    81159/s  *
+           t:llh    72403/s
+         d:xh_rf    64791/s
+            a:oh    62666/s
+         t:ix_th    59809/s
+            a:ah    16405/s
+</section>Résultats pour le remplacement de ~10 % de 1000 éléments
+          h:o_oo    19909/s  *
+           t:h:i    13445/s
+         d:xh_oo    12487/s
+         t:ix_oo    11601/s
+          h:o_th     8357/s  *
+           t:llh     7503/s
+         d:xh_rf     6599/s
+            a:oh     6410/s
+         t:ix_th     6118/s
+            a:ah     1651/s
+class="Ss"&gt;
+<h2 class="Ss" id='Adding_hash_elements'><a class='permalink' href='#Adding_hash_elements'>Ajout   d'éléments de </a></h2>hachage
+<p class="Pp">J'ai testé l'ajout de 10, 100 et 1000 éléments à un hachage </p>vide.
+<p class="Pp">Certains modules offraient le choix de la manière d'ajouter une valeur, généralement
+    entre une méthode (désignée par "_oo"), un accès à un hachage lié
+    ("_th") ou un déréférencement ("_rf")</p>.
+<p class="Pp">Pour <span class="Li">"Tie::LLHash", </span>je n'ai pas utilisé
+    l'option "lazy", mais j'ai fait l'équivalent en utilisant
+    <span class="Li">"tied" </span>et un appel de méthode </p>:
+<pre>tied(%tllh)-&gt;last( irand(), 42 ) for 1 .. </pre>$n;
+<p class="Pp">Généralement, il semblait que les différences étaient plus faibles que pour
+    les autres tests de performance. Les méthodes restaient les plus </p>rapides.
+<pre>Résultats pour l'ajout de 10 éléments à un hachage vide
+          h:o_oo   341022/s  *
+           t:h:i   295079/s
+         t:ix_oo   258981/s
+          h:o_th   245996/s  *
+         t:ix_th   211341/s
+           t:llh   191298/s
+            a:oh   137447/s
+            a:ah   112651/s
+         d:xh_oo    87215/s
+         d:xh_rf    80379/s
+R</pre>ésultats pour l'ajout de 100 éléments à un hachage vide
+          h:o_oo    58519/s  *
+           t:h:i    55166/s
+         t:ix_oo    48658/s
+          h:o_th    42066/s  *
+         t:ix_th    38632/s
+            a:oh    34842/s
+           t:llh    28384/s
+         d:xh_oo    24841/s
+         d:xh_rf    21517/s
+            a:ah    13726/s
+</section>Résultats pour l'ajout de 1000 éléments à un hachage vide
+          h:o_oo     6497/s  *
+           t:h:i     6108/s
+         t:ix_oo     5528/s
+          h:o_th     4650/s  *
+         t:ix_th     4329/s
+            a:oh     4233/s
+         d:xh_oo     3121/s
+           t:llh     3011/s
+         d:xh_rf     2696/s
+            a:ah     1423/s
+<section class="Ss">
+<h2 class="Ss" id='Deleting_hash_elements'><a class='permalink' href='#Deleting_hash_elements'>Suppression   d'éléments de </a></h2>hachage
+<p class="Pp">J'ai testé la création de hachages de 10, 100 et 1000 éléments puis la
+    suppression de 10% des clés, choisies aléatoirement. J'aurais aimé isoler la
+    création de la suppression, mais je n'ai pas trouvé de moyen de le faire
+    étant donné comment <span class="Li">"Benchmark" </span>exécute les mêmes tests
+    encore et </p>encore.
+<p class="Pp">Certains modules offraient le choix de la manière de supprimer une valeur, généralement
+    entre une méthode (désignée par "_oo"), un accès à un hachage lié
+    ("_th") ou un déréférencement ("_rf")</p>.
+<p class="Pp">Les changements de performance (ou leur absence) aux trois tailles
+    différentes révèlent des différences d'implémentation. (Bien que vous rappeliez
+    qu'une partie de cela est aussi la différence de performance de création
+    que la différence de suppression.</p>)
+<p class="Pp">Par exemple,
+    <span class="Li">"Tie::Hash::Indexed" XS </span>se comporte très bien,
+    ce qui pourrait être sa bonne performance de création, mais pourrait aussi être
+    une bonne </p>suppression.
+<p class="Pp"><span class="Li">"Hash::Ordered" fait </span>une recherche
+    linéaire pour supprimer une clé pour le hachage de 10 éléments, mais passe
+    automatiquement à la suppression indexée avec pierres tombales pour les
+    hachages plus grands. Lors de la suppression de seulement 10% des clés, la
+    collecte des déchets des clés marquées par une pierre tombale ne se produit
+    jamais, donc ce coût amorti n'est pas </p>inclus.
+<p class="Pp"><span class="Li">"Tie::LLHash" </span>s'améliore pour les tailles
+    plus grandes car supprimer depuis une liste chaînée est plus rapide que de
+    retirer un élément d'un tableau. À l'inverse, <span class="Li">"Array::AsHash"
+ </span>   se dégrade </p>simplement.
+<pre>Résultats pour la création d'un hachage de 10 éléments puis la suppression de ~10%
+           t:h:i   131578/s
+          h:o_oo    94598/s  *
+          h:o_th    84018/s  *
+            a:ah    67109/s
+         t:ix_oo    55477/s
+         t:ix_th    52792/s
+            a:oh    46938/s
+           t:llh    30399/s
+         d:xh_oo    13756/s
+         d:xh_rf    13499/s
+R</pre>ésultats pour la création d'un hachage de 100 éléments puis la suppression de ~10%
+           t:h:i    17420/s
+          h:o_oo     9242/s  *
+          h:o_th     8438/s  *
+            a:oh     5738/s
+         t:ix_oo     3922/s
+         t:ix_th     3862/s
+            a:ah     3286/s
+           t:llh     3250/s
+         d:xh_oo     1508/s
+         d:xh_rf     1499/s
+</section>Résultats pour la création d'un hachage de 1000 éléments puis la suppression de ~10%
+           t:h:i     1635/s
+          h:o_oo      934/s  *
+          h:o_th      799/s  *
+           t:llh      319/s
+            a:oh      204/s
+         d:xh_oo      152/s
+         d:xh_rf      151/s
+         t:ix_oo       78/s
+         t:ix_th       78/s
+            a:ah       40/s
+<section class="Ss">
+<h2 class="Ss" id='Extracting_the_hash_as_a_list'><a class='permalink' href='#Extracting_the_hash_as_a_list'>Extraction   du hachage sous forme de </a></h2>liste
+<p class="Pp">J'ai testé l'obtention d'une liste ordonnée de paires à partir de hachages de 10, 100
+    et 1000 éléments. Le hachage était créé au préalable afin que les tests de
+    performance ne reflètent que la conversion en </p>liste.
+<p class="Pp">Étrangement, les modules qui ont généralement plus d'une manière de faire les choses
+    n'en ont pas pour cela. Même <span class="Li">"Tie::IxHash" </span>n'a
+    pas vraiment de façon OO de le faire, donc je l'ai fait à la main </p>:
+<pre>@list = map { $_ =&gt; $tix_oo-&gt;FETCH($_) } $tix_oo-&gt;</pre>Keys;
+<p class="Pp">Parce que <span class="Li">"Array::AsHash" </span>conserve
+    sa représentation interne sous forme de liste ordonnée de paires, il surpasse
+    largement les autres car il lui suffit simplement de déréférencer cette
+    structure de </p>données.
+<pre>Résultats pour lister les paires d'un hachage de 10 éléments
+            a:ah   321044/s
+          h:o_oo   178288/s  *
+         t:ix_oo    89263/s
+           t:h:i    79184/s
+          h:o_th    56112/s  *
+         t:ix_th    48009/s
+     </pre>       a:oh    47433/s
+           t:llh    37996/s
+            d:xh    37439/s
+Résultats pour lister les paires d'un hachage de 100 éléments
+            a:ah    36399/s
+          h:o_oo    19537/s  *
+         t:ix_oo     9049/s
+           t</section>:h:i     7768/s
+          h:o_th     6254/s  *
+            a:oh     5060/s
+         t:ix_th     4907/s
+            d:xh     4122/s
+           t:llh     3813/s
+Résultats pour lister les paires d'un hachage de 1000 éléments
+            a:ah </section>    3784/s
+          h:o_oo     1959/s  *
+         t:ix_oo      905/s
+           t:h:i      773/s
+          h:o_th      625/s  *
+            a:oh      523/s
+         t:ix_th      492/s
+            d:xh      427/s
+           t:llh      377/s
+<section class="Sh">
+<h1 class="Sh" id='CONCLUSION'><a class='permalink' href='#CONCLUSION'>CONCLUSIO</a></h1>N
+<p class="Pp">À l'exception de la création de hachage et de la suppression d'éléments,
+    <span class="Li">"Hash::Ordered" </span>a généralement surpassé les
+    autres implémentations de hachage ordonné. Même pour la création, c'était le
+    plus rapide des implémentations basées sur des hachages en Perl pur, souvent
+    de </p>loin.
+<p class="Pp">Dans la version originale de
+    <span class="Li">"Hash::Ordered", la </span>suppression devenait
+    plus mauvaise à mesure que la taille du hachage augmentait. La nouvelle
+    indexation JIT avec pierres tombales rend maintenant la suppression bien plus
+    rapide que toute implémentation en Perl </p>pur.
+<p class="Pp"><span class="Li">"Array::AsHash",</span> avec une implémentation
+    interne opposée à celle de
+    <span class="Li">"Hash::Ordered", se </span>comporte le mieux
+    à la création et à la liste des paires, mais est tout dernier pour l'accès et
+    la modification des éléments. Je crois que la mauvaise performance est
+    principalement due à des indirections supplémentaires (par exemple un appel
+    de fonction supplémentaire) et à la logique dans les méthodes d'accès aux
+    éléments. Pour les utilisations qui ne nécessitent pas beaucoup d'accès aux
+    éléments et qui ont beaucoup de création/sérialisation, cela pourrait rester
+    un choix </p>utile.
+<p class="Pp">Généralement, chaque module qui dépend de
+    <span class="Li">"tie" </span>pour une partie de son
+    implémentation paie une pénalité de performance substantielle. Comparer les
+    <span class="Li">tests de performance </span>de "Hash::Ordered" avec et sans <span class="Li">"tie" </span>pour les opérations sur des
+    éléments individuels montre à quel point cette pénalité peut être sévère.
+    <span class="Li">"Tie::Hash::Indexed" </span>— probablement à
+    cause de son implémentation XS — se comporte décemment, mais pas assez bien
+    à mon avis pour justifier son </p>utilisation.
+<p class="Pp">En tant qu'auteur de
+    <span class="Li">"Hash::Ordered", je suis clairement
+    biaisé, mais je</span> pense que ces tests de performance constituent un très</p> bon
+    argument pour qu'il soit le module de référen</section>ce pour les hachages ordonnés
+    généraux en Perl pur.
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTEU</a></h1>R
+<p class="Pp">David Golde</p>n &lt;dagolde</section>n@cpan.org&gt;
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT_AND_LICENSE'><a class='permalink' href='#COPYRIGHT_AND_LICENSE'>DROITS   D'AUTEUR ET </a></h1>LICENCE
+<p class="Pp">Ce logiciel est Copyright (c) 2014 par David </p>Golden.
+<p class="Pp">Ceci est un logiciel libre, sous licence </p>:
+<pre>The Apache </pre>License, Ve</section>rsion 2.0, J</div>anuary 2004
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07</td>-13
+    <td class="foot-os">pe</td>rl</tr> v</table>5.</section>42</article>.0
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le </p>paquet :
+    <dl>
+        <dt>Nom du </dt>paquet :
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-hash-ordered/">extra/perl-hash-o</a></dd>rdered
+        <dt>Version </dt>:
+        <dd>0.</dd>014-5
+        <dt>Amont </dt>:
+        <dd><a href="https://github.com/dagolden/Hash-Ordered">https://github.com/dagolden/Hash-</a></dd>Ordered
+        <dt>Licences </dt>:
+        <dd>PerlArtistic,</dd> GPL
+        <dt>Manuels </dt>:
+        <dd><a href="/listing/extra/perl-hash-ordered/">/listing</a></dd>/extra/p</dl>erl-hash-</section>ordered/
+
+<details>
+    <summary>Table des </summary>matières
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">N</a></li>OM
+        
+            <li><a href="#VERSION">VE</a></li>RSION
+        
+            <li><a href="#INTRODUCTION">INTR</a></li>ODUCTION
+        
+            <li><a href="#MODULES_TESTED">MODULES </a></li>TESTÉS
+        
+            <li><a href="#BENCHMARKS">TESTS </a></li>DE PERFORMANCE
+        
+            <li><a href="#CONCLUSION">CON</a></li>CLUSION
+        
+            <li><a href="#AUTHOR">A</a></li>UTEUR
+        
+            <li><a href="#COPYRIGHT_AND_LICENSE">DROIT</a></li>S D'A</ul>UTEUR </nav>ET LI</details>CENCE
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Hash::Ordered::Benchmarks.3pm.en.txt">t</a>xt, 
+        
+            <a href="/man/Hash::Ordered::Benchmarks.3pm.en.raw">b</a></p>r</nav>u</aside></main>t
+        <footer>
+            de manuel.
+            <p>Le site web est disponible selon les termes de la <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">licence
+               GPL-3</a>.0, à l'exception du contenu </p>des pages de manuel, qui ont </footer>leur propre licence
+        </body>       spécifiée dans le paq</html>uet Arch Linux correspondant.

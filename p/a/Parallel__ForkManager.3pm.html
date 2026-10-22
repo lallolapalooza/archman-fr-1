@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Parallel::ForkManager(3pm) — Pages man Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Parallel__ForkManager(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-parallel-forkmanager/">perl-parallel-forkmanager</a></p>
+<p class="lic">Licences: PerlArtistic, GPL</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Parallel::ForkManager(3)</td>
+    <td class="head-vol">Documentation des contributions Perl</td>
+    <td class="head-rtitle">Parallel::ForkManager(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>Nom</a></h1>
+<p class="Pp">Parallel::ForkManager - Un gestionnaire de processus parallèle simple</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VERSION'><a class='permalink' href='#VERSION'>Version</a></h1>
+<p class="Pp">version 2.04</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>Syntaxe</a></h1>
+<pre>use Parallel::ForkManager;
+my $pm = Parallel::ForkManager-&gt;new($MAX_PROCESSES);
+DATOS:
+foreach my $data (@all_data) {
+  # Crée un processus enfant et renvoie son PID :
+  my $pid = $pm-&gt;start y next DATOS;
+  ... effectuer le travail avec $data dans le processus enfant ...
+  $pm-&gt;finish; # Termine le processus enfant
+}</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>Description</a></h1>
+<p class="Pp">Ce module est conçu pour être utilisé dans des opérations qui peuvent être effectuées en parallèle où le nombre de processus à créer doit être limité. Une utilisation typique est un téléchargeur qui récupérera des centaines/des milliers de fichiers.</p>
+<p class="Pp">Le code d'un téléchargeur ressemblerait à ceci :</p>
+<pre>use LWP::Simple;
+use Parallel::ForkManager;
+...
+my @links=(
+  ["http://www.foo.bar/rulez.data", "rulez_data.txt"],
+  ["http://new.host/more_data.doc", "more_data.doc"],
+  ...
+);
+...
+# Maximum 30 processus pour le téléchargement parallèle
+my $pm = Parallel::ForkManager-&gt;new(30);
+DATOS:
+foreach my $linkarray (@links) {
+  $pm-&gt;start y next DATOS; # Faire le fork
+  my ($link, $fn) = @$linkarray;
+  warn "Impossible d'obtenir $fn depuis $link"
+    if getstore($link, $fn) != RC_OK;
+  $pm-&gt;finish; # Quitter le processus enfant
+}
+$pm-&gt;wait_all_children;</pre>
+<p class="Pp">Vous devez d'abord instancier le ForkManager avec le constructeur « new ». Vous devez spécifier le nombre maximum de processus à créer. Si vous spécifiez 0 (zéro), aucun processus enfant ne sera créé. Ceci est utile à des fins de débogage.</p>
+<p class="Pp">Ensuite, utilisez $pm-&gt;start pour effectuer le fork. $pm renvoie 0 pour le processus enfant et le PID du processus parent (voir également « fork » dans perlfunc). Le « y next » saute la boucle interne dans le processus parent. REMARQUE : $pm-&gt;start échoue si le fork échoue.</p>
+<p class="Pp">$pm-&gt;finish termine le processus enfant (en supposant qu'un fork a été effectué dans le « start »).</p>
+<p class="Pp">REMARQUE : Vous ne pouvez pas utiliser $pm-&gt;start si vous êtes déjà dans un processus enfant. Si vous souhaitez gérer un autre ensemble de processus enfants dans le processus enfant, vous devez instancier un autre objet Parallel::ForkManager !</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='METHODS'><a class='permalink' href='#METHODS'>Méthodes</a></h1>
+<p class="Pp">Le préfixe « # » indique où la méthode doit être exécutée. P pour parent, C pour enfant.</p>
+<dl class="Bl-tag">
+  <dt id="new"><a class="permalink" href="#new">new $processus</a></dt>
+  <dd>Crée un nouvel objet Parallel::ForkManager. Vous devez spécifier le nombre maximum de processus à créer. Si vous spécifiez 0 (zéro), aucun processus enfant ne sera créé. Ceci est utile à des fins de débogage.
+    <p class="Pp">Le paramètre optionnel $tempdir n'est utilisé que si vous souhaitez que les enfants renvoient une référence à certaines données (voir RETRIEVING DATASTRUCTURES ci-dessous). S'il n'est pas spécifié, il est défini par un appel à File::Temp::<b>tempdir()</b>.</p>
+    <p class="Pp">La méthode new se comporte comme une erreur si le répertoire temporaire n'existe pas ou n'est pas un répertoire.</p>
+    <p class="Pp">À partir de la version 2.00, le constructeur peut également être appelé dans le style typique de Moo/Moose. Par exemple :</p>
+        <pre>my $fm = Parallel::ForkManager-&gt;new(
+    max_proc =&gt; 4,
+    tempdir =&gt; '...',
+    child_role =&gt; 'Parallel::ForkManager::CustomChild',
+);
+</pre>
+  </dd>
+  <dt id="child_role"><a class="permalink" href="#child_role">child_role</a></dt>
+  <dd>Renvoie le nom du rôle que le gestionnaire de processus enfant consomme. Par défaut, il s'agit de Parallel::ForkManager::Child et peut être modifié via le constructeur.</dd>
+  <dt id="start"><a class="permalink" href="#start">start [ $identifiant_processus ]</a></dt>
+  <dd>Cette méthode effectue le fork. Elle renvoie le PID du processus enfant au parent, et 0 au processus enfant. Si le paramètre $processus du constructeur est 0, en supposant que vous êtes dans le processus enfant, $pm-&gt;start renvoie simplement 0.
+    <p class="Pp">Un paramètre optionnel $identifiant_processus peut être fourni à cette méthode... Il est utilisé par le callback « run_on_finish » (voir CALLBACKS) pour identifier le processus terminé.</p>
+  </dd>
+  <dt id="start_child"><a class="permalink" href="#start_child">start_child [ $identifiant_processus, ] \&amp;callback</a></dt>
+  <dd>Comme la méthode « start », mais exécute le callback en tant qu'enfant. Si le callback renvoie quelque chose, il sera transmis comme données à la mère via « finish() ».</dd>
+  <dt id="finish"><a class="permalink" href="#finish">finish [ $code_de_sortie [, $reference_structure_donnees ] ]</a></dt>
+  <dd>Ferme le processus enfant en sortant et accepte un code de sortie optionnel (le code de sortie par défaut est 0), qui peut être récupéré dans le parent via le callback. Si le second paramètre est fourni, l'enfant tente d'envoyer ses données à la mère. Si utilisé en mode débogage ($processus == 0), cette méthode appelle simplement le callback.
+    <p class="Pp">Si $reference_structure_donnees est fournie, elle est sérialisée et transmise au processus parent. Voir RETRIEVING DATASTRUCTURES pour plus d'informations.</p>
+  </dd>
+  <dt id="set_max_procs"><a class="permalink" href="#set_max_procs">set_max_procs $processus</a></dt>
+  <dd>Permet de définir un nouveau nombre maximum de processus à maintenir.</dd>
+  <dt id="wait_all_children"><a class="permalink" href="#wait_all_children">wait_all_children</a></dt>
+  <dd>Peut être appelée pour attendre tous les processus qui ont été forkés. Il s'agit d'une attente bloquante.</dd>
+  <dt id="reap_finished_children"><a class="permalink" href="#reap_finished_children">reap_finished_children</a></dt>
+  <dd>Un appel non bloquant pour récupérer les enfants terminés et exécuter les callbacks indépendamment des appels à « start » ou « wait_all_children ». Utilisez ceci dans des situations où « start » est rarement appelé mais où vous souhaitez exécuter les callbacks rapidement.</dd>
+  <dt id="is_parent"><a class="permalink" href="#is_parent">is_parent</a></dt>
+  <dd>Renvoie « vrai » si dans le parent ou « faux » si dans l'enfant.</dd>
+  <dt id="is_child"><a class="permalink" href="#is_child">is_child</a></dt>
+  <dd>Renvoie « vrai » si dans l'enfant ou « faux » si dans le parent.</dd>
+  <dt id="max_procs"><a class="permalink" href="#max_procs">max_procs</a></dt>
+  <dd>Renvoie le nombre maximum de processus que le gestionnaire va créer.</dd>
+  <dt id="running_procs"><a class="permalink" href="#running_procs">running_procs</a></dt>
+  <dd>Renvoie les PID des processus qui sont surveillés par Parallel::ForkManager. Vous devez noter que les enfants sont toujours signalés comme en cours d'exécution jusqu'à ce que le gestionnaire de processus effectue un appel à « start » ou « wait_all_children ».
+    <pre>my @pids = $pm-&gt;running_procs;
+my $nbr_children = $pm-&gt;running_procs;
+</pre>
+  </dd>
+  <dt id="running_procs_with_identifiers"><a class="permalink" href="#running_procs_with_identifiers">running_procs_with_identifiers</a></dt>
+  <dd>Renvoie une liste de paires. Les clés sont les PID des processus créés (tels que renvoyés par « running_procs »), et les valeurs sont les identifiants donnés à ces PID par « start ». Si aucun identifiant n'a été fourni pour un processus, la valeur pour ce PID sera indéfinie.</dd>
+  <dt id="wait_for_available_procs("><a class="permalink" href="#wait_for_available_procs(">wait_for_available_procs(
+    $n )</a></dt>
+  <dd>Attend jusqu'à ce que $n slots de processus soient disponibles. Si $n n'est pas spécifié, la valeur par défaut de 1 est utilisée.</dd>
+  <dt id="waitpid_blocking_sleep"><a class="permalink" href="#waitpid_blocking_sleep">waitpid_blocking_sleep</a></dt>
+  <dd>Renvoie la période de sommeil, en secondes, des appels pseudo-bloquants. La période de sommeil peut être une fraction de seconde.
+    <p class="Pp">Renvoie 0 si désactivé.</p>
+    <p class="Pp">La valeur par défaut est de 1 seconde.</p>
+    <p class="Pp">Voir « BLOCKING CALLS » pour plus de détails.</p>
+  </dd>
+  <dt id="set_waitpid_blocking_sleep"><a class="permalink" href="#set_waitpid_blocking_sleep">set_waitpid_blocking_sleep $secondes</a></dt>
+  <dd>Définit la période de sommeil, en secondes, des appels pseudo-bloquants. Définir à 0 pour désactiver.
+    <p class="Pp">Voir « BLOCKING CALLS » pour plus de détails.</p>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CALLBACKS'><a class='permalink' href='#CALLBACKS'>CALLBACKS</a></h1>
+<p class="Pp">Pour spécifier une sous-routine à exécuter après qu'un enfant ait terminé, vous pouvez utiliser le constructeur pour spécifier une sous-routine et une sous-routine optionnelle pour les processus terminés.</p>
+<pre>my $pm = Parallel::ForkManager-&gt;new(10, undef, undef, \&amp;my_callback);
+...
+sub my_callback {
+  my ($pid, $exit_code, $arg_ref) = @_;
+  if ($arg_ref and ref $arg_ref eq 'ARRAY') {
+    my ($identifiant, $filename) = @$arg_ref;
+    print "Child $pid with identifier $identifiant exited with code $exit_code and processed $filename.\n";
+  } else {
+    print "Child $pid exited with code $exit_code.\n";
+  }
+}</pre>
+<p class="Pp">Le paramètre $arg_ref est le troisième paramètre de la méthode &quot;finish&quot;.</p>
+<p class="Pp">Pour spécifier des sous-routines distinctes pour la terminaison d'enfants et les données des enfants, utilisez la syntaxe de style Moo/Moose :</p>
+<pre>my $pm = Parallel::ForkManager-&gt;new(
+    max_proc       =&gt; 4,
+    run_on_finish  =&gt; \&amp;my_finish_callback,
+    get_child_data =&gt; \&amp;my_child_data_callback,
+);
+...
+sub my_finish_callback {
+    my ($pid, $exit_code, $child_ident) = @_;
+    print "Child $pid exited with code $exit_code.\n";
+    # $child_ident est le 3ème arg de $pm-&gt;finish
+}
+sub my_child_data_callback {
+    my ($pid, $child_data, $child_ident) = @_;
+    # $child_data est la structure de données retournée par l'enfant
+    print "Child $pid returned data. Identifier: $child_ident.\n";
+    return $child_data; # Obligatoire si vous voulez utiliser les données
+}</pre>
+<p class="Pp">Les sous-routines de rappel sont exécutées dans l'ordre suivant :</p>
+<ol class="Bl-enum">
+  <li>La sous-routine &quot;run_on_finish&quot; est exécutée.</li>
+  <li>Si des données ont été retournées par le processus enfant et qu'une sous-routine &quot;get_child_data&quot; a été spécifiée, celle-ci est appelée. Le résultat de cette sous-routine est renvoyé par la méthode &quot;wait_all_children&quot; comme une liste de paires (child_ident, child_data).</li>
+</ol>
+<p class="Pp">La sous-routine &quot;run_on_finish&quot; peut également retourner des données qui seront utilisées par la méthode &quot;wait_all_children&quot;.</p>
+<p class="Pp">Les sous-routines de rappel sont appelées dans le processus parent.</p>
+<p class="Pp">Il existe également une sous-routine &quot;on_thread_error&quot; qui est appelée en cas d'erreur lors de la création de threads. Elle est transmise aux arguments du thread.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='RETRIEVING'><a class='permalink' href='#RETRIEVING'>RETRANSMISSION</a></h1>
+<p class="Pp">Les structures de données peuvent être transmises des enfants aux parents en utilisant la méthode &quot;finish&quot;. Les données doivent être sérialisables et désérialisables à l'aide de Storable.</p>
+<pre>use Storable qw(freeze thaw);
+...
+my $pm = Parallel::ForkManager->new(4);
+$pm->run_on_finish( \&amp;print_results );
+DATOS:
+foreach my $file (@files_to_process) {
+  my $pid = $pm->start and next DATOS;
+  # ... traitement du fichier ...
+  my $results = { # structure de données à renvoyer
+    original_file =&gt; $file,
+    processed_size =&gt; -s $file,
+    checksum =&gt; compute_checksum($file)
+  };
+  $pm->finish( 0, $results ); # 0 = code de sortie, $results = structure de données
+}</pre>
+<p class="Pp">Le processus parent reçoit la structure de données dé-sérialisée.</p>
+<pre>sub print_results {
+  my ($pid, $exit_code, $ident) = @_;
+  my $results = $pm->get_child_data($ident); # Récupère les données de l'enfant
+  if ($results) {
+    print "File: $results-&gt;{original_file}, Size: $results-&gt;{processed_size}, Checksum: $results-&gt;{checksum}\n";
+  } else {
+    print "Child $pid finished with code $exit_code\n";
+  }
+}</pre>
+<p class="Pp">Notez que vous devez appeler $pm-&gt;get_child_data($ident) pour récupérer les données de l'enfant.</p>
+<p class="Pp">Si vous n'utilisez pas de sous-routine de rappel, mais que vous voulez récupérer les données, vous pouvez appeler wait_all_children.</p>
+<pre>my @children_results = $pm-&gt;wait_all_children;
+for my $child_result (@children_results) {
+  my $pid = $child_result-&gt;{pid};
+  my $exit_code = $child_result-&gt;{code};
+  my $data = $child_result-&gt;{data};
+  print "Child $pid ($exit_code) returned: $data\n";
+}</pre>
+<p class="Pp">Le tableau @children_results contiendra une liste de hachages contenant les PID, les codes de sortie et les données retournées par les enfants.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BLOCKING'><a class='permalink' href='#BLOCKING'>APPELS BLOQUANTS</a></h1>
+<p class="Pp">Dans un monde normal, la méthode wait_all_children attendrait l'achèvement de tous les enfants.</p>
+<p class="Pp">Cependant, si la méthode wait_all_children est appelée dans un scénario où il n'y a qu'un seul enfant, alors le comportement par défaut est de ne pas vraiment attendre.</p>
+<p class="Pp">Si la gestion des signaux est importante, vous pourriez souhaiter modifier le comportement de la méthode wait_all_children.</p>
+<p class="Pp">En définissant &quot;waitpid_blocking_sleep&quot; à un nombre différent de 1, vous pouvez modifier la façon dont le programme attend les enfants. Par exemple, si vous définissez &quot;waitpid_blocking_sleep&quot; à 0, alors il ne fera pas d'attente du tout.</p>
+<p class="Pp">Si vous définissez &quot;waitpid_blocking_sleep&quot; à une valeur plus grande, par exemple 5, alors l'attente sera plus longue.</p>
+<p class="Pp">Dans le cas où vous utilisez la méthode reap_finished_children, vous pouvez également spécifier une valeur pour reap_finished_children à la place.</p>
+<pre>my $pm = Parallel::ForkManager->new(10);
+$pm->set_waitpid_blocking_sleep(5); # Attend 5 secondes entre chaque vérification
+# Ou
+$pm->set_reap_finished_children(5); # Fait des vérifications toutes les 5 secondes</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DEBUGGING'><a class='permalink' href='#DEBUGGING'>DÉBOGAGE</a></h1>
+<p class="Pp">Si vous souhaitez déboguer le comportement de votre code avec Parallel::ForkManager, vous pouvez instancier le gestionnaire avec 0 processus. Cela désactivera le fork et exécutera simplement le code dans le processus parent.</p>
+<pre>my $pm = Parallel::ForkManager-&gt;new(0); # Désactive le fork
+DATOS:
+foreach my $data (@all_data) {
+  # my $pid = $pm-&gt;start y next DATOS; # N'est pas appelé
+  ... effectuer le travail avec $data ...
+  # $pm-&gt;finish; # N'est pas appelé
+}</pre>
+<p class="Pp">Cela vous permet de tester le code qui s'exécute dans le processus enfant sans avoir à vous soucier du comportement du fork.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>Auteur</a></h1>
+<p class="Pp">Paul Johnson &lt;paul@xpan.org&gt;</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT'><a class='permalink' href='#COPYRIGHT'>Copyright</a></h1>
+<p class="Pp">Copyright (C) 2001-2009 Paul Johnson (paul@xpan.org)</p>
+<p class="Pp">Ce programme est un logiciel libre ; vous pouvez le redistribuer et/ou le modifier sous les termes de la licence Perl.</p>
+</section>
+</div>
+</section>
+
+            </article>
+            <aside id="content-right">
+                
+<nav>
+    <h2>Manuel</h2>
+    <ul>
+        <li><a href="/man/fr/index.html">Index</a></li>
+    </ul>
+    <h2>Manuel par section</h2>
+    <ul>
+        <li><a href="/man/fr/section1/index.html">section 1</a></li>
+        <li><a href="/man/fr/section2/index.html">section 2</a></li>
+        <li><a href="/man/fr/section3/index.html">section 3</a></li>
+        <li><a href="/man/fr/section4/index.html">section 4</a></li>
+        <li><a href="/man/fr/section5/index.html">section 5</a></li>
+        <li><a href="/man/fr/section6/index.html">section 6</a></li>
+        <li><a href="/man/fr/section7/index.html">section 7</a></li>
+        <li><a href="/man/fr/section8/index.html">section 8</a></li>
+    </ul>
+    <h2>Page actuelle</h2>
+    <ul>
+        <li><a href="/man/fr/3pm/Parallel-ForkManager.html">Parallel::ForkManager(3pm)</a></li>
+    </ul>
+</nav>
+
+            </aside>
+        </main>
+        <footer>
+            
+        </footer>
+    </body>
+</html>CALLBACKS'><a class='permalink' href='#CALLBACKS'>CALLBACKS</a></h1>
+<p class="Pp">Vous pouvez définir des rappels dans le code, qui sont appelés lors d'événements tels que le démarrage d'un processus ou à son achèvement. Déclarez-les avant le premier appel à <b>start()</b>.</p>
+<p class="Pp">Les rappels peuvent être définis avec les méthodes suivantes :</p>
+<dl class="Bl-tag">
+  <dt id="run_on_finish"><a class="permalink" href="#run_on_finish">run_on_finish
+    $code [, $pid ]</a></dt>
+  <dd>Vous pouvez définir une sous-routine qui est appelée lorsqu'un enfant est terminé. Elle est appelée dans le processus parent.
+    <p class="Pp">Les paramètres de <span class="Li">$code</span> sont les suivants :</p>
+        <pre>- PID du processus terminé
+- Code de sortie du programme
+- Identification du processus (si fournie dans la méthode "start")
+- Signal de sortie (0-127 : nom du signal)
+- Core dump (1 s'il y a eu un core dump à la sortie)
+- Référence de structure de données ou undef (voir RÉCUPÉRATION DES STRUCTURES DE DONNÉES)
+</pre>
+  </dd>
+  <dt id="run_on_start"><a class="permalink" href="#run_on_start">run_on_start
+    $code</a></dt>
+  <dd>Vous pouvez définir une sous-routine qui est appelée lorsqu'un enfant est démarré. Elle est appelée après le démarrage réussi d'un enfant dans le processus parent.
+    <p class="Pp">Les paramètres de <span class="Li">$code</span> sont les suivants :</p>
+        <pre>- PID du processus qui a été démarré
+- Identification du processus (si fournie dans la méthode "start")
+</pre>
+  </dd>
+  <dt id="run_on_wait"><a class="permalink" href="#run_on_wait">run_on_wait
+    $code, [$period]</a></dt>
+  <dd>Vous pouvez définir une sous-routine qui est appelée lorsque le processus enfant doit attendre le démarrage. Si <span class="Li">$period</span> n'est pas défini, alors un appel est effectué par enfant. Si <span class="Li">$period</span> est défini, alors <span class="Li">$code</span> est appelé périodiquement et le module attend <span class="Li">$period</span> secondes entre les deux appels. Notez que <span class="Li">$period</span> peut également être un nombre fractionnaire. La durée exacte de « $period secondes » n'est pas garantie ; les signaux peuvent la raccourcir et le planificateur de processus peut l'allonger (sur les systèmes chargés).
+    <p class="Pp">Le <span class="Li">$code</span> est également appelé dans les méthodes "start" et "wait_all_children".</p>
+    <p class="Pp">Aucun paramètre n'est passé à <span class="Li">$code</span> lors de l'appel.</p>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='APPELS_BLOQUANTS'><a class='permalink' href='#APPELS_BLOQUANTS'>APPELS BLOQUANTS</a></h1>
+<p class="Pp">Lorsqu'il s'agit d'attendre la terminaison des processus enfants,
+    <span class="Li">&quot;Parallel::ForkManager&quot;</span> se trouve entre le marteau et l'enclume (si vous me pardonnez ce terrible jeu de mots). La fonction Perl sous-jacente
+    <span class="Li">&quot;waitpid&quot;</span> sur laquelle le module s'appuie peut bloquer jusqu'à ce qu'un processus spécifique ou n'importe quel processus enfant se termine, mais pas pour un processus faisant partie d'un groupe donné.</p>
+<p class="Pp">Cela signifie que le module peut faire l'une des deux choses suivantes lorsqu'il attend qu'un de ses processus enfants se termine :</p>
+<dl class="Bl-tag">
+  <dt id="Seulement"><a class="permalink" href="#Seulement">Attendre uniquement ses propres processus enfants</a></dt>
+  <dd>Ceci est fait via une boucle utilisant un appel non bloquant
+      <span class="Li">&quot;waitpid&quot;</span> et une instruction sleep. Le code fait quelque chose comme :
+        <pre>while(1) {
+    if ( un des processus enfants de P::FM est terminé ) {
+        return son pid
+    }
+    sleep $sleep_period
+}
+</pre>
+    <p class="Pp">C'est le comportement par défaut que le module utilisera. Ce n'est pas la manière la plus efficace d'attendre les processus enfants, mais c'est la manière la plus sûre de garantir que
+        <span class="Li">&quot;Parallel::ForkManager&quot;</span> n'interférera pas avec toute autre partie du code.</p>
+    <p class="Pp">La période de sommeil est définie via la méthode
+        <span class="Li">&quot;set_waitpid_blocking_sleep&quot;</span>.</p>
+  </dd>
+  <dt id="Bloquer"><a class="permalink" href="#Bloquer">Bloquer jusqu'à ce que n'importe quel processus
+    se termine</a></dt>
+  <dd>Alternativement, <span class="Li">&quot;Parallel::ForkManager&quot;</span>
+      peut appeler <span class="Li">&quot;waitpid&quot;</span> de manière à bloquer jusqu'à ce que n'importe quel processus enfant se termine. Si le processus enfant n'était pas l'un des sous-processus surveillés, l'attente reprendra. C'est plus efficace, mais cela signifie que <span class="Li">&quot;P::FM&quot;</span> peut capturer (et ignorer) la notification de terminaison qu'une autre partie du code pourrait attendre.
+    <p class="Pp">Si c'est une condition de concurrence qui ne s'applique pas à votre base de code, vous pouvez définir la période <i>waitpid_blocking_sleep</i> à
+        <span class="Li">0</span>, ce qui activera l'appel bloquant
+        <span class="Li">&quot;waitpid&quot;</span>.</p>
+        <pre>my $pm = Parallel::ForkManager-&gt;new( 4 );
+$pm-&gt;set_waitpid_blocking_sleep(0);  # appels bloquants réels activés
+for ( 1..100 ) {
+    $pm-&gt;start and next;
+    ...; # faire le travail
+    $pm-&gt;finish;
+}
+</pre>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='RECUPERATION_DES_STRUCTURES_DE_DONNEES_depuis_les_processus_enfants'><a class='permalink' href='#RECUPERATION_DES_STRUCTURES_DE_DONNEES_depuis_les_processus_enfants'>RECUPÉRATION DES STRUCTURES DE DONNÉES depuis les processus enfants</a></h1>
+<p class="Pp">La capacité du parent à récupérer des structures de données est nouvelle depuis la version 0.7.6.</p>
+<p class="Pp">Chaque processus enfant peut éventuellement envoyer 1 structure de données au parent. Par structure de données, nous entendons une référence à une chaîne, une table de hachage ou un tableau. Le contenu de la structure de données est écrit dans des fichiers temporaires sur disque en utilisant la méthode <b>store()</b> du module Storable. La référence est ensuite récupérée depuis le code que vous envoyez à la fonction de rappel run_on_finish.</p>
+<p class="Pp">La structure de données peut être n'importe quelle structure de données scalaire Perl qui a du sens : une chaîne, une valeur numérique ou une référence à un tableau, une table de hachage ou un objet.</p>
+<p class="Pp">Il y a 2 étapes impliquées dans la récupération des structures de données :</p>
+<p class="Pp">1) Une référence à la structure de données que l'enfant souhaite renvoyer au parent est fournie comme deuxième argument à l'appel <b>finish()</b>. Il appartient à l'enfant de décider s'il souhaite renvoyer quelque chose au parent ou non.</p>
+<p class="Pp">2) La référence de la structure de données est récupérée à l'aide du rappel fourni dans la méthode <b>run_on_finish()</b>.</p>
+<p class="Pp">Gardez à l'esprit que la récupération de structures de données n'est pas la même chose que le retour d'une structure de données à partir d'un appel de méthode. Ce n'est pas ce qui se passe réellement. La structure de données référencée dans un processus enfant donné est sérialisée et écrite dans un fichier par Storable. Le fichier est ensuite relu en mémoire et une nouvelle structure de données appartenant au processus parent est créée. Veuillez tenir compte de la pénalité de performance que cela peut impliquer, alors essayez de garder la structure retournée petite.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXEMPLES'><a class='permalink' href='#EXEMPLES'>EXEMPLES</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='Parallèle_get'><a class='permalink' href='#Parallèle_get'>Obtention parallèle</a></h2>
+<p class="Pp">Ce petit exemple peut être utilisé pour obtenir des URL en parallèle.</p>
+<pre>use Parallel::ForkManager;
+use LWP::Simple;
+my $pm = Parallel::ForkManager-&gt;new(10);
+LIENS:
+for my $link (@ARGV) {
+  $pm-&gt;start and next LIENS;
+  my ($fn) = $link =~ /^.*\/(.*?)$/;
+  if (!$fn) {
+    warn "Impossible de déterminer le nom de fichier à partir de $fn\n";
+  } else {
+    $0 .= " " . $fn;
+    print "Obtention de $fn à partir de $link\n";
+    my $rc = getstore($link, $fn);
+    print "$link téléchargé. code de réponse : $rc\n";
+  };
+  $pm-&gt;finish;
+};</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Callbacks'><a class='permalink' href='#Callbacks'>Callbacks</a></h2>
+<p class="Pp">Exemple d'un programme utilisant des rappels pour obtenir les codes de sortie des enfants :</p>
+<pre>use strict;
+use Parallel::ForkManager;
+my $max_procs = 5;
+my @names = qw( Fred Jim Lily Steve Jessica Bob Dave Christine Rico Sara );
+# hachage pour associer les PID aux informations spécifiques de l'enfant
+my $pm = Parallel::ForkManager-&gt;new($max_procs);
+# Configuration d'un rappel pour lorsqu'un enfant se termine afin que nous puissions
+# obtenir son code de sortie
+$pm-&gt;run_on_finish( sub {
+    my ($pid, $exit_code, $ident) = @_;
+    print "** $ident vient de quitter la pool " .
+      "avec le PID $pid et le code de sortie : $exit_code\n";
+});
+$pm-&gt;run_on_start( sub {
+    my ($pid, $ident)=@_;
+    print "** $ident démarré, pid : $pid\n";
+});
+$pm-&gt;run_on_wait( sub {
+    print "** Je dois attendre un enfant...\n"
+  },
+  0.5
+);
+NOMS:
+foreach my $child ( 0 .. $#names ) {
+  my $pid = $pm-&gt;start($names[$child]) and next NOMS;
+  # Ce code est le processus enfant
+  print "Ceci est $names[$child], Enfant numéro $child\n";
+  sleep ( 2 * $child );
+  print "$names[$child], L'enfant $child est sur le point de sortir...\n";
+  sleep 1;
+  $pm-&gt;finish($child); # passer un code de sortie à finish
+}
+print "Attente des enfants...\n";
+$pm-&gt;wait_all_children;
+print "Tout le monde a quitté la pool !\n";</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Recuperation_de_structure_de_donnees'><a class='permalink' href='#Recuperation_de_structure_de_donnees'>Récupération de structure de données</a></h2>
+<p class="Pp">Dans cet exemple simple, chaque enfant renvoie une référence de chaîne.</p>
+<pre>use Parallel::ForkManager 0.7.6;
+use strict;
+my $pm = Parallel::ForkManager-&gt;new(2, '/server/path/to/temp/dir/');
+# récupération et gestion des structures de données
+$pm -&gt; run_on_finish ( # appelé AVANT le premier appel à start()
+  sub {
+    my ($pid, $exit_code, $ident, $exit_signal, $core_dump, $data_structure_reference) = @_;
+    # récupérer la structure de données de l'enfant
+    if (defined($data_structure_reference)) {  # les enfants ne sont pas obligés d'envoyer quoi que ce soit
+      my $string = ${$data_structure_reference};  # l'enfant a passé une référence de chaîne
+      print "$string\n";
+    }
+    else {  # les problèmes survenant pendant le stockage ou la récupération généreront un avertissement
+      print qq|Aucun message reçu du processus enfant $pid!\n|;
+    }
+  }
+);
+# préparer des composants d'instructions aléatoires
+my @foods = ('chocolat', 'crème glacée', 'beurre de cacahuète', 'cornichons', 'pizza', 'bacon', 'pancakes', 'spaghetti', 'cookies');
+my @preferences = ('adore', 'ne supporte pas', 'en veut toujours plus', 'marchera 100 miles pour', 'ne mange que', 'préférerait mourir plutôt que de manger');
+# exécuter les processus parallèles
+PERSONNES:
+foreach my $person (qw(Fred Wilma Ernie Bert Lucy Ethel Curly Moe Larry)) {
+  $pm-&gt;start() and next PERSONNES;
+  # générer une déclaration aléatoire sur les préférences alimentaires
+  my $statement = $person . ' ' . $preferences[int(rand @preferences)] . ' ' . $foods[int(rand @foods)];
+  # le renvoyer au processus parent
+  $pm-&gt;finish(0, \$statement);  # noter que c'est une référence scalaire, pas le scalaire lui-même
+}
+$pm-&gt;wait_all_children;</pre>
+<p class="Pp">Un deuxième exemple de récupération de structure de données montre comment les enfants décident s'il faut envoyer quelque chose en retour, quoi envoyer et comment le parent doit traiter ce qui est récupéré.</p>
+<pre>use Parallel::ForkManager 0.7.6;
+use Data::Dumper;  # pour afficher les structures de données récupérées.
+use strict;
+my $pm = Parallel::ForkManager-&gt;new(20);  # en utilisant le répertoire temporaire du système $L&lt;File::Temp::tempdir()
+# récupération et gestion des structures de données
+my %retrieved_responses = ();  # pour collecter les réponses
+$pm -&gt; run_on_finish (
+  sub {
+    my ($pid, $exit_code, $ident, $exit_signal, $core_dump, $data_structure_reference) = @_;
+    # voir ce que l'enfant nous a envoyé, s'il y en a
+    if (defined($data_structure_reference)) {  # tester plutôt que supposer que l'enfant a envoyé quelque chose
+      my $reftype = ref($data_structure_reference);
+      print qq|l'identifiant "$ident" a retourné une référence de type "$reftype"|;
+e.
+
+|;
+      if (1) {  # simple on/off switch to display the contents
+        print &amp;Dumper($data_structure_reference) . qq|fin de la structure envoyée &quot;$ident&quot;\n\n|;
+      }
+      # we can also collect retrieved data structures for processing after all children have exited
+      $retrieved_responses{$ident} = $data_structure_reference;
+    } else {
+      print qq|l'identifiant &quot;$ident&quot; n'a rien envoyé.\n\n|;
+    }
+  }
+);
+# generate a list of instructions
+my @instructions = (  # a unique identifier and what the child process should send
+  {'name' =&gt; 'Clés %ENV sous forme de chaîne', 'send' =&gt; 'keys'},
+  {'name' =&gt; 'N\'envoyer rien'},  # not instructing the child to send anything back to the parent
+  {'name' =&gt; '%ENV des enfants', 'send' =&gt; 'all'},
+  {'name' =&gt; 'L\'enfant choisit aléatoirement', 'send' =&gt; 'random'},
+  {'name' =&gt; 'Instructions d\'envoi invalides', 'send' =&gt; 'Na Na Nana Na'},
+  {'name' =&gt; 'Valeurs ENV dans un tableau', 'send' =&gt; 'values'},
+);
+INSTRUCTS:
+foreach my $instruction (@instructions) {
+  $pm-&gt;start($instruction-&gt;{'name'}) and next INSTRUCTS;  # this time we are using an explicit, unique child process identifier
+  # last step in child processing
+  $pm-&gt;finish(0) unless $instruction-&gt;{'send'};  # no data structure is sent unless this child is told what to send.
+  if ($instruction-&gt;{'send'} eq 'keys') {
+    $pm-&gt;finish(0, \join(', ', keys %ENV));
+  } elsif ($instruction-&gt;{'send'} eq 'values') {
+    $pm-&gt;finish(0, [values %ENV]);  # kinda useless without knowing which keys they belong to...
+  } elsif ($instruction-&gt;{'send'} eq 'all') {
+    $pm-&gt;finish(0, \%ENV);  # remember, we are not &quot;returning&quot; anything, just copying the hash to disc
+  # demonstrate clearly that the child determines what type of reference to send
+  } elsif ($instruction-&gt;{'send'} eq 'random') {
+    my $string = q|Je ne suis qu'une chaîne.|;
+    my @array = qw(Je suis un tableau);
+    my %hash = (type =&gt; 'tableau associatif', synonym =&gt; 'hash', cool =&gt; 'très :)');
+    my $return_choice = ('string', 'array', 'hash')[int(rand 3)];  # randomly choose return data type
+    $pm-&gt;finish(0, \$string) if ($return_choice eq 'string');
+    $pm-&gt;finish(0, \@array) if ($return_choice eq 'array');
+    $pm-&gt;finish(0, \%hash) if ($return_choice eq 'hash');
+  # as a responsible child, inform parent that their instruction was invalid
+  } else {
+    $pm-&gt;finish(0, \qq|Instructions invalides: &quot;$instruction-&gt;{'send'}&quot;.|);  # ordinarily I wouldn't include invalid input in a response...
+  }
+}
+$pm-&gt;wait_all_children;  # blocks until all forked processes have exited
+# post fork processing of returned data structures
+for (sort keys %retrieved_responses) {
+  print qq|Post traitement de &quot;$_&quot;...\n|;
+}</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='UTILISATION_DE_&lt;b&gt;RAND()&lt;/b&gt;_DANS_LES_PROCESSUS_FORKÉS'><a class='permalink' href='#UTILISATION_DE_&lt;b&gt;RAND()&lt;/b&gt;_DANS_LES_PROCESSUS_FORKÉS'>UTILISATION   DE <b>RAND()</b> DANS LES PROCESSUS FORKÉS</a></h1>
+<p class="Pp">Une mise en garde à noter est que tous les processus forkés utiliseront la même graine aléatoire, fournissant potentiellement les mêmes résultats (voir <a href='http://blogs.perl.org/users/brian_phillips/2010/06/when-rand-isnt-random.html'>http://blogs.perl.org/users/brian_phillips/2010/06/when-rand-isnt-random.html</a>). Si vous utilisez <span class="Li">rand()</span> et souhaitez que chaque enfant forké utilise une graine différente, vous pouvez ajouter ceci à votre programme :</p>
+<pre>$pm-&gt;run_on_start(sub { srand });</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXTENSION'><a class='permalink' href='#EXTENSION'>EXTENSION</a></h1>
+<p class="Pp">À partir de la version 2.0.0, <span class="Li">&quot;Parallel::ForkManager&quot;</span> utilise Moo en coulisses. Lorsqu'un processus est forgé à partir de l'objet parent, l'instance forgée de l'objet sera modifiée pour consommer le rôle Parallel::ForkManager::Child. Tout cela rend l'extension de Parallel::ForkManager pour implémenter n'importe quel mécanisme de stockage/récupération ou tout autre comportement assez facile.</p>
+<section class="Ss">
+<h2 class="Ss" id='Exemple:_stocker_et_récupérer_des_données_via_un_service_web'><a class='permalink' href='#Exemple:_stocker_et_récupérer_des_données_via_un_service_web'>Exemple :   stocker et récupérer des données via un service web</a></h2>
+<pre>{
+    package Parallel::ForkManager::Web;
+    use HTTP::Tiny;
+    use Moo;
+    extends 'Parallel::ForkManager';
+    has ua =&gt; (
+        is =&gt; 'ro',
+        lazy =&gt; 1,
+        default =&gt; sub {
+            HTTP::Tiny-&gt;new;
+        }
+    );
+    sub store {
+        my( $self, $data ) = @_;
+        $self-&gt;ua-&gt;post( &quot;http://.../store/$$&quot;, { body =&gt; $data } );
+    }
+    sub retrieve {
+        my( $self, $kid_id ) = @_;
+        $self-&gt;ua-&gt;get( &quot;http://.../store/$kid_id&quot; )-&gt;{content};
+    }
+}
+my $fm = Parallel::ForkManager::Web-&gt;new(2);
+$fm-&gt;run_on_finish(sub{
+    my $retrieved = $_[5];
+    print &quot;reçu &quot;, $retrieved, &quot;\n&quot;;
+});
+$fm-&gt;start_child(sub {
+    return $_**2;
+}) for 1..3;
+$fm-&gt;wait_all_children;</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Exemple:_faire_sortir_les_processus_enfants_différemment'><a class='permalink' href='#Exemple:_faire_sortir_les_processus_enfants_différemment'>Exemple :   faire sortir les processus enfants différemment</a></h2>
+<pre>use Parallel::ForkManager;
+package Parallel::ForkManager::Child::PosixExit {
+    use Moo::Role;
+    with 'Parallel::ForkManager::Child';
+    sub finish  { POSIX::_exit() };
+}
+my $fm = Parallel::ForkManager-&gt;new(
+    max_proc   =&gt; 1,
+    child_role =&gt; 'Parallel::ForkManager::Child::PosixExit'
+);</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SÉCURITÉ'><a class='permalink' href='#SÉCURITÉ'>SÉCURITÉ</a></h1>
+<p class="Pp">Parallel::ForkManager utilise des fichiers temporaires lorsqu'un processus enfant renvoie des informations à son processus parent. Les noms de fichiers sont basés sur le processus du parent et des enfants, ils sont donc assez faciles à deviner. Ainsi, si la sécurité est une préoccupation dans votre environnement, assurez-vous que le répertoire utilisé par Parallel::ForkManager est restreint à l'utilisateur actuel uniquement (le comportement par défaut est de créer un répertoire, via <span class="Li">&quot;tempdir&quot;</span> de File::Temp, ce qui le fait).</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DÉPANNAGE'><a class='permalink' href='#DÉPANNAGE'>DÉPANNAGE</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='PerlIO::gzip_et_Parallel::ForkManager_ne_jouent_pas_bien_ensemble'><a class='permalink' href='#PerlIO::gzip_et_Parallel::ForkManager_ne_jouent_pas_bien_ensemble'>PerlIO::gzip   et Parallel::ForkManager ne jouent pas bien ensemble</a></h2>
+<p class="Pp">Si vous utilisez PerlIO::gzip dans vos processus enfants, vous pourriez vous retrouver avec des fichiers corrompus. Ce n'est pas vraiment la faute de P::FM, mais plutôt un problème entre PerlIO::gzip et <span class="Li">fork()</span> (voir <a href='https://rt.cpan.org/Public/Bug/Display.html?id=114557'>https://rt.cpan.org/Public/Bug/Display.html?id=114557</a>).</p>
+<p class="Pp">Heureusement, il semble qu'il existe une solution simple au problème en ajoutant la couche "unix" ? C'est-à-dire,</p>
+<pre>open(IN, '&lt;:unix:gzip', ...</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BOGUES_ET_LIMITATIONS'><a class='permalink' href='#BOGUES_ET_LIMITATIONS'>BOGUES   ET LIMITATIONS</a></h1>
+<p class="Pp">N'utilisez pas Parallel::ForkManager dans un environnement où d'autres processus enfants peuvent affecter l'exécution du programme principal ; l'utilisation de ce module n'est pas recommandée dans un environnement où <b>fork()</b> / <b>wait()</b> est déjà utilisé.</p>
+<p class="Pp">Si vous souhaitez utiliser plusieurs copies de Parallel::ForkManager, vous devez vous assurer que tous les processus enfants sont terminés avant d'utiliser le second objet dans le programme principal.</p>
+<p class="Pp">Vous êtes libre d'utiliser une nouvelle copie de Parallel::ForkManager dans les processus enfants, bien que je ne pense pas que cela ait de sens.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CRÉDITS'><a class='permalink' href='#CRÉDITS'>CRÉDITS</a></h1>
+<pre>Michael Gang (rapport de bug)
+Noah Robin &lt;sitz@onastick.net&gt; (ajustements de documentation)
+Chuck Hirstius &lt;chirstius@megapathdsl.net&gt; (statut de sortie de rappel, exemple)
+Grant Hopwood &lt;hopwoodg@valero.com&gt; (port win32)
+Mark Southern &lt;mark_southern@merck.com&gt; (correction de bug)
+Ken Clarke &lt;www.perlprogrammer.net&gt;  (récupération de structure de données)</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEURS'><a class='permalink' href='#AUTEURS'>AUTEURS</a></h1>
+<ul class="Bl-bullet">
+  <li>dLux (Szab&#x00F3;, Bal&#x00E1;zs) &lt;dlux@dlux.hu&gt;</li>
+  <li>Yanick Champoux &lt;yanick@cpan.org&gt;</li>
+  <li>Gabor Szabo &lt;gabor@szabgab.com&gt;</li>
+</ul>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT_ET_LICENCE'><a class='permalink' href='#COPYRIGHT_ET_LICENCE'>COPYRIGHT   ET LICENCE</a></h1>
+<p class="Pp">Ce logiciel est copyright (c) 2025, 2015 par Bal&#x00E1;zs
+    Szab&#x00F3;.</p>
+<p class="Pp">C'est un logiciel libre ; vous pouvez le redistribuer et/ou le modifier
+    sous les mêmes termes que le système de langage de programmation Perl 5 lui-même.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-09-27</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher une page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Aller" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-parallel-forkmanager/">extra/perl-parallel-forkmanager</a></dd>
+        <dt>Version :</dt>
+        <dd>2.04-1</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://metacpan.org/release/Parallel-ForkManager">https://metacpan.org/release/Parallel-ForkManager</a></dd>
+        <dt>Licences :</dt>
+        <dd>PerlArtistic, GPL</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-parallel-forkmanager/">/listing/extra/perl-parallel-forkmanager/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#VERSION">VERSION</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#MÉTHODES">MÉTHODES</a></li>
+        
+            <li><a href="#RAPPELS">RAPPELS</a></li>
+        
+            <li><a href="#APPELS_BLOQUANTS">APPELS BLOQUANTS</a></li>
+        
+            <li><a href="#RÉCUPÉRATION_DE_STRUCTURES_DE_DONNÉES_depuis_les_processus_enfants">RÉCUPÉRATION DE STRUCTURES DE DONNÉES depuis les processus enfants</a></li>
+        
+            <li><a href="#EXEMPLES">EXEMPLES</a></li>
+        
+            <li><a href="#UTILISATION_DE_&lt;b&gt;RAND()&lt;/b&gt;_DANS_LES_PROCESSUS_FORKÉS">UTILISATION DE <b>RAND()</b> DANS LES PROCESSUS FORKÉS</a></li>
+        
+            <li><a href="#EXTENSION">EXTENSION</a></li>
+        
+            <li><a href="#SÉCURITÉ">SÉCURITÉ</a></li>
+        
+            <li><a href="#DÉPANNAGE">DÉPANNAGE</a></li>
+        
+            <li><a href="#BOGUES_ET_LIMITATIONS">BOGUES ET LIMITATIONS</a></li>
+        
+            <li><a href="#CRÉDITS">CRÉDITS</a></li>
+        
+            <li><a href="#AUTEURS">AUTEURS</a></li>
+        
+            <li><a href="#COPYRIGHT_ET_LICENCE">COPYRIGHT ET LICENCE</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Parallel::ForkManager.3pm.fr.txt">txt</a>, 
+    <a href="/man/Parallel::ForkManager.3pm.fr.raw">brut</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               sauf pour le contenu des pages de manuel, qui ont leur propre licence spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

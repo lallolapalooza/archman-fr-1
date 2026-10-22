@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>MIME::Tools(3pm) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">MIME__Tools(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-mime-tools/">perl-mime-tools</a></p>
+<p class="lic">Licences: GPL, PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">MIME::Tools(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">MIME::Tools(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">MIME-tools - modules pour l'analyse (et la création !) d'entités MIME</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Voici un code assez basique pour <b>analyser un message MIME,</b>
+    et écrire ses composants décodés dans un répertoire donné :</p>
+<pre>use MIME::Parser;
+### Créer un analyseur, et définir quelques options d'analyse :
+my $parser = new MIME::Parser;
+$parser-&gt;output_under(&quot;$ENV{HOME}/mimemail&quot;);
+### Analyser l'entrée :
+$entity = $parser-&gt;parse(\*STDIN) or die &quot;l'analyse a échoué\n&quot;;
+### Examiner l'entité de niveau supérieur (et les parties qu'elle contient) :
+$entity-&gt;dump_skeleton;</pre>
+<p class="Pp">Voici un code qui <b>compose et envoie un message MIME</b>
+    contenant trois parties : un fichier texte, un GIF attaché, et un peu plus de
+  texte :</p>
+<pre>use MIME::Entity;
+### Créer le niveau supérieur, et configurer les en-têtes d'e-mail :
+$top = MIME::Entity-&gt;build(Type    =&gt;&quot;multipart/mixed&quot;,
+                           From    =&gt; &quot;moi\@monhost.com&quot;,
+                           To      =&gt; &quot;toi\@tonhost.com&quot;,
+                           Subject =&gt; &quot;Bonjour, infirmière !&quot;);
+### Partie n°1 : un simple document texte :
+$top-&gt;attach(Path=&gt;&quot;./testin/short.txt&quot;);
+### Partie n°2 : un fichier GIF :
+$top-&gt;attach(Path        =&gt; &quot;./docs/mime-sm.gif&quot;,
+             Type        =&gt; &quot;image/gif&quot;,
+             Encoding    =&gt; &quot;base64&quot;);
+### Partie n°3 : du texte littéral :
+$top-&gt;attach(Data=&gt;$message);
+### L'envoyer :
+open MAIL, &quot;| /usr/lib/sendmail -t -oi -oem&quot; or die &quot;open: $!&quot;;
+$top-&gt;print(\*MAIL);
+close MAIL;</pre>
+<p class="Pp">Pour plus d'exemples, regardez les scripts dans le répertoire
+    <b>examples</b> de la distribution MIME-tools.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">MIME-tools est une collection de modules Perl5 MIME:: pour analyser,
+    décoder, <i>et générer</i> des messages MIME simples ou multipart (même
+    imbriqués). (Oui, mes petits, cela signifie que vous pouvez envoyer des
+    messages avec des fichiers GIF attachés).</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXIGENCES'><a class='permalink' href='#EXIGENCES'>EXIGENCES</a></h1>
+<p class="Pp">Vous devrez avoir les éléments suivants installés sur votre système :</p>
+<pre>File::Path
+File::Spec
+IPC::Open2              (facultatif)
+MIME::Base64
+MIME::QuotedPrint
+Net::SMTP
+Mail::Internet, ...     de la distribution MailTools.</pre>
+<p class="Pp">Consultez le Makefile.PL dans votre distribution pour la liste la
+    plus complète des modules prérequis et leurs numéros de version.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='UNE_VISITE_RAPIDE'><a class='permalink' href='#UNE_VISITE_RAPIDE'>UNE VISITE RAPIDE</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='Vue_d_ensemble_des_classes'><a class='permalink' href='#Vue_d_ensemble_des_classes'>Vue d'ensemble des classes</a></h2>
+<p class="Pp">Voici les classes avec lesquelles vous interagirez généralement
+  directement :</p>
+<pre> (COMMENCEZ ICI)         results() .-----------------.
+       \                 .--------&gt;| MIME::          |
+        .-----------.   /          | Parser::Results |
+        | MIME::    |--'           `-----------------'
+        | Parser    |--.           .-----------------.
+        `-----------'   \ filer()  | MIME::          |
+           | parse()     `--------&gt;| Parser::Filer   |
+           | vous donne            `-----------------'
+           | une...                                  | output_path()
+           |                                         | détermine le
+           |    head()       .--------.              | chemin de...
+           |    retourne...  | MIME:: | get()        |
+           V       .--------&gt;| Head   | etc...       |
+        .--------./          `--------'              |
+  .---&gt; | MIME:: |                                   |
+  `-----| Entity |           .--------.              /
+parts() `--------'\          | MIME:: |             /
+retourne            `--------&gt;| Body   |&lt;-----------'
+les sous-entités    bodyhandle() `--------'
+(s'il y en a)       retourne...         | open()
+                                       | retourne...
+                                       |
+                                       V
+                                   .--------. read()
+                                   | IO::   | getline()
+                                   | Handle | print()
+                                   `--------' etc...</pre>
+<p class="Pp">Pour illustrer, l'analyse fonctionne ainsi :</p>
+<ul class="Bl-bullet">
+  <li><b>L'« analyseur » analyse le flux MIME.</b> Un analyseur est une instance
+      de <span class="Li">&quot;MIME::Parser&quot;</span>. Vous lui donnez un flux
+      d'entrée (comme un descripteur de fichier) pour analyser un message : si
+      l'analyse réussit, le résultat est une « entité ».</li>
+  <li><b>Un message analysé est représenté par une « entité ».</b> Une entité
+      est une instance de <span class="Li">&quot;MIME::Entity&quot;</span> (une
+      sous-classe de <span class="Li">&quot;Mail::Internet&quot;</span>). Si le
+      message avait des « parties » (par exemple, des pièces jointes), alors ces
+      parties sont aussi des « entités », contenues dans l'entité de niveau
+      supérieur. Chaque entité a une « tête » et un « corps ».</li>
+  <li><b>La « tête » de l'entité contient des informations sur le message.</b>
+      Une « tête » est une instance de <span class="Li">&quot;MIME::Head&quot;</span>
+      (une sous-classe de <span class="Li">&quot;Mail::Header&quot;</span>). Elle
+      contient des informations de l'en-tête du message : type de contenu,
+      expéditeur, ligne d'objet, etc.</li>
+  <li><b>Le « corps » de l'entité sait où se trouvent les données du message.</b>
+      Vous pouvez demander à « ouvrir » cette source de données pour la
+      *lecture* ou l'*écriture*, et vous obtiendrez un « descripteur d'E/S ».</li>
+  <li><b>Vous pouvez ouvrir() un « corps » et obtenir un « descripteur d'E/S »
+      pour lire/écrire les données du message.</b> Ce descripteur est un objet
+      qui est essentiellement comme un IO::Handle... il peut être de n'importe
+      quelle classe, tant qu'il supporte un petit ensemble standard de méthodes
+      pour lire ou écrire depuis la source de données sous-jacente.</li>
+</ul>
+<p class="Pp">Un message multipart typique contenant deux parties - une salutation
+    textuelle et un fichier GIF « attaché » - serait un arbre d'objets
+    MIME::Entity, chacun ayant sa propre MIME::Head. Comme ceci :</p>
+<pre>.--------.
+| MIME:: | Content-type: multipart/mixed
+| Entity | Subject: Joyeux Samhain !
+`--------'
+     |
+     `----.
+    parts |
+          |   .--------.
+          |---| MIME:: | Content-type: text/plain; charset=us-ascii
+          |   | Entity | Content-transfer-encoding: 7bit
+          |   `--------'
+          |   .--------.
+          |---| MIME:: | Content-type: image/gif
+              | Entity | Content-transfer-encoding: base64
+              `--------' Content-disposition: inline;
+                           filename=&quot;hs.gif&quot;</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Analyse_des_messages'><a class='permalink' href='#Analyse_des_messages'>Analyse des messages</a></h2>
+<p class="Pp">Vous commencez généralement par créer une instance de
+    <b>MIME::Parser</b> et en définissant certains paramètres d'analyse : quel
+    répertoire pour enregistrer les fichiers extraits, comment nommer les
+    fichiers, etc.</p>
+<p class="Pp">Vous donnez ensuite à cette instance un descripteur de fichier
+    lisible sur lequel se trouve un message MIME. Si tout se passe bien, vous
+    obtiendrez un objet <b>MIME::Entity</b> (une sous-classe de
+    <b>Mail::Internet</b>), qui se compose de...</p>
+<ul class="Bl-bullet">
+  <li>Une <b>MIME::Head</b> (une sous-classe de <b>Mail::Header</b>) qui
+      contient les données d'en-tête MIME.</li>
+  <li>Un <b>MIME::Body</b>, qui est un objet qui sait où se trouvent les données
+      du corps. Vous demandez à cet objet de s'« ouvrir » pour la lecture, et il
+      vous donnera un « descripteur d'E/S » pour lire les données : cela pourrait
+      être de n'importe quelle classe, tant qu'il est conforme à un sous-ensemble
+      de l'interface <b>IO::Handle</b>.</li>
+</ul>
+<p class="Pp">Si le message original était un document multipart, l'objet
+    MIME::Entity aura une liste non vide de « parties », chacune étant à son
+    tour une MIME::Entity (qui pourrait également être une entité multipart,
+    etc., etc...).</p>
+<p class="Pp">En interne, l'analyseur (dans MIME::Parser) demande des instances de
+    <b>MIME::Decoder</b> chaque fois qu'il a besoin de décoder un fichier codé.
+    MIME::Decoder a une correspondance entre les codages supportés (par exemple,
+    'base64') et les classes dont les instances peuvent les décoder. Vous pouvez
+    ajouter à cette correspondance pour essayer de nouveaux codages/expérimentaux.
+    Vous pouvez également utiliser MIME::Decoder par vous-même.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Composition_des_messages'><a class='permalink' href='#Composition_des_messages'>Composition des messages</a></h2>
+<p class="Pp">Toute la composition des messages se fait via la classe
+    <b>MIME::Entity</b>. Pour les messages à partie unique, vous pouvez utiliser
+    le constructeur <b>MIME::Entity/build</b> pour créer très facilement des
+    entités MIME.</p>
+<p class="Pp">Pour les messages multipart, vous pouvez commencer par créer une
+    entité <span class="Li">&quot;multipart&quot;</span> de niveau supérieur avec
+    <b>MIME::Entity::build()</b>, puis utiliser la méthode similaire
+    <b>MIME::Entity::attach()</b> pour attacher des parties à ce message.
+    <i>Veuillez noter :</i> ce que la plupart des gens considèrent comme « un
+    message texte avec un fichier GIF attaché » est *réellement* un message
+    multipart avec 2 parties : la première étant le message texte, et la seconde
+    le fichier GIF.</p>
+<p class="Pp">Lors de la construction d'une entité MIME, vous devrez pro</p>
+</section>
+</div>
+</section>
+            </article>
+        </main>
+    </body>
+</html>
+vide deux informations très
+    importantes : le <i>type de contenu</i> et le <i>codage de transfert de contenu</i>. Le type est généralement facile à déterminer, car il est directement lié au format du fichier ; par exemple, un fichier HTML est
+    <span class="Li">&quot;text/html&quot;</span>. Le codage, cependant, est
+    plus délicat... par exemple, certains fichiers HTML sont
+    conformes au codage
+    <span class="Li">&quot;7bit&quot;</span>, mais d'autres peuvent avoir des lignes très longues et nécessiteraient d'être envoyés en
+    <span class="Li">&quot;quoted-printable&quot;</span> pour assurer la fiabilité.</p>
+<p class="Pp">Consultez la section sur le codage/décodage pour plus de détails, ainsi que le &quot;MANUEL MIME&quot; ci-dessous.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Envoi_d&apos;e-mails'><a class='permalink' href='#Envoi_d&apos;e-mails'>Envoi d'e-mails</a></h2>
+<p class="Pp">Étant donné que MIME::Entity hérite directement de Mail::Internet, vous pouvez utiliser les mécanismes normaux de Mail::Internet pour envoyer des e-mails. Par exemple :</p>
+<pre>$entity-&gt;smtpsend;</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Support_de_codage/décodage'><a class='permalink' href='#Support_de_codage/décodage'>Support de codage/décodage</a></h2>
+<p class="Pp">La classe <b>MIME::Decoder</b> peut également être utilisée pour *encoder* ; cela se fait lors de l'impression des entités MIME. Tous les codages standard sont pris en charge (voir &quot;MANUEL MIME&quot; ci-dessous pour les détails) :</p>
+<pre>Encodage :       | Normalement utilisé lorsque le contenu du message est :
+-------------------------------------------------------------------
+7bit             | Données 7 bits avec moins de 1000 caractères/ligne, ou multipart.
+8bit             | Données 8 bits avec moins de 1000 caractères/ligne.
+binary           | Données 8 bits avec des lignes longues (ou pas de sauts de ligne).
+quoted-printable | Fichiers texte avec des caractères 8 bits (par ex., texte Latin-1).
+base64           | Fichiers binaires.</pre>
+<p class="Pp">Le choix de l'encodage pour un document donné dépend largement (1) de ce que vous savez du contenu du document (texte ou binaire) et (2) si vous avez besoin que le message résultant ait un encodage fiable pour le transport d'e-mails Internet 7 bits.</p>
+<p class="Pp">En général, seuls
+    <span class="Li">&quot;quoted-printable&quot;</span> et
+    <span class="Li">&quot;base64&quot;</span> garantissent un transport fiable de
+    toutes les données ; les trois autres codages &quot;sans encodage&quot; transmettent simplement les données, et ne sont fiables que si ces données sont en ASCII 7 bits avec moins de 1000 caractères par ligne, et n'entrent pas en conflit avec les délimiteurs multipart.</p>
+<p class="Pp">J'ai envisagé de faire en sorte que le type de contenu et l'encodage puissent être déduits automatiquement du chemin du fichier, mais cela semble être une source de problèmes... ou du moins, une source de problèmes pour Mail::Cap...</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Journalisation_des_messages'><a class='permalink' href='#Journalisation_des_messages'>Journalisation des messages</a></h2>
+<p class="Pp">MIME-tools est une boîte à outils vaste et complexe qui tente de traiter une grande variété d'entrées externes. Il est parfois utile de voir ce qui se passe réellement en coulisses. Il existe plusieurs types de messages enregistrés par la boîte à outils elle-même :</p>
+<dl class="Bl-tag">
+  <dt id="Debug"><a class="permalink" href="#Debug">Messages de débogage</a></dt>
+  <dd>Ceux-ci sont imprimés directement sur STDERR, avec le préfixe
+      <span class="Li">&quot;MIME-tools: debug&quot;</span>.
+    <p class="Pp">Les messages de débogage ne sont enregistrés que si vous avez activé le &quot;débogage&quot; dans la configuration de MIME::Tools.</p>
+  </dd>
+  <dt id="Warning"><a class="permalink" href="#Warning">Messages d'avertissement</a></dt>
+  <dd>Ceux-ci sont enregistrés par le mécanisme standard Perl <b>warn()</b> pour indiquer une situation inhabituelle. Ils ont tous le préfixe
+      <span class="Li">&quot;MIME-tools: warning&quot;</span>.
+    <p class="Pp">Les messages d'avertissement ne sont enregistrés que si
+        <span class="Li">$^W</span> est défini sur vrai et que MIME::Tools n'est pas configuré pour être &quot;silencieux&quot;.</p>
+  </dd>
+  <dt id="Error"><a class="permalink" href="#Error">Messages d'erreur</a></dt>
+  <dd>Ceux-ci sont enregistrés par le mécanisme standard Perl <b>warn()</b> pour indiquer qu'un problème s'est réellement produit. Ils ont tous le préfixe
+      <span class="Li">&quot;MIME-tools: error&quot;</span>.
+    <p class="Pp">Les messages d'erreur ne sont enregistrés que si <span class="Li">$^W</span>
+        est défini sur vrai et que MIME::Tools n'est pas configuré pour être
+      &quot;silencieux&quot;.</p>
+  </dd>
+  <dt id="Usage"><a class="permalink" href="#Usage">Messages d'utilisation</a></dt>
+  <dd>Contrairement aux avertissements &quot;typiques&quot; ci-dessus, qui signalent des problèmes de traitement des données, les avertissements d'utilisation servent à alerter les développeurs sur les méthodes obsolètes et les invocations suspectes.
+    <p class="Pp">Les messages d'utilisation ne sont actuellement enregistrés que si
+        <span class="Li">$^W</span> est défini sur vrai et que MIME::Tools n'est pas configuré pour être &quot;silencieux&quot;.</p>
+  </dd>
+</dl>
+<p class="Pp">Lorsqu'un MIME::Parser (ou l'une de ses classes auxiliaires internes) souhaite signaler un message, il le fait généralement en enregistrant le message dans l'objet
+    <b>MIME::Parser::Results</b> juste avant d'appeler la fonction appropriée ci-dessus. Cela signifie que chaque exécution d'analyse a son propre journal de traces qui peut être examiné pour détecter les problèmes.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Configuration_de_la_boîte_à_outils'><a class='permalink' href='#Configuration_de_la_boîte_à_outils'>Configuration de la boîte à outils</a></h2>
+<p class="Pp">Si vous souhaitez ajuster le fonctionnement de cette boîte à outils (par exemple, pour activer le débogage), utilisez les routines du module
+    <b>MIME::Tools</b>.</p>
+<dl class="Bl-tag">
+  <dt id="debugging"><a class="permalink" href="#debugging">débogage</a></dt>
+  <dd>Active ou désactive le débogage. Par défaut, c'est faux (désactivé).
+        <pre>MIME::Tools-&gt;debugging(1);
+</pre>
+  </dd>
+  <dt id="quiet"><a class="permalink" href="#quiet">silencieux</a></dt>
+  <dd>Active ou désactive la notification des messages d'avertissement/erreur. Par défaut, c'est vrai,
+      ce qui signifie que ces messages sont supprimés.
+        <pre>MIME::Tools-&gt;quiet(1);
+</pre>
+  </dd>
+  <dt id="version"><a class="permalink" href="#version">version</a></dt>
+  <dd>Retourne la version de la boîte à outils.
+        <pre>print MIME::Tools-&gt;version, &quot;\n&quot;;
+</pre>
+  </dd>
+</dl>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CHOSES_À_FAIRE'><a class='permalink' href='#CHOSES_À_FAIRE'>CHOSES À FAIRE</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='Jetez_un_œil_aux_exemples'><a class='permalink' href='#Jetez_un_œil_aux_exemples'>Jetez un œil aux exemples</a></h2>
+<p class="Pp">La distribution MIME-Tools est livrée avec un répertoire &quot;examples&quot;. Les scripts qui s'y trouvent sont assez sommairement conçus, mais ils vous donneront quelques idées sur la façon d'utiliser l'analyseur.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Exécutez_avec_les_avertissements_activés'><a class='permalink' href='#Exécutez_avec_les_avertissements_activés'>Exécutez avec les avertissements activés</a></h2>
+<p class="Pp">Exécutez *toujours* votre script Perl avec
+    <span class="Li">&quot;-w&quot;</span>. Si vous voyez un avertissement concernant une méthode obsolète, modifiez votre code dès que possible. Cela facilitera énormément les mises à niveau.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Évitez_les_encodages_non_standard'><a class='permalink' href='#Évitez_les_encodages_non_standard'>Évitez les encodages non standard</a></h2>
+<p class="Pp">N'essayez pas d'encoder au format MIME en utilisant les encodages MIME non standard. Ce n'est tout simplement pas une bonne pratique si vous voulez que les gens puissent lire vos messages.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Prévoyez_les_exceptions_levées'><a class='permalink' href='#Prévoyez_les_exceptions_levées'>Prévoyez les exceptions levées</a></h2>
+<p class="Pp">Par exemple, si votre code de traitement des e-mails ne doit absolument pas planter, alors effectuez l'analyse MIME comme suit :</p>
+<pre>$entity = eval { $parser-&gt;parse(\*INPUT) };</pre>
+<p class="Pp">L'analyse est un processus complexe, et certains composants peuvent lever des exceptions en cas de problèmes graves. Comme ce qui est &quot;grave&quot; est subjectif, il est préférable de *capturer* les exceptions possibles plutôt que de me demander de propager
+    <span class="Li">&quot;undef&quot;</span> dans la pile. L'utilisation d'exceptions dans les modules réutilisables est une de ces questions religieuses sur lesquelles nous ne serons jamais tous d'accord ; heureusement, c'est pour cela que
+    <span class="Li">&quot;eval{}&quot;</span> est utile.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Vérifiez_les_résultats_de_l&apos;analyse_pour_les_avertissements/erreurs'><a class='permalink' href='#Vérifiez_les_résultats_de_l&apos;analyse_pour_les_avertissements/erreurs'>Vérifiez les résultats de l'analyse pour les avertissements/erreurs</a></h2>
+<p class="Pp">À partir de la version 5.3xx, l'analyseur s'efforce de vous fournir une MIME::Entity. En cas de problème, il enregistre des avertissements/erreurs dans l'objet &quot;résultats&quot; sous-jacent (voir MIME::Parser::Results). Examinez cet objet après chaque analyse. Imprimez les avertissements et les erreurs, *surtout* si les messages ne s'analysent pas comme vous le pensiez.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Ne_prévoyez_pas_d&apos;imprimer_exactement_ce_que_vous_avez_analysé!'><a class='permalink' href='#Ne_prévoyez_pas_d&apos;imprimer_exactement_ce_que_vous_avez_analysé!'>Ne prévoyez pas d'imprimer exactement ce que vous avez analysé !</a></h2>
+<p class="Pp"><i>L'analyse est une opération (légèrement) avec perte.</i> En raison d'éléments tels que les ambiguïtés dans le codage base64, ce qui suit ne va *pas* restituer son entrée inchangée dans tous les cas :</p>
+<pre>$entity = $parser-&gt;parse(\*STDIN);
+$entity-&gt;print(\*STDOUT);</pre>
+<p class="Pp">Si vous utilisez MIME::Tools pour traiter des e-mails, n'oubliez pas de sauvegarder les données que vous analysez si vous souhaitez les renvoyer inchangées. Ceci est vital pour des choses comme les e-mails signés PGP.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Comprenez_comment_les_caractères_internationaux_sont_représentés'><a class='permalink' href='#Comprenez_comment_les_caractères_internationaux_sont_représentés'>Comprenez comment les caractères internationaux sont représentés</a></h2>
+<p class="Pp">La norme MIME permet aux chaînes de texte dans les en-têtes de contenir des caractères de n'importe quel jeu de caractères, en utilisant des séquences spéciales qui ressemblent à ceci :</p>
+<pre>=?ISO-8859-1?Q?Keld_J=F8rn_Simonsen?=</pre>
+<p class="Pp">Pour être cohérent avec les classes Mail::Field existantes,
+    MIME::Tools ne décode *pas* automatiquement ces chaînes, car le faire perdrait l'information du jeu de caractères et interférerait avec l'analyse des champs (voir &quot;decode_headers&quot; dans MIME::Parser pour une explication complète). Cela signifie que vous devez être prêt à gérer ces chaînes encodées.</p>
+<p class="Pp">La question la plus fréquente alors est : **comment décoder ces chaînes encodées ?** La réponse dépend de ce que vous voulez décoder : ASCII, Latin1, UTF-8, etc. Soyez conscient que votre représentation &quot;cible&quot; peut ne pas prendre en charge tous les jeux de caractères possibles que vous pourriez rencontrer ; par exemple, Latin1 (ISO-8859-1) n'a aucun moyen de représenter les caractères Big5 (chinois). Une pratique courante consiste à représenter les caractères &quot;non traduisibles&quot; par des &quot;?&quot;, ou à les ignorer complètement.</p>
+<p class="Pp">Pour décoder les chaînes dans certaines des représentations d'octets occidentales les plus courantes (par exemple, Latin1, Latin2, etc.), vous pouvez utiliser les décodeurs de MIME::WordDecoder (voir MIME::WordDecoder). Le moyen le plus simple est d'utiliser
+    <span class="Li">unmime()</span>, une fonction enveloppant votre décodeur &quot;par défaut&quot;, comme suit :</p>
+<pre>use MIME::WordDecoder;
+...
+$subject = unmime $entity-&gt;head-&gt;get('subject');</pre>
+<p class="Pp">Un endroit où cela est fait automatiquement est lors de l'extraction du nom de fichier recommandé pour une partie lors de l'analyse. C'est pourquoi vous devriez commencer par configurer le meilleur décodeur &quot;par défaut&quot; si la cible par défaut de Latin1 ne vous convient pas.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CHOSES_QUE_JE_FAIS_ET_QUE_VOUS_DEVRIEZ_SAVOIR'><a class='permalink' href='#CHOSES_QUE_JE_FAIS_ET_QUE_VOUS_DEVRIEZ_SAVOIR'>CHOSES QUE JE FAIS ET QUE VOUS DEVRIEZ SAVOIR</a></h1><h1><a id='DO_THAT_YOU_SHOULD_KNOW_ABOUT'>JE FAIS CELA QUE VOUS DEVRIEZ SAVOIR</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='Fuzzing_of_CRLF_and_newline_on_input'><a class='permalink' href='#Fuzzing_of_CRLF_and_newline_on_input'>Fuzzing des CRLF et des retours à la ligne en entrée</a></h2>
+<p class="Pp">La RFC 2045 stipule que les flux MIME ont des lignes terminées par CRLF
+(<span class="Li">&quot;\r\n&quot;</span>). Cependant, il est très probable
+que les gens voudront analyser des flux MIME où chaque ligne se termine par le caractère de retour à la ligne local
+<span class="Li">&quot;\n&quot;</span> à la place.</p>
+<p class="Pp">Une tentative a été faite pour permettre à l'analyseur de gérer à la fois les entrées terminées par CRLF et par retour à la ligne.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Fuzzing_of_CRLF_and_newline_when_decoding'><a class='permalink' href='#Fuzzing_of_CRLF_and_newline_when_decoding'>Fuzzing des CRLF et des retours à la ligne lors du décodage</a></h2>
+<p class="Pp">Les décodeurs <span class="Li">&quot;7bit&quot;</span> et
+<span class="Li">&quot;8bit&quot;</span> décoderont à la fois une séquence de fin de ligne
+<span class="Li">&quot;\n&quot;</span> et une séquence de fin de ligne
+<span class="Li">&quot;\r\n&quot;</span> en un
+<span class="Li">&quot;\n&quot;</span>.</p>
+<p class="Pp">Le décodeur <span class="Li">&quot;binary&quot;</span> (par défaut si aucun encodage n'est spécifié) sort toujours les choses telles quelles... donc un message MIME
+avec des CRLF et aucun encodage explicite sera sorti comme un fichier texte qui, sur de nombreux systèmes, aura un ^M gênant à la fin de chaque ligne... <i>mais c'est comme ça que ça doit être</i>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Fuzzing_of_CRLF_and_newline_when_encoding/composing'><a class='permalink' href='#Fuzzing_of_CRLF_and_newline_when_encoding/composing'>Fuzzing des CRLF et des retours à la ligne lors de l'encodage/composition</a></h2>
+<p class="Pp">TODO FIXME Tous les encodeurs génèrent actuellement la séquence de fin de ligne comme un
+<span class="Li">&quot;\n&quot;</span>, en supposant que l'agent de messagerie local effectuera la conversion du retour à la ligne en CRLF lors de l'envoi du courrier. Cependant, il devrait probablement y avoir une option pour générer CRLF conformément à la RFC 2045.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Inability_to_handle_multipart_boundaries_with_embedded_newlines'><a class='permalink' href='#Inability_to_handle_multipart_boundaries_with_embedded_newlines'>Incapacité à gérer les délimiteurs multipart avec des retours à la ligne intégrés</a></h2>
+<p class="Pp">Soyons clairs : c'est une pratique perverse, TRÈS PERVERSE. Si votre
+expéditeur crée des chaînes de délimiteurs multipart qui contiennent des retours à la ligne, donnez-lui un préavis de deux semaines et trouvez-en un autre. Si votre robot de messagerie reçoit du courrier MIME comme ceci, considérez-le comme syntaxiquement incorrect, ce qu'il est.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Ignoring_non-header_headers'><a class='permalink' href='#Ignoring_non-header_headers'>Ignorer les en-têtes non-header</a></h2>
+<p class="Pp">Les gens aiment donner à l'analyseur des messages bruts directement depuis POP3 ou depuis une boîte aux lettres. Il y a souvent des informations non-header prévisibles devant les vrais headers; par exemple, la ligne initiale &quot;From&quot; dans le message suivant :</p>
+<pre>From - Wed Mar 22 02:13:18 2000
+Return-Path: &lt;eryq@zeegee.com&gt;
+Subject: Hello</pre>
+<p class="Pp">L'analyseur ignore simplement ces éléments silencieusement. Peut-être qu'il ne devrait pas, mais la plupart des gens semblent vouloir ce comportement.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Fuzzing_of_empty_multipart_preambles'><a class='permalink' href='#Fuzzing_of_empty_multipart_preambles'>Fuzzing des préambules multipart vides</a></h2>
+<p class="Pp">Veuillez noter qu'il y a actuellement une ambiguïté dans la façon dont les préambules sont analysés. Les fragments de message suivants <i>les deux</i> sont considérés comme ayant un préambule vide (où
+<span class="Li">&quot;\n&quot;</span> indique un caractère de retour à la ligne) :</p>
+<pre>Content-type: multipart/mixed; boundary=&quot;xyz&quot;\n
+Subject: This message (#1) has an empty preamble\n
+\n
+--xyz\n
+...
+Content-type: multipart/mixed; boundary=&quot;xyz&quot;\n
+Subject: This message (#2) also has an empty preamble\n
+\n
+\n
+--xyz\n
+...</pre>
+<p class="Pp">Dans les deux cas, la <i>première</i> ligne complètement vide (après le &quot;Subject&quot;) marque la fin de l'en-tête.</p>
+<p class="Pp">Mais nous devrions clairement ignorer la <i>deuxième</i> ligne vide dans le message #2, car elle remplit le rôle de <i>&quot;la nouvelle ligne qui n'est là que pour s'assurer que le délimiteur est au début d'une ligne&quot;</i>. De tels retours à la ligne ne font <i>jamais</i> partie du contenu précédant le délimiteur ; par conséquent, il n'y a pas de contenu de préambule &quot;content&quot; dans le message #2.</p>
+<p class="Pp">Cependant, il semble clair que le message #1 n'a <i>pas non plus</i> de contenu de préambule &quot;content&quot;, et n'est en fait qu'une représentation compacte d'un préambule vide.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Use_of_a_temp_file_during_parsing'><a class='permalink' href='#Use_of_a_temp_file_during_parsing'>Utilisation d'un fichier temporaire pendant l'analyse</a></h2>
+<p class="Pp"><i>Pourquoi ne pas tout faire en mémoire ?</i> Bien que la quantité de mémoire disponible sur un système même modeste continue de croître, la taille des pièces jointes continue de croître avec elle. Je voulais m'assurer que même les utilisateurs de petits systèmes puissent traiter le décodage de sons et de fichiers vidéo de plusieurs mégaoctets. Cela signifie ne pas être limité par la mémoire.</p>
+<p class="Pp">Depuis la version 5.3xx publiée, MIME::Parser se débrouille avec un seul fichier temporaire ouvert par analyseur. Ce fichier temporaire fournit une sorte d'espace de travail infini pour traiter la partie du message actuelle. C'est rapide et léger, mais vous devriez le savoir de toute façon.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Why_do_I_assume_that_MIME_objects_are_email_objects?'><a class='permalink' href='#Why_do_I_assume_that_MIME_objects_are_email_objects?'>Pourquoi est-ce que je suppose que les objets MIME sont des objets d'email ?</a></h2>
+<p class="Pp">Achim Bohnet a souligné un jour que les en-têtes MIME ne font que stocker une collection d'attributs, et pourraient donc être représentés par des objets qui n'héritent pas de Mail::Header.</p>
+<p class="Pp">Je suis d'accord en principe, mais la RFC 2045 dit le contraire. Les en-têtes de la RFC 2045 [MIME] sont un sous-ensemble syntaxique des en-têtes de la RFC 822 [email]. Peut-être qu'un meilleur nom pour ces modules aurait été RFC1521:: au lieu de MIME::, mais nous sommes un peu au-delà de ce stade maintenant.</p>
+<p class="Pp">Lorsque j'ai initialement écrit ces modules pour le CPAN, j'ai longuement hésité à savoir s'ils devaient réellement hériter de
+<b>Mail::Internet</b> (alors à la version 1.17). Grâce à Graham Barr, qui a gracieusement fait évoluer MailTools 1.06 pour qu'il soit plus adapté au MIME, l'unification a été réalisée lors de la sortie de MIME-tools 2.0. Les avantages en termes de réutilisation seuls ont été considérables.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='A_MIME_PRIMER'><a class='permalink' href='#A_MIME_PRIMER'>UN PRIMER MIME</a></h1>
+<p class="Pp">Vous devez analyser (ou créer) du MIME, mais vous n'êtes pas tout à fait au fait des spécificités ? Pas de problème...</p>
+<section class="Ss">
+<h2 class="Ss" id='Glossary'><a class='permalink' href='#Glossary'>Glossaire</a></h2>
+<p class="Pp">Voici quelques définitions adaptées de la RFC 1521 (prédécesseur de la RFC 204[56789] actuelle définissant le MIME) expliquant la terminologie que nous utilisons ; chacune est accompagnée de l'équivalent dans les termes du module MIME ::...</p>
+<dl class="Bl-tag">
+  <dt id="attachment"><a class="permalink" href="#attachment">pièce jointe</a></dt>
+  <dd>Une &quot;pièce jointe&quot; est un terme courant pour toute partie d'un message multipart -- sauf, peut-être, pour la première partie, qui transporte normalement un message utilisateur décrivant les pièces jointes qui suivent (par exemple : &quot;Salut mec, voici le fichier GIF que je t'avais promis.&quot;).
+    <p class="Pp">Dans notre système, une pièce jointe n'est qu'une <b>MIME::Entity</b> sous l'entité de niveau supérieur, probablement l'une de ses parties.</p>
+  </dd>
+  <dt id="body"><a class="permalink" href="#body">corps</a></dt>
+  <dd>Le &quot;corps&quot; d'une entité est la partie de l'entité qui suit l'en-tête et qui contient le contenu réel du message. Par exemple, si votre message MIME a une pièce jointe de fichier GIF, alors le corps de cette pièce jointe est le fichier GIF codé en base64 lui-même.
+    <p class="Pp">Un corps est représenté par une instance de <b>MIME::Body</b>. Vous obtenez le corps d'une entité en lui envoyant un message <b>bodyhandle()</b>.</p>
+  </dd>
+  <dt>partie du corps</dt>
+  <dd>Une des parties du corps d'une <b>/entité</b> multipart. Une partie du corps a un <b>/header</b> et un <b>/body</b>, il est donc logique de parler du corps d'une partie du corps.
+    <p class="Pp">Étant donné qu'une partie du corps est juste une sorte d'entité, elle est représentée par une instance de <b>MIME::Entity</b>.</p>
+  </dd>
+  <dt id="entity"><a class="permalink" href="#entity">entité</a></dt>
+  <dd>Une &quot;entité&quot; signifie soit un <b>/message</b>, soit une <b>partie de corps</b>. Toutes les entités ont un <b>/header</b> et un <b>/body</b>.
+    <p class="Pp">Une entité est représentée par une instance de
+        <b>MIME::Entity</b>. Il existe des méthodes d'instance pour récupérer l'en-tête (un <b>MIME::Head</b>) et le corps (un <b>MIME::Body</b>).</p>
+  </dd>
+  <dt id="header"><a class="permalink" href="#header">en-tête</a></dt>
+  <dd>C'est la partie supérieure du message MIME, qui contient le &quot;Content-type&quot;, &quot;Content-transfer-encoding&quot;, etc. Chaque entité MIME a un en-tête, représenté par une instance de
+      <b>MIME::Head</b>. Vous obtenez l'en-tête d'une entité en lui envoyant un message <b>head()</b>.</dd>
+  <dt id="message"><a class="permalink" href="#message">message</a></dt>
+  <dd>Un &quot;message&quot; signifie généralement le message complet (ou &quot;de niveau supérieur&quot;) transféré sur un réseau.
+    <p class="Pp">Il n'existe actuellement pas de package explicite pour les &quot;messages&quot; ; sous MIME::, les messages sont des flux de données qui peuvent être lus à partir de fichiers ou de descripteurs de fichiers. Vous pouvez considérer que le
+        <b>MIME::Entity</b> retourné par le <b>MIME::Parser</b> représente le message complet.</p>
+  </dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Content_types'><a class='permalink' href='#Content_types'>Types de contenu</a></h2>
+<p class="Pp">Cela indique quel type de données se trouve dans le message MIME, généralement sous la forme <i>type majeur/type mineur</i>. Les types majeurs standard sont présentés ci-dessous. Une liste plus complète peut être trouvée dans la RFC-2046.</p>
+<dl class="Bl-tag">
+  <dt id="application"><a class="permalink" href="#application">application</a></dt>
+  <dd>Données qui ne rentrent dans aucune autre catégorie, en particulier les données destinées à être traitées par un type de programme d'application.
+      <span class="Li">&quot;application/octet-stream&quot;</span>,
+      <span class="Li">&quot;application/gzip&quot;</span>,
+      <span class="Li">&quot;application/postscript&quot;</span>...</dd>
+  <dt id="audio"><a class="permalink" href="#audio">audio</a></dt>
+  <dd>Données audio. <span class="Li">&quot;audio/basic&quot;</span>...</dd>
+  <dt id="image"><a class="permalink" href="#image">image</a></dt>
+  <dd>Données graphiques. <span class="Li">&quot;image/gif&quot;</span>,
+      <span class="Li">&quot;image/jpeg&quot;</span>...</dd>
+  <dt id="message~2"><a class="permalink" href="#message~2">message</a></dt>
+  <dd>Un message, généralement un autre message email ou MIME.
+      <span class="Li">&quot;message/rfc822&quot;</span>...</dd>
+  <dt id="multipart"><a class="permalink" href="#multipart">multipart</a></dt>
+  <dd>Un message contenant d'autres messages.
+      <span class="Li">&quot;multipart/mixed&quot;</span>,
+      <span class="Li">&quot;multipart/alternative&quot;</span>...</dd>
+  <dt id="text"><a class="permalink" href="#text">texte</a></dt>
+  <dd>Données textuelles, destinées à être lues par des humains.
+      <span class="Li">&quot;text/plain&quot;</span>,
+      <span class="Li">&quot;text/html&quot;</span>...</dd>
+  <dt id="video"><a class="permalink" href="#video">vidéo</a></dt>
+  <dd>Données vidéo. <span class="Li">&quot;video/mpeg&quot;</span>...</dd>
+</dl>
+</section>
+</section>
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="/css/main.css">
+        <link rel="stylesheet" href="/css/man.css">
+        <title>MIME::Tools 5.515 - Arch Linux man pages</title>
+    </head>
+    <body>
+        <main>
+            <article class="man-page">
+                
+                <section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NAME</a></h1>
+<p class="Pp">MIME::Tools - A collection of modules for manipulating MIME
+    messages.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>    use MIME::Parser;
+    my $parser = new MIME::Parser;
+    my $message = $parser-&gt;parse_data($mime_data);
+    # or
+    my $message = $parser-&gt;parse_open(\*STDIN);
+    # or
+    my $message = $parser-&gt;parse_file("message.txt");
+
+    # ... do something with the message ...
+
+    use MIME::Entity;
+    my $entity = MIME::Entity->build(
+        From     =&gt; 'user@host.com',
+        To       =&gt; 'friend@host.org',
+        Subject  =&gt; 'A test message',
+        Comment  =&gt; 'This is a test message',
+        Type     =&gt; 'text/plain',
+        Bodyfile =&gt; 'some_file.txt',
+    );
+    $entity-&gt;print(\*STDOUT);
+
+    # ... or read an existing entity and modify it ...
+    my $entity = MIME::Entity->build( 'file' =&gt; 'old_message.txt');
+    $entity-&gt;prune("message/partial");
+    $entity-&gt;replace_header('X-Mailer' =&gt; 'MIME::Tools');
+    $entity-&gt;update_mime_header();
+    $entity-&gt;print(\*STDOUT);</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">MIME::Tools is a collection of Perl modules that help you
+    parse and create MIME (Multipurpose Internet Mail Extensions) messages.
+    MIME is defined in RFCs 2045-2049 and is the standard way of encoding
+    non-ASCII text and arbitrary binary data in email. It is also used by
+    many other Internet protocols.</p>
+<p class="Pp">The modules are designed to be used by other programs, but they
+    also provide a simple command-line interface for converting between
+    various formats.</p>
+<p class="Pp">The modules are:</p>
+<dl class="Bl-tag">
+  <dt>MIME::Entity</dt>
+  <dd>This is the primary object. It represents a MIME message or
+      part. A MIME message can be a simple text document or a complex
+      multipart message containing text, images, audio, video, and other
+      files.</dd>
+  <dt>MIME::Head</dt>
+  <dd>Represents the header section of a MIME message or part. Allows
+      access to the various header fields.</dd>
+  <dt>MIME::Body</dt>
+  <dd>Represents the body section of a MIME message or part. The body
+      can be plain text or encoded (e.g., base64, quoted-printable).</dd>
+  <dt>MIME::Parser</dt>
+  <dd>The main entry point for parsing MIME messages. It takes raw MIME
+      data (from a file, a string, or a filehandle) and turns it into a
+      MIME::Entity object.</dd>
+  <dt>MIME::Decoder</dt>
+  <dd>A base class for various content transfer encoding decoders.
+      Specific decoders (like MIME::Base64, MIME::QuotedPrint) inherit
+      from this.</dd>
+  <dt>MIME::Encoder</dt>
+  <dd>A base class for various content transfer encoding encoders.
+      Specific encoders (like MIME::Base64, MIME::QuotedPrint) inherit
+      from this.</dd>
+  <dt>MIME::Type</dt>
+  <dd>Provides a way to determine and manipulate MIME types.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='REQUIREMENTS'><a class='permalink' href='#REQUIREMENTS'>REQUIREMENTS</a></h1>
+<p class="Pp">This module requires Perl 5.003 or later.</p>
+<p class="Pp">It also requires the following modules:</p>
+<dl class="Bl-tag">
+  <dt>MIME::Base64</dt>
+  <dd>Provided with Perl 5.003+.</dd>
+  <dt>Mail::Header</dt>
+  <dd>From the MailTools package.</dd>
+  <dt>Mail::Internet</dt>
+  <dd>From the MailTools package.</dd>
+</dl>
+<p class="Pp">The MailTools package is available from CPAN.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='A_QUICK_TOUR'><a class='permalink' href='#A_QUICK_TOUR'>A QUICK TOUR</a></h1>
+<p class="Pp">The MIME::Parser module is the primary way to read MIME messages.
+    You create a parser object and tell it where to find the message data.
+    The parser returns a MIME::Entity object representing the entire message.</p>
+<p class="Pp">You can then traverse the MIME::Entity object, which represents
+    a tree structure. Each node in the tree is either a simple MIME part (a
+    leaf node) or a multipart entity (an internal node). You can access the
+    headers and body of each part, and you can iterate over the children of
+    a multipart entity.</p>
+<p class="Pp">The MIME::Entity module provides methods for creating new MIME
+    messages, modifying existing ones, and printing them out.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='THINGS_YOU_SHOULD_DO'><a class='permalink' href='#THINGS_YOU_SHOULD_DO'>THINGS YOU SHOULD DO</a></h1>
+<p class="Pp">Use <code class="Li">MIME::Parser</code> to parse incoming MIME
+    messages.</p>
+<p class="Pp">Use <code class="Li">MIME::Entity</code> to create outgoing MIME
+    messages.</p>
+<p class="Pp">Use the <code class="Li">type()</code> method to determine the
+    MIME type of a part, and <code class="Li">subparts()</code> to iterate
+    over the children of a multipart part.</p>
+<p class="Pp">Use the <code class="Li">head()</code> method to get the header
+    object, and the <code class="Li">body()</code> method to get the body
+    object.</p>
+<p class="Pp">Use the <code class="Li">decode()</code> method of a
+    <code class="Li">MIME::Body</code> object to get the decoded content.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='THINGS_I_DO_THAT_YOU_SHOULD_KNOW_ABOUT'><a class='permalink' href='#THINGS_I_DO_THAT_YOU_SHOULD_KNOW_ABOUT'>THINGS I DO THAT YOU SHOULD KNOW ABOUT</a></h1>
+<p class="Pp">I try to automatically determine the correct MIME type for
+    files when you create them.</p>
+<p class="Pp">I use the <code class="Li">quoted-printable</code> encoding by
+    default for text messages, because it's more readable than
+    <code class="Li">base64</code>.</p>
+<p class="Pp">I will automatically encode attachments using
+    <code class="Li">base64</code>.</p>
+<p class="Pp">I will try to make a multipart/alternative message if you give
+    me both plain text and HTML versions of a message.</p>
+<p class="Pp">I try to be smart about line endings, but I can't always get
+    it right.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='A_MIME_PRIMER'><a class='permalink' href='#A_MIME_PRIMER'>A MIME PRIMER</a></h1>
+<p class="Pp">MIME is a standard for encoding non-ASCII data in email. It
+    defines several things:</p>
+<dl class="Bl-tag">
+  <dt>MIME Types</dt>
+  <dd>These specify the type of data in a message part. For example,
+      <span class="Li">&quot;text/plain&quot;</span>, <span class="Li">&quot;image/gif&quot;</span>,
+      <span class="Li">&quot;video/mpeg&quot;</span>.</dd>
+</dl>
+<section class="Ss">
+<h2 class="Ss" id='Content_transfer_encodings'><a class='permalink' href='#Content_transfer_encodings'>Content   transfer encodings</a></h2>
+<p class="Pp">This is how the message body is packaged up for safe transit.
+    There are the 5 major MIME encodings. A more-comprehensive listing may be
+    found in RFC-2045.</p>
+<dl class="Bl-tag">
+  <dt>7bit</dt>
+  <dd>No encoding is done at all. This label simply asserts that no 8-bit
+      characters are present, and that lines do not exceed 1000 characters in
+      length (including the CRLF).</dd>
+  <dt>8bit</dt>
+  <dd>No encoding is done at all. This label simply asserts that the message
+      might contain 8-bit characters, and that lines do not exceed 1000
+      characters in length (including the CRLF).</dd>
+  <dt id="binary"><a class="permalink" href="#binary">binary</a></dt>
+  <dd>No encoding is done at all. This label simply asserts that the message
+      might contain 8-bit characters, and that lines may exceed 1000 characters
+      in length. Such messages are the <i>least</i> likely to get through mail
+      gateways.</dd>
+  <dt id="base64"><a class="permalink" href="#base64">base64</a></dt>
+  <dd>A standard encoding, which maps arbitrary binary data to the 7bit domain.
+      Like &quot;uuencode&quot;, but very well-defined. This is how you should
+      send essentially binary information (tar files, GIFs, JPEGs, etc.).</dd>
+  <dt id="quoted"><a class="permalink" href="#quoted">quoted-printable</a></dt>
+  <dd>A standard encoding, which maps arbitrary line-oriented data to the 7bit
+      domain. Useful for encoding messages which are textual in nature, yet
+      which contain non-ASCII characters (e.g., Latin-1, Latin-2, or any other
+      8-bit alphabet).</dd>
+</dl>
+</section>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>SEE   ALSO</a></h1>
+<p class="Pp">MIME::Parser, MIME::Head, MIME::Body, MIME::Entity, MIME::Decoder,
+    Mail::Header, Mail::Internet</p>
+<p class="Pp">The MIME format is documented in RFCs 1521-1522, and more recently
+    in RFCs 2045-2049.</p>
+<p class="Pp">The MIME header format is an outgrowth of the mail header format
+    documented in RFC 822.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SUPPORT'><a class='permalink' href='#SUPPORT'>SUPPORT</a></h1>
+<p class="Pp">Please file support requests via rt.cpan.org.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CHANGE_LOG'><a class='permalink' href='#CHANGE_LOG'>CHANGE   LOG</a></h1>
+<p class="Pp">Released as MIME-parser (1.0): 28 April 1996. Released as
+    MIME-tools (2.0): Halloween 1996. Released as MIME-tools (4.0): Christmas
+    1997. Released as MIME-tools (5.0): Mother's Day 2000.</p>
+<p class="Pp">See ChangeLog file for full details.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTHOR</a></h1>
+<p class="Pp">Eryq (<i>eryq@zeegee.com</i>), ZeeGee Software Inc
+    (<a href='http://www.zeegee.com'>http://www.zeegee.com</a>). Dianne Skoll (<i>dianne@skoll.ca</i>)</p>
+<p class="Pp">Copyright (c) 1998, 1999 by ZeeGee Software Inc (www.zeegee.com).
+    Copyright (c) 2004 by Roaring Penguin Software Inc Copyright (c) 2022 by
+    Dianne Skoll</p>
+<p class="Pp">This program is free software; you can redistribute it and/or
+    modify it under the same terms as Perl itself.</p>
+<p class="Pp">See the COPYING file in the distribution for details.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ACKNOWLEDGMENTS'><a class='permalink' href='#ACKNOWLEDGMENTS'>ACKNOWLEDGMENTS</a></h1>
+<p class="Pp"><b>This kit would not have been possible</b> but for the direct
+    contributions of the following:</p>
+<pre>Gisle Aas             The MIME encoding/decoding modules.
+Laurent Amon          Bug reports and suggestions.
+Graham Barr           The new MailTools.
+Achim Bohnet          Numerous good suggestions, including the I/O model.
+Kent Boortz           Initial code for RFC-1521-decoding of MIME headers.
+Andreas Koenig        Numerous good ideas, tons of beta testing,
+                        and help with CPAN-friendly packaging.
+Igor Starovoitov      Bug reports and suggestions.
+Jason L Tibbitts III  Bug reports, suggestions, patches.</pre>
+<p class="Pp">Not to mention the Accidental Beta Test Team, whose bug reports
+    (and comments) have been invaluable in improving the whole:</p>
+<pre>Phil Abercrombie
+Mike Blazer
+Brandon Browning
+Kurt Freytag
+Steve Kilbane
+Jake Morrison
+Rolf Nelson
+Joel Noble
+Michael W. Normandin
+Tim Pierce
+Andrew Pimlott
+Dragomir R. Radev
+Nickolay Saukh
+Russell Sutherland
+Larry Virden
+Zyx</pre>
+<p class="Pp">Please forgive me if I've accidentally left you out. Better yet,
+    email me, and I'll put you in.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='LICENSE'><a class='permalink' href='#LICENSE'>LICENSE</a></h1>
+<p class="Pp">This program is free software; you can redistribute it and/or
+    modify it under the same terms as Perl itself.</p>
+<p class="Pp">See the COPYING file for more details.</p>
+</section>
+</article>
+<aside id="sidebar">
+
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Package information:</p>
+    <dl>
+        <dt>Package name:</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-mime-tools/">extra/perl-mime-tools</a></dd>
+        <dt>Version:</dt>
+        <dd>5.515-3</dd>
+        <dt>Upstream:</dt>
+        <dd><a href="https://metacpan.org/pod/MIME::Tools">https://metacpan.org/pod/MIME::Tools</a></dd>
+        <dt>Licenses:</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuals:</dt>
+        <dd><a href="/listing/extra/perl-mime-tools/">/listing/extra/perl-mime-tools/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table of contents</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NAME</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#REQUIREMENTS">REQUIREMENTS</a></li>
+        
+            <li><a href="#A_QUICK_TOUR">A QUICK TOUR</a></li>
+        
+            <li><a href="#THINGS_YOU_SHOULD_DO">THINGS YOU SHOULD DO</a></li>
+        
+            <li><a href="#THINGS_I_DO_THAT_YOU_SHOULD_KNOW_ABOUT">THINGS I DO THAT YOU SHOULD KNOW ABOUT</a></li>
+        
+            <li><a href="#A_MIME_PRIMER">A MIME PRIMER</a></li>
+        
+            <li><a href="#SEE_ALSO">SEE ALSO</a></li>
+        
+            <li><a href="#SUPPORT">SUPPORT</a></li>
+        
+            <li><a href="#CHANGE_LOG">CHANGE LOG</a></li>
+        
+            <li><a href="#AUTHOR">AUTHOR</a></li>
+        
+            <li><a href="#ACKNOWLEDGMENTS">ACKNOWLEDGMENTS</a></li>
+        
+            <li><a href="#LICENSE">LICENSE</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Other formats:
+        
+            <a href="/man/MIME::Tools.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/MIME::Tools.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+</aside>
+</main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquetage Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

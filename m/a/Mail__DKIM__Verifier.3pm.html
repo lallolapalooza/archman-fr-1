@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Mail::DKIM::Verifier(3) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Mail__DKIM__Verifier(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-mail-dkim/">perl-mail-dkim</a></p>
+<p class="lic">Licences: PerlArtistic, GPL</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Mail::DKIM::Verifier(3)</td>
+    <td class="head-vol">Documentation soumise par les utilisateurs de Perl</td>
+    <td class="head-rtitle">Mail::DKIM::Verifier(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">Mail::DKIM::Verifier - vérifie un message DKIM signé</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VERSION'><a class='permalink' href='#VERSION'>VERSION</a></h1>
+<p class="Pp">version 1.20240923</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNTAXE</a></h1>
+<pre>use Mail::DKIM::Verifier;
+# créer un objet vérificateur
+my $dkim = Mail::DKIM::Verifier-&gt;new();
+# lire un courriel depuis un flux d'entrée
+$dkim-&gt;load(*STDIN);
+# ou lire un courriel et le passer à la vérification, progressivement
+while (&lt;STDIN&gt;)
+{
+    # supprimer les finisseurs de ligne locaux
+    chomp;
+    s/\015$//;
+    # utiliser les finisseurs de ligne SMTP
+    $dkim-&gt;PRINT(&quot;$_\015\012&quot;);
+}
+$dkim-&gt;CLOSE;
+# quel est le résultat de la vérification ?
+my $result = $dkim-&gt;result;
+# il y a plusieurs signatures, quel est le résultat par signature ?
+foreach my $signature ($dkim-&gt;signatures)
+{
+    print 'identité de la signature : ' . $signature-&gt;identity . &quot;\n&quot;;
+    print 'résultat de la vérification : ' . $signature-&gt;result_detail . &quot;\n&quot;;
+}
+# l'auteur invoqué du courriel peut spécifier comment gérer le courriel
+foreach my $policy ($dkim-&gt;policies)
+{
+    die 'courriel frauduleux' if ($policy-&gt;apply($dkim) eq 'reject');
+}</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">L'objet vérificateur permet de scanner un message électronique à la recherche de signatures DKIM et DomainKeys et de vérifier ces signatures. Le vérificateur suit l'état du message au fur et à mesure de sa lecture en mémoire. Lorsque le message a été entièrement lu, les signatures sont vérifiées et les résultats de la vérification sont accessibles.</p>
+<p class="Pp">Pour utiliser le vérificateur, vous devez d'abord créer l'objet vérificateur. Ensuite, vous devez commencer à "alimenter" le message électronique à vérifier. Lorsque tous les _en-têtes_ ont été lus, le vérificateur :</p>
+<pre>1. vérifie si des signatures DomainKeys/DKIM ont été trouvées
+2. recherche les clés publiques nécessaires pour vérifier les signatures
+3. établit les algorithmes et objets de canonicalisation appropriés
+4. canonicalise les en-têtes et calcule le hachage des en-têtes</pre>
+<p class="Pp">Ensuite, lorsque le _corps_ du message a été entièrement fourni au vérificateur, le hachage du corps est calculé et les signatures sont vérifiées.</p>
+<p class="Pp">Les résultats de la vérification peuvent être vérifiés avec « <b>result()</b> » ou « <b>signatures()</b> ».</p>
+<p class="Pp">Les messages qui ne vérifient pas peuvent être examinés par rapport à la politique de signature publiée par l'expéditeur invoqué avec « <b>policies()</b> » et « <b>apply()</b> » dans Mail::DKIM::Policy.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CONSTRUCTOR'><a class='permalink' href='#CONSTRUCTOR'>CONSTRUCTEUR</a></h1>
+<section class="Ss">
+<h2 class="Ss"><b>new()</b></h2>
+<p class="Pp">Crée un objet vérificateur orienté objet.</p>
+<pre>my $dkim = Mail::DKIM::Verifier-&gt;new();
+my $dkim = Mail::DKIM::Verifier-&gt;new(%options);</pre>
+<p class="Pp">Les options actuellement prises en charge sont :</p>
+<dl class="Bl-tag">
+  <dt id="Debug_Canonicalization"><a class="permalink" href="#Debug_Canonicalization">Debug_Canonicalization</a></dt>
+  <dd>Si spécifié, le message canonique pour la première signature est écrit dans la chaîne ou le fichier de sortie référencé.</dd>
+  <dt id="Strict"><a class="permalink" href="#Strict">Strict</a></dt>
+  <dd>Si vrai, rejette les hachages SHA1 et les clés de signature inférieures à 1024 bits.</dd>
+</dl>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='METHODS'><a class='permalink' href='#METHODS'>MÉTHODES</a></h1>
+<section class="Ss">
+<h2 class="Ss"><b>PRINT()</b></h2>
+<p class="Pp">Envoie une partie du message au vérificateur.</p>
+<pre>$dkim-&gt;PRINT(&quot;une ligne de message\015\012&quot;);
+$dkim-&gt;PRINT('plus de');
+$dkim-&gt;PRINT(&quot; le message\015\012au revoir\015\012&quot;);</pre>
+<p class="Pp">Envoie le contenu du message à vérifier au vérificateur. L'API est conçue de cette manière afin que le message complet N'AIT PAS besoin d'être chargé en mémoire à un seul endroit.</p>
+<p class="Pp">Remarque : bien que la méthode <b>PRINT()</b> s'attende à ce que vous utilisiez les finisseurs de ligne SMTP, vous ne devez pas utiliser la technique de dot-stuffing décrite dans la RFC 2821 section 4.5.2. Vous ne devez pas non plus utiliser une séquence de &lt;CR&gt;&lt;LF&gt;&lt;CR&gt;&lt;LF&gt; pour terminer le message.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>CLOSE()</b></h2>
+<p class="Pp">Appelez ceci lorsque vous avez fini d'alimenter le message.</p>
+<pre>$dkim-&gt;CLOSE;</pre>
+<p class="Pp">Cette méthode termine le processus de canonicalisation, calcule un hachage et vérifie la signature.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>fetch_author_domain_policies()</b></h2>
+<p class="Pp">Récupère les enregistrements ADSP depuis le DNS.</p>
+<pre>my @policies = $dkim-&gt;fetch_author_domain_policies;
+foreach my $policy (@policies)
+{
+    my $policy_result = $policy-&gt;apply($dkim);
+}</pre>
+<p class="Pp">Cette méthode obtiendra toutes les politiques de signature « author-domain-signing-practices » publiées dans le DNS pour ce message. Les politiques de signature sont indexées sur l'adresse électronique dans l'en-tête From :, c'est-à-dire l'auteur invoqué du message.</p>
+<p class="Pp">Cette méthode renvoie une *liste* d'enregistrements de politique, car il peut y avoir 0 ou plusieurs adresses électroniques dans l'en-tête From :.</p>
+<p class="Pp">Le résultat de la méthode <b>apply()</b> est l'un des éléments suivants : « accept », « reject », « neutral ».</p>
+<p class="Pp">Voir également : « <b>policies()</b> ».</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>fetch_author_policy()</b></h2>
+<p class="Pp">Récupère une politique de signature depuis le DNS.</p>
+<pre>my $policy = $dkim-&gt;fetch_author_policy;
+my $policy_result = $policy-&gt;apply($dkim);</pre>
+<p class="Pp">Cette méthode obtient la règle de signature DKIM Sender Signing Practices telle que décrite dans le brouillon Internet draft-ietf-dkim-ssp-00-01dc. Ce brouillon Internet est maintenant obsolète ; cette méthode est conservée uniquement pour des raisons de rétrocompatibilité.</p>
+<p class="Pp">Veuillez utiliser la méthode « <b>policies()</b> » à la place.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>fetch_sender_policy()</b></h2>
+<p class="Pp">Récupère une politique de signature depuis le DNS.</p>
+<pre>my $policy = $dkim-&gt;fetch_sender_policy;
+my $policy_result = $policy-&gt;apply($dkim);</pre>
+<p class="Pp">La politique de « l'expéditeur » est la politique de signature telle que décrite dans la norme DomainKeys, maintenant disponible dans la RFC4870 (historique). J'appelle cette politique « l'expéditeur » car elle est indexée sur l'adresse électronique dans l'en-tête Sender :, ou sur l'en-tête From : s'il n'y a pas d'en-tête Sender. C'est la personne à qui le message prétend être « l'expéditeur » du message (pas nécessairement l'auteur).</p>
+<p class="Pp">Si le courriel en cours de vérification n'a pas d'en-tête From : ou Sender : à partir duquel obtenir une adresse électronique (ce qui viole les normes de messagerie), alors cette méthode <span class="Li">&quot;die&quot;</span>.</p>
+<p class="Pp">Le résultat de la méthode <b>apply()</b> est l'un des éléments suivants : « accept », « reject », « neutral ».</p>
+<p class="Pp">Voir également : « <b>policies()</b> ».</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>load()</b></h2>
+<p class="Pp">Charge le message complet depuis un flux d'entrée.</p>
+<pre>$dkim-&gt;load($file_handle);</pre>
+<p class="Pp">Lit un message complet depuis le fichier désigné et le transmet au vérificateur. Le message doit utiliser des finisseurs de ligne &lt;CRLF&gt; (comme le protocole SMTP).</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>message_originator()</b></h2>
+<p class="Pp">Accès à l'en-tête « From ».</p>
+<pre>my $address = $dkim-&gt;message_originator;</pre>
+<p class="Pp">Renvoie l'adresse de « l'origineur » trouvée dans le message, sous forme d'objet Mail::Address. Il s'agit généralement de la (première) adresse et adresse électronique trouvées dans l'en-tête From :. S'il n'y a pas d'en-tête From :, un objet Mail::Address vide est renvoyé.</p>
+<p class="Pp">Pour obtenir uniquement la partie adresse électronique, faites :</p>
+<pre>my $email = $dkim-&gt;message_originator-&gt;address;</pre>
+<p class="Pp">Voir également « <b>message_sender()</b> ».</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>message_sender()</b></h2>
+<p class="Pp">Accès à l'en-tête « From » ou « Sender ».</p>
+<pre>my $address = $dkim-&gt;message_sender;</pre>
+<p class="Pp">Renvoie « l'expéditeur » trouvé dans le message, sous forme d'objet Mail::Address. Il s'agit généralement de la (première) adresse et adresse électronique trouvées dans l'en-tête Sender :. S'il n'y a pas d'en-tête Sender :, c'est la première adresse et adresse électronique de l'en-tête From :. Si aucun des deux en-têtes n'est présent, un objet Mail::Address vide est renvoyé.</p>
+<p class="Pp">Pour obtenir uniquement la partie adresse électronique, faites :</p>
+<pre>my $email = $dkim-&gt;message_sender-&gt;address;</pre>
+<p class="Pp">« L'expéditeur » est le bureau de poste de l'agent responsable de la transmission du message. Par exemple, si un secrétaire envoyait un message pour une autre personne, « l'expéditeur » serait le secrétaire et « l'origineur » serait la personne réelle qui a écrit le message.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>policies()</b></h2>
+<p class="Pp">Récupère les politiques de signature applicables depuis le DNS.</p>
+<pre>my @policies = $dkim-&gt;policies;
+foreach my $policy (@policies)
+{
+    $policy_result = $policy-&gt;apply($dkim);
+    # $policy_result est l'un des éléments suivants : « accept », « reject », « neutral »
+}</pre>
+<p class="Pp">Cette méthode renvoie une liste d'objets Mail::DKIM::Policy pour toutes les politiques applicables à ce message. Cela comprend les politiques ADSP (Author Domain Signing Practices) et les politiques de l'expéditeur (DomainKeys).</p>
+<p class="Pp">L'ordre des politiques dans la liste est le suivant : ADSP, puis expéditeur.</p>
+<p class="Pp">Les politiques sont évaluées dans l'ordre dans lequel elles apparaissent dans la liste. La première politique qui renvoie autre chose que « neutral » est la politique appliquée.</p>
+<p class="Pp">Voir également : « <b>fetch_author_domain_policies()</b> », « <b>fetch_sender_policy()</b> ».</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>PRINT()</b></h2>
+<p class="Pp">Les méthodes <b>PRINT()</b> et <b>CLOSE()</b> sont toutes deux utilisées pour alimenter le vérificateur avec le contenu du message.</p>
+<pre>$dkim-&gt;PRINT( $message_part );
+$dkim-&gt;CLOSE;</pre>
+<p class="Pp">Il s'agit d'une interface pour le contrôle des flux, dans laquelle le corps du message peut être passé au vérificateur en morceaux. Ceci est particulièrement utile lors de la vérification de courriels en temps réel, où le message n'est pas entièrement disponible en mémoire.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>result()</b></h2>
+<p class="Pp">Renvoie le résultat de la vérification.</p>
+<pre>my $result = $dkim-&gt;result;</pre>
+<p class="Pp">Cela renvoie l'état général de la vérification DKIM pour le message. Les valeurs possibles sont :</p>
+<dl class="Bl-tag">
+  <dt id="none"><a class="permalink" href="#none">none</a></dt>
+  <dd>Aucune signature DKIM trouvée.</dd>
+  <dt id="valid"><a class="permalink" href="#valid">valid</a></dt>
+  <dd>Au moins une signature est valide et aucune n'est invalide.</dd>
+  <dt id="invalid"><a class="permalink" href="#invalid">invalid</a></dt>
+  <dd>Au moins une signature est invalide. Les autres peuvent être valides ou non.</dd>
+  <dt id="permerror"><a class="permalink" href="#permerror">permerror</a></dt>
+  <dd>Une erreur de "permanent error" s'est produite lors de la vérification d'une signature.</dd>
+  <dt id="temperror"><a class="permalink" href="#temperror">temperror</a></dt>
+  <dd>Une erreur de "temporary error" s'est produite lors de la vérification d'une signature.</dd>
+</dl>
+<p class="Pp">Notez que les erreurs `permerror` et `temperror` se produisent lorsque le vérificateur ne peut pas récupérer la clé publique ou rencontre un autre problème qui empêche la vérification d'avoir lieu. Ces résultats sont distincts de `valid` et `invalid`, qui concernent le résultat de la comparaison de la signature avec le message.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>signatures()</b></h2>
+<p class="Pp">Renvoie une liste d'objets Mail::DKIM::Signature.</p>
+<pre>my @signatures = $dkim-&gt;signatures;</pre>
+<p class="Pp">Chaque objet retourné par cette méthode représente une seule signature DKIM trouvée dans le message. Ces objets contiennent des informations détaillées sur la signature, y compris l'identité du signataire et le résultat de sa vérification.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTEUR</a></h1>
+<p class="Pp">Sander van Vosbergen &lt;svanvos@xs4all.nl&gt;</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CONTRIBUTORS'><a class='permalink' href='#CONTRIBUTORS'>CONTRIBUTEURS</a></h1>
+<p class="Pp">Jens Rehs &lt;jens@extra.dk&gt;</p>
+<p class="Pp">Marc Hoff&amp;aacute;n &lt;m.hoffman@web.de&gt;</p>
+<p class="Pp">Martin Pohl&amp;aacute;k &lt;m.pohlak@web.de&gt;</p>
+<p class="Pp">Scott Schwartz &lt;schwartz@web.de&gt;</p>
+<p class="Pp">Tobias D&amp;auml;hn&amp;auml;r &lt;tobias.daehnaer@web.de&gt;</p>
+<p class="Pp">Tobias Oetiker &lt;tobi@etoy.com&gt;</p>
+<p class="Pp">Simon Butcher &lt;simon@4-thought.com&gt;</p>
+<p class="Pp">Sander van Vosbergen &lt;svanvos@xs4all.nl&gt;</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT'><a class='permalink' href='#COPYRIGHT'>DROIT D'AUTEUR</a></h1>
+<p class="Pp">Copyright (c) 2005-2014, Sander van Vosbergen. Tous droits réservés.</p>
+<p class="Pp">Ceci est un logiciel libre ; vous pouvez le redistribuer et/ou le modifier sous les mêmes termes que Perl lui-même.</p>
+</section>
+</div>
+</section>
+                
+            </article>
+            <aside id="content-right">
+                <nav>
+                    <h2>Sur cette page</h2>
+                    <ul>
+                        <li><a href="#NAME">Nom</a></li>
+                        <li><a href="#VERSION">Version</a></li>
+                        <li><a href="#SYNOPSIS">Syntaxe</a></li>
+                        <li><a href="#DESCRIPTION">Description</a></li>
+                        <li><a href="#CONSTRUCTOR">Constructeur</a>
+                            <ul>
+                                <li><a href="#new()">new()</a></li>
+                            </ul>
+                        </li>
+                        <li><a href="#METHODS">Méthodes</a>
+                            <ul>
+                                <li><a href="#PRINT()">PRINT()</a></li>
+                                <li><a href="#CLOSE()">CLOSE()</a></li>
+                                <li><a href="#fetch_author_domain_policies()">fetch_author_domain_policies()</a></li>
+                                <li><a href="#fetch_author_policy()">fetch_author_policy()</a></li>
+                                <li><a href="#fetch_sender_policy()">fetch_sender_policy()</a></li>
+                                <li><a href="#load()">load()</a></li>
+                                <li><a href="#message_originator()">message_originator()</a></li>
+                                <li><a href="#message_sender()">message_sender()</a></li>
+                                <li><a href="#policies()">policies()</a></li>
+                                <li><a href="#PRINT()">PRINT()</a></li>
+                                <li><a href="#result()">result()</a></li>
+                                <li><a href="#signatures()">signatures()</a></li>
+                            </ul>
+                        </li>
+                        <li><a href="#AUTHOR">Auteur</a></li>
+                        <li><a href="#CONTRIBUTORS">Contributeurs</a></li>
+                        <li><a href="#COPYRIGHT">Droit d'auteur</a></li>
+                    </ul>
+                </nav>
+            </aside>
+        </main>
+        <footer>
+            <p>Page générée le 2024-09-23</p>
+        </footer>
+    </body>
+</html><!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <title>Mail::DKIM::Verifier - Perl manual page</title>
+        <meta name="description" content="Mail::DKIM::Verifier documentation">
+        <link rel="stylesheet" type="text/css" href="/css/style.css" />
+    </head>
+    <body>
+        
+        <main class="container">
+            <article>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NAME</a></h1>
+<p class="Pp">Mail::DKIM::Verifier - verify DKIM signatures</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VERSION'><a class='permalink' href='#VERSION'>VERSION</a></h1>
+<p class="Pp">1.20240923-2</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre> use Mail::DKIM::Verifier;
+
+ my $verifier = Mail::DKIM::Verifier-&gt;new();
+ $verifier-&gt;verify(message =&gt; $message); # or message_file => $filename
+
+ # Check the overall result
+ my $result = $verifier-&gt;result;
+
+ # Get more details
+ my $detail = $verifier-&gt;result_detail;
+
+ # Get the best signature (if any)
+ my $signature = $verifier-&gt;signature;
+
+ # Get all signatures
+ my @signatures = $verifier-&gt;signatures;
+</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">This class implements DKIM verification. It will examine a message
+    and determine if any DKIM signatures contained within are valid.</p>
+<p class="Pp">The primary method is <b>verify()</b>, which takes a message (as a
+    string or file) and processes it.</p>
+<p class="Pp">See Mail::DKIM::KeyTable, Mail::DKIM::Signer, Mail::DKIM::Trusted,
+    Mail::DKIM::Signature and Mail::DKIM::InternalStorage for more information
+    on how the configuration of the library is handled.</p>
+<p class="Pp">The verification process involves looking for DKIM-Signature headers
+    within the message. For each signature found, the module will look up the
+    public key for the signing domain (specified in the <tt>d=</tt> tag of the
+    signature) by performing a DNS TXT query for the selector (specified in the
+    <tt>s=</tt> tag).</p>
+<p class="Pp">The public key is then used to verify the signature. The process
+    of verification involves checking that the signed header fields and the
+    signed body hash all match the contents of the actual message headers and
+    body.</p>
+<p class="Pp">The method <b>signing_policies()</b> is intended to return any
+    signing policies that would apply to this message. Signing policies are
+    selected based on the domain that the message *claims* to be from. So, for
+    example, if a message claims to be from security@bank, and forwarded by
+    trusted@listserv, when in reality the message came from
+    foe@evilcorp, this method would check for signing policies for
+    security@bank and trusted@listserv. The signing policies might tell whether
+    foe@evilcorp (the real sender) is allowed to send mail claiming to be from
+    your bank or your listserv.</p>
+<p class="Pp">I say &quot;might tell&quot;, because in reality this is still
+    really hard to specify with any accuracy. In addition, most senders do not
+    publish useful policies.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='METHODS'><a class='permalink' href='#METHODS'>METHODS</a></h1>
+<section class="Ss">
+<h2 class="Ss"><b>signing_policies()</b></h2>
+<p class="Pp">This method searches for and returns any signing policies that
+    would apply to this message. Signing policies are selected based on the
+    domain that the message *claims* to be from. So, for example, if a message
+    claims to be from security@bank, and forwarded by trusted@listserv, when in
+    reality the message came from foe@evilcorp, this method would check for
+    signing policies for security@bank and trusted@listserv. The signing
+    policies might tell whether foe@evilcorp (the real sender) is allowed to
+    send mail claiming to be from your bank or your listserv.</p>
+<p class="Pp">I say &quot;might tell&quot;, because in reality this is still
+    really hard to specify with any accuracy. In addition, most senders do not
+    publish useful policies.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>result()</b></h2>
+<p class="Pp">Access the result of the verification.</p>
+<pre>my $result = $dkim-&gt;result;</pre>
+<p class="Pp">Gives the result of the verification. The following values are
+    possible:</p>
+<dl class="Bl-tag">
+  <dt id="pass"><a class="permalink" href="#pass">pass</a></dt>
+  <dd>Returned if a valid DKIM-Signature header was found, and the signature
+      contains a correct value for the message.</dd>
+  <dt id="fail"><a class="permalink" href="#fail">fail</a></dt>
+  <dd>Returned if a valid DKIM-Signature header was found, but the signature
+      does not contain a correct value for the message.</dd>
+  <dt id="invalid"><a class="permalink" href="#invalid">invalid</a></dt>
+  <dd>Returned if a DKIM-Signature could not be checked because of a problem in
+      the signature itself or the public key record. I.e. the signature could
+      not be processed.</dd>
+  <dt id="temperror"><a class="permalink" href="#temperror">temperror</a></dt>
+  <dd>Returned if a DKIM-Signature could not be checked due to some error which
+      is likely transient in nature, such as a temporary inability to retrieve a
+      public key. A later attempt may produce a better result.</dd>
+  <dt id="none"><a class="permalink" href="#none">none</a></dt>
+  <dd>Returned if no DKIM-Signature headers (valid or invalid) were found.</dd>
+</dl>
+<p class="Pp">In case of multiple signatures, the &quot;best&quot; result will
+    be returned. Best is defined as &quot;pass&quot;, followed by
+    &quot;fail&quot;, &quot;invalid&quot;, and &quot;none&quot;. To examine the
+    results of individual signatures, use the &quot;<b>signatures()</b>&quot;
+    method to retrieve the signature objects. See &quot;<b>result()</b>&quot; in
+    Mail::DKIM::Signature.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>result_detail()</b></h2>
+<p class="Pp">Access the result, plus details if available.</p>
+<pre>my $detail = $dkim-&gt;result_detail;</pre>
+<p class="Pp">The detail is constructed by taking the result (e.g.
+    &quot;pass&quot;, &quot;fail&quot;, &quot;invalid&quot; or &quot;none&quot;)
+    and appending any details provided by the verification process in
+    parenthesis.</p>
+<p class="Pp">The following are possible results from the <b>result_detail()</b>
+    method:</p>
+<pre>pass
+fail (bad RSA signature)
+fail (OpenSSL error: ...)
+fail (message has been altered)
+fail (body has been altered)
+invalid (bad identity)
+invalid (invalid domain in d tag)
+invalid (missing q tag)
+invalid (missing d tag)
+invalid (missing s tag)
+invalid (unsupported version 0.1)
+invalid (unsupported algorithm ...)
+invalid (unsupported canonicalization ...)
+invalid (unsupported query protocol ...)
+invalid (signature is expired)
+invalid (public key: not available)
+invalid (public key: unknown query type ...)
+invalid (public key: syntax error)
+invalid (public key: unsupported version)
+invalid (public key: unsupported key type)
+invalid (public key: missing p= tag)
+invalid (public key: invalid data)
+invalid (public key: does not support email)
+invalid (public key: does not support hash algorithm 'sha1')
+invalid (public key: does not support signing subdomains)
+invalid (public key: revoked)
+invalid (public key: granularity mismatch)
+invalid (public key: granularity is empty)
+invalid (public key: OpenSSL error: ...)
+none</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>signature()</b></h2>
+<p class="Pp">Access the message's DKIM signature.</p>
+<pre>my $sig = $dkim-&gt;signature;</pre>
+<p class="Pp">Accesses the signature found and verified in this message. The
+    returned object is of type Mail::DKIM::Signature.</p>
+<p class="Pp">In case of multiple signatures, the signature with the
+    &quot;best&quot; result will be returned. Best is defined as
+    &quot;pass&quot;, followed by &quot;fail&quot;, &quot;invalid&quot;, and
+    &quot;none&quot;.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>signatures()</b></h2>
+<p class="Pp">Access all of this message's signatures.</p>
+<pre>my @all_signatures = $dkim-&gt;signatures;</pre>
+<p class="Pp">Use <span class="Li">$signature</span>-&gt;result or
+    <span class="Li">$signature</span>-&gt;result_detail to access the
+    verification results of each signature.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHORS'><a class='permalink' href='#AUTHORS'>AUTHORS</a></h1>
+<ul class="Bl-bullet">
+  <li>Jason Long &lt;jason@long.name&gt;</li>
+  <li>Marc Bradshaw &lt;marc@marcbradshaw.net&gt;</li>
+  <li>Bron Gondwana &lt;brong@fastmailteam.com&gt; (ARC)</li>
+</ul>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='THANKS'><a class='permalink' href='#THANKS'>THANKS</a></h1>
+<p class="Pp">Work on ensuring that this module passes the ARC test suite was
+    generously sponsored by Valimail (<a href='https://www.valimail.com/'>https://www.valimail.com/</a>)</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT_AND_LICENSE'><a class='permalink' href='#COPYRIGHT_AND_LICENSE'>COPYRIGHT   AND LICENSE</a></h1>
+<ul class="Bl-bullet">
+  <li>Copyright (C) 2013 by Messiah College</li>
+  <li>Copyright (C) 2010 by Jason Long</li>
+  <li>Copyright (C) 2017 by Standcore LLC</li>
+  <li>Copyright (C) 2020 by FastMail Pty Ltd</li>
+</ul>
+<p class="Pp">This library is free software; you can redistribute it and/or
+    modify it under the same terms as Perl itself, either Perl version 5.8.6 or,
+    at your option, any later version of Perl 5 you may have available.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Package information:</p>
+    <dl>
+        <dt>Package name:</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-mail-dkim/">extra/perl-mail-dkim</a></dd>
+        <dt>Version:</dt>
+        <dd>1.20240923-2</dd>
+        <dt>Upstream:</dt>
+        <dd><a href="https://metacpan.org/release/Mail-DKIM">https://metacpan.org/release/Mail-DKIM</a></dd>
+        <dt>Licenses:</dt>
+        <dd>PerlArtistic, GPL</dd>
+        <dt>Manuals:</dt>
+        <dd><a href="/listing/extra/perl-mail-dkim/">/listing/extra/perl-mail-dkim/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table of contents</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NAME</a></li>
+        
+            <li><a href="#VERSION">VERSION</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#METHODS">METHODS</a></li>
+        
+            <li><a href="#AUTHORS">AUTHORS</a></li>
+        
+            <li><a href="#THANKS">THANKS</a></li>
+        
+            <li><a href="#COPYRIGHT_AND_LICENSE">COPYRIGHT AND LICENSE</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Other formats:
+        
+            <a href="/man/Mail::DKIM::Verifier.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/Mail::DKIM::Verifier.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>The website is available under the terms of the <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               license, except for the contents of the manual pages, which have their own license
+               specified in the corresponding Arch Linux package.
+            </p>
+        </footer>
+    </body>
+</html>

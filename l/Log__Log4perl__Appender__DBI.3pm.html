@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Log::Log4perl::Appender::DBI(3pm) — Pages man Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Log__Log4perl__Appender__DBI(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-log-log4perl/">perl-log-log4perl</a></p>
+<p class="lic">Licences: PerlArtistic, GPL</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Appender::DBI(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">Appender::DBI(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Log::Log4perl::Appender::DBI - implémente l'ajout à une base de données</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<pre>  my $config = q{
+   log4j.category = WARN, DBAppndr
+   log4j.appender.DBAppndr             = Log::Log4perl::Appender::DBI
+   log4j.appender.DBAppndr.datasource  = DBI:CSV:f_dir=t/tmp
+   log4j.appender.DBAppndr.username    = bobjones
+   log4j.appender.DBAppndr.password    = 12345
+   log4j.appender.DBAppndr.sql         = \
+      insert into log4perltest           \
+      (loglevel, custid, category, message, ipaddr) \
+      values (?,?,?,?,?)
+   log4j.appender.DBAppndr.params.1 = %p    
+                                 #2 est custid de l'appel log()
+   log4j.appender.DBAppndr.params.3 = %c
+                                 #4 est le message de log()
+                                 #5 est ipaddr de log()
+   log4j.appender.DBAppndr.usePreparedStmt = 1
+    #--ou--
+   log4j.appender.DBAppndr.bufferSize = 2
+   #passe simplement le tableau d'éléments de message dans l'instruction log
+   log4j.appender.DBAppndr.layout    = Log::Log4perl::Layout::NoopLayout
+   log4j.appender.DBAppndr.warp_message = 0
+   #support des attributs du pilote
+   log4j.appender.DBAppndr.attrs.f_encoding = utf8
+  };
+&#x00A0; Log::Log4perl::init ( \$config ) ;                                      
+&#x00A0; my $logger = Log::Log4perl-&gt;get_logger () ;                             
+  $logger-&gt;warn( $custid, 'problème majeur !!', $ip_addr );</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AVERTISSEMENT'><a class='permalink' href='#AVERTISSEMENT'>AVERTISSEMENT</a></h1>
+<p class="Pp">Ceci est un module très jeune et il existe de nombreuses variations
+    dans les configurations avec différentes bases de données et méthodes de
+    connexion, alors assurez-vous de tester soigneusement ! Tout commentaire est
+    bienvenu !</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Il s'agit d'un objet Log::Dispatch spécialisé, personnalisé pour
+    fonctionner avec log4perl et ses capacités, basé à l'origine sur Log::Dispatch::DBI
+    de Tatsuhiko Miyagawa mais avec des modifications importantes.</p>
+<p class="Pp">Il s'agit d'une tentative de compromis entre ce que faisait
+    Log::Dispatch::DBI et ce que fait JDBCAppender de log4j. Notez que la
+    documentation de log4j indique que JDBCAppender « sera très probablement
+    entièrement remplacé à l'avenir ».</p>
+<p class="Pp">L'utilisation la plus simple est la suivante :</p>
+<pre>log4j.category = WARN, DBAppndr
+log4j.appender.DBAppndr            = Log::Log4perl::Appender::DBI
+log4j.appender.DBAppndr.datasource = DBI:CSV:f_dir=t/tmp
+log4j.appender.DBAppndr.username   = bobjones
+log4j.appender.DBAppndr.password   = 12345
+log4j.appender.DBAppndr.sql        = \
+   INSERT INTO logtbl                \
+      (loglevel, message)            \
+      VALUES ('%c','%m')
+log4j.appender.DBAppndr.layout    = Log::Log4perl::Layout::PatternLayout
+$logger-&gt;fatal('message fatal');
+$logger-&gt;warn('message d'avertissement');
+===============================
+|FATAL|message fatal          |
+|WARN |message d'avertissement |
+===============================</pre>
+<p class="Pp">Mais les inconvénients de cette utilisation sont :</p>
+<ul class="Bl-bullet">
+  <li>Mieux vaut être sûr qu'il n'y a pas de guillemets dans votre message de
+      journal, sinon votre insertion pourrait avoir des conséquences imprévues !
+      C'est une manière très peu sûre de gérer les insertions dans la base de
+      données, utiliser des espaces réservés et lier les valeurs est beaucoup
+      mieux, continuez à lire. (Notez que la documentation de log4j avertit «
+      Soyez prudent avec les guillemets dans vos messages ! ») <b>*</b>.</li>
+  <li>Ce n'est pas très performant, une instruction est créée et exécutée pour
+      chaque appel de journal.</li>
+  <li>Le seul paramètre d'exécution que vous obtenez est le message <span
+      class="Li">%m</span>, en réalité vous souhaitez probablement enregistrer
+      des données spécifiques dans des colonnes de table spécifiques.</li>
+</ul>
+<p class="Pp">Alors essayons d'utiliser des espaces réservés et indiquons au
+    journal de créer une gestion d'instruction préparée au début et de la réutiliser
+    (tout comme le fait Log::Dispatch::DBI)</p>
+<pre>log4j.appender.DBAppndr.sql = \
+   INSERT INTO logtbl \
+      (custid, loglevel, message) \
+      VALUES (?,?,?)
+#---------------------------------------------------
+#maintenant les valeurs liées :
+                              #1 est le custid
+log4j.appender.DBAppndr.params.2 = %p    
+                              #3 est le message
+#---------------------------------------------------
+log4j.appender.DBAppndr.layout    = Log::Log4perl::Layout::NoopLayout
+log4j.appender.DBAppndr.warp_message = 0
+
+log4j.appender.DBAppndr.usePreparedStmt = 1
+
+
+$logger-&gt;warn( 1234, 'message d'avertissement' );</pre>
+<p class="Pp">Maintenant, voyez comment nous utilisons les espaces réservés « ?
+    » dans notre instruction ? Cela signifie que nous n'avons pas à nous soucier
+    des messages qui ressemblent à</p>
+<pre>entrée invalide : 1234';drop table custid;</pre>
+<p class="Pp">endommager notre base de données !</p>
+<p class="Pp">Normalement, une liste d'éléments dans l'instruction de journalisation est concaténée en une seule chaîne, mais en réglant
+    <span class="Li">&quot;warp_message&quot;</span> sur 0 et en utilisant
+    NoopLayout, cela signifie que dans</p>
+<pre>$logger-&gt;warn( 1234, 'message d'avertissement', 'bgates' );</pre>
+<p class="Pp">les éléments individuels de la liste seront toujours disponibles pour
+    l'annexe DBI par la suite. (Si <span class="Li">&quot;warp_message&quot;</span>
+    n'est pas réglé sur 0, le comportement par défaut est de joindre les éléments
+    de la liste en une seule chaîne. Si PatternLayout ou SimpleLayout sont utilisés,
+    leur tentative de <span class="Li">render()</span> votre disposition entraînera
+    quelque chose comme « ARRAY(0x841d8dc) » dans vos journaux. Plus d'informations
+    sur <span class="Li">&quot;warp_message&quot;</span> se trouvent dans
+    Log::Log4perl::Appender.)</p>
+<p class="Pp">Dans votre instruction d'insertion, vous pouvez mélanger des espaces
+    réservés « ? » avec des spécificateurs de conversion (%c, <span
+    class="Li">%p</span>, etc.) comme vous le souhaitez - le journal correspondra
+    aux points d'interrogation aux paramètres que vous avez définis dans le fichier
+    de configuration et remplira le reste avec les valeurs de votre liste. S'il y a
+    plus d'espaces réservés « ? » que de valeurs dans votre message, il utilisera
+    `undef` pour les restants. Par exemple,</p>
+<pre>log4j.appender.DBAppndr.sql =                 \
+   insert into log4perltest                   \
+   (loglevel, message, datestr, subpoena_id)\
+   values (?,?,?,?)
+log4j.appender.DBAppndr.params.1 = %p
+log4j.appender.DBAppndr.params.3 = %d
+log4j.appender.DBAppndr.warp_message=0
+$logger-&gt;info('arrêtez-le !', $subpoena_id);</pre>
+<p class="Pp">résulte en le premier espace réservé « ? » étant lié à
+    <span class="Li">%p</span>, le deuxième à « arrêtez-le ! », le troisième
+    à la date de « %d », et le quatrième à votre <span
+    class="Li">$subpoenaid</span>. Si vous oubliez le
+    <span class="Li">$subpoena_id</span> et enregistrez simplement</p>
+<pre>$logger-&gt;info('arrêtez-le !');</pre>
+<p class="Pp">alors vous obtenez simplement `undef` dans la quatrième colonne.</p>
+<p class="Pp">Si l'instruction de journalisation est également traitée par d'autres
+    annexes non-DBI, elles joindront simplement la liste en une chaîne, jointe par
+    <span class="Li">$Log::Log4perl::JOIN_MSG_ARRAY_CHAR</span> (par défaut une
+    chaîne vide).</p>
+<p class="Pp">Et voyez le <span class="Li">&quot;usePreparedStmt&quot;</span> ?
+    Cela crée une gestion d'instruction lors de la création de l'objet journal et
+    la réutilise simplement. Cela peut cependant poser problème pour les processus
+    de longue durée comme les serveurs web, auquel cas vous pouvez utiliser ce
+    paramètre à la place</p>
+<pre>log4j.appender.DBAppndr.bufferSize=2</pre>
+<p class="Pp">Ceci copie le comportement JDBCAppender de log4j, il accumule ce
+    nombre d'instructions de journal et les écrit toutes en une seule fois. Si
+    votre instruction INSERT utilise uniquement des espaces réservés « ? » et aucun
+    spécificateur de conversion <span class="Li">%x</span>, elle devrait être
+    assez efficace car le journal peut réutiliser la même gestion d'instruction
+    pour les insertions.</p>
+<p class="Pp">Si le programme se termine alors que le tampon n'est que partiellement
+    rempli, le bloc DESTROY devrait vider les instructions restantes, si le bloc
+    DESTROY s'exécute bien sûr.</p>
+<p class="Pp">* <i>Pendant que j'écrivais ceci, Danko Mannhaupt sortait son</i>
+    <i>JDBCAppender amélioré pour log4j
+    (<a href='http://www.mannhaupt.com/danko/projects/'>http://www.mannhaupt.com/danko/projects/</a>)</i>
+    <i>qui surmonte de nombreux inconvénients de l'JDBCAppender original.</i></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION_2'><a class='permalink' href='#DESCRIPTION_2'>DESCRIPTION 2</a></h1>
+<p class="Pp">Ou une autre façon de dire la même chose :</p>
+<p class="Pp">L'idée est que si vous enregistrez dans une table de base de données,
+    vous voulez probablement des parties spécifiques de vos informations de journal
+    dans des colonnes particulières. À cette fin, vous passez une liste à
+    l'instruction de journal, comme</p>
+<pre>$logger-&gt;warn('problème majeur !!',$userid,$subpoena_nr,$ip_addr);</pre>
+<p class="Pp">et les membres du tableau tombent dans les positions définies par les
+    espaces réservés dans votre instruction SQL. Vous pouvez également définir des
+    informations dans le fichier de configuration comme</p>
+<pre>log4j.appender.DBAppndr.params.2 = %p</pre>
+<p class="Pp">auquel cas ces espaces réservés numérotés seront remplis avec les
+    valeurs spécifiées, et le reste des espaces réservés sera rempli avec les
+    valeurs du tableau de votre instruction de journal.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PARAMETRES_DIVERS'><a class='permalink' href='#PARAMETRES_DIVERS'>PARAMETRES DIVERS</a></h1>
+<dl class="Bl-tag">
+  <dt id="usePreparedStmt"><a class="permalink" href="#usePreparedStmt">usePreparedStmt</a></dt>
+  <dd>Voir ci-dessus.</dd>
+  <dt id="warp_message"><a class="permalink" href="#warp_message">warp_message</a></dt>
+  <dd>voir Log::Log4perl::Appender</dd>
+  <dt id="max_col_size"><a class="permalink" href="#max_col_size">max_col_size</a></dt>
+</dl>
+</div>
+</section>
+            </article>
+            
+        </main>
+        <footer>
+            
+        </footer>
+    </body>
+</html>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Log::Log4perl::Appender::DBI</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<p class="Pp">Utilisez ce module pour créer un appender DBI pour Log4perl.</p>
+<pre>use Log::Log4perl::Appender::DBI;</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ATTENTION'><a class='permalink' href='#ATTENTION'>ATTENTION</a></h1>
+<p class="Pp">Si vous utilisez <span class="Li">&quot;log4j.appender.DBAppndr.usePreparedStmt&quot;</span>, ce module crée un sth lors de son démarrage et le conserve pendant toute la durée du programme. Pour les processus de longue durée (par exemple, mod_perl), les connexions peuvent devenir obsolètes, mais si <span class="Li">&quot;Log::Log4perl::Appender::DBI&quot;</span> essaie d'écrire un message et découvre que la connexion à la base de données ne fonctionne plus (en utilisant la méthode ping de DBI), il se reconnectera.</p>
+<p class="Pp">Le processus de reconnexion peut être contrôlé par deux paramètres, <span class="Li">&quot;reconnect_attempts&quot;</span> et <span class="Li">&quot;reconnect_sleep&quot;</span>. <span class="Li">&quot;reconnect_attempts&quot;</span> spécifie le nombre de tentatives de reconnexion que l'appender DBI effectue jusqu'à ce qu'il abandonne et échoue. <span class="Li">&quot;reconnect_sleep&quot;</span> est le temps entre les tentatives de reconnexion, mesuré en secondes. <span class="Li">&quot;reconnect_attempts&quot;</span> vaut par défaut 1, <span class="Li">&quot;reconnect_sleep&quot;</span> vaut 0.</p>
+<p class="Pp">Alternativement, utilisez <span class="Li">&quot;Apache::DBI&quot;</span> ou <span class="Li">&quot;Apache::DBI::Cache&quot;</span> et lisez CHANGING DBCONNECTIONS ci-dessus.</p>
+<p class="Pp">Notez que <span class="Li">&quot;Log::Log4perl::Appender::DBI&quot;</span> maintient une connexion ouverte pour chaque appender, ce qui peut être trop.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Si vous utilisez <span class="Li">&quot;log4j.appender.DBAppndr.usePreparedStmt&quot;</span>, ce module crée un sth lors de son démarrage et le conserve pendant toute la durée du programme. Pour les processus de longue durée (par exemple, mod_perl), les connexions peuvent devenir obsolètes, mais si <span class="Li">&quot;Log::Log4perl::Appender::DBI&quot;</span> essaie d'écrire un message et découvre que la connexion à la base de données ne fonctionne plus (en utilisant la méthode ping de DBI), il se reconnectera.</p>
+<p class="Pp">Le processus de reconnexion peut être contrôlé par deux paramètres, <span class="Li">&quot;reconnect_attempts&quot;</span> et <span class="Li">&quot;reconnect_sleep&quot;</span>. <span class="Li">&quot;reconnect_attempts&quot;</span> spécifie le nombre de tentatives de reconnexion que l'appender DBI effectue jusqu'à ce qu'il abandonne et échoue. <span class="Li">&quot;reconnect_sleep&quot;</span> est le temps entre les tentatives de reconnexion, mesuré en secondes. <span class="Li">&quot;reconnect_attempts&quot;</span> vaut par défaut 1, <span class="Li">&quot;reconnect_sleep&quot;</span> vaut 0.</p>
+<p class="Pp">Alternativement, utilisez <span class="Li">&quot;Apache::DBI&quot;</span> ou <span class="Li">&quot;Apache::DBI::Cache&quot;</span> et lisez CHANGING DBCONNECTIONS ci-dessus.</p>
+<p class="Pp">Notez que <span class="Li">&quot;Log::Log4perl::Appender::DBI&quot;</span> maintient une connexion ouverte pour chaque appender, ce qui peut être trop.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION_2'><a class='permalink' href='#DESCRIPTION_2'>DESCRIPTION 2</a></h1>
+<p class="Pp">Si vous utilisez <span class="Li">&quot;log4j.appender.DBAppndr.usePreparedStmt&quot;</span>, ce module crée un sth lors de son démarrage et le conserve pendant toute la durée du programme. Pour les processus de longue durée (par exemple, mod_perl), les connexions peuvent devenir obsolètes, mais si <span class="Li">&quot;Log::Log4perl::Appender::DBI&quot;</span> essaie d'écrire un message et découvre que la connexion à la base de données ne fonctionne plus (en utilisant la méthode ping de DBI), il se reconnectera.</p>
+<p class="Pp">Le processus de reconnexion peut être contrôlé par deux paramètres, <span class="Li">&quot;reconnect_attempts&quot;</span> et <span class="Li">&quot;reconnect_sleep&quot;</span>. <span class="Li">&quot;reconnect_attempts&quot;</span> spécifie le nombre de tentatives de reconnexion que l'appender DBI effectue jusqu'à ce qu'il abandonne et échoue. <span class="Li">&quot;reconnect_sleep&quot;</span> est le temps entre les tentatives de reconnexion, mesuré en secondes. <span class="Li">&quot;reconnect_attempts&quot;</span> vaut par défaut 1, <span class="Li">&quot;reconnect_sleep&quot;</span> vaut 0.</p>
+<p class="Pp">Alternativement, utilisez <span class="Li">&quot;Apache::DBI&quot;</span> ou <span class="Li">&quot;Apache::DBI::Cache&quot;</span> et lisez CHANGING DBCONNECTIONS ci-dessus.</p>
+<p class="Pp">Notez que <span class="Li">&quot;Log::Log4perl::Appender::DBI&quot;</span> maintient une connexion ouverte pour chaque appender, ce qui peut être trop.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PARAMETRES_DIVERS'><a class='permalink' href='#PARAMETRES_DIVERS'>PARAMETRES DIVERS</a></h1>
+<p class="Pp">Les paramètres sont les suivants :</p>
+<ul>
+<li><span class="Li">&quot;reconnect_attempts&quot;</span> - nombre de tentatives de reconnexion</li>
+<li><span class="Li">&quot;reconnect_sleep&quot;</span> - temps entre les tentatives de reconnexion (en secondes)</li>
+</ul>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CHANGEMENT_DES_CONNEXIONS_DBH_(POOLING)'><a class='permalink' href='#CHANGEMENT_DES_CONNEXIONS_DBH_(POOLING)'>CHANGEMENT DES CONNEXIONS DBH (POOLING)</a></h1>
+<p class="Pp">Si vous souhaitez obtenir votre dbh d'un endroit particulier, comme peut-être un pool, sous-classez et surchargez <b>_init()</b> et/ou <b>create_statement()</b>, par exemple</p>
+<pre>sub _init {
+    ; #pas d'opération, pas de pooling à ce niveau
+}
+sub create_statement {
+    my ($self, $stmt) = @_;
+
+    $stmt || croak &quot;Log4perl: sql non défini dans &quot;.__PACKAGE__;
+
+    return My::Connections-&gt;getConnection-&gt;prepare($stmt)
+        || croak &quot;Log4perl: DBI-&gt;prepare a échoué $DBI::errstr\n$stmt&quot;;
+}</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VIE_DES_CONNEXIONS'><a class='permalink' href='#VIE_DES_CONNEXIONS'>VIE DES CONNEXIONS</a></h1>
+<p class="Pp">Si vous utilisez <span class="Li">&quot;log4j.appender.DBAppndr.usePreparedStmt&quot;</span>, ce module crée un sth lors de son démarrage et le conserve pendant toute la durée du programme. Pour les processus de longue durée (par exemple, mod_perl), les connexions peuvent devenir obsolètes, mais si <span class="Li">&quot;Log::Log4perl::Appender::DBI&quot;</span> essaie d'écrire un message et découvre que la connexion à la base de données ne fonctionne plus (en utilisant la méthode ping de DBI), il se reconnectera.</p>
+<p class="Pp">Le processus de reconnexion peut être contrôlé par deux paramètres, <span class="Li">&quot;reconnect_attempts&quot;</span> et <span class="Li">&quot;reconnect_sleep&quot;</span>. <span class="Li">&quot;reconnect_attempts&quot;</span> spécifie le nombre de tentatives de reconnexion que l'appender DBI effectue jusqu'à ce qu'il abandonne et échoue. <span class="Li">&quot;reconnect_sleep&quot;</span> est le temps entre les tentatives de reconnexion, mesuré en secondes. <span class="Li">&quot;reconnect_attempts&quot;</span> vaut par défaut 1, <span class="Li">&quot;reconnect_sleep&quot;</span> vaut 0.</p>
+<p class="Pp">Alternativement, utilisez <span class="Li">&quot;Apache::DBI&quot;</span> ou <span class="Li">&quot;Apache::DBI::Cache&quot;</span> et lisez CHANGING DBCONNECTIONS ci-dessus.</p>
+<p class="Pp">Notez que <span class="Li">&quot;Log::Log4perl::Appender::DBI&quot;</span> maintient une connexion ouverte pour chaque appender, ce qui peut être trop.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR AUSSI</a></h1>
+<p class="Pp">Log::Dispatch::DBI</p>
+<p class="Pp">Log::Log4perl::JavaMap::JDBCAppender</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='LICENCE'><a class='permalink' href='#LICENCE'>LICENCE</a></h1>
+<p class="Pp">Copyright 2002-2013 par Mike Schilli &lt;m@perlmeister.com&gt; et Kevin Goess &lt;cpan@goess.org&gt;.</p>
+<p class="Pp">Cette bibliothèque est un logiciel libre ; vous pouvez la redistribuer et/ou la modifier selon les mêmes termes que Perl lui-même.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Veuillez contribuer avec des correctifs au projet sur Github :</p>
+<a href='http://github.com/mschilli/log4perl'>http://github.com/mschilli/log4perl</a>
+<p class="Pp">Envoyez les rapports de bugs ou les demandes d'amélioration aux auteurs via notre</p>
+<p class="Pp">LISTE DE DIFFUSION (questions, rapports de bugs, suggestions/correctifs) :
+    log4perl-devel@lists.sourceforge.net</p>
+<p class="Pp">Auteurs (veuillez les contacter via la liste ci-dessus, pas directement) :
+    Mike Schilli &lt;m@perlmeister.com&gt;, Kevin Goess
+  &lt;cpan@goess.org&gt;</p>
+<p class="Pp">Contributeurs (par ordre alphabétique) : Ateeq Altaf, Cory Bennett,
+    Jens Berthold, Jeremy Bopp, Hutton Davidson, Chris R. Donnelly, Matisse
+    Enzer, Hugh Esco, Anthony Foiani, James FitzGibbon, Carl Franks, Dennis
+    Gregorovic, Andy Grundman, Paul Harrington, Alexander Hartmaier David Hull,
+    Robert Jacobson, Jason Kohles, Jeff Macdonald, Markus Peter, Brett Rann,
+    Peter Rabbitson, Erik Selberg, Aaron Straup Cope, Lars Thegler, David Viner,
+    Mac Yang.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-13</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-log-log4perl/">extra/perl-log-log4perl/</a></dd>
+        <dt>Version :</dt>
+        <dd>1.57-5</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://metacpan.org/release/Log-Log4perl">https://metacpan.org/release/Log-Log4perl</a></dd>
+        <dt>Licences :</dt>
+        <dd>PerlArtistic, GPL</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-log-log4perl/">/listing/extra/perl-log-log4perl/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#ATTENTION">ATTENTION</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#DESCRIPTION_2">DESCRIPTION 2</a></li>
+        
+            <li><a href="#PARAMETRES_DIVERS">PARAMETRES DIVERS</a></li>
+        
+            <li><a href="#CHANGEMENT_DES_CONNEXIONS_DBH_(POOLING)">CHANGEMENT DES CONNEXIONS DBH (POOLING)</a></li>
+        
+            <li><a href="#VIE_DES_CONNEXIONS">VIE DES CONNEXIONS</a></li>
+        
+            <li><a href="#VOIR_AUSSI">VOIR AUSSI</a></li>
+        
+            <li><a href="#LICENCE">LICENCE</a></li>
+        
+            <li><a href="#AUTEUR">AUTEUR</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Log::Log4perl::Appender::DBI.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/Log::Log4perl::Appender::DBI.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

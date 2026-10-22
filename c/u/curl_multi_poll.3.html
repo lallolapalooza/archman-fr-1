@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>curl_multi_poll(3) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">curl_multi_poll(3)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/core/x86_64/curl/">curl</a></p>
+<p class="lic">Licences: MIT</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">curl_multi_poll(3)</td>
+    <td class="head-vol">Manuel des fonctions de bibliothèque</td>
+    <td class="head-rtitle">curl_multi_poll(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">curl_multi_poll - sonder tous les descripteurs faciles dans un descripteur multiple</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<pre>#include &lt;curl/curl.h&gt;
+CURLMcode curl_multi_poll(CURLM *multi_handle,
+                          struct curl_waitfd extra_fds[],
+                          unsigned int extra_nfds,
+                          int timeout_ms,
+                          int *numfds);</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp"><a href='/man/curl_multi_poll.3.en'>curl_multi_poll(3)</a> sonde tous les descripteurs de fichiers utilisés par les
+    descripteurs faciles de curl contenus dans l'ensemble du descripteur multiple donné. Il bloque jusqu'à ce qu'une activité soit détectée sur au moins un des descripteurs ou que <i>timeout_ms</i> soit écoulé. Alternativement, si le descripteur multiple a un délai d'attente interne en attente dont l'expiration est plus courte que <i>timeout_ms</i>, ce temps plus court est utilisé à la place pour garantir une précision raisonnable du délai d'attente.</p>
+<p class="Pp">L'application appelante peut passer des structures curl_waitfd supplémentaires qui sont similaires à la structure <i>pollfd</i> de <a href='/man/poll.2.en'>poll(2)</a> à attendre lors du même appel.</p>
+<p class="Pp">À la fin, si <i>numfds</i> n'est pas NULL, il est rempli avec le nombre total de descripteurs de fichiers sur lesquels des événements intéressants se sont produits. Ce nombre peut inclure à la fois les descripteurs internes de libcurl ainsi que les descripteurs fournis dans <i>extra_fds</i>.</p>
+<p class="Pp">La fonction <a href='/man/curl_multi_wakeup.3.en'>curl_multi_wakeup(3)</a> peut être utilisée depuis un autre thread pour réveiller cette fonction et retourner plus rapidement. C'est l'un des détails qui distingue cette fonction de <a href='/man/curl_multi_wait.3.en'>curl_multi_wait(3)</a> qui ne peut pas être réveillée de cette manière.</p>
+<p class="Pp">Si aucun descripteur de fichier supplémentaire n'est fourni et que libcurl n'a aucun descripteur de fichier à proposer pour l'attente, cette fonction attend pendant <i>timeout_ms</i> millisecondes (ou moins si une minuterie interne l'indique). C'est l'autre détail qui distingue cette fonction de <a href='/man/curl_multi_wait.3.en'>curl_multi_wait(3)</a>.</p>
+<p class="Pp">Il est recommandé d'utiliser cette fonction au lieu de select(3) lors de l'utilisation de l'interface multiple pour permettre aux applications de contourner plus facilement le problème courant de 1024 descripteurs de fichiers maximum.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='curl_waitfd'><a class='permalink' href='#curl_waitfd'>curl_waitfd</a></h1>
+<pre>struct curl_waitfd {
+  curl_socket_t fd;
+  short events;
+  short revents;
+};</pre>
+<dl class="Bl-tag">
+  <dt id="CURL_WAIT_POLLIN"><a class="permalink" href="#CURL_WAIT_POLLIN">CURL_WAIT_POLLIN</a></dt>
+  <dd>Indicateur de bit pour curl_waitfd.events indiquant que le socket doit sonder les événements de lecture tels que les nouvelles données reçues.</dd>
+  <dt id="CURL_WAIT_POLLPRI"><a class="permalink" href="#CURL_WAIT_POLLPRI">CURL_WAIT_POLLPRI</a></dt>
+  <dd>Indicateur de bit pour curl_waitfd.events indiquant que le socket doit sonder les événements de lecture à haute priorité tels que les données hors bande.</dd>
+  <dt id="CURL_WAIT_POLLOUT"><a class="permalink" href="#CURL_WAIT_POLLOUT">CURL_WAIT_POLLOUT</a></dt>
+  <dd>Indicateur de bit pour curl_waitfd.events indiquant que le socket doit sonder les événements d'écriture tels que le socket est prêt à écrire sans bloquer.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PROTOCOLES'><a class='permalink' href='#PROTOCOLES'>PROTOCOLES</a></h1>
+<p class="Pp">Cette fonctionnalité affecte tous les protocoles pris en charge</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXEMPLE'><a class='permalink' href='#EXEMPLE'>EXEMPLE</a></h1>
+<pre>extern void handle_fd(int);
+int main(void)
+{
+  CURL *easy_handle;
+  CURLM *multi_handle;
+  int still_running = 0;
+  int myfd = 2; /* c'est notre propre descripteur de fichier */
+  multi_handle = curl_multi_init();
+  easy_handle = curl_easy_init();
+  /* ajouter le descripteur facile individuel */
+  curl_multi_add_handle(multi_handle, easy_handle);
+  do {
+    CURLMcode mc;
+    int numfds;
+    mc = curl_multi_perform(multi_handle, &amp;still_running);
+    if(mc == CURLM_OK) {
+      struct curl_waitfd myown;
+      myown.fd = myfd;
+      myown.events = CURL_WAIT_POLLIN; /* attendre l'entrée */
+      myown.revents = 0; /* l'effacer */
+      /* attendre l'activité sur les descripteurs de curl ou sur le nôtre,
+         ou le délai d'attente */
+      mc = curl_multi_poll(multi_handle, &amp;myown, 1, 1000, &amp;numfds);
+      if(myown.revents) {
+        /* notre descripteur a-t-il reçu un événement ? */
+        handle_fd(myfd);
+      }
+    }
+    if(mc != CURLM_OK) {
+      fprintf(stderr, &quot;curl_multi a échoué, code %d.\n&quot;, mc);
+      break;
+    }
+  } while(still_running);
+  curl_multi_remove_handle(multi_handle, easy_handle);
+}</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DISPONIBILITE'><a class='permalink' href='#DISPONIBILITE'>DISPONIBILITE</a></h1>
+<p class="Pp">Ajouté dans curl 7.66.0</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VALEUR_DE_RETOUR'><a class='permalink' href='#VALEUR_DE_RETOUR'>VALEUR DE RETOUR</a></h1>
+<p class="Pp">Cette fonction retourne un CURLMcode indiquant le succès ou l'erreur.</p>
+<p class="Pp">CURLM_OK (0) signifie que tout était correct, une valeur non nulle indique une erreur, voir <a href='/man/libcurl-errors.3.en'>libcurl-errors(3)</a>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR AUSSI</a></h1>
+<p class="Pp"><a href='/man/curl_multi_fdset.3.en'>curl_multi_fdset(3)</a>, <a href='/man/curl_multi_perform.3.en'>curl_multi_perform(3)</a>,
+    <a href='/man/curl_multi_wait.3.en'>curl_multi_wait(3)</a>, <a href='/man/curl_multi_wakeup.3.en'>curl_multi_wakeup(3)</a></p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-11-13</td>
+    <td class="foot-os">libcurl</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher une page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/core/x86_64/curl/">core/curl</a></dd>
+        <dt>Version :</dt>
+        <dd>8.17.0-2</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://curl.se/">https://curl.se/</a></dd>
+        <dt>Licences :</dt>
+        <dd>MIT</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/core/curl/">/listing/core/curl/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#SYNTAXE">SYNTAXE</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#curl_waitfd">curl_waitfd</a></li>
+        
+            <li><a href="#PROTOCOLES">PROTOCOLES</a></li>
+        
+            <li><a href="#EXEMPLE">EXEMPLE</a></li>
+        
+            <li><a href="#DISPONIBILITE">DISPONIBILITE</a></li>
+        
+            <li><a href="#VALEUR_DE_RETOUR">VALEUR DE RETOUR</a></li>
+        
+            <li><a href="#VOIR_AUSSI">VOIR AUSSI</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/curl_multi_poll.3.en.txt">txt</a>, 
+        
+            <a href="/man/curl_multi_poll.3.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

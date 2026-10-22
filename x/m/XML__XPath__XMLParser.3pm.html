@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>XML::XPath::XMLParser(3pm) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">XML__XPath__XMLParser(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-xml-xpath/">perl-xml-xpath</a></p>
+<p class="lic">Licences: PerlArtistic, GPL</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">XML::XPath::XMLParser(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">XML::XPath::XMLParser(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">XML::XPath::XMLParser - La classe d'analyse XML par défaut qui produit un arbre de nœuds</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>my $parser = XML::XPath::XMLParser-&gt;new(
+            filename =&gt; $self-&gt;get_filename,
+            xml =&gt; $self-&gt;get_xml,
+            ioref =&gt; $self-&gt;get_ioref,
+            parser =&gt; $self-&gt;get_parser,
+        );
+my $root_node = $parser-&gt;parse;</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Ce module génère un arbre de nœuds destiné à être utilisé comme nœud de contexte pour le traitement XPath. Il vise à être un analyseur rapide, rien de fantaisiste, et pourtant il doit stocker plus d'informations que la plupart des analyseurs. Pour ce faire, j'ai utilisé des références de tableaux partout - pas de hachages. Je n'ai aucun chiffre de performance pour les gains de vitesse obtenus, je ne m'excuse donc pas auprès de ceux qui ne sont pas habitués à utiliser des tableaux au lieu de hachages. Je pense qu'ils ont du sens ici où nous connaissons les attributs de chaque type de nœud.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Node_Structure'><a class='permalink' href='#Node_Structure'>STRUCTURE_DU_NŒUD</a></h1>
+<p class="Pp">Tous les nœuds ont les 2 premières entrées dans le tableau : node_parent et node_pos. Le type du nœud est déterminé à l'aide de la fonction <b>ref()</b>. Le node_parent contient toujours une entrée pour le parent du nœud actuel - à l'exception du nœud racine qui a undef comme valeur. Et node_pos est la position de ce nœud dans le tableau auquel il appartient (pensez : <span class="Li">$node</span> == <span class="Li">$node</span>-&gt;[node_parent]-&gt;[node_children]-&gt;[$node-&gt;[node_pos]])</p>
+<p class="Pp">Les nœuds sont structurés comme suit :</p>
+<section class="Ss">
+<h2 class="Ss" id='Root_Node'><a class='permalink' href='#Root_Node'>NŒUD_RACINE</a></h2>
+<p class="Pp">Le nœud racine est juste un nœud d'élément sans parent.</p>
+<pre>[
+  undef, # node_parent - vérifier undef pour identifier le nœud racine
+  undef, # node_pos
+  undef, # node_prefix
+  [ ... ], # node_children (voir ci-dessous)
+]</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Element_Node'><a class='permalink' href='#Element_Node'>NŒUD_ÉLÉMENT</a></h2>
+<pre>[
+  $parent, # node_parent
+  &lt;position dans le tableau actuel&gt;, # node_pos
+  'xxx', # node_prefix - préfixe de namespace sur cet élément
+  [ ... ], # node_children
+  'yyy', # node_name - nom de la balise de l'élément
+  [ ... ], # node_attribs - attributs sur cet élément
+  [ ... ], # node_namespaces - namespaces actuellement en portée
+]</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Attribute_Node'><a class='permalink' href='#Attribute_Node'>NŒUD_ATTRIBUT</a></h2>
+<pre>[
+  $parent, # node_parent - le nœud élément
+  &lt;position dans le tableau actuel&gt;, # node_pos
+  'xxx', # node_prefix - préfixe de namespace sur cet élément
+  'href', # node_key - nom de l'attribut
+  'ftp://ftp.com/', # node_value - valeur dans le nœud
+]</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Namespace_Nodes'><a class='permalink' href='#Namespace_Nodes'>NŒUDS_NAMESPACE</a></h2>
+<p class="Pp">Chaque élément a un ensemble associé de nœuds de namespace qui sont actuellement en portée. Chaque nœud de namespace stocke un préfixe et le nom développé (récupéré de l'attribut xmlns:prefix=&quot;...&quot;).</p>
+<pre>[
+  $parent,
+  &lt;pos&gt;,
+  'a', # node_prefix - le namespace tel qu'il était écrit comme préfixe
+  'http://my.namespace.com', # node_expanded - le nom développé.
+]</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Text_Nodes'><a class='permalink' href='#Text_Nodes'>NŒUDS_TEXTE</a></h2>
+<pre>[
+  $parent,
+  &lt;pos&gt;,
+  'Ceci est du texte' # node_text - le texte dans le nœud
+]</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Comment_Nodes'><a class='permalink' href='#Comment_Nodes'>NŒUDS_COMMENTAIRE</a></h2>
+<pre>[
+  $parent,
+  &lt;pos&gt;,
+  'Ceci est un commentaire' # node_comment
+]</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Processing_Instruction_Nodes'><a class='permalink' href='#Processing_Instruction_Nodes'>NŒUDS_INSTRUCTION_DE_TRAITEMENT</a></h2>
+<pre>[
+  $parent,
+  &lt;pos&gt;,
+  'cible', # node_target
+  'données', # node_data
+]</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Usage'><a class='permalink' href='#Usage'>UTILISATION</a></h1>
+<p class="Pp">Si vous ressentez le besoin d'utiliser ce module en dehors de XML::XPath (par exemple, vous pourriez utiliser ce module directement afin de mettre en cache les arbres analysés), vous pouvez suivre l'API suivante :</p>
+<section class="Ss">
+<h2 class="Ss" id='new'><a class='permalink' href='#new'>new</a></h2>
+<p class="Pp">La méthode new ne prend aucun paramètre, ou l'un des paramètres suivants :</p>
+<pre>filename
+xml
+parser
+ioref</pre>
+<p class="Pp">Elle utilise la syntaxe de hachage familière, donc un exemple pourrait être :</p>
+<pre>use XML::XPath::XMLParser;
+my $parser = XML::XPath::XMLParser-&gt;new(filename =&gt; 'example.xml');</pre>
+<p class="Pp">Les paramètres représentent un nom de fichier, une chaîne contenant du XML, une instance de XML::Parser et une référence de descripteur de fichier ouvert respectivement. Vous pouvez également définir ou obtenir toutes ces propriétés à l'aide des fonctions get_ et set_ qui portent le même nom que la propriété : par exemple, get_filename, set_ioref, etc.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='parse'><a class='permalink' href='#parse'>parse</a></h2>
+<p class="Pp">La méthode parse ne prend généralement aucun paramètre, cependant vous êtes libre de passer une référence de descripteur de fichier ouvert ou une chaîne XML si vous le souhaitez. La valeur de retour est un arbre que XML::XPath peut utiliser. La méthode parse mourra s'il y a une erreur dans votre XML, alors assurez-vous d'utiliser le mécanisme de gestion des exceptions de perl (eval{};) si vous voulez éviter cela.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='parsefile'><a class='permalink' href='#parsefile'>parsefile</a></h2>
+<p class="Pp">La méthode parsefile est identique à <b>parse()</b> sauf qu'elle attend un seul paramètre qui est une chaîne nommant un fichier à ouvrir et à analyser. Encore une fois, elle renvoie un arbre et meurt également en cas d'erreurs XML.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='NOTICES'><a class='permalink' href='#NOTICES'>AVIS</a></h1>
+<p class="Pp">Ce fichier est distribué dans le cadre du module XML::XPath, et est copyright 2000 Fastnet Software Ltd. Veuillez consulter la documentation du module dans son ensemble pour les informations de licence.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher une page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-xml-xpath/">extra/perl-xml-xpath</a></dd>
+        <dt>Version :</dt>
+        <dd>1.48-5</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://metacpan.org/release/XML-XPath">https://metacpan.org/release/XML-XPath</a></dd>
+        <dt>Licences :</dt>
+        <dd>PerlArtistic, GPL</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-xml-xpath/">/listing/extra/perl-xml-xpath/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#Node_Structure">STRUCTURE_DU_NŒUD</a></li>
+        
+            <li><a href="#Usage">UTILISATION</a></li>
+        
+            <li><a href="#NOTICES">AVIS</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/XML::XPath::XMLParser.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/XML::XPath::XMLParser.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

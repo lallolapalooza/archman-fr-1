@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>cap_iab_dup(3) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">cap_iab_dup(3)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/core/x86_64/libcap/">libcap</a></p>
+<p class="lic">Licences: BSD-3-Clause OU GPL-2.0-only</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">CAP_IAB(3)</td>
+    <td class="head-vol">Manuel du programmeur Linux</td>
+    <td class="head-rtitle">CAP_IAB(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">cap_iab_init, cap_iab_dup, cap_iab_get_proc, cap_iab_get_pid,
+    cap_iab_set_proc, cap_iab_to_text, cap_iab_from_text, cap_iab_get_vector,
+    cap_iab_compare, cap_iab_set_vector, cap_iab_fill, cap_proc_root -
+    fonctions de support du tuple IAB héritable</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>#include &lt;sys/capability.h&gt;
+cap_iab_t cap_iab_init(void);
+cap_iab_t cap_iab_dup(cap_iab_t iab);
+cap_iab_t cap_iab_get_proc(void);
+cap_iab_t cap_iab_get_pid(pid_t pid);
+int cap_iab_set_proc(cap_iab_t iab);
+char *cap_iab_to_text(cap_iab_t iab);
+cap_iab_t cap_iab_from_text(const char *text);
+cap_flag_value_t cap_iab_get_vector(cap_iab_t iab, cap_iab_vector_t vec,
+    cap_value_t val);
+int cap_iab_compare(cap_iab_t a, cap_iab_t b);
+int cap_iab_set_vector(cap_iab_t iab, cap_iab_vector_t vec, cap_value_t val,
+    cap_flag_value_t enable);
+int cap_iab_fill(cap_iab_t iab, cap_iab_vector_t vec,
+    cap_t set, cap_flag_t flag);
+char *cap_proc_root(const char *root);</pre>
+<p class="Pp">Lier avec <i>-lcap</i>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Les fonctions définies dans cette page de manuel concernent les trois
+    vecteurs de capacités de processus naïvement héritables : Inh, Amb et Bound.
+    Ce tuple <i>IAB</i> de 3 vecteurs de capacités, capturé dans le type
+    <i>cap_iab_t</i>, se combinent pour passer des capacités d'un processus à
+    un autre via les appels système <a href='/man/execve.2.en'>execve(2)</a>. Les règles de convolution
+    utilisant le tuple IAB sont un ensemble de règles de repli lorsque le fichier
+    exécuté n'a pas de <i>capacités de fichier</i> configurées.</p>
+<p class="Pp">Il existe certaines contraintes appliquées par le noyau concernant
+    les trois composantes d'un tuple IAB et l'indicateur de capacité de processus
+    Permitted. Elles sont : le vecteur Inh (<b>CAP_IAB_INH</b>) est entièrement
+    égal à l'indicateur Inheritable du processus à tout moment ; le vecteur Amb
+    (<b>CAP_IAB_AMB</b>) ne contient pas plus de valeurs de capacité que l'intersection
+    du vecteur Inh et de l'indicateur Permitted pour le processus ; et le vecteur
+    Bound (ou <i>bloqué</i>) (<b>CAP_IAB_BOUND</b>) est le complément à deux du
+    vecteur bounding du processus.</p>
+<p class="Pp">Dans certains environnements, il est considéré comme souhaitable
+    d'hériter <i>naïvement</i> des capacités. C'est-à-dire, passer des capacités,
+    indépendamment de l'état du binaire exécuté, du parent à l'enfant via les
+    appels système <b>exec*</b>. Les capacités survivantes deviennent l'indicateur
+    Permitted pour le processus post-exec. Cette méthode d'héritage diffère
+    significativement de l'héritage par poignée de main entre un processus pré-exec*
+    et un exécutable doté de capacités de fichier du mécanisme de capacité
+    traditionnel (POSIX.1e).</p>
+<p class="Pp">Les règles de convolution pour l'héritage de style IAB sont :
+    I'=I ; A'=A&amp;I ; P'=A&amp;I&amp;P. Où P etc sont les valeurs pré-exec et P'
+    etc sont les valeurs post-exec.</p>
+<p class="Pp">Avec une compréhension de ces règles de convolution, nous pouvons
+    expliquer comment <a href='/man/libcap.3.en'>libcap(3)</a> gère le support du tuple IAB : l'API IAB.</p>
+<p class="Pp"><b>cap_iab_init</b>() renvoie une valeur IAB vide. C'est-à-dire un tuple
+    <i>plutôt inoffensif</i>. Il ne bloquera aucune capacité de fichier Permitted
+    via exec, mais il n'en accordera aucune non plus. Le <i>cap_iab_t</i> retourné
+    devrait être libéré avec <a href='/man/cap_free.3.en'>cap_free(3)</a>.</p>
+<p class="Pp"><b>cap_iab_dup</b>() renvoie une copie de la valeur IAB spécifiée. Le
+    cap_iab_t retourné doit être libéré avec <a href='/man/cap_free.3.en'>cap_free(3)</a>.</p>
+<p class="Pp"><b>cap_iab_get_proc</b>() renvoie une copie de la valeur IAB pour le
+    processus courant. Le cap_iab_t retourné doit être libéré avec
+    <a href='/man/cap_free.3.en'>cap_free(3)</a>.</p>
+<p class="Pp"><b>cap_iab_get_pid</b>() renvoie une copie de la valeur IAB pour le
+    processus spécifié. Le cap_iab_t retourné doit être libéré avec
+    <a href='/man/cap_free.3.en'>cap_free(3)</a>. Cette fonction recherche par défaut dans
+    <b>/proc/</b>&lt;PID&gt;<b>/status</b> les informations IAB, mais cet emplacement peut
+    être remplacé en utilisant la fonction <b>cap_proc_root</b>().</p>
+<p class="Pp"><b>cap_iab_set_proc</b>() peut être utilisée pour définir la valeur IAB
+    portée par le processus courant. Un tel réglage échouera si le processus n'est
+    pas suffisamment capable. Pour élever les bits I qui ne sont pas présents dans
+    l'indicateur P, ou pour appliquer de nouveaux masquages B, il faut que
+    <b>CAP_SETPCAP</b> soit présent dans l'indicateur Permitted (la fonction
+    l'élèvera temporairement dans l'indicateur Effective si nécessaire). Dans tous
+    les cas, les valeurs A élevées doivent être présentes dans l'intersection des
+    valeurs Permitted et Inh.</p>
+<p class="Pp"><b>cap_iab_to_text</b>() convertira un tuple IAB en une représentation
+    textuelle canonique IAB. La représentation est légèrement redondante mais
+    <a href='/man/libcap.3.en'>libcap(3)</a> essaiera de générer une représentation aussi courte que
+    possible.</p>
+<p class="Pp"><b>cap_iab_from_text</b>() génère un tuple IAB à partir d'une chaîne
+    de caractères (probablement générée par la fonction précédente). Le tuple IAB
+    retourné doit être libéré avec <b>cap_free</b>().</p>
+<p class="Pp"><b>cap_iab_get_vector</b>() peut être utilisée pour déterminer la valeur
+    spécifique d'une capacité d'un vecteur IAB.</p>
+<p class="Pp"><b>cap_iab_compare</b>() peut être utilisée pour comparer deux tuples
+    cap_iab_t. Lorsque la valeur de retour est non nulle, la macro
+    <b>CAP_IAB_DIFFERS</b>(<i>status</i>, <i>vector</i>) est non nulle si le statut
+    retourné diffère dans ses composantes <i>vector</i>.</p>
+<p class="Pp"><b>cap_iab_set_vector</b>() peut être utilisée pour définir une valeur de
+    vecteur spécifique sur le réglage d'activation.</p>
+<p class="Pp"><b>cap_iab_fill</b>() peut être utilisée pour copier en bloc la valeur d'un
+    indicateur de <i>cap_t</i> dans le vecteur vec du tuple IAB. La copie dans Amb
+    (<b>CAP_IAB_AMB</b>) de cette manière peut élever implicitement les valeurs Inh
+    (<b>CAP_IAB_INH</b>) dans le tuple IAB. De même, la copie dans le vecteur Inh
+    peut abaisser implicitement les valeurs Amb qui ne sont pas présentes dans le
+    vecteur Inh résultant.</p>
+<p class="Pp"><b>cap_proc_root</b>() peut être utilisée pour déterminer l'emplacement
+    actuel interrogé par <b>cap_iab_get_pid</b>(). Les valeurs retournées doivent
+    être libérées avec <a href='/man/cap_free.3.en'>cap_free(3)</a>. Si l'argument de
+    <b>cap_proc_root</b>() n'est pas <b>NULL</b>, une copie deviendra le remplacement
+    pour <b>/proc</b>. Notez que cette fonction n'est <i>pas</i> thread-safe par
+    rapport aux appels concurrents à <b>cap_iab_get_pid</b>().</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ERREURS'><a class='permalink' href='#ERREURS'>ERREURS</a></h1>
+<p class="Pp">Les fonctions retournant des valeurs <i>cap_iab_t</i> ou de la mémoire
+    allouée sous forme de chaîne retournent NULL en cas d'erreur.</p>
+<p class="Pp">Les valeurs de retour entières sont -1 en cas d'erreur et 0 en cas de
+    succès.</p>
+<p class="Pp">En cas d'erreur, consultez <i>errno</i>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='NOTES'><a class='permalink' href='#NOTES'>NOTES</a></h1>
+<p class="Pp">Contrairement à l'ensemble de capacités <i>cap_t</i> traditionnel, le
+    tuple IAB, pris ensemble, est incompatible avec les capacités de système de
+    fichiers créées via des outils comme <a href='/man/setcap.8.en'>setcap(8)</a>. C'est-à-dire, le vecteur Amb du
+    tuple IAB est rendu caduc lorsqu'un exécutable avec une capacité de fichier est
+    exécuté.</p>
+<p class="Pp">De plus, il existe des <a href='/man/cap_mode.3.en'>cap_mode(3)</a>s de libcap qui rendent le
+    vecteur Amb et sa méthode d'héritage de processus désactivés.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='HISTORIQUE'><a class='permalink' href='#HISTORIQUE'>HISTORIQUE</a></h1>
+<p class="Pp">Le format IAB pour les variantes héritables des capacités a été développé
+    pour la première fois comme syntaxe de configuration pour le module
+    <i>pam_cap.so</i> de Linux-PAM dans libcap-2.29. Il a été introduit pour étendre
+    la liste <i>simple</i> séparée par des virgules des capacités Hériditaires de
+    processus, que le module pouvait accorder à un arbre de processus authentifié,
+    afin d'inclure des limites appliquées au vecteur Bounding et d'introduire le
+    support du vecteur Ambient des bits de capacité.</p>
+<p class="Pp">Alors que les vecteurs Inheritable et Bounding étaient anticipés par la
+    brouillon POSIX.1e qui a introduit les capacités, le vecteur Ambient est une
+    invention Linux, et incompatible avec le modèle de capacité de fichier POSIX.1e.
+    À ce titre, il a été estimé que tenter de mélanger les 5 vecteurs de capacité
+    en une seule représentation textuelle ne fonctionnerait pas. Au lieu de cela, la
+    syntaxe de configuration de <i>pam_cap.so</i> a été généralisée en un ensemble
+    de fonctions libcap pour regrouper les trois capacités naïvement héritables :
+    le tuple IAB. Le support pour cela a fait ses débuts dans libcap-2.33.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SIGNALER_DES_BOGUES'><a class='permalink' href='#SIGNALER_DES_BOGUES'>SIGNALER   DES   BOGUES</a></h1>
+<p class="Pp">Veuillez signaler les bugs via :</p>
+<dl class="Bl-tag">
+  <dt id="<a href='https://bugzilla.kernel.org/buglist.cgi?component=libcap'>https://bugzilla.kernel.org/buglist.cgi?component=libcap</a>&amp;list_id=1090757"><a class="permalink" href="#https://bugzilla.kernel.org/buglist.cgi?component=libcap&amp;list_id=1090757">https://bugzilla.kernel.org/buglist.cgi?component=libcap&amp;list_id=1090757</a></dt>
+  <dd></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR   AUSSI</a></h1>
+<p class="Pp"><a href='/man/libcap.3.en'>libcap(3)</a>, <a href='/man/cap_launch.3.en'>cap_launch(3)</a>, <a href='/man/cap_init.3.en'>cap_init(3)</a>,
+    <a href='/man/capabilities.7.en'>capabilities(7)</a> et <a href='/man/errno.3.en'>errno(3)</a>.</p></section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-03-19</td>
+    <td class="foot-os"></td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher une page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/core/x86_64/libcap/">core/libcap</a></dd>
+        <dt>Version :</dt>
+        <dd>2.77-1</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://sites.google.com/site/fullycapable/">https://sites.google.com/site/fullycapable/</a></dd>
+        <dt>Licences :</dt>
+        <dd>BSD-3-Clause OU GPL-2.0-only</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/core/libcap/">/listing/core/libcap/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNTAXE</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#ERRORS">ERREURS</a></li>
+        
+            <li><a href="#NOTES">NOTES</a></li>
+        
+            <li><a href="#HISTORY">HISTORIQUE</a></li>
+        
+            <li><a href="#REPORTING_BUGS">SIGNALEMENT DE BUGS</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/cap_iab_dup.3.en.txt">txt</a>, 
+        
+            <a href="/man/cap_iab_dup.3.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

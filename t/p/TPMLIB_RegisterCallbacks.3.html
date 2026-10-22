@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>TPMLIB_RegisterCallbacks(3) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">TPMLIB_RegisterCallbacks(3)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/libtpms/">libtpms</a></p>
+<p class="lic">Licences: BSD-3-Clause</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">TPMLIB_RegisterCallbacks(3)</td>
+    <td class="head-vol"></td>
+    <td class="head-rtitle">TPMLIB_RegisterCallbacks(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">TPMLIB_RegisterCallbacks - Enregistrer des fonctions de rappel pour implémenter un comportement personnalisé de certaines fonctions</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BIBLIOTHÈQUE'><a class='permalink' href='#BIBLIOTHÈQUE'>BIBLIOTHÈQUE</a></h1>
+<p class="Pp">TPM library (libtpms, -ltpms)</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp"><b>#include &lt;libtpms/tpm_types.h</b>&gt;</p>
+<p class="Pp"><b>#include &lt;libtpms/tpm_library.h</b>&gt;</p>
+<p class="Pp"><b>#include &lt;libtpms/tpm_error.h</b>&gt;</p>
+<p class="Pp"><b>TPM_RESULT TPMLIB_RegisterCallbacks(struct tpmlibrary_callbacks
+    *</b><i>callbacks</i><b>);</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">La fonction <b>TPMLIB_RegisterCallbacks()</b> permet d'enregistrer plusieurs fonctions de rappel avec libtpms, ce qui permet à l'utilisateur d'implémenter un comportement personnalisé de plusieurs fonctions internes à la bibliothèque. Cette fonctionnalité sera généralement utilisée si le comportement des fonctions internes fournies n'est pas celui requis. Un exemple serait que libtpms écrive toutes les données dans des fichiers avec certains noms. Si, cependant, les données doivent être écrites dans un type de stockage spécial, l'utilisateur enregistrera des fonctions de rappel avec la bibliothèque qui seront appelées lorsque le TPM doit lire, écrire ou supprimer des données du stockage, et l'utilisateur pourra alors implémenter un comportement personnalisé dans ces fonctions.</p>
+<p class="Pp">Ce qui suit montre la structure de données utilisée pour enregistrer les fonctions de rappel.</p>
+<pre>struct libtpms_callbacks {  
+        int sizeOfStruct;
+        TPM_RESULT (*tpm_nvram_init)(void);
+        TPM_RESULT (*tpm_nvram_loaddata)(unsigned char **data,
+                                         uint32_t *length,
+                                         uint32_t tpm_number,
+                                         const char *name);
+        TPM_RESULT (*tpm_nvram_storedata)(const unsigned char *data,
+                                          uint32_t length,
+                                          uint32_t tpm_number,
+                                          const char *name);
+        TPM_RESULT (*tpm_nvram_deletename)(uint32_t tpm_number,
+                                           const char *name,
+                                           TPM_BOOL mustExist);
+        TPM_RESULT (*tpm_io_init)(void);
+        TPM_RESULT (*tpm_io_getlocality)(TPM_MODIFIER_INDICATOR *localityModifer,
+                                         uint32_t tpm_number);
+        TPM_RESULT (*tpm_io_getphysicalpresence)(TPM_BOOL *physicalPresence,
+                                                 uint32_t tpm_number);
+};</pre>
+<p class="Pp">Actuellement, 7 fonctions de rappel sont prises en charge. Si un pointeur de fonction de rappel dans la structure ci-dessus est défini sur NULL, l'implémentation interne par défaut de cette fonction sera utilisée.</p>
+<p class="Pp">Si l'une des fonctions de rappel du groupe <i>tpm_nvram</i> ou <i>tpm_io</i> est définie, alors toutes les fonctions de rappel du groupe respectif doivent être implémentées.</p>
+<dl class="Bl-tag">
+  <dt id="tpm_nvram_init"><a class="permalink" href="#tpm_nvram_init"><b>tpm_nvram_init</b></a></dt>
+  <dd>Cette fonction est appelée avant toute opération sur le stockage persistant. Elle permet à l'utilisateur d'initialiser l'accès au stockage persistant.
+    <p class="Pp">En cas de succès, cette fonction doit retourner <b>TPM_SUCCESS</b>, un code d'échec sinon.</p>
+    <p class="Pp">L'implémentation par défaut exige que la variable d'environnement <i>TPM_PATH</i> soit définie et pointe vers un répertoire où l'état du TPM peut être écrit. Si la variable n'est pas définie, elle retournera <b>TPM_FAIL</b> et l'initialisation du TPM dans <b>TPMLIB_MainInit()</b> échouera.</p>
+  </dd>
+  <dt id="tpm_nvram_loaddata"><a class="permalink" href="#tpm_nvram_loaddata"><b>tpm_nvram_loaddata</b></a></dt>
+  <dd>Cette fonction est appelée lorsque le TPM souhaite charger son état depuis le stockage persistant. La fonction implémentée doit allouer un tampon (<i>data</i>) et le retourner au TPM avec la longueur du tampon (<i>length</i>). Le <i>tpm_number</i> est toujours 0 et peut être ignoré. Le paramètre <i>name</i> est soit <b>TPM_SAVESTATE_NAME</b>, <b>TPM_VOLATILESTATE_NAME</b>, soit <b>TPM_PERMANENT_ALL_NAME</b> et indique quel type d'état parmi les 3 doit être chargé.
+    <p class="Pp">En cas de succès, cette fonction doit retourner <b>TPM_SUCCESS</b>, un code d'échec sinon.</p>
+    <p class="Pp">L'implémentation par défaut écrit l'état du TPM dans des fichiers d'un répertoire vers lequel la variable d'environnement <i>TPM_PATH</i> pointait lors de l'exécution de <b>TPMLIB_MainInit()</b>. L'échec de l'écriture de l'état du TPM dans les fichiers placera le TPM en mode échec.</p>
+    <p class="Pp">Si cette fonction n'est pas définie (NULL), le fichier NVChip d'origine sera lu lors de l'utilisation d'un TPM 2. Ce fichier contient un vidage mémoire des structures de données internes et n'est ni portable entre les différentes endianness ou architectures de tailles différentes (32 bits, 64 bits), ni ne permettra de gérer les extensions de ces structures de données internes qu'il contient par des ajouts dans le code du TPM 2. Dans le pire des cas, cela peut entraîner des erreurs d'accès mémoire par les fonctions internes et provoquer des plantages. Il est donc recommandé de définir cette fonction et de gérer l'écriture de l'état du TPM.</p>
+  </dd>
+  <dt id="tpm_nvram_storedata"><a class="permalink" href="#tpm_nvram_storedata"><b>tpm_nvram_storedata</b></a></dt>
+  <dd>Cette fonction est appelée lorsque le TPM souhaite stocker son état dans le stockage persistant. Les paramètres <i>data</i> et <i>length</i> fournissent les données à stocker et leur nombre d'octets. La fonction implémentée ne doit pas libérer le tampon <i>data</i>. Le <i>tpm_number</i> est toujours 0 et peut être ignoré. Le paramètre <i>name</i> est soit <b>TPM_SAVESTATE_NAME</b>, <b>TPM_VOLATILESTATE_NAME</b>, soit <b>TPM_PERMANENT_ALL_NAME</b> et indique quel type d'état parmi les 3 doit être stocké.
+    <p class="Pp">En cas de succès, cette fonction doit retourner <b>TPM_SUCCESS</b>, un code d'échec sinon.</p>
+    <p class="Pp">L'implémentation par défaut lit l'état du TPM à partir de fichiers dans un répertoire vers lequel la variable d'environnement <i>TPM_PATH</i> pointait lors de l'exécution de <b>TPMLIB_MainInit()</b>. L'échec de la lecture de l'état du TPM à partir des fichiers peut placer le TPM en mode échec.</p>
+    <p class="Pp">Si cette fonction n'est pas définie (NULL), le vidage mémoire sera écrit dans le fichier NVChip (TPM 2) et les mêmes commentaires s'appliquent que lorsque la fonction d'interface <i>tpm_nvram_loaddata</i> n'est pas définie.</p>
+  </dd>
+  <dt id="tpm_nvram_deletename"><a class="permalink" href="#tpm_nvram_deletename"><b>tpm_nvram_deletename</b></a></dt>
+  <dd>Cette fonction est appelée lorsque le TPM souhaite supprimer l'état du stockage persistant. Le <i>tpm_number</i> est toujours 0 et peut être ignoré. Le paramètre <i>name</i> est soit <b>TPM_SAVESTATE_NAME</b>, <b>TPM_VOLATILESTATE_NAME</b>, soit <b>TPM_PERMANENT_ALL_NAME</b> et indique quel type d'état parmi les 3 doit être supprimé. Le paramètre <i>mustExist</i> indique si les données fournies doivent exister et la fonction implémentée doit retourner <b>TPM_FAIL</b> si les données n'existaient pas.
+    <p class="Pp">En cas de succès, cette fonction doit retourner <b>TPM_SUCCESS</b>, un code d'échec sinon.</p>
+    <p class="Pp">L'implémentation par défaut supprime les fichiers d'état du TPM dans un répertoire vers lequel la variable d'environnement <i>TPM_PATH</i> pointait lors de l'exécution de <b>TPMLIB_MainInit()</b>. L'échec de la suppression des fichiers d'état du TPM peut placer le TPM en mode échec.</p>
+  </dd>
+  <dt id="tpm_io_init"><a class="permalink" href="#tpm_io_init"><b>tpm_io_init</b></a></dt>
+  <dd>Cette fonction est appelée pour initialiser le sous-système d'entrée/sortie du TPM.
+    <p class="Pp">En cas de succès, cette fonction doit retourner <b>TPM_SUCCESS</b>, un code d'échec sinon.</p>
+    <p class="Pp">L'implémentation par défaut retourne simplement <b>TPM_SUCCESS</b>.</p>
+  </dd>
+  <dt id="tpm_io_getlocality"><a class="permalink" href="#tpm_io_getlocality"><b>tpm_io_getlocality</b></a></dt>
+  <dd>Cette fonction est appelée lorsque le TPM doit déterminer la localité sous laquelle une commande doit être exécutée. La fonction implémentée doit retourner le numéro de la localité en l'écrivant dans le pointeur <b>localityModifier</b>.
+    <p class="Pp">Cette fonction est censée retourner <b>TPM_SUCCESS</b> ainsi qu'un numéro de localité valide. Le programme implémentant la fonction appelée est censé gérer correctement les numéros de localité.</p>
+    <p class="Pp">L'implémentation par défaut retourne 0 comme localité.</p>
+  </dd>
+  <dt id="tpm_io_getphysicalpresence"><a class="permalink" href="#tpm_io_getphysicalpresence"><b>tpm_io_getphysicalpresence</b></a></dt>
+  <dd>Cette fonction est appelée lorsque le TPM doit déterminer si la présence physique a été confirmée. La fonction implémentée doit écrire <b>TRUE</b> ou <b>FALSE</b> dans le pointeur physicalPresence.
+    <p class="Pp">En cas de succès, cette fonction doit retourner <b>TPM_SUCCESS</b>, un code d'échec sinon.</p>
+    <p class="Pp">L'implémentation par défaut retourne <b>FALSE</b> pour la présence physique.</p>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VALEUR_DE_RETOUR'><a class='permalink' href='#VALEUR_DE_RETOUR'>VALEUR DE RETOUR</a></h1>
+<p class="Pp">La fonction <b>TPMLIB_RegisterCallbacks()</b> retourne <b>TPM_SUCCESS</b> en cas de succès ou un code d'erreur TPM en cas d'échec.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR AUSSI</a></h1>
+<p class="Pp"><b>TPMLIB_MainInit</b>(3), <b>TPMLIB_MainShutdown</b>(3)</p>
+</section>
+</div>
+</section>
+
+            </article>
+            
+        </main>
+        <footer>
+            
+        </footer>
+    </body>
+</html>nk' href='#RETURN_VALUE'>VALEUR   DE RETOUR</a></h1>
+<p class="Pp">En cas de succès, <b>TPMLIB_MainInit()</b> retourne
+    <b>TPM_SUCCESS</b>, une valeur d'erreur sinon.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ERREURS'><a class='permalink' href='#ERREURS'>ERREURS</a></h1>
+<dl class="Bl-tag">
+  <dt id="TPM_SUCCESS"><a class="permalink" href="#TPM_SUCCESS"><b>TPM_SUCCESS</b></a></dt>
+  <dd>La fonction s'est terminée avec succès.</dd>
+  <dt id="TPM_FAIL"><a class="permalink" href="#TPM_FAIL"><b>TPM_FAIL</b></a></dt>
+  <dd>Échec général.</dd>
+</dl>
+<p class="Pp">Pour une liste complète des codes d'erreur TPM, veuillez consulter
+    le fichier d'inclusion <b>libtpms/tpm_error.h</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXEMPLE'><a class='permalink' href='#EXEMPLE'>EXEMPLE</a></h1>
+<pre>#include &lt;libtpms/tpm_types.h&gt;
+#include &lt;libtpms/tpm_library.h&gt;
+#include &lt;libtpms/tpm_error.h&gt;
+static TPM_MODIFIER_INDICATOR locality;
+static TPM_RESULT mytpm_io_init(void)
+{
+       return TPM_SUCCESS;
+}
+static TPM_RESULT mytpm_io_getlocality(TPM_MODIFIER_INDICATOR *locModif,
+                                       uint32_t tpm_number)
+{
+       *locModif = locality;
+       return TPM_SUCCESS:
+}
+static TPM_RESULT mytpm_io_getphysicalpresence(TPM_BOOL *physicalPresence,
+                                               uint32_t tpm_number)
+{
+       *physicalPresence = FALSE;
+       return TPM_SUCCESS;
+}
+int main(void) {
+    TPM_RESULT res;
+    unsigned char *respbuffer;
+    uint32_t resp_size;
+    uint32_t respbufsize;
+    unsigned char *command;
+    uint32_t command_size;
+    struct libtpms_callbacks cbs = {
+        .sizeOfStruct               = sizeof(struct libtpms_callbacks),
+        .tpm_nvram_init             = NULL,
+        .tpm_nvram_loaddata         = NULL,
+        .tpm_nvram_storedata        = NULL,
+        .tpm_nvram_deletename       = NULL,
+        .tpm_io_init                = mytpm_io_init,
+        .tpm_io_getlocality         = mytpm_io_getlocality,
+        .tpm_io_getphysicalpresence = mytpm_io_getphysicalpresence,
+    };
+    [...]
+    if (TPMLIB_RegisterCallbacks(&amp;cbs) != TPM_SUCCESS) {
+        fprintf(stderr, &quot;Could not register the callbacks.\n&quot;);
+        return 1;
+    }
+    if (TPMLIB_MainInit()) != TPM_SUCCESS) {
+        fprintf(stderr, &quot;Could not start the TPM.\n&quot;);
+        return 1;
+    }
+    [...]
+    /* build TPM command */
+    [...]
+    res = TPMLIB_Process(&amp;respbuffer, &amp;resp_size,
+                         &amp;respbufsize,
+                         command, command_size);
+    [...]
+    TPMLIB_Terminate();
+    return 0;
+}</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR   AUSSI</a></h1>
+<p class="Pp"><a href='/man/TPMLIB_Process.3.en'>TPMLIB_Process(3)</a>, <a href='/man/TPMLIB_MainInit.3.en'>TPMLIB_MainInit(3)</a>,
+    <a href='/man/TPMLIB_Terminate.3.en'>TPMLIB_Terminate(3)</a>, <a href='/man/TPMLIB_DecodeBlobs.3.en'>TPMLIB_DecodeBlobs(3)</a></p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-06-10</td>
+    <td class="foot-os">libtpms</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Package information:</p>
+    <dl>
+        <dt>Package name:</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/libtpms/">extra/libtpms</a></dd>
+        <dt>Version:</dt>
+        <dd>0.10.1-1</dd>
+        <dt>Upstream:</dt>
+        <dd><a href="https://github.com/stefanberger/libtpms">https://github.com/stefanberger/libtpms</a></dd>
+        <dt>Licenses:</dt>
+        <dd>BSD-3-Clause</dd>
+        <dt>Manuals:</dt>
+        <dd><a href="/listing/extra/libtpms/">/listing/extra/libtpms/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table of contents</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NAME</a></li>
+        
+            <li><a href="#LIBRARY">LIBRARY</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#RETURN_VALUE">VALEUR DE RETOUR</a></li>
+        
+            <li><a href="#ERREURS">ERREURS</a></li>
+        
+            <li><a href="#EXEMPLE">EXEMPLE</a></li>
+        
+            <li><a href="#VOIR_AUSSI">VOIR AUSSI</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Other formats:
+        
+            <a href="/man/TPMLIB_RegisterCallbacks.3.en.txt">txt</a>, 
+        
+            <a href="/man/TPMLIB_RegisterCallbacks.3.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>The website is available under the terms of the <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               license, except for the contents of the manual pages, which have their own license
+               specified in the corresponding Arch Linux package.
+            </p>
+        </footer>
+    </body>
+</html>

@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Sys::Virt(3pm) — Pages de manuel Arch Linux</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Sys__Virt(3pm)</h1>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Sys::Virt(3pm)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">Sys::Virt(3pm)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Sys::Virt - Représenter et gérer une connexion hyperviseur
+    libvirt</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>my $conn = Sys::Virt-&gt;new(uri =&gt; $uri);
+my @domains = $conn-&gt;list_domains();
+foreach my $dom (@domains) {
+  print &quot;Domaine &quot;, $dom-&gt;get_id, &quot; &quot;, $dom-&gt;get_name, &quot;\n&quot;;
+}</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Le module Sys::Virt fournit une liaison XS Perl aux API de gestion
+    de machines virtuelles de libvirt. Cela permet de gérer des machines
+    fonctionnant dans des conteneurs de virtualisation arbitraires avec une API
+    cohérente.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='GESTION_DES_RAPPELS'><a class='permalink' href='#GESTION_DES_RAPPELS'>GESTION DES RAPPELS</a></h1>
+<p class="Pp">Chaque routine d'enregistrement de rappel retourne un
+    <span class="Li">$callbackID</span> (sauf pour
+    <span class="Li">&quot;domain_event_register&quot;</span> et
+    <span class="Li">&quot;register_close_callback&quot;</span>). Cette valeur de
+    retour doit être conservée et utilisée pour la désinscription des rappels.</p>
+<p class="Pp"><b>IMPORTANT :</b> Tous les rappels doivent être désinscrits (y
+    compris ceux enregistrés à l'aide de
+    <span class="Li">&quot;domain_event_register&quot;</span> et
+    <span class="Li">&quot;register_close_callback&quot;</span>) ; ne pas le faire
+    empêche l'objet <span class="Li">&quot;Sys::Virt&quot;</span> d'être collecté
+    par le garbage collector et la connexion à
+    <span class="Li">&quot;libvirtd&quot;</span> de se fermer.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='GESTION_DES_ERREURS'><a class='permalink' href='#GESTION_DES_ERREURS'>GESTION DES ERREURS</a></h1>
+<p class="Pp">Toutes les opérations de l'API Sys::Virt présentant des scénarios
+    d'échec déclencheront une instance du module Sys::Virt::Error. Pour attraper
+    ces erreurs, il suffit d'encapsuler la méthode dans un bloc eval :</p>
+<pre>eval { my $conn = Sys::Virt-&gt;new(uri =&gt; $uri); };
+if ($@) {
+  print STDERR &quot;Impossible d'ouvrir la connexion à $addr&quot; . $@-&gt;message . &quot;\n&quot;;
+}</pre>
+<p class="Pp">Pour plus de détails sur les informations contenues dans les
+    objets d'erreur, consultez la page de manuel de Sys::Virt::Error.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES'><a class='permalink' href='#MÉTHODES'>MÉTHODES</a></h1>
+<dl class="Bl-tag">
+  <dt id="my"><a class="permalink" href="#my">my $conn = Sys::Virt-&gt;new(uri
+    =&gt; $uri, readonly =&gt; $ro, flags =&gt; $flags);</a></dt>
+  <dd>Se connecte à l'hôte de virtualisation identifié par
+      <span class="Li">&quot;uri&quot;</span>. Le paramètre
+      <span class="Li">&quot;uri&quot;</span> peut être omis, auquel cas la connexion
+      par défaut sera établie avec l'hyperviseur Xen local. Voici quelques exemples
+      d'URI :</dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="xen:///"><a class="permalink" href="#xen:///">xen:///</a></dt>
+  <dd>Xen sur la machine locale</dd>
+  <dt id="test:///default"><a class="permalink" href="#test:///default">test:///default</a></dt>
+  <dd>Pilote factice &quot;en mémoire&quot; pour les suites de tests</dd>
+  <dt id="qemu:///system"><a class="permalink" href="#qemu:///system">qemu:///system</a></dt>
+  <dd>Pilote système pour la virtualisation QEMU / KVM</dd>
+  <dt id="qemu:///session"><a class="permalink" href="#qemu:///session">qemu:///session</a></dt>
+  <dd>Pilote par utilisateur pour la virtualisation QEMU</dd>
+  <dt id="qemu+tls://somehost/system"><a class="permalink" href="#qemu+tls://somehost/system">qemu+tls://somehost/system</a></dt>
+  <dd>Pilote QEMU système sur <span class="Li">&quot;somehost&quot;</span>
+      utilisant la sécurité TLS</dd>
+  <dt id="xen+tcp://somehost/"><a class="permalink" href="#xen+tcp://somehost/">xen+tcp://somehost/</a></dt>
+  <dd>Pilote Xen sur <span class="Li">&quot;somehost&quot;</span> utilisant TCP
+      / sécurité SASL</dd>
+</dl>
+</div>
+<div class="Bd-indent">
+<p class="Pp">Pour plus de détails, consultez
+    <span class="Li">&quot;<a href='http://libvirt.org/uri.html'>http://libvirt.org/uri.html</a>&quot;</span></p>
+<p class="Pp">Si le paramètre optionnel <span class="Li">&quot;readonly&quot;</span>
+    est fourni, une connexion non privilégiée à l'hyperviseur sera tentée. S'il
+    n'est pas fourni, la valeur par défaut est d'établir une connexion entièrement
+    privilégiée à l'hyperviseur. Si l'application appelante n'est pas exécutée en
+    tant que root, il peut être nécessaire de fournir des rappels d'authentification.</p>
+<p class="Pp">Si le paramètre optionnel <span class="Li">&quot;auth&quot;</span>
+    est défini sur une valeur non nulle, l'authentification sera activée pendant
+    la connexion, en utilisant l'ensemble par défaut de rappels de collecte
+    d'identifiants. Les rappels par défaut demandent les identifiants sur la
+    console, ils ne conviennent donc pas aux applications graphiques. Pour de telles
+    applications, une implémentation personnalisée devrait être fournie. Le
+    paramètre <span class="Li">&quot;credlist&quot;</span> doit être une référence
+    de tableau listant l'ensemble des types d'identifiants qui seront pris en
+    charge. Les constantes d'identifiants de ce module peuvent être utilisées comme
+    valeurs dans cette liste. Le paramètre
+    <span class="Li">&quot;callback&quot;</span> doit être une référence de
+    sous-routine contenant le code nécessaire pour collecter les identifiants.
+    Lorsqu'elle est invoquée, elle recevra un seul paramètre, une référence de
+    tableau des identifiants demandés. Les éléments du tableau sont des références
+    de hachage, avec les clés <span class="Li">&quot;type&quot;</span> donnant le
+    type d'identifiant, <span class="Li">&quot;prompt&quot;</span> donnant une
+    invite descriptive pour l'utilisateur, <span class="Li">&quot;challenge&quot;</span>
+    donnant le nom de l'identifiant requis. La réponse doit être collectée auprès
+    de l'utilisateur et renvoyée en définissant la clé
+    <span class="Li">&quot;result&quot;</span>. Cette clé peut déjà être définie avec
+    un résultat par défaut si applicable.</p>
+<p class="Pp">Comme exemple simple renvoyant des identifiants codés en dur</p>
+<pre>my $uri  = &quot;qemu+tcp://192.168.122.1/system&quot;;
+my $username = &quot;test&quot;;
+my $password = &quot;123456&quot;;
+my $con = Sys::Virt-&gt;new(uri =&gt; $uri,
+                         auth =&gt; 1,
+                         credlist =&gt; [
+                           Sys::Virt::CRED_AUTHNAME,
+                           Sys::Virt::CRED_PASSPHRASE,
+                         ],
+                         callback =&gt;
+     sub {
+           my $creds = shift;
+           foreach my $cred (@{$creds}) {
+              if ($cred-&gt;{type} == Sys::Virt::CRED_AUTHNAME) {
+                  $cred-&gt;{result} = $username;
+              }
+              if ($cred-&gt;{type} == Sys::Virt::CRED_PASSPHRASE) {
+                  $cred-&gt;{result} = $password;
+              }
+           }
+           return 0;
+     });</pre>
+<p class="Pp">Pour des raisons de compatibilité avec les versions antérieures,
+    le paramètre <span class="Li">&quot;address&quot;</span> est accepté comme
+    synonyme du paramètre <span class="Li">&quot;uri&quot;</span>. L'utilisation de
+    <span class="Li">&quot;uri&quot;</span> est recommandée pour tout nouveau code.</p>
+</div>
+<dl class="Bl-tag">
+  <dt>$conn-&gt;set_identity($identity, $flags=0)</dt>
+  <dd>Change l'identité utilisée pour le contrôle d'accès sur la connexion.
+      Normalement, le démon distant utilisera l'identité associée au socket de
+      domaine UNIX que l'application ouvre. Seul un client privilégié peut
+      normalement outrepasser cela. L'<span class="Li">$identity</span> doit
+      être une référence de hachage dont les clés sont l'une des constantes
+      IDENTITY. Le paramètre <span class="Li">$flags</span> est actuellement
+      inutilisé et vaut 0 par défaut s'il est omis.</dd>
+  <dt id="my~2"><a class="permalink" href="#my~2">my $st =
+    $conn-&gt;new_stream($flags)</a></dt>
+  <dd>Crée un nouveau flux, avec les indicateurs spécifiés</dd>
+  <dt id="my~3"><a class="permalink" href="#my~3">my $dom =
+    $conn-&gt;create_domain($xml, $flags=0);</a></dt>
+  <dd>Crée un nouveau domaine basé sur la description XML passée dans le
+      paramètre <span class="Li">$xml</span>. L'objet retourné est une instance
+      de la classe Sys::Virt::Domain. Cette méthode n'est pas disponible avec les
+      connexions non privilégiées à l'hyperviseur. Le paramètre
+      <span class="Li">$flags</span> accepte l'une des constantes de CRÉATION
+      DE DOMAINE documentées dans Sys::Virt::Domain, et vaut 0 par défaut si omis.</dd>
+  <dt id="my~4"><a class="permalink" href="#my~4">my $dom =
+    $conn-&gt;create_domain_with_files($xml, $fds, $flags=0);</a></dt>
+  <dd>Crée un nouveau domaine basé sur la description XML passée dans le
+      paramètre <span class="Li">$xml</span>. L'objet retourné est une instance
+      de la classe Sys::Virt::Domain. Cette méthode n'est pas disponible avec les
+      connexions non privilégiées à l'hyperviseur. Le paramètre
+      <span class="Li">$fds</span> est un tableau de descripteurs de fichiers
+      UNIX qui seront passés au processus init du conteneur. Ceci n'est pris en
+      charge qu'avec la virtualisation basée sur conteneur. Le paramètre
+      <span class="Li">$flags</span> accepte l'une des constantes de CRÉATION DE
+      DOMAINE documentées dans Sys::Virt::Domain, et vaut 0 par défaut si omis.</dd>
+  <dt id="my~5"><a class="permalink" href="#my~5">my $dom =
+    $conn-&gt;define_domain($xml, $flags=0);</a></dt>
+  <dd>Définit, mais ne démarre pas, un nouveau domaine basé sur la description XML
+      passée dans le paramètre <span class="Li">$xml</span>. L'objet retourné
+      est une instance de la classe Sys::Virt::Domain. Cette méthode n'est pas
+      disponible avec les connexions non privilégiées à l'hyperviseur. Le domaine
+      défini</dd>
+</dl>
+</div>
+
+</section>
+</div>
+
+</section>
+                
+            </article>
+            <aside id="content-right">
+                
+            </aside>
+        </main>
+        <footer>
+            
+        </footer>
+    </body>
+</html>
+<dd>Renvoie une liste de tous les domaines actuellement en cours d'exécution connus de l'hyperviseur. Les éléments de la liste renvoyée sont des instances de la classe Sys::Virt::Domain. Cette méthode nécessite O(n) appels RPC, il est donc recommandé d'utiliser la méthode list_all_domains comme alternative plus efficace.</dd>
+<dd>Renvoie le nombre de domaines en cours d'exécution connus de l'hyperviseur. Ceci peut être utilisé comme paramètre maxids pour la méthode list_domain_ids.</dd>
+<dd>Renvoie une liste de tous les identifiants de domaines actuellement connus de l'hyperviseur. Les identifiants peuvent être utilisés avec la méthode get_domain_by_id.</dd>
+<dd>Renvoie une liste de noms de tous les domaines définis, mais non en cours d'exécution, sur l'hyperviseur. Les noms peuvent être utilisés avec la méthode get_domain_by_name.</dd>
+<dd>Renvoie une liste de tous les domaines définis, mais non en cours d'exécution, sur l'hyperviseur. Les éléments de la liste renvoyée sont des instances de la classe Sys::Virt::Domain. Cette méthode nécessite O(n) appels RPC, il est donc recommandé d'utiliser la méthode list_all_domains comme alternative plus efficace.</dd>
+<dd>Renvoie le nombre de domaines définis connus de l'hyperviseur. Ceci peut être utilisé comme paramètre maxnames pour la méthode list_defined_domain_names.</dd>
+<dd>Renvoie une liste de noms de tous les domaines définis, mais non en cours d'exécution, sur l'hôte. Les noms peuvent être utilisés avec la méthode get_network_by_name.</dd>
+<dd>Renvoie une liste de tous les réseaux actuellement connus de l'hyperviseur. Les éléments de la liste renvoyée sont des instances de la classe Sys::Virt::Network. Cette méthode nécessite O(n) appels RPC, il est donc recommandé d'utiliser la méthode list_all_networks comme alternative plus efficace.</dd>
+<dd>Renvoie le nombre de réseaux en cours d'exécution connus de l'hyperviseur. Ceci peut être utilisé comme paramètre maxids pour la méthode list_network_ids.</dd>
+<dd>Renvoie une liste de noms de tous les réseaux actuellement connus de l'hyperviseur. Les noms peuvent être utilisés avec la méthode get_network_by_name.</dd>
+<dd>Renvoie une liste de tous les réseaux définis, mais non en cours d'exécution, sur l'hyperviseur. Les éléments de la liste renvoyée sont des instances de la classe Sys::Virt::Network. Cette méthode nécessite O(n) appels RPC, il est donc recommandé d'utiliser la méthode list_all_networks comme alternative plus efficace.</dd>
+<dd>Renvoie le nombre de réseaux définis connus de l'hôte. Ceci peut être utilisé comme paramètre maxnames pour la méthode list_defined_network_names.</dd>
+<dd>Renvoie une liste de noms de tous les réseaux définis, mais non en cours d'exécution, sur l'hôte. Les noms peuvent être utilisés avec la méthode get_network_by_name.</dd>
+<dl>
+  <dt id="my~30"><a class="permalink" href="#my~30">my @nets =
+    $conn-&gt;list_all_networks($flags)</a></dt>
+  <dd>Retourne une liste de tous les réseaux actuellement connus de l'hyperviseur, qu'ils soient en cours d'exécution ou arrêtés. Les éléments de la liste retournée sont des instances de la classe Sys::Virt::Network. Le paramètre <span class="Li">$flags</span> peut être utilisé pour filtrer la liste des réseaux retournés.</dd>
+  <dt id="my~31"><a class="permalink" href="#my~31">my @pools =
+    $conn-&gt;<b>list_storage_pools()</b></a></dt>
+  <dd>Retourne une liste de tous les pools de stockage actuellement connus de l'hôte. Les éléments de la liste retournée sont des instances de la classe Sys::Virt::StoragePool. Cette méthode nécessite O(n) appels RPC, donc la méthode <span class="Li">&quot;list_all_storage_pools&quot;</span> est recommandée comme alternative plus efficace.</dd>
+  <dt id="my~32"><a class="permalink" href="#my~32">my $npools =
+    $conn-&gt;<b>num_of_storage_pools()</b></a></dt>
+  <dd>Retourne le nombre de pools de stockage en cours d'exécution connus de l'hyperviseur. Ceci peut être utilisé comme paramètre <span class="Li">&quot;maxids&quot;</span> pour <span class="Li">&quot;list_storage_pool_names&quot;</span>.</dd>
+  <dt id="my~33"><a class="permalink" href="#my~33">my @poolNames =
+    $conn-&gt;list_storage_pool_names($maxnames)</a></dt>
+  <dd>Retourne une liste de tous les noms de pools de stockage actuellement connus de l'hyperviseur. Les ID peuvent être utilisés avec la méthode <span class="Li">&quot;get_network_by_id&quot;</span>.</dd>
+  <dt id="my~34"><a class="permalink" href="#my~34">my @pools =
+    $conn-&gt;<b>list_defined_storage_pools()</b></a></dt>
+  <dd>Retourne une liste de tous les pools de stockage définis, mais pas actuellement en cours d'exécution, sur l'hôte. Les éléments de la liste retournée sont des instances de la classe Sys::Virt::StoragePool. Cette méthode nécessite O(n) appels RPC, donc la méthode <span class="Li">&quot;list_all_storage_pools&quot;</span> est recommandée comme alternative plus efficace.</dd>
+  <dt id="my~35"><a class="permalink" href="#my~35">my $npools =
+    $conn-&gt;<b>num_of_defined_storage_pools()</b></a></dt>
+  <dd>Retourne le nombre de réseaux en cours d'exécution connus de l'hôte. Ceci peut être utilisé comme paramètre <span class="Li">&quot;maxnames&quot;</span> pour <span class="Li">&quot;list_defined_storage_pool_names&quot;</span>.</dd>
+  <dt id="my~36"><a class="permalink" href="#my~36">my @names =
+    $conn-&gt;list_defined_storage_pool_names($maxnames)</a></dt>
+  <dd>Retourne une liste de noms de tous les pools de stockage définis, mais pas actuellement en cours d'exécution, sur l'hôte. Les noms peuvent être utilisés avec la méthode <span class="Li">&quot;get_storage_pool_by_name&quot;</span>.</dd>
+  <dt id="my~37"><a class="permalink" href="#my~37">my @pools =
+    $conn-&gt;list_all_storage_pools($flags)</a></dt>
+  <dd>Retourne une liste de tous les pools de stockage actuellement connus de l'hyperviseur, qu'ils soient en cours d'exécution ou arrêtés. Les éléments de la liste retournée sont des instances de la classe Sys::Virt::StoragePool. Le paramètre <span class="Li">$flags</span> peut être utilisé pour filtrer la liste des pools retournés.</dd>
+  <dt id="my~38"><a class="permalink" href="#my~38">my @devs =
+    $conn-&gt;list_node_devices($capability)</a></dt>
+  <dd>Retourne une liste de tous les périphériques actuellement connus du système d'exploitation hôte. Les éléments de la liste retournée sont des instances de la classe Sys::Virt::NodeDevice. Le paramètre optionnel <span class="Li">&quot;capability&quot;</span> permet de restreindre la liste aux seuls périphériques ayant un type de capacité particulier. Cette méthode nécessite O(n) appels RPC, donc la méthode <span class="Li">&quot;list_all_node_devices&quot;</span> est recommandée comme alternative plus efficace.</dd>
+  <dt id="my~39"><a class="permalink" href="#my~39">my $ndevs =
+    $conn-&gt;num_of_node_devices($capability[, $flags])</a></dt>
+  <dd>Retourne le nombre de périphériques hôtes connus de l'hyperviseur. Ceci peut être utilisé comme paramètre <span class="Li">&quot;maxids&quot;</span> pour <span class="Li">&quot;list_node_device_names&quot;</span>. Le paramètre <span class="Li">&quot;capability&quot;</span> permet de restreindre la liste aux seuls périphériques ayant un type de capacité particulier et doit être laissé à <span class="Li">&quot;undef&quot;</span> si la liste complète est requise. Le paramètre optionnel &lt;flags&gt; n'est actuellement pas utilisé et vaut 0 par défaut s'il est omis.</dd>
+  <dt id="my~40"><a class="permalink" href="#my~40">my @devNames =
+    $conn-&gt;list_node_device_names($capability, $maxnames[, $flags])</a></dt>
+  <dd>Retourne une liste de tous les noms de périphériques hôtes actuellement connus de l'hyperviseur. Les noms peuvent être utilisés avec la méthode <span class="Li">&quot;get_node_device_by_name&quot;</span>. Le paramètre <span class="Li">&quot;capability&quot;</span> permet de restreindre la liste aux seuls périphériques ayant un type de capacité particulier et doit être laissé à <span class="Li">&quot;undef&quot;</span> si la liste complète est requise. Le paramètre optionnel &lt;flags&gt; n'est actuellement pas utilisé et vaut 0 par défaut s'il est omis.</dd>
+  <dt id="my~41"><a class="permalink" href="#my~41">my @devs =
+    $conn-&gt;list_all_node_devices($flags)</a></dt>
+  <dd>Retourne une liste de tous les périphériques hôtes actuellement connus de l'hyperviseur. Les éléments de la liste retournée sont des instances de la classe Sys::Virt::NodeDevice. Le paramètre <span class="Li">$flags</span> peut être utilisé pour filtrer la liste des périphériques retournés.</dd>
+  <dt id="my~42"><a class="permalink" href="#my~42">my @ifaces =
+    $conn-&gt;<b>list_interfaces()</b></a></dt>
+  <dd>Retourne une liste de toutes les interfaces réseau actuellement connues de l'hyperviseur. Les éléments de la liste retournée sont des instances de la classe Sys::Virt::Interface. Cette méthode nécessite O(n) appels RPC, donc la méthode <span class="Li">&quot;list_all_interfaces&quot;</span> est recommandée comme alternative plus efficace.</dd>
+  <dt id="my~43"><a class="permalink" href="#my~43">my $nifaces =
+    $conn-&gt;<b>num_of_interfaces()</b></a></dt>
+  <dd>Retourne le nombre d'interfaces en cours d'exécution connues de l'hyperviseur. Ceci peut être utilisé comme paramètre <span class="Li">&quot;maxnames&quot;</span> pour <span class="Li">&quot;list_interface_names&quot;</span>.</dd>
+  <dt id="my~44"><a class="permalink" href="#my~44">my @names =
+    $conn-&gt;list_interface_names($maxnames)</a></dt>
+  <dd>Retourne une liste de tous les noms d'interfaces actuellement connus de l'hyperviseur. Les noms peuvent être utilisés avec la méthode <span class="Li">&quot;get_interface_by_name&quot;</span>.</dd>
+  <dt id="my~45"><a class="permalink" href="#my~45">my @ifaces =
+    $conn-&gt;<b>list_defined_interfaces()</b></a></dt>
+  <dd>Retourne une liste de toutes les interfaces réseau actuellement connues de l'hyperviseur. Les éléments de la liste retournée sont des instances de la classe Sys::Virt::Interface. Cette méthode nécessite O(n) appels RPC, donc la méthode <span class="Li">&quot;list_all_interfaces&quot;</span> est recommandée comme alternative plus efficace.</dd>
+  <dt id="my~46"><a class="permalink" href="#my~46">my $nifaces =
+    $conn-&gt;<b>num_of_defined_interfaces()</b></a></dt>
+  <dd>Retourne le nombre d'interfaces inactives connues de l'hyperviseur. Ceci peut être utilisé comme paramètre <span class="Li">&quot;maxnames&quot;</span> pour <span class="Li">&quot;list_defined_interface_names&quot;</span>.</dd>
+  <dt id="my~47"><a class="permalink" href="#my~47">my @names =
+    $conn-&gt;list_defined_interface_names($maxnames)</a></dt>
+  <dd>Retourne une liste de noms d'interfaces inactives actuellement connues de l'hyperviseur. Les noms peuvent être utilisés avec la méthode <span class="Li">&quot;get_interface_by_name&quot;</span>.</dd>
+  <dt id="my~48"><a class="permalink" href="#my~48">my @ifaces =
+    $conn-&gt;list_all_interfaces($flags)</a></dt>
+  <dd>Retourne une liste de toutes les interfaces actuellement connues de l'hyperviseur, qu'elles soient en cours d'exécution ou arrêtées. Les éléments de la liste retournée sont des instances de la classe Sys::Virt::Interface. Le paramètre <span class="Li">$flags</span> peut être utilisé pour filtrer la liste des interfaces retournées.</dd>
+  <dt id="my~49"><a class="permalink" href="#my~49">my @ifaces =
+    $conn-&gt;<b>list_secrets()</b></a></dt>
+  <dd>Retourne une liste de tous les secrets actuellement connus de l'hyperviseur. Les éléments de la liste retournée sont des instances de la classe Sys::Virt::Secret. Cette méthode nécessite O(n) appels RPC, donc la méthode <span class="Li">&quot;list_all_secrets&quot;</span> est recommandée comme alternative plus efficace.</dd>
+  <dt id="my~50"><a class="permalink" href="#my~50">my $nuuids =
+    $conn-&gt;<b>num_of_secrets()</b></a></dt>
+  <dd>Retourne le nombre de secrets connus de l'hyperviseur. Ceci peut être utilisé comme paramètre <span class="Li">&quot;maxuuids&quot;</span> pour <span class="Li">&quot;list_secrets&quot;</span>.</dd>
+  <dt id="my~51"><a class="permalink" href="#my~51">my @uuids =
+    $conn-&gt;list_secret_uuids($maxuuids)</a></dt>
+  <dd>Retourne une liste de tous les UUID de secrets actuellement connus de l'hyperviseur. Les UUID peuvent être utilisés avec la méthode <span class="Li">&quot;get_secret_by_uuid&quot;</span>.</dd>
+  <dt id="my~52"><a class="permalink" href="#my~52">my @secrets =
+    $conn-&gt;list_all_secrets($flags)</a></dt>
+  <dd>Retourne une liste de tous les secrets actuellement connus de l'hyperviseur. Les éléments de la liste retournée sont des instances de la classe Sys::Virt::Network. Le paramètre <span class="Li">$flags</span> peut être utilisé pour filtrer la liste des secrets retournés.</dd>
+  <dt id="my~53"><a class="permalink" href="#my~53">my @nwfilters =
+    $conn-&gt;<b>list_nwfilters()</b></a></dt>
+  <dd>Retourne une liste de tous les filtres réseau (nwfilters) actuellement connus de l'hyperviseur. Les éléments de la liste retournée sont des instances de la classe Sys::Virt::NWFilter. Cette méthode nécessite O(n) appels RPC, donc la méthode <span class="Li">&quot;list_all_nwfilters&quot;</span> est recommandée comme alternative plus efficace.</dd>
+  <dt id="my~54"><a class="permalink" href="#my~54">my $nnwfilters =
+    $conn-&gt;<b>num_of_nwfilters()</b></a></dt>
+  <dd>Retourne le nombre de filtres réseau (nwfilters) en cours d'exécution connus de l'hyperviseur. Ceci peut être utilisé comme paramètre <span class="Li">&quot;maxids&quot;</span> pour <span class="Li">&quot;list_nwfilter_names&quot;</span>.</dd>
+  <dt id="my~55"><a class="permalink" href="#my~55">my @filterNames =
+    $conn-&gt;list_nwfilter_names($maxnames)</a></dt>
+  <dd>Retourne une liste de tous les noms de filtres réseau (nwfilters) actuellement connus de l'hyperviseur. Les noms peuvent être utilisés avec la méthode <span class="Li">&quot;get_nwfilter_by_name&quot;</span>.</dd>
+  <dt id="my~56"><a class="permalink" href="#my~56">my @nwfilters =
+    $conn-&gt;list_all_nwfilters($flags)</a></dt>
+  <dd>Retourne une liste de tous les filtres réseau (nwfilters) actuellement connus de l'hyperviseur. Les éléments de la liste retournée sont des instances de la classe Sys::Virt::NWFilter. Le paramètre <span class="Li">$flags</span> n'est actuellement pas utilisé et vaut zéro par défaut.</dd>
+  <dt id="my~57"><a class="permalink" href="#my~57">my @bindings =
+    $conn-&gt;list_all_nwfilter_bindings($flags)</a></dt>
+  <dd>Retourne une liste de toutes les liaisons de filtres réseau (nwfilter bindings) actuellement connues de l'hyperviseur. Les éléments de la liste retournée sont des instances de la classe Sys::Virt::NWFilterBinding. Le paramètre <span class="Li">$flags</span> n'est actuellement pas utilisé et vaut zéro par défaut.</dd>
+  <dt>$conn-&gt;define_save_image_xml($file, $dxml, $flags=0)</dt>
+  <dd>Met à jour le XML associé à l'image de sauvegarde d'une machine virtuelle. Le paramètre <span class="Li">$file</span> est le chemin complet vers le XML de l'image de sauvegarde, tandis que <span class="Li">$dxml</span> est le nouveau document XML à écrire. Le paramètre <span class="Li">$flags</span> n'est actuellement pas utilisé et vaut zéro par défaut.</dd>
+  <dt>$xml = $conn-&gt;get_save_image_xml_description($file, $flags=1)</dt>
+  <dd>
+</dl>
+Mantén toda la estructura del archivo.
+Récupération de la configuration XML actuelle associée à l'image de sauvegarde de la machine virtuelle identifiée par <span class="Li">$file</span>. Le paramètre <span class="Li">$flags</span> accepte les mêmes constantes que <span class="Li">&quot;Sys::Virt::Domain::managed_save_get_xml_description&quot;</span>.
+
+dt id="my~58"><a class="permalink" href="#my~58">my $dom = $conn-&gt;get_domain_by_name($name)</a></dt>
+<dd>Retourne le domaine portant le nom <span class="Li">$name</span>. L'objet retourné est une instance de la classe Sys::Virt::Domain.</dd>
+
+dt id="my~59"><a class="permalink" href="#my~59">my $dom = $conn-&gt;get_domain_by_id($id)</a></dt>
+<dd>Retourne le domaine portant l'ID local <span class="Li">$id</span>. L'objet retourné est une instance de la classe Sys::Virt::Domain.</dd>
+
+dt id="my~60"><a class="permalink" href="#my~60">my $dom = $conn-&gt;get_domain_by_uuid($uuid)</a></dt>
+<dd>Retourne le domaine portant l'ID unique global <span class="Li">$uuid</span>. L'objet retourné est une instance de la classe Sys::Virt::Domain.</dd>
+
+dt id="my~61"><a class="permalink" href="#my~61">my $net = $conn-&gt;get_network_by_name($name)</a></dt>
+<dd>Retourne le réseau portant le nom <span class="Li">$name</span>. L'objet retourné est une instance de la classe Sys::Virt::Network.</dd>
+
+dt id="my~62"><a class="permalink" href="#my~62">my $net = $conn-&gt;get_network_by_uuid($uuid)</a></dt>
+<dd>Retourne le réseau portant l'ID unique global <span class="Li">$uuid</span>. L'objet retourné est une instance de la classe Sys::Virt::Network.</dd>
+
+dt id="my~63"><a class="permalink" href="#my~63">my $pool = $conn-&gt;get_storage_pool_by_name($name)</a></dt>
+<dd>Retourne le pool de stockage portant le nom <span class="Li">$name</span>. L'objet retourné est une instance de la classe Sys::Virt::StoragePool.</dd>
+
+dt id="my~64"><a class="permalink" href="#my~64">my $pool = $conn-&gt;get_storage_pool_by_uuid($uuid)</a></dt>
+<dd>Retourne le pool de stockage portant l'ID unique global <span class="Li">$uuid</span>. L'objet retourné est une instance de la classe Sys::Virt::StoragePool.</dd>
+
+dt id="my~65"><a class="permalink" href="#my~65">my $pool = $conn-&gt;get_storage_pool_by_volume($vol)</a></dt>
+<dd>Retourne le pool de stockage contenant le volume de stockage <span class="Li">$vol</span>. Le paramètre <span class="Li">$vol</span> doit être une instance de la classe Sys::Virt::StorageVol. L'objet retourné est une instance de la classe Sys::Virt::StoragePool.</dd>
+
+dt id="my~66"><a class="permalink" href="#my~66">my $pool = $conn-&gt;get_storage_pool_by_target_path($path)</a></dt>
+<dd>Retourne le pool de stockage portant le chemin cible <span class="Li">$path</span>. L'objet retourné est une instance de la classe Sys::Virt::StoragePool.</dd>
+
+dt id="my~67"><a class="permalink" href="#my~67">my $vol = $conn-&gt;get_storage_volume_by_path($path)</a></dt>
+<dd>Retourne le volume de stockage portant l'emplacement <span class="Li">$path</span>. L'objet retourné est une instance de la classe Sys::Virt::StorageVol.</dd>
+
+dt id="my~68"><a class="permalink" href="#my~68">my $vol = $conn-&gt;get_storage_volume_by_key($key)</a></dt>
+<dd>Retourne le volume de stockage portant l'ID unique global <span class="Li">$key</span>. L'objet retourné est une instance de la classe Sys::Virt::StorageVol.</dd>
+
+dt id="my~69"><a class="permalink" href="#my~69">my $dev = $conn-&gt;get_node_device_by_name($name)</a></dt>
+<dd>Retourne le périphérique du nœud portant le nom <span class="Li">$name</span>. L'objet retourné est une instance de la classe Sys::Virt::NodeDevice.</dd>
+
+dt id="my~70"><a class="permalink" href="#my~70">my $dev = $conn-&gt;get_node_device_scsihost_by_wwn($wwnn, $wwpn, $flags=0)</a></dt>
+<dd>Retourne le périphérique du nœud qui est un hôte SCSI identifié par <span class="Li">$wwnn</span> et <span class="Li">$wwpn</span>. Le paramètre <span class="Li">$flags</span> est inutilisé et vaut zéro par défaut. L'objet retourné est une instance de la classe Sys::Virt::NodeDevice.</dd>
+
+dt id="my~71"><a class="permalink" href="#my~71">my $iface = $conn-&gt;get_interface_by_name($name)</a></dt>
+<dd>Retourne l'interface portant le nom <span class="Li">$name</span>. L'objet retourné est une instance de la classe Sys::Virt::Interface.</dd>
+
+dt id="my~72"><a class="permalink" href="#my~72">my $iface = $conn-&gt;get_interface_by_mac($mac)</a></dt>
+<dd>Retourne l'interface portant l'adresse MAC <span class="Li">$mac</span>. L'objet retourné est une instance de la classe Sys::Virt::Interface.</dd>
+
+dt id="my~73"><a class="permalink" href="#my~73">my $sec = $conn-&gt;get_secret_by_uuid($uuid)</a></dt>
+<dd>Retourne le secret portant l'ID unique global <span class="Li">$uuid</span>. L'objet retourné est une instance de la classe Sys::Virt::Secret.</dd>
+
+dt id="my~74"><a class="permalink" href="#my~74">my $sec = $conn-&gt;get_secret_by_usage($usageType, $usageID)</a></dt>
+<dd>Retourne le secret portant le type d'utilisation <span class="Li">$usageType</span>, identifié par <span class="Li">$usageID</span>. L'objet retourné est une instance de la classe Sys::Virt::Secret.</dd>
+
+dt id="my~75"><a class="permalink" href="#my~75">my $nwfilter = $conn-&gt;get_nwfilter_by_name($name)</a></dt>
+<dd>Retourne le domaine portant le nom <span class="Li">$name</span>. L'objet retourné est une instance de la classe Sys::Virt::NWFilter.</dd>
+
+dt id="my~76"><a class="permalink" href="#my~76">my $nwfilter = $conn-&gt;get_nwfilter_by_uuid($uuid)</a></dt>
+<dd>Retourne le filtre réseau portant l'ID unique global <span class="Li">$uuid</span>. L'objet retourné est une instance de la classe Sys::Virt::NWFilter.</dd>
+
+dt id="my~77"><a class="permalink" href="#my~77">my $binding = $conn-&gt;get_nwfilter_binding_by_port_dev($name)</a></dt>
+<dd>Retourne la liaison de filtre réseau pour le périphérique de port <span class="Li">$name</span>. L'objet retourné est une instance de la classe Sys::Virt::NWFilterBinding.</dd>
+
+dt id="my~78"><a class="permalink" href="#my~78">my $xml = $conn-&gt;find_storage_pool_sources($type, $srcspec[, $flags])</a></dt>
+<dd>Sonde les sources de pools de stockage disponibles pour le pool de type <span class="Li">$type</span>. Le paramètre <span class="Li">$srcspec</span> peut être <span class="Li">&quot;undef&quot;</span>, ou un paramètre pour affiner le processus de découverte, par exemple un nom d'hôte de serveur pour la découverte NFS. Le paramètre <span class="Li">$flags</span> est facultatif et vaut zéro par défaut s'il est omis. Le scalaire retourné est un document XML décrivant les sources de pools de stockage découvertes.</dd>
+
+dt id="my~79"><a class="permalink" href="#my~79">my @stats = $conn-&gt;get_all_domain_stats($stats, \@doms=undef, $flags=0);</a></dt>
+<dd>Obtient une liste de toutes les statistiques pour les domaines connus de l'hyperviseur. Le paramètre <span class="Li">$stats</span> contrôle quels champs de données retourner et doit être une combinaison des CONSTANTES DE CHAMPS STATISTIQUES DE DOMAINE.
+<p class="Pp">Le paramètre facultatif <span class="Li">@doms</span> est une liste d'objets Sys::Virt::Domain pour lesquels retourner les statistiques. S'il est indéfini, tous les domaines seront retournés. La méthode <span class="Li">$flags</span> peut être utilisée pour filtrer la liste des domaines retournés.</p>
+<p class="Pp">Les données retournées par la méthode sont une liste, un élément pour chaque domaine. L'élément sera une hash avec deux clés, <span class="Li">&quot;dom&quot;</span> pointant vers une instance de <span class="Li">&quot;Sys::Virt::Domain&quot;</span> et <span class="Li">&quot;data&quot;</span> pointant vers une autre référence de hash contenant les statistiques réelles.</p>
+</dd>
+
+dt id="my~80"><a class="permalink" href="#my~80">my $hostname = $conn-&gt;<b>get_hostname()</b></a></dt>
+<dd>Retourne le nom de l'hôte auquel cette connexion est associée.</dd>
+
+dt id="my~81"><a class="permalink" href="#my~81">my $uri = $conn-&gt;<b>get_uri()</b></a></dt>
+<dd>Retourne l'URI associée à la connexion ouverte. Cela peut être différent de l'URI utilisée lors de la connexion initiale à libvirt, lorsque des "probations automatiques" ou des pilotes se produisent.</dd>
+
+dt id="my~82"><a class="permalink" href="#my~82">my $xml = $conn-&gt;<b>get_sysinfo()</b></a></dt>
+<dd>Retourne une représentation XML documentée des informations du système hôte, généralement obtenues à partir des tables SMBIOS.</dd>
+
+dt id="my~83"><a class="permalink" href="#my~83">my $type = $conn-&gt;<b>get_type()</b></a></dt>
+<dd>Retourne le type de backend de virtualisation accédé par cet objet hyperviseur. Actuellement, le seul type pris en charge est <span class="Li">&quot;Xen&quot;</span>.</dd>
+
+dt id="my~84"><a class="permalink" href="#my~84">my $xml = $conn-&gt;domain_xml_from_native($format, $config);</a></dt>
+<dd>Convertit la configuration native de l'hyperviseur <span class="Li">$config</span>, qui est au format &lt;$format&gt;, en XML de domaine libvirrt. Les valeurs valides de <span class="Li">$format</span> varient selon les pilotes d'hyperviseur.</dd>
+
+dt id="my~85"><a class="permalink" href="#my~85">my $config = $conn-&gt;domain_xml_to_native($format, $xml)</a></dt>
+<dd>Convertit la configuration XML de domaine libvirt <span class="Li">$xml</span> en une configuration native de l'hyperviseur au format <span class="Li">$format</span></dd>
+
+dt id="my~86"><a class="permalink" href="#my~86">my $ver = $conn-&gt;<b>get_version()</b></a></dt>
+<dd>Retourne le numéro de version complet sous forme de chaîne encodée selon la formule <span class="Li">&quot;(major * 1000000) + (minor * 1000) + micro&quot;</span>.</dd>
+
+dt id="my~87"><a class="permalink" href="#my~87">my $ver = $conn-&gt;get_major_version</a></dt>
+<dd>Retourne le numéro de version majeur de la bibliothèque libvirt.</dd>
+
+dt id="my~88"><a class="permalink" href="#my~88">my $ver = $conn-&gt;get_minor_version</a></dt>
+<dd>Retourne le numéro de version mineur de la bibliothèque libvirt.</dd>
+
+dt id="my~89"><a class="permalink" href="#my~89">my $ver = $conn-&gt;get_micro_version</a></dt>
+<dd>Retourne le numéro de version micro de la bibliothèque libvirt.</dd>
+
+dt id="my~90"><a class="permalink" href="#my~90">my $ver = $conn-&gt;get_library_version</a></dt>
+<dd>Retourne le numéro de version de l'API associé à la connexion active. Ceci diffère de <span class="Li">&quot;get_version&quot;</span> car si la connexion est à un démon libvirtd distant, elle retournera la version de l'API de la bibliothèque.</dd><dl class="Bl-tag">
+  <dt id="my~91"><a class="permalink" href="#my~91">my $info = $con-&gt;<b>get_node_info()</b></a></dt>
+  <dd>Retourne une référence de hachage résumant les capacités du nœud hôte. Les éléments du hachage sont les suivants :</dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="memory"><a class="permalink" href="#memory">memory</a></dt>
+  <dd>La quantité de mémoire physique sur l'hôte</dd>
+  <dt id="model"><a class="permalink" href="#model">model</a></dt>
+  <dd>Le modèle du CPU, par exemple x86_64</dd>
+  <dt id="cpus"><a class="permalink" href="#cpus">cpus</a></dt>
+  <dd>Le nombre total de CPU logiques.</dd>
+  <dt id="mhz"><a class="permalink" href="#mhz">mhz</a></dt>
+  <dd>Le pic de MHZ du CPU</dd>
+  <dt id="nodes"><a class="permalink" href="#nodes">nodes</a></dt>
+  <dd>Le nombre de cellules NUMA</dd>
+  <dt id="sockets"><a class="permalink" href="#sockets">sockets</a></dt>
+  <dd>Le nombre de sockets CPU</dd>
+  <dt id="cores"><a class="permalink" href="#cores">cores</a></dt>
+  <dd>Le nombre de cœurs par socket</dd>
+  <dt id="threads"><a class="permalink" href="#threads">threads</a></dt>
+  <dd>Le nombre de threads par cœur</dd>
+</dl>
+</div>
+<div class="Bd-indent">
+<p class="Pp">NB, des informations plus précises sur le nombre total de CPU et ceux en ligne peuvent être obtenues en utilisant la méthode <span class="Li">&quot;get_node_cpu_map&quot;</span>.</p>
+</div>
+<dl class="Bl-tag">
+  <dt id="my~92"><a class="permalink" href="#my~92">my ($totcpus, $onlinemap, $totonline) = $con-&gt;<b>get_node_cpu_map()</b>;</a></dt>
+  <dd>Retourne un tableau contenant des informations sur les CPU disponibles sur l'hôte. Le premier élément, <span class="Li">&quot;totcpus&quot;</span>, spécifie le nombre total de CPU disponibles pour l'hôte, quelle que soit leur statistique en ligne. Le second élément, <span class="Li">&quot;onlinemap&quot;</span>, fournit une carte bitmap détaillant quels CPU sont actuellement en ligne. Le troisième élément, <span class="Li">&quot;totonline&quot;</span>, spécifie le nombre total de CPU en ligne. Les valeurs dans la carte bitmap peuvent être extraites en utilisant la méthode <span class="Li">&quot;unpack&quot;</span> comme suit :
+        <pre>my @onlinemap = split(//, unpack(&quot;b*&quot;, $onlinemap));</pre>
+  </dd>
+  <dt id="my~93"><a class="permalink" href="#my~93">my $info = $con-&gt;get_node_cpu_stats($cpuNum=-1, $flags=0)</a></dt>
+  <dd>Retourne une référence de hachage fournissant des informations sur les statistiques du CPU de l'hôte. Si &lt;$cpuNum&gt; est omis, il prend par défaut <span class="Li">&quot;Sys::Virt::NODE_CPU_STATS_ALL_CPUS&quot;</span>, ce qui entraîne le retour d'informations cumulées pour tous les CPU de l'hôte. Si <span class="Li">$cpuNum</span> est zéro ou plus, il retourne des informations uniquement pour le numéro spécifié. Le paramètre <span class="Li">$flags</span> n'est actuellement pas utilisé et prend par défaut la valeur zéro. Les champs de la référence de hachage retournée sont :</dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="kernel"><a class="permalink" href="#kernel">kernel</a></dt>
+  <dd>Le temps passé dans l'espace noyau</dd>
+  <dt id="user"><a class="permalink" href="#user">user</a></dt>
+  <dd>Le temps passé dans l'espace utilisateur</dd>
+  <dt id="idle"><a class="permalink" href="#idle">idle</a></dt>
+  <dd>Le temps d'inactivité</dd>
+  <dt id="iowait"><a class="permalink" href="#iowait">iowait</a></dt>
+  <dd>Le temps d'attente des entrées/sorties</dd>
+  <dt id="utilization"><a class="permalink" href="#utilization">utilization</a></dt>
+  <dd>Le pourcentage global d'utilisation.</dd>
+</dl>
+</div>
+<dl class="Bl-tag">
+  <dt id="my~94"><a class="permalink" href="#my~94">my $info = $con-&gt;get_node_memory_stats($cellNum=-1, $flags=0)</a></dt>
+  <dd>Retourne une référence de hachage fournissant des informations sur les statistiques de mémoire de l'hôte. Si &lt;$cellNum&gt; est omis, il prend par défaut <span class="Li">&quot;Sys::Virt::NODE_MEMORY_STATS_ALL_CELLS&quot;</span>, ce qui entraîne le retour d'informations cumulées pour toutes les cellules NUMA de l'hôte. Si <span class="Li">$cellNum</span> est zéro ou plus, il retourne des informations uniquement pour le numéro spécifié. Le paramètre <span class="Li">$flags</span> n'est actuellement pas utilisé et prend par défaut la valeur zéro. Les champs de la référence de hachage retournée sont :</dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="total"><a class="permalink" href="#total">total</a></dt>
+  <dd>La mémoire totale</dd>
+  <dt id="free"><a class="permalink" href="#free">free</a></dt>
+  <dd>La mémoire libre</dd>
+  <dt id="buffers"><a class="permalink" href="#buffers">buffers</a></dt>
+  <dd>La mémoire consommée par les tampons</dd>
+  <dt id="cached"><a class="permalink" href="#cached">cached</a></dt>
+  <dd>La mémoire consommée pour le cache</dd>
+</dl>
+</div>
+<dl class="Bl-tag">
+  <dt id="my~95"><a class="permalink" href="#my~95">my $params = $conn-&gt;get_node_memory_parameters($flags=0)</a></dt>
+  <dd>Retourne une référence de hachage contenant l'ensemble des paramètres ajustables de mémoire pour le nœud. Les clés du hachage sont l'une des constantes PARAMÈTRES DE MÉMOIRE décrites plus loin. Le paramètre <span class="Li">$flags</span> n'est actuellement pas utilisé et prend par défaut la valeur 0 s'il est omis.</dd>
+  <dt>$conn-&gt;set_node_memory_parameters($params, $flags=0)</dt>
+  <dd>Met à jour les paramètres ajustables de mémoire pour le nœud. Le paramètre <span class="Li">$params</span> doit être une référence de hachage dont les clés sont l'une des constantes PARAMÈTRES DE MÉMOIRE. Le paramètre <span class="Li">$flags</span> n'est actuellement pas utilisé et prend par défaut la valeur 0 s'il est omis.</dd>
+  <dt>$info = $conn-&gt;get_node_sev_info($flags=0)</dt>
+  <dd>Obtient les informations AMD SEV pour l'hôte. <span class="Li">$flags</span> n'est actuellement pas utilisé et prend par défaut la valeur 0 s'il est omis. Le hachage retourné contient les clés suivantes :</dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="Sys::Virt::SEV_CBITPOS"><a class="permalink" href="#Sys::Virt::SEV_CBITPOS">Sys::Virt::SEV_CBITPOS</a></dt>
+  <dd>La position du CBit</dd>
+  <dt id="Sys::Virt::SEV_CERT_CHAIN"><a class="permalink" href="#Sys::Virt::SEV_CERT_CHAIN">Sys::Virt::SEV_CERT_CHAIN</a></dt>
+  <dd>La chaîne de certificats</dd>
+  <dt id="Sys::Virt::SEV_PDH"><a class="permalink" href="#Sys::Virt::SEV_PDH">Sys::Virt::SEV_PDH</a></dt>
+  <dd>Clé de clé Diffie-Hellman de la plateforme</dd>
+  <dt id="Sys::Virt::SEV_REDUCED_PHYS_BITS"><a class="permalink" href="#Sys::Virt::SEV_REDUCED_PHYS_BITS">Sys::Virt::SEV_REDUCED_PHYS_BITS</a></dt>
+  <dd>Le nombre de bits d'adresse physique utilisés par SEV</dd>
+  <dt id="Sys::Virt::SEV_MAX_GUESTS"><a class="permalink" href="#Sys::Virt::SEV_MAX_GUESTS">Sys::Virt::SEV_MAX_GUESTS</a></dt>
+  <dd>Nombre maximum d'invités SEV pouvant être lancés</dd>
+  <dt id="Sys::Virt::SEV_MAX_ES_GUESTS"><a class="permalink" href="#Sys::Virt::SEV_MAX_ES_GUESTS">Sys::Virt::SEV_MAX_ES_GUESTS</a></dt>
+  <dd>Nombre maximum d'invités SEV-ES pouvant être lancés</dd>
+  <dt id="Sys::Virt::SEV_CPU0_ID"><a class="permalink" href="#Sys::Virt::SEV_CPU0_ID">Sys::Virt::SEV_CPU0_ID</a></dt>
+  <dd>L'identifiant du firmware SEV pour le CPU 0</dd>
+</dl>
+</div>
+<dl class="Bl-tag">
+  <dt>$conn-&gt;node_suspend_for_duration($target, $duration, $flags=0)</dt>
+  <dd>Suspend l'hôte, en utilisant le mode <span class="Li">$target</span> qui est l'une des constantes NODE SUSPEND listées plus loin. Le paramètre <span class="Li">$duration</span> contrôle la durée pendant laquelle le nœud est suspendu avant de se réveiller.</dd>
+  <dt>$conn-&gt;domain_event_register($callback)</dt>
+  <dd>Enregistre une fonction de rappel pour recevoir des notifications d'événements de changement d'état de domaine. Une seule fonction de rappel peut être enregistrée avec chaque instance de connexion. La fonction de rappel sera appelée avec quatre paramètres : une instance de <span class="Li">&quot;Sys::Virt&quot;</span> pour la connexion, une instance de <span class="Li">&quot;Sys::Virt::Domain&quot;</span> pour le domaine dont l'état change, et des arguments <span class="Li">&quot;event&quot;</span> et <span class="Li">&quot;detail&quot;</span>, correspondant aux constantes d'événement définies dans le module <span class="Li">&quot;Sys::Virt::Domain&quot;</span>. Avant de supprimer l'objet de connexion, la fonction de rappel doit être désenregistrée, sinon la mémoire de l'objet de connexion ne sera jamais libérée par le ramasse-miettes.</dd>
+  <dt>$conn-&gt;<b>domain_event_deregister()</b></dt>
+  <dd>Désenregistre une fonction de rappel, permettant à l'objet de connexion d'être récupéré par le ramasse-miettes.</dd>
+  <dt>$callbackID = $conn-&gt;domain_event_register_any($dom, $eventID, $callback)</dt>
+  <dd>Enregistre une fonction de rappel pour recevoir des notifications d'événements de domaine. Le paramètre <span class="Li">$dom</span> peut être <span class="Li">&quot;undef&quot;</span> pour demander des événements sur tous les domaines connus, ou un objet <span class="Li">&quot;Sys::Virt::Domain&quot;</span> spécifique pour filtrer les événements. Le paramètre <span class="Li">$eventID</span> est l'une des constantes EVENT ID décrites plus loin dans ce document. Le paramètre <span class="Li">$callback</span> est une référence de sous-routine qui recevra les événements.
+    <p class="Pp">Toutes les fonctions de rappel reçoivent une connexion <span class="Li">&quot;Sys::Virt&quot;</span> comme premier paramètre et un objet <span class="Li">&quot;Sys::Virt::Domain&quot;</span> indiquant le domaine sur lequel l'événement s'est produit comme deuxième paramètre. Les paramètres suivants varient selon le type d'événement.</p>
+  </dd>
+</dl>
+ constants décrits plus loin. Les
+      paramètres <span class="Li">&quot;local&quot;</span> et
+      <span class="Li">&quot;remote&quot;</span> suivent avec les
+      détails des adresses réseau locales et distantes.
+      <span class="Li">&quot;authScheme&quot;</span> décrit comment l'utilisateur a été
+      authentifié (le cas échéant). Enfin
+      <span class="Li">&quot;identities&quot;</span> est une référence de tableau contenant
+      les identités authentifiées pour l'utilisateur, le cas échéant.</dd>
+</dl>
+</div>
+<div class="Bd-indent">
+<p class="Pp">La valeur de retour est un ID de rappel unique qui doit être utilisé lors de
+    la désinscription de l'événement.</p>
+</div>
+<dl class="Bl-tag">
+  <dt>$conn-&gt;domain_event_deregister_any($callbackID)</dt>
+  <dd>Désinscrit un rappel, associé au
+      <span class="Li">$callbackID</span> obtenu précédemment à partir de
+      <span class="Li">&quot;domain_event_register_any&quot;</span>.</dd>
+  <dt>$callbackID = $conn-&gt;network_event_register_any($net, $eventID,
+    $callback)</dt>
+  <dd>Enregistre un rappel pour recevoir des notifications d'événements réseau. Le
+      paramètre <span class="Li">$net</span> peut être
+      <span class="Li">&quot;undef&quot;</span> pour demander des événements sur tous les réseaux connus,
+      ou un objet
+      <span class="Li">&quot;Sys::Virt::Network&quot;</span> spécifique pour filtrer les événements.
+      Le paramètre <span class="Li">$eventID</span> est l'une des constantes ID D'ÉVÉNEMENT
+      décrites plus loin dans ce document. Le
+      <span class="Li">$callback</span> est une référence de sous-routine qui recevra les événements.
+    <p class="Pp">Tous les rappels reçoivent une connexion
+        <span class="Li">&quot;Sys::Virt&quot;</span> comme premier paramètre et un objet
+        <span class="Li">&quot;Sys::Virt::Network&quot;</span> indiquant le réseau sur lequel l'événement s'est produit comme deuxième paramètre. Les paramètres suivants varient en fonction du type d'événement.</p>
+  </dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="EVENT_ID_LIFECYCLE~2"><a class="permalink" href="#EVENT_ID_LIFECYCLE~2">EVENT_ID_LIFECYCLE</a></dt>
+  <dd>Paramètres supplémentaires <span class="Li">&quot;event&quot;</span> et
+      <span class="Li">&quot;detail&quot;</span> définissant la transition de cycle de vie qui s'est produite.</dd>
+</dl>
+</div>
+<div class="Bd-indent">
+<p class="Pp">La valeur de retour est un ID de rappel unique qui doit être utilisé lors de
+    la désinscription de l'événement.</p>
+</div>
+<dl class="Bl-tag">
+  <dt>$conn-&gt;network_event_deregister_any($callbackID)</dt>
+  <dd>Désinscrit un rappel, associé au
+      <span class="Li">$callbackID</span> obtenu précédemment à partir de
+      <span class="Li">&quot;network_event_register_any&quot;</span>.</dd>
+  <dt>$callbackID = $conn-&gt;storage_pool_event_register_any($pool, $eventID,
+    $callback)</dt>
+  <dd>Enregistre un rappel pour recevoir des notifications d'événements de pool de stockage. Le
+      paramètre <span class="Li">$pool</span> peut être
+      <span class="Li">&quot;undef&quot;</span> pour demander des événements sur tous les pools de stockage connus,
+      ou un objet
+      <span class="Li">&quot;Sys::Virt::StoragePool&quot;</span> spécifique pour filtrer les événements. Le paramètre <span class="Li">$eventID</span> est l'une des constantes ID D'ÉVÉNEMENT décrites plus loin dans ce document. Le
+      <span class="Li">$callback</span> est une référence de sous-routine qui recevra les événements.
+    <p class="Pp">Tous les rappels reçoivent une connexion
+        <span class="Li">&quot;Sys::Virt&quot;</span> comme premier paramètre et un objet
+        <span class="Li">&quot;Sys::Virt::StoragePool&quot;</span> indiquant le pool de stockage sur lequel l'événement s'est produit comme deuxième paramètre. Les paramètres suivants varient en fonction du type d'événement.</p>
+  </dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="EVENT_ID_LIFECYCLE~3"><a class="permalink" href="#EVENT_ID_LIFECYCLE~3">EVENT_ID_LIFECYCLE</a></dt>
+  <dd>Paramètres supplémentaires <span class="Li">&quot;event&quot;</span> et
+      <span class="Li">&quot;detail&quot;</span> définissant la transition de cycle de vie qui s'est produite.</dd>
+  <dt id="EVENT_ID_REFRESH"><a class="permalink" href="#EVENT_ID_REFRESH">EVENT_ID_REFRESH</a></dt>
+  <dd>Aucun paramètre supplémentaire.</dd>
+</dl>
+</div>
+<div class="Bd-indent">
+<p class="Pp">La valeur de retour est un ID de rappel unique qui doit être utilisé lors de
+    la désinscription de l'événement.</p>
+</div>
+<dl class="Bl-tag">
+  <dt>$conn-&gt;storage_pool_event_deregister_any($callbackID)</dt>
+  <dd>Désinscrit un rappel, associé au
+      <span class="Li">$callbackID</span> obtenu précédemment à partir de
+      <span class="Li">&quot;storage_pool_event_register_any&quot;</span>.</dd>
+  <dt>$callbackID = $conn-&gt;node_device_event_register_any($dev, $eventID,
+    $callback)</dt>
+  <dd>Enregistre un rappel pour recevoir des notifications d'événements de périphérique de nœud. Le
+      paramètre <span class="Li">$dev</span> peut être
+      <span class="Li">&quot;undef&quot;</span> pour demander des événements sur tous les périphériques de nœud connus,
+      ou un objet
+      <span class="Li">&quot;Sys::Virt::NodeDevice&quot;</span> spécifique pour filtrer les événements. Le paramètre <span class="Li">$eventID</span> est l'une des constantes ID D'ÉVÉNEMENT décrites plus loin dans ce document. Le
+      <span class="Li">$callback</span> est une référence de sous-routine qui recevra les événements.
+    <p class="Pp">Tous les rappels reçoivent une connexion
+        <span class="Li">&quot;Sys::Virt&quot;</span> comme premier paramètre et un objet
+        <span class="Li">&quot;Sys::Virt::NodeDevice&quot;</span> indiquant le périphérique de nœud sur lequel l'événement s'est produit comme deuxième paramètre. Les paramètres suivants varient en fonction du type d'événement.</p>
+  </dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="EVENT_ID_LIFECYCLE~4"><a class="permalink" href="#EVENT_ID_LIFECYCLE~4">EVENT_ID_LIFECYCLE</a></dt>
+  <dd>Paramètres supplémentaires <span class="Li">&quot;event&quot;</span> et
+      <span class="Li">&quot;detail&quot;</span> définissant la transition de cycle de vie qui s'est produite.</dd>
+</dl>
+</div>
+<div class="Bd-indent">
+<p class="Pp">La valeur de retour est un ID de rappel unique qui doit être utilisé lors de
+    la désinscription de l'événement.</p>
+</div>
+<dl class="Bl-tag">
+  <dt>$conn-&gt;node_device_event_deregister_any($callbackID)</dt>
+  <dd>Désinscrit un rappel, associé au
+      <span class="Li">$callbackID</span> obtenu précédemment à partir de
+      <span class="Li">&quot;node_device_event_register_any&quot;</span>.</dd>
+  <dt>$callbackID = $conn-&gt;secret_event_register_any($secret, $eventID,
+    $callback)</dt>
+  <dd>Enregistre un rappel pour recevoir des notifications d'événements secrets. Le
+      paramètre <span class="Li">$secret</span> peut être
+      <span class="Li">&quot;undef&quot;</span> pour demander des événements sur tous les secrets connus,
+      ou un objet
+      <span class="Li">&quot;Sys::Virt::Secret&quot;</span> spécifique pour filtrer les événements. Le paramètre <span class="Li">$eventID</span> est l'une des constantes ID D'ÉVÉNEMENT décrites plus loin dans ce document. Le
+      <span class="Li">$callback</span> est une référence de sous-routine qui recevra les événements.
+    <p class="Pp">Tous les rappels reçoivent une connexion
+        <span class="Li">&quot;Sys::Virt&quot;</span> comme premier paramètre et un objet
+        <span class="Li">&quot;Sys::Virt::Secret&quot;</span> indiquant le secret sur lequel l'événement s'est produit comme deuxième paramètre. Les paramètres suivants varient en fonction du type d'événement.</p>
+  </dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="EVENT_ID_LIFECYCLE~5"><a class="permalink" href="#EVENT_ID_LIFECYCLE~5">EVENT_ID_LIFECYCLE</a></dt>
+  <dd>Paramètres supplémentaires <span class="Li">&quot;event&quot;</span> et
+      <span class="Li">&quot;detail&quot;</span> définissant la transition de cycle de vie qui s'est produite.</dd>
+  <dt id="EVENT_ID_VALUE_CHANGED"><a class="permalink" href="#EVENT_ID_VALUE_CHANGED">EVENT_ID_VALUE_CHANGED</a></dt>
+  <dd>Aucun paramètre supplémentaire.</dd>
+</dl>
+</div>
+<div class="Bd-indent">
+<p class="Pp">La valeur de retour est un ID de rappel unique qui doit être utilisé lors de
+    la désinscription de l'événement.</p>
+</div>
+<dl class="Bl-tag">
+  <dt>$conn-&gt;secret_event_deregister_any($callbackID)</dt>
+  <dd>Désinscrit un rappel, associé au
+      <span class="Li">$callbackID</span> obtenu précédemment à partir de
+      <span class="Li">&quot;secret_event_register_any&quot;</span>.</dd>
+  <dt>$conn-&gt;register_close_callback($coderef);</dt>
+  <dd>Enregistre un rappel à invoquer lorsque la connexion est fermée. Le
+      rappel sera invoqué avec deux paramètres, la connexion
+      <span class="Li">$conn</span> sur laquelle il a été enregistré, et la raison
+      de l'événement de fermeture. La valeur de raison sera l'une des
+      <span class="Li">&quot;CONSTANTES DE RAISON DE FERMETURE&quot;</span> listées plus loin dans ce document.</dd>
+  <dt>$conn-&gt;<b>unregister_close_callback()</b>;</dt>
+  <dd>Supprime le rappel de fermeture précédemment enregistré.</dd>
+  <dt id="my~96"><a class="permalink" href="#my~96">my $xml =
+    $con-&gt;baseline_cpu(\@xml, $flags=0)</a></dt>
+  <dd>Étant donné une référence de tableau dont les éléments sont des documents XML décrivant les CPU de l'hôte,
+      calcule le modèle de CPU de base qui est opérationnel sur tous les hôtes. Le XML
+      du modèle de CPU de base est retourné. Le paramètre optionnel
+      <span class="Li">$flags</span> peut prendre l'une des valeurs suivantes.</dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="Sys::Virt::BASELINE_CPU_EXPAND_FEATURES"><a class="permalink" href="#Sys::Virt::BASELINE_CPU_EXPAND_FEATURES">Sys::Virt::BASELINE_CPU_EXPAND_FEATURES</a></dt>
+  <dd>Développe la définition du CPU pour lister tous les indicateurs de fonctionnalité, même ceux implicites par
+      le nom du modèle.</dd>
+  <dt id="Sys::Virt::BASELINE_CPU_MIGRATABLE"><a class="permalink" href="#Sys::Virt::BASELINE_CPU_MIGRATABLE">Sys::Virt::BASELINE_CPU_MIGRATABLE</a></dt>
+  <dd>Inclut uniquement les fonctionnalités qui peuvent être migrées à chaud.</dd>
+  <dt id="Sys::Virt::BASELINE_CPU_IGNORE_HOST"><a class="permalink" href="#Sys::Virt::BASELINE_CPU_IGNORE_HOST">Sys::Virt::BASELINE_CPU_IGNORE_HOST</a></dt>
+  <dd>Lorsque plusieurs définitions de CPU sont disponibles, ne rend pas le résultat
+      dépendant du CPU de l'hôte actuel.</dd>
+</dl>
+</div>
+<dl class="Bl-tag">
+  <dt id="my~97"><a class="permalink" href="#my~97">my $xml =
+    $con-&gt;baseline_hypervisor_cpu($emulator, $arch, $machine, $virttype,
+    \@xml, $flags=0)</a></dt>
+  <dd>Étant donné une référence de tableau dont les éléments sont des documents XML décrivant les CPU de l'hôte,
+      calcule le modèle de CPU de base qui est opérationnel sur tous les hôtes. Le XML
+      du modèle de CPU de base est retourné. Soit
+      <span class="Li">$emulator</span> soit <span class="Li">$arch</span> doit être
+      une chaîne de caractères valide faisant référence à un émulateur binaire ou un nom d'architecture
+      respectivement. Le paramètre <span class="Li">$machine</span> est un
+      nom optionnel d'une machine invitée, et <span class="Li">$virttype</span> est
+      un nom optionnel du type de virtualisation. Le paramètre optionnel
+      <span class="Li">$flags</span> accepte les mêmes valeurs que
+      <span class="Li">&quot;baseline_cpu&quot;</span>.</dd>
+  <dt>@names = $con-&gt;get_cpu_model_names($arch, $flags=0)</dt>
+  <dd>Obtient une liste des noms de modèles de CPU valides pour l'architecture donnée par
+      <span class="Li">$arch</span>. La valeur de <span class="Li">$arch</span>
+      devrait être l'une des architectures listées dans le document XML des capacités. Le paramètre <span class="Li">$flags</span> n'est actuellement pas utilisé et vaut par défaut 0.</dd>
+  <dt id="my~98"><a class="permalink" href="#my~98">my $info =
+    $con-&gt;<b>get_node_security_model()</b></a></dt>
+  <dd>Retourne une référence de hachage résumant le modèle de sécurité du nœud hôte.
+      Il y a deux clés dans le hachage, <span class="Li">&quot;model&quot;</span>
+      spécifiant le nom du modèle de sécurité (par exemple 'selinux') et
+      <span class="Li">&quot;doi&quot;</span> spécifiant le 'domaine d'interprétation' pour les étiquettes de sécurité.</dd>
+  <dt id="my~99"><a class="permalink" href="#my~99">my $xml =
+    $con-&gt;<b>get_capabilities()</b>;</a></dt>
+  <dd>Retourne un document XML décrivant les capacités de l'hyperviseur</dd>
+  <dt id="my~100"><a class="permalink" href="#my~100">my $xml =
+    $con-&gt;get_domain_capabilities($emulator, $arch, $machine, $virttype,
+    flags=0);</a></dt>
+  <dd>Retourne un document XML décrivant les capacités de la configuration d'invité demandée. Soit <span class="Li">$emulator</span>, soit <span class="Li">$arch</span> doit être une chaîne de caractères valide faisant référence à un binaire d'émulateur ou à un nom d'architecture respectivement. Le paramètre <span class="Li">$machine</span> est un nom optionnel d'une machine d'invité, et <span class="Li">$virttype</span> est un nom optionnel du type de virtualisation. <span class="Li">$flags</span> vaut par défaut zéro et accepte une ou plusieurs des constantes suivantes :</dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt>$Sys::Virt::DOMAIN_CAPABILITIES_DISABLE_DEPRECATED_FEATURES</dt>
+  <dd>Désactive les fonctionnalités obsolètes lors de la notification des informations sur le modèle de CPU.</dd>
+</dl>
+</div>
+<dl class="Bl-tag">
+  <dt id="my~101"><a class="permalink" href="#my~101">my $xml =
+    $con-&gt;get_storage_pool_capabilities($flags=0);</a></dt>
+  <dd>Retourne un document XML décrivant les capacités du pilote de pool de stockage (par exemple, quels types de pools de stockage sont pris en charge, etc.).
+      <span class="Li">$flags</span> est actuellement inutilisé et vaut par défaut
+    zéro.</dd>
+  <dt id="my~102"><a class="permalink" href="#my~102">my $result =
+    $con-&gt;compare_cpu($xml, $flags=0);</a></dt>
+  <dd>Vérifie si la définition du CPU dans <span class="Li">$xml</span> est
+      compatible avec la connexion hyperviseur actuelle. Cela peut être utilisé pour
+      déterminer s'il est sûr de migrer un invité vers cet hôte. Le
+      résultat retourné est l'une des constantes listées plus loin. Le paramètre optionnel
+      <span class="Li">$flags</span> peut prendre l'une des constantes suivantes :</dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="Sys::Virt::COMPARE_CPU_FAIL_INCOMPATIBLE"><a class="permalink" href="#Sys::Virt::COMPARE_CPU_FAIL_INCOMPATIBLE">Sys::Virt::COMPARE_CPU_FAIL_INCOMPATIBLE</a></dt>
+  <dd>Lève une erreur fatale si les CPUs ne sont pas compatibles, au lieu de simplement
+      retourner un code d'erreur spécial.</dd>
+  <dt id="Sys::Virt::COMPARE_CPU_VALIDATE_XML"><a class="permalink" href="#Sys::Virt::COMPARE_CPU_VALIDATE_XML">Sys::Virt::COMPARE_CPU_VALIDATE_XML</a></dt>
+  <dd>Valide le document XML d'entrée par rapport au schéma RNG.</dd>
+</dl>
+</div>
+<dl class="Bl-tag">
+  <dt id="my~103"><a class="permalink" href="#my~103">my $result =
+    $con-&gt;compare_hypervisor_cpu($emulator, $arch, $machine, $virttype, $xml,
+    $flags=0);</a></dt>
+  <dd>Vérifie si la définition du CPU dans <span class="Li">$xml</span> est
+      compatible avec la connexion hyperviseur actuelle. Cela peut être utilisé pour
+      déterminer s'il est sûr de migrer un invité vers cet hôte. Soit
+      <span class="Li">$emulator</span>, soit <span class="Li">$arch</span> doit être
+      une chaîne de caractères valide faisant référence à un binaire d'émulateur
+      ou à un nom d'architecture respectivement. Le paramètre <span class="Li">$machine</span> est un
+      nom optionnel d'une machine d'invité, et <span class="Li">$virttype</span> est
+      un nom optionnel du type de virtualisation. Le résultat retourné est l'un des
+      constantes listées plus loin. Le paramètre optionnel <span class="Li">$flags</span>
+      peut prendre les mêmes valeurs que la méthode
+      <span class="Li">&quot;compare_cpu&quot;</span>.</dd>
+  <dt>$mem = $con-&gt;<b>get_node_free_memory()</b>;</dt>
+  <dd>Retourne la mémoire libre actuelle sur l'hôte.</dd>
+  <dt>@mem = $con-&gt;get_node_cells_free_memory($start, $end);</dt>
+  <dd>Retourne la mémoire libre de chaque cellule NUMA entre
+      <span class="Li">$start</span> et <span class="Li">$end</span>.</dd>
+  <dt>@pages = $con-&gt;get_node_free_pages(\@pagesizes, $start, $end);</dt>
+  <dd>Retourne des informations sur le nombre de pages libres dans chaque cellule NUMA
+      entre <span class="Li">$start</span> et <span class="Li">$end</span>
+      inclus. Le paramètre <span class="Li">@pagesizes</span> doit être un
+      arrayref spécifiant pour quelles tailles de pages les informations doivent être retournées.
+      Des informations sur les tailles de pages prises en charge sont disponibles dans le XML des capacités.
+      Le tableau retourné a un élément pour chaque cellule NUMA demandée. Les
+      éléments sont des références de hachage avec deux clés, 'cell' spécifie le numéro
+      de la cellule NUMA et 'pages' spécifie les informations de pages libres pour cette cellule. La
+      valeur 'pages' est une autre référence de hachage où les clés sont les tailles de pages
+      et les valeurs sont le nombre de pages libres pour cette taille.</dd>
+  <dt>$con-&gt;node_alloc_pages(\@pages, $start, $end, $flags=0)</dt>
+  <dd>Alloue des pages énormes supplémentaires pour le périphérique réservé. Le
+      paramètre <span class="Li">&quot;\@pages&quot;</span> est une référence de tableau
+      avec une entrée par taille de page à allouer. Chaque entrée est une autre référence de tableau
+      où le premier élément est la taille de la page et le second élément est le nombre de pages. Le même nombre de pages sera
+      alloué sur chaque nœud NUMA dans la plage <span class="Li">$start</span> à
+      <span class="Li">$end</span> inclus. Le paramètre <span class="Li">$flags</span>
+      accepte deux constantes :</dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="Sys::Virt::NODE_ALLOC_PAGES_ADD"><a class="permalink" href="#Sys::Virt::NODE_ALLOC_PAGES_ADD">Sys::Virt::NODE_ALLOC_PAGES_ADD</a></dt>
+  <dd>Le nombre de pages demandé sera ajouté à la réservation de pages énormes existante.</dd>
+  <dt id="Sys::Virt::NODE_ALLOC_PAGES_SET"><a class="permalink" href="#Sys::Virt::NODE_ALLOC_PAGES_SET">Sys::Virt::NODE_ALLOC_PAGES_SET</a></dt>
+  <dd>La réservation de pages énormes sera définie exactement au nombre demandé.</dd>
+</dl>
+</div>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CONSTANTS'><a class='permalink' href='#CONSTANTS'>CONSTANTES</a></h1>
+<p class="Pp">Les ensembles de constantes suivants sont utiles lors de l'utilisation des API
+    de ce package :</p>
+<section class="Ss">
+<h2 class="Ss" id='CONNECTION'><a class='permalink' href='#CONNECTION'>CONNECTION</a></h2>
+<p class="Pp">Lors de l'ouverture d'une connexion, les constantes suivantes peuvent être utilisées :</p>
+<dl class="Bl-tag">
+  <dt id="Sys::Virt::CONNECT_RO"><a class="permalink" href="#Sys::Virt::CONNECT_RO">Sys::Virt::CONNECT_RO</a></dt>
+  <dd>Demande une connexion en lecture seule.</dd>
+  <dt id="Sys::Virt::CONNECT_NO_ALIASES"><a class="permalink" href="#Sys::Virt::CONNECT_NO_ALIASES">Sys::Virt::CONNECT_NO_ALIASES</a></dt>
+  <dd>Empêche la résolution des alias d'URI.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='CREDENTIAL_TYPES'><a class='permalink' href='#CREDENTIAL_TYPES'>TYPES   DE   CRÉDENTIALS</a></h2>
+<p class="Pp">Lors de la fourniture de rappels d'authentification, les constantes suivantes indiquent le type de credential demandé :</p>
+<dl class="Bl-tag">
+  <dt id="Sys::Virt::CRED_AUTHNAME"><a class="permalink" href="#Sys::Virt::CRED_AUTHNAME">Sys::Virt::CRED_AUTHNAME</a></dt>
+  <dd>Identité à utiliser.</dd>
+  <dt id="Sys::Virt::CRED_USERNAME"><a class="permalink" href="#Sys::Virt::CRED_USERNAME">Sys::Virt::CRED_USERNAME</a></dt>
+  <dd>Identité pour s'autoriser.</dd>
+  <dt id="Sys::Virt::CRED_CNONCE"><a class="permalink" href="#Sys::Virt::CRED_CNONCE">Sys::Virt::CRED_CNONCE</a></dt>
+  <dd>Le client fournit un nonce.</dd>
+  <dt id="Sys::Virt::CRED_REALM"><a class="permalink" href="#Sys::Virt::CRED_REALM">Sys::Virt::CRED_REALM</a></dt>
+  <dd>Domaine d'authentification.</dd>
+  <dt id="Sys::Virt::CRED_ECHOPROMPT"><a class="permalink" href="#Sys::Virt::CRED_ECHOPROMPT">Sys::Virt::CRED_ECHOPROMPT</a></dt>
+  <dd>Réponse au défi, non secrète.</dd>
+  <dt id="Sys::Virt::CRED_NOECHOPROMPT"><a class="permalink" href="#Sys::Virt::CRED_NOECHOPROMPT">Sys::Virt::CRED_NOECHOPROMPT</a></dt>
+  <dd>Réponse au défi, secrète.</dd>
+  <dt id="Sys::Virt::CRED_PASSPHRASE"><a class="permalink" href="#Sys::Virt::CRED_PASSPHRASE">Sys::Virt::CRED_PASSPHRASE</a></dt>
+  <dd>Mot de passe secret.</dd>
+  <dt id="Sys::Virt::CRED_LANGUAGE"><a class="permalink" href="#Sys::Virt::CRED_LANGUAGE">Sys::Virt::CRED_LANGUAGE</a></dt>
+  <dd>Code langue RFC 1766.</dd>
+  <dt id="Sys::Virt::CRED_EXTERNAL"><a class="permalink" href="#Sys::Virt::CRED_EXTERNAL">Sys::Virt::CRED_EXTERNAL</a></dt>
+  <dd>Credential fournie par une source externe.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='IDENTITY_CONSTANTS'><a class='permalink' href='#IDENTITY_CONSTANTS'>CONSTANTES   D'IDENTITÉ</a></h2>
+<p class="Pp">Les constantes suivantes sont utiles pour modifier l'identité de la connexion :</p>
+<dl class="Bl-tag">
+  <dt id="Sys::Virt::IDENTITY_USER_NAME"><a class="permalink" href="#Sys::Virt::IDENTITY_USER_NAME">Sys::Virt::IDENTITY_USER_NAME</a></dt>
+  <dd>Le nom d'utilisateur du processus.</dd>
+  <dt id="Sys::Virt::IDENTITY_UNIX_USER_ID"><a class="permalink" href="#Sys::Virt::IDENTITY_UNIX_USER_ID">Sys::Virt::IDENTITY_UNIX_USER_ID</a></dt>
+  <dd>L'ID utilisateur UNIX du processus.</dd>
+  <dt id="Sys::Virt::IDENTITY_GROUP_NAME"><a class="permalink" href="#Sys::Virt::IDENTITY_GROUP_NAME">Sys::Virt::IDENTITY_GROUP_NAME</a></dt>
+  <dd>Le nom du groupe du processus.</dd>
+  <dt id="Sys::Virt::IDENTITY_UNIX_GROUP_ID"><a class="permalink" href="#Sys::Virt::IDENTITY_UNIX_GROUP_ID">Sys::Virt::IDENTITY_UNIX_GROUP_ID</a></dt>
+  <dd>L'ID de groupe UNIX du processus.</dd>
+  <dt id="Sys::Virt::IDENTITY_PROCESS_ID"><a class="permalink" href="#Sys::Virt::IDENTITY_PROCESS_ID">Sys::Virt::IDENTITY_PROCESS_ID</a></dt>
+  <dd>L'ID du processus.</dd>
+  <dt id="Sys::Virt::IDENTITY_PROCESS_TIME"><a class="permalink" href="#Sys::Virt::IDENTITY_PROCESS_TIME">Sys::Virt::IDENTITY_PROCESS_TIME</a></dt>
+  <dd>L'heure de démarrage du processus.</dd>
+  <dt id="Sys::Virt::IDENTITY_SASL_USER_NAME"><a class="permalink" href="#Sys::Virt::IDENTITY_SASL_USER_NAME">Sys::Virt::IDENTITY_SASL_USER_NAME</a></dt>
+  <dd>Le nom d'utilisateur authentifié SASL.</dd>
+  <dt id="Sys::Virt::IDENTITY_X509_DISTINGUISHED_NAME"><a class="permalink" href="#Sys::Virt::IDENTITY_X509_DISTINGUISHED_NAME">Sys::Virt::IDENTITY_X509_DISTINGUISHED_NAME</a></dt>
+  <dd>Le nom distinctif du certificat X509 pour la connexion TLS.</dd>
+  <dt id="Sys::Virt::IDENTITY_SELINUX_CONTEXT"><a class="permalink" href="#Sys::Virt::IDENTITY_SELINUX_CONTEXT">Sys::Virt::IDENTITY_SELINUX_CONTEXT</a></dt>
+  <dd>Le contexte SELinux du processus.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='CPU_COMPARISON_CONSTANTS'><a class='permalink' href='#CPU_COMPARISON_CONSTANTS'>CONSTANTES   DE   COMPARaison   DE   CPU</a></h2>
+<dl class="Bl-tag">
+  <dt id="Sys::Virt::CPU_COMPARE_INCOMPATIBLE"><a class="permalink" href="#Sys::Virt::CPU_COMPARE_INCOMPATIBLE">Sys::Virt::CPU_COMPARE_INCOMPATIBLE</a></dt>
+  <dd>Cet hôte manque une ou plusieurs fonctionnalités CPU dans la description du CPU.</dd>
+  <dt id="Sys::Virt::CPU_COMPARE_IDENTICAL"><a class="permalink" href="#Sys::Virt::CPU_COMPARE_IDENTICAL">Sys::Virt::CPU_COMPARE_IDENTICAL</a></dt>
+  <dd>L'hôte a une description de CPU identique.</dd>
+  <dt id="Sys::Virt::CPU_COMPARE_SUPERSET"><a class="permalink" href="#Sys::Virt::CPU_COMPARE_SUPERSET">Sys::Virt::CPU_COMPARE_SUPERSET</a></dt>
+  <dd>L'hôte offre un sur-ensemble de la description du CPU.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='NODE_SUSPEND_CONSTANTS'><a class='permalink' href='#NODE_SUSPEND_CONSTANTS'>CONSTANTES   DE   MISE   EN   SUSPENSION   DE   NOEUD</a></h2>
+<dl class="Bl-tag">
+  <dt id="Sys::Virt::NODE_SUSPEND_TARGET_MEM"><a class="permalink" href="#Sys::Virt::NODE_SUSPEND_TARGET_MEM">Sys::Virt::NODE_SUSPEND_TARGET_MEM</a></dt>
+  <dd>Se met en veille dans la mémoire (équivalent de S3 sur les architectures x86).</dd>
+  <dt id="Sys::Virt::NODE_SUSPEND_TARGET_DISK"><a class="permalink" href="#Sys::Virt::NODE_SUSPEND_TARGET_DISK">Sys::Virt::NODE_SUSPEND_TARGET_DISK</a></dt>
+  <dd>Se met en veille sur disque (équivalent de S5 sur les architectures x86).</dd>
+  <dt id="Sys::Virt::NODE_SUSPEND_TARGET_HYBRID"><a class="permalink" href="#Sys::Virt::NODE_SUSPEND_TARGET_HYBRID">Sys::Virt::NODE_SUSPEND_TARGET_HYBRID</a></dt>
+  <dd>Se met en veille dans la mémoire et sur disque (équivalent de S3+S5 sur les architectures x86).</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 clas<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Sys::Virt - Perl interface to libvirt</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<pre>  use Sys::Virt;
+
+  my $conn = Sys::Virt-&gt;new(uri =&gt; &quot;qemu:///system&quot;);
+  # ou
+  my $conn = Sys::Virt-&gt;connect(uri =&gt; &quot;qemu:///system&quot;);
+
+  # Pour se déconnecter
+  $conn-&gt;close();
+
+  # Obtenir un domaine
+  my $domain = $conn-&gt;get_domain(name =&gt; &quot;my_vm&quot;);
+
+  # Obtenir tous les domaines
+  my @domains = $conn-&gt;list_domains();
+
+  # Gérer les callbacks
+  $conn-&gt;add_domain_event_callback(sub { ... });
+  $conn-&gt;add_connection_close_callback(sub { ... });
+
+  # Gérer les erreurs
+  eval {
+    # Code qui peut échouer
+  };
+  if ($@) {
+    my $error = Sys::Virt::Error-&gt;get_last();
+    # ... gérer l'erreur ...
+  }</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Ce module fournit une interface Perl pour l'API libvirt.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CALLBACK_HANDLING'><a class='permalink' href='#CALLBACK_HANDLING'>CALLBACK HANDLING</a></h1>
+<p class="Pp">Le module prend en charge la gestion des événements via des callbacks.
+    Vous pouvez enregistrer des sous-routines pour être appelées lors de divers
+    événements, tels que la création ou la destruction d'un domaine, ou la
+    fermeture de la connexion.</p>
+<dl class="Bl-tag">
+  <dt id="Sys::Virt::add_domain_event_callback"><a class="permalink" href="#Sys::Virt::add_domain_event_callback">add_domain_event_callback($callback)</a></dt>
+  <dd>Enregistre une sous-routine à appeler lors d'événements liés aux domaines.</dd>
+  <dt id="Sys::Virt::add_connection_close_callback"><a class="permalink" href="#Sys::Virt::add_connection_close_callback">add_connection_close_callback($callback)</a></dt>
+  <dd>Enregistre une sous-routine à appeler lorsque la connexion est fermée.</dd>
+  <dt id="Sys::Virt::remove_domain_event_callback"><a class="permalink" href="#Sys::Virt::remove_domain_event_callback">remove_domain_event_callback($callback)</a></dt>
+  <dd>Supprime un callback d'événement de domaine.</dd>
+  <dt id="Sys::Virt::remove_connection_close_callback"><a class="permalink" href="#Sys::Virt::remove_connection_close_callback">remove_connection_close_callback($callback)</a></dt>
+  <dd>Supprime un callback de fermeture de connexion.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ERROR_HANDLING'><a class='permalink' href='#ERROR_HANDLING'>ERROR HANDLING</a></h1>
+<p class="Pp">Les erreurs libvirt sont capturées et peuvent être récupérées via
+    l'objet <span class="Li">Sys::Virt::Error</span>. Utilisez le bloc <code class="Li">eval</code> pour attraper les exceptions.</p>
+<dl class="Bl-tag">
+  <dt id="Sys::Virt::Error::get_last"><a class="permalink" href="#Sys::Virt::Error::get_last">Sys::Virt::Error::get_last()</a></dt>
+  <dd>Récupère la dernière erreur libvirt.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='METHODS'><a class='permalink' href='#METHODS'>METHODS</a></h1>
+<dl class="Bl-tag">
+  <dt id="Sys::Virt::new"><a class="permalink" href="#Sys::Virt::new">new(uri => $uri_string)</a></dt>
+  <dd>Crée une nouvelle connexion à libvirt.</dd>
+  <dt id="Sys::Virt::connect"><a class="permalink" href="#Sys::Virt::connect">connect(uri => $uri_string)</a></dt>
+  <dd>Alias pour new().</dd>
+  <dt id="Sys::Virt::close"><a class="permalink" href="#Sys::Virt::close">close()</a></dt>
+  <dd>Ferme la connexion à libvirt.</dd>
+  <dt id="Sys::Virt::get_domain"><a class="permalink" href="#Sys::Virt::get_domain">get_domain(name => $name)</a></dt>
+  <dd>Récupère un objet domaine par son nom.</dd>
+  <dt id="Sys::Virt::list_domains"><a class="permalink" href="#Sys::Virt::list_domains">list_domains()</a></dt>
+  <dd>Liste tous les objets domaines disponibles.</dd>
+  <dt id="Sys::Virt::get_node_info"><a class="permalink" href="#Sys::Virt::get_node_info">get_node_info()</a></dt>
+  <dd>Récupère les informations sur le nœud hôte.</dd>
+  <dt id="Sys::Virt::get_node_cpus"><a class="permalink" href="#Sys::Virt::get_node_cpus">get_node_cpus()</a></dt>
+  <dd>Récupère les informations sur les CPUs du nœud.</dd>
+  <dt id="Sys::Virt::get_node_memory_stats"><a class="permalink" href="#Sys::Virt::get_node_memory_stats">get_node_memory_stats()</a></dt>
+  <dd>Récupère les statistiques mémoire du nœud.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CONSTANTS'><a class='permalink' href='#CONSTANTS'>CONSTANTS</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='NODE_VCPU_CONSTANTS'><a class='permalink' href='#NODE_VCPU_CONSTANTS'>NODE   VCPU CONSTANTS</a></h2>
+<dl class="Bl-tag">
+  <dt id="Sys::Virt::NODE_CPU_STATS_ALL_CPUS"><a class="permalink" href="#Sys::Virt::NODE_CPU_STATS_ALL_CPUS">Sys::Virt::NODE_CPU_STATS_ALL_CPUS</a></dt>
+  <dd>Demande des statistiques pour tous les CPUs.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='NODE_MEMORY_CONSTANTS'><a class='permalink' href='#NODE_MEMORY_CONSTANTS'>NODE   MEMORY CONSTANTS</a></h2>
+<dl class="Bl-tag">
+  <dt id="Sys::Virt::NODE_MEMORY_STATS_ALL_CELLS"><a class="permalink" href="#Sys::Virt::NODE_MEMORY_STATS_ALL_CELLS">Sys::Virt::NODE_MEMORY_STATS_ALL_CELLS</a></dt>
+  <dd>Demande des statistiques pour toutes les cellules mémoire.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='MEMORY_PARAMETERS'><a class='permalink' href='#MEMORY_PARAMETERS'>MEMORY   PARAMETERS</a></h2>
+<p class="Pp">Les constantes suivantes sont utilisées pour nommer les paramètres
+    mémoire du nœud.</p>
+<dl class="Bl-tag">
+  <dt id="Sys::Virt::NODE_MEMORY_SHARED_FULL_SCANS"><a class="permalink" href="#Sys::Virt::NODE_MEMORY_SHARED_FULL_SCANS">Sys::Virt::NODE_MEMORY_SHARED_FULL_SCANS</a></dt>
+  <dd>Nombre de fois où toutes les zones fusionnables ont été scannées.</dd>
+  <dt id="Sys::Virt::NODE_MEMORY_SHARED_PAGES_SHARED"><a class="permalink" href="#Sys::Virt::NODE_MEMORY_SHARED_PAGES_SHARED">Sys::Virt::NODE_MEMORY_SHARED_PAGES_SHARED</a></dt>
+  <dd>Nombre de pages mémoire partagées utilisées.</dd>
+  <dt id="Sys::Virt::NODE_MEMORY_SHARED_PAGES_SHARING"><a class="permalink" href="#Sys::Virt::NODE_MEMORY_SHARED_PAGES_SHARING">Sys::Virt::NODE_MEMORY_SHARED_PAGES_SHARING</a></dt>
+  <dd>Nombre de sites partageant les pages.</dd>
+  <dt id="Sys::Virt::NODE_MEMORY_SHARED_PAGES_TO_SCAN"><a class="permalink" href="#Sys::Virt::NODE_MEMORY_SHARED_PAGES_TO_SCAN">Sys::Virt::NODE_MEMORY_SHARED_PAGES_TO_SCAN</a></dt>
+  <dd>Nombre de pages présentes à scanner avant que le service de mémoire partagée
+      ne se mette en veille.</dd>
+  <dt id="Sys::Virt::NODE_MEMORY_SHARED_PAGES_UNSHARED"><a class="permalink" href="#Sys::Virt::NODE_MEMORY_SHARED_PAGES_UNSHARED">Sys::Virt::NODE_MEMORY_SHARED_PAGES_UNSHARED</a></dt>
+  <dd>Nombre de pages uniques mais vérifiées de manière répétée pour la fusion.</dd>
+  <dt id="Sys::Virt::NODE_MEMORY_SHARED_PAGES_VOLATILE"><a class="permalink" href="#Sys::Virt::NODE_MEMORY_SHARED_PAGES_VOLATILE">Sys::Virt::NODE_MEMORY_SHARED_PAGES_VOLATILE</a></dt>
+  <dd>Nombre de pages changeant trop rapidement pour être placées dans un arbre.</dd>
+  <dt id="Sys::Virt::NODE_MEMORY_SHARED_SLEEP_MILLISECS"><a class="permalink" href="#Sys::Virt::NODE_MEMORY_SHARED_SLEEP_MILLISECS">Sys::Virt::NODE_MEMORY_SHARED_SLEEP_MILLISECS</a></dt>
+  <dd>Nombre de millisecondes pendant lesquelles le service de mémoire partagée
+      doit dormir avant le prochain scan.</dd>
+  <dt id="Sys::Virt::NODE_MEMORY_SHARED_MERGE_ACROSS_NODES"><a class="permalink" href="#Sys::Virt::NODE_MEMORY_SHARED_MERGE_ACROSS_NODES">Sys::Virt::NODE_MEMORY_SHARED_MERGE_ACROSS_NODES</a></dt>
+  <dd>Indique si les pages peuvent être fusionnées entre les nœuds NUMA.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='CLOSE_REASON_CONSTANTS'><a class='permalink' href='#CLOSE_REASON_CONSTANTS'>CLOSE   REASON CONSTANTS</a></h2>
+<p class="Pp">Les constantes suivantes sont liées au callback de fermeture de
+    connexion et décrivent la raison de la fermeture de la connexion.</p>
+<dl class="Bl-tag">
+  <dt id="Sys::Virt::CLOSE_REASON_CLIENT"><a class="permalink" href="#Sys::Virt::CLOSE_REASON_CLIENT">Sys::Virt::CLOSE_REASON_CLIENT</a></dt>
+  <dd>L'application cliente a demandé la fermeture de la connexion.</dd>
+  <dt id="Sys::Virt::CLOSE_REASON_EOF"><a class="permalink" href="#Sys::Virt::CLOSE_REASON_EOF">Sys::Virt::CLOSE_REASON_EOF</a></dt>
+  <dd>Fin de fichier rencontrée lors de la lecture de données depuis la
+      connexion.</dd>
+  <dt id="Sys::Virt::CLOSE_REASON_ERROR"><a class="permalink" href="#Sys::Virt::CLOSE_REASON_ERROR">Sys::Virt::CLOSE_REASON_ERROR</a></dt>
+  <dd>Une erreur d'E/S a été rencontrée lors de la lecture/écriture de données
+      depuis/vers la connexion.</dd>
+  <dt id="Sys::Virt::CLOSE_REASON_KEEPALIVE"><a class="permalink" href="#Sys::Virt::CLOSE_REASON_KEEPALIVE">Sys::Virt::CLOSE_REASON_KEEPALIVE</a></dt>
+  <dd>Le timer de maintenance de connexion s'est déclenché en raison de l'absence
+      de réponse du serveur.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='CPU_STATS_CONSTANTS'><a class='permalink' href='#CPU_STATS_CONSTANTS'>CPU   STATS CONSTANTS</a></h2>
+<p class="Pp">Les constantes suivantes fournissent les noms des champs de statistiques
+    CPU connus.</p>
+<dl class="Bl-tag">
+  <dt id="Sys::Virt::NODE_CPU_STATS_IDLE"><a class="permalink" href="#Sys::Virt::NODE_CPU_STATS_IDLE">Sys::Virt::NODE_CPU_STATS_IDLE</a></dt>
+  <dd>Temps passé inactif.</dd>
+  <dt id="Sys::Virt::NODE_CPU_STATS_IOWAIT"><a class="permalink" href="#Sys::Virt::NODE_CPU_STATS_IOWAIT">Sys::Virt::NODE_CPU_STATS_IOWAIT</a></dt>
+  <dd>Temps passé à attendre la fin des opérations d'E/S.</dd>
+  <dt id="Sys::Virt::NODE_CPU_STATS_KERNEL"><a class="permalink" href="#Sys::Virt::NODE_CPU_STATS_KERNEL">Sys::Virt::NODE_CPU_STATS_KERNEL</a></dt>
+  <dd>Temps passé à exécuter du code noyau.</dd>
+  <dt id="Sys::Virt::NODE_CPU_STATS_USER"><a class="permalink" href="#Sys::Virt::NODE_CPU_STATS_USER">Sys::Virt::NODE_CPU_STATS_USER</a></dt>
+  <dd>Temps passé à exécuter du code utilisateur.</dd>
+  <dt id="Sys::Virt::NODE_CPU_STATS_INTR"><a class="permalink" href="#Sys::Virt::NODE_CPU_STATS_INTR">Sys::Virt::NODE_CPU_STATS_INTR</a></dt>
+  <dd>Temps passé à traiter les interruptions.</dd>
+  <dt id="Sys::Virt::NODE_CPU_STATS_UTILIZATION"><a class="permalink" href="#Sys::Virt::NODE_CPU_STATS_UTILIZATION">Sys::Virt::NODE_CPU_STATS_UTILIZATION</a></dt>
+  <dd>Pourcentage d'utilisation du CPU.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='MEMORY_STAS_CONSTANTS'><a class='permalink' href='#MEMORY_STAS_CONSTANTS'>MEMORY   STAS CONSTANTS</a></h2>
+<p class="Pp">Les constantes suivantes fournissent les noms des champs de statistiques
+    mémoire connus.</p>
+<dl class="Bl-tag">
+  <dt id="Sys::Virt::NODE_MEMORY_STATS_BUFFERS"><a class="permalink" href="#Sys::Virt::NODE_MEMORY_STATS_BUFFERS">Sys::Virt::NODE_MEMORY_STATS_BUFFERS</a></dt>
+  <dd>Quantité de mémoire consommée par les tampons d'E/S.</dd>
+  <dt id="Sys::Virt::NODE_MEMORY_STATS_CACHED"><a class="permalink" href="#Sys::Virt::NODE_MEMORY_STATS_CACHED">Sys::Virt::NODE_MEMORY_STATS_CACHED</a></dt>
+  <dd>Quantité de mémoire consommée par le cache disque.</dd>
+  <dt id="Sys::Virt::NODE_MEMORY_STATS_FREE"><a class="permalink" href="#Sys::Virt::NODE_MEMORY_STATS_FREE">Sys::Virt::NODE_MEMORY_STATS_FREE</a></dt>
+  <dd>Quantité de mémoire libre.</dd>
+  <dt id="Sys::Virt::NODE_MEMORY_STATS_TOTAL"><a class="permalink" href="#Sys::Virt::NODE_MEMORY_STATS_TOTAL">Sys::Virt::NODE_MEMORY_STATS_TOTAL</a></dt>
+  <dd>Quantité totale de mémoire.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='IP_address_constants'><a class='permalink' href='#IP_address_constants'>IP   address constants</a></h2>
+<p class="Pp">Les constantes suivantes sont utilisées pour interpréter les types
+    d'adresses IP.</p>
+<dl class="Bl-tag">
+  <dt id="Sys::Virt::IP_ADDR_TYPE_IPV4"><a class="permalink" href="#Sys::Virt::IP_ADDR_TYPE_IPV4">Sys::Virt::IP_ADDR_TYPE_IPV4</a></dt>
+  <dd>Un type d'adresse IPv4.</dd>
+  <dt id="Sys::Virt::IP_ADDR_TYPE_IPV6"><a class="permalink" href="#Sys::Virt::IP_ADDR_TYPE_IPV6">Sys::Virt::IP_ADDR_TYPE_IPV6</a></dt>
+  <dd>Un type d'adresse IPv6.</dd>
+</dl>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BUGS'><a class='permalink' href='#BUGS'>BUGS</a></h1>
+<p class="Pp">Espérons qu'il n'y en ait pas, mais le code XS doit être audité pour
+    s'assurer qu'il ne fuit pas de mémoire.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHORS'><a class='permalink' href='#AUTHORS'>AUTHORS</a></h1>
+<p class="Pp">Daniel P. Berrange &lt;berrange@redhat.com&gt;</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT'><a class='permalink' href='#COPYRIGHT'>COPYRIGHT</a></h1>
+<p class="Pp">Copyright (C) 2006-2009 Red Hat Copyright (C) 2006-2009 Daniel P.
+    Berrange</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='LICENSE'><a class='permalink' href='#LICENSE'>LICENSE</a></h1>
+<p class="Pp">Ce programme est un logiciel libre ; vous pouvez le redistribuer et/ou
+    le modifier selon les termes soit de la licence GNU General Public, telle que
+    publiée par la Free Software Foundation (soit la version 2 de la Licence,
+    ou selon votre choix toute version ultérieure), soit de la Licence Artistique,
+    telles que spécifiées dans le fichier README de Perl.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>SEE   ALSO</a></h1>
+<p class="Pp">Sys::Virt::Domain, Sys::Virt::Network, Sys::Virt::StoragePool,
+    Sys::Virt::StorageVol, Sys::Virt::Error,
+    <span class="Li">&quot;<a href='http://libvirt.org'>http://libvirt.org</a>&quot;</span></p>
+</section>
+</section>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-09-27</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>

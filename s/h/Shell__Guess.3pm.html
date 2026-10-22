@@ -1,0 +1,4726 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Shell::Guess(3pm) — Pages man d'Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Shell__Guess(3pm)</h1>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Shell::Guess(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">Shell::Guess(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">Shell::Guess - Faire une estimation éclairée du shell utilisé</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VERSION'><a class='permalink' href='#VERSION'>VERSION</a></h1>
+<p class="Pp">version 0.10</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<p class="Pp">deviner le shell qui a appelé le script Perl :</p>
+<pre>use Shell::Guess;
+my $shell = Shell::Guess-&gt;running_shell;
+if($shell-&gt;is_c) {
+  print &quot;setenv FOO bar\n&quot;;
+} elsif($shell-&gt;is_bourne) {
+  print &quot;export FOO=bar\n&quot;;
+}</pre>
+<p class="Pp">deviner le shell de connexion de l'utilisateur actuel :</p>
+<pre>use Shell::Guess;
+my $shell = Shell::Guess-&gt;login_shell;
+print $shell-&gt;name, &quot;\n&quot;;</pre>
+<p class="Pp">deviner le shell de connexion d'un utilisateur arbitraire :</p>
+<pre>use Shell::Guess;
+my $shell = Shell::Guess-&gt;login_shell('bob');
+print $shell-&gt;name, &quot;\n&quot;;</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess tente de manière assez agressive de déterminer le
+    shell utilisé par l'utilisateur, soit le shell qui a directement exécuté le
+    script Perl (le shell &quot;en cours d'exécution&quot;), soit le shell de
+    connexion de l'utilisateur (le shell de &quot;connexion&quot;). Pour ce
+    faire, il utilise divers moyens à sa disposition, en fonction de la
+    plateforme sur laquelle il s'exécute.</p>
+<ul class="Bl-bullet">
+  <li>getpwent
+    <p class="Pp">Sur les systèmes UNIX avec getpwent, cela peut être utilisé pour
+        déterminer le shell de connexion.</p>
+  </li>
+  <li>dscl
+    <p class="Pp">Sous Mac OS X, getpwent ne fournit généralement aucune
+        information utile, donc la commande dscl est utilisée à la place.</p>
+  </li>
+  <li>systèmes de fichiers proc
+    <p class="Pp">Sur les systèmes UNIX avec un système de fichiers proc (comme
+        Linux), Shell::Guess tentera de l'utiliser pour déterminer le shell en
+        cours d'exécution.</p>
+  </li>
+  <li>ps
+    <p class="Pp">Sur les systèmes UNIX sans système de fichiers proc,
+        Shell::Guess utilisera la commande ps pour déterminer le shell en cours
+        d'exécution.</p>
+  </li>
+  <li>Win32::Getppid et Win32::Process::List
+    <p class="Pp">Sous Windows, si ces modules sont installés, ils seront utilisés
+        pour déterminer le shell en cours d'exécution. Cette méthode peut
+        différencier PowerShell, <span class="Li">&quot;command.com&quot;</span> et
+        <span class="Li">&quot;cmd.exe&quot;</span>.</p>
+  </li>
+  <li>ComSpec
+    <p class="Pp">Si la méthode ci-dessus n'est pas concluante, la variable
+        d'environnement ComSpec sera consultée pour différencier entre
+        <span class="Li">&quot;command.com&quot;</span> et
+        <span class="Li">&quot;cmd.exe&quot;</span> (PowerShell ne peut pas être
+        détecté de cette manière).</p>
+  </li>
+  <li>valeurs par défaut raisonnables
+    <p class="Pp">Si le shell en cours d'exécution ou de connexion ne peut pas être
+        déterminé autrement, une valeur par défaut raisonnable pour votre
+        plateforme sera utilisée comme solution de repli. Sous OpenVMS, il
+        s'agit de dcl, sous Windows 95/98 et MS-DOS, il s'agit de
+        command.com, et sous Windows NT/2000/XP/Vista/7, il s'agit de cmd.exe.
+        Les plateformes UNIX se rabattent sur le shell Bourne.</p>
+  </li>
+</ul>
+<p class="Pp">L'objectif de ce module est de permettre à un développeur Perl
+    d'écrire un script qui génère des configurations de shell pour le shell
+    appelant afin qu'elles puissent être réimportées dans le shell appelant en
+    utilisant <span class="Li">&quot;eval&quot;</span> et des backticks ou
+    <span class="Li">&quot;source&quot;</span>. Par exemple, si votre script
+    ressemble à ceci :</p>
+<pre>#!/usr/bin/perl
+use Shell::Guess;
+my $shell = Shell::Guess-&gt;running_shell;
+if($shell-&gt;is_bourne) {
+  print &quot;export FOO=bar\n&quot;;
+} else($shell-&gt;is_c) {
+  print &quot;setenv FOO bar\n&quot;;
+} else {
+  die &quot;Je ne supporte pas le shell &quot;, $shell-&gt;name, &quot;\n&quot;;
+}</pre>
+<p class="Pp">Vous pouvez ensuite importer FOO dans votre shell bash ou c shell
+    comme ceci :</p>
+<pre>% eval `perl script.pl`</pre>
+<p class="Pp">ou, vous pouvez écrire la sortie dans un fichier de configuration et
+    le sourcer :</p>
+<pre>% perl script.pl &gt; foo.sh
+% source foo.sh</pre>
+<p class="Pp">Shell::Config::Generate fournit une interface portable pour
+    générer de telles configurations de shell et est conçu pour fonctionner avec
+    ce module.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CLASS_METHODS'><a class='permalink' href='#CLASS_METHODS'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Ces méthodes de classe retournent une instance de Shell::Guess, qui
+    peut ensuite être interrogée par les méthodes d'instance de la section
+    suivante.</p>
+<section class="Ss">
+<h2 class="Ss" id='running_shell'><a class='permalink' href='#running_shell'>running_shell</a></h2>
+<pre>my $shell = Shell::Guess-&gt;running_shell;</pre>
+<p class="Pp">Retourne une instance de Shell::Guess basée sur le shell qui a
+    directement démarré le script Perl actuel. Si le shell en cours d'exécution
+    ne peut pas être déterminé, il retournera le shell de connexion.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='login_shell'><a class='permalink' href='#login_shell'>login_shell</a></h2>
+<pre>my $shell = Shell::Guess-&gt;login_shell;
+my $shell = Shell::Guess-&gt;login_shell( $username )</pre>
+<p class="Pp">Retourne une instance de Shell::Guess pour l'utilisateur donné. Si
+    aucun nom d'utilisateur n'est spécifié, l'utilisateur actuel sera utilisé. Si
+    aucun shell ne peut être deviné, une solution de repli raisonnable sera
+    choisie en fonction de votre plateforme.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='bash_shell'><a class='permalink' href='#bash_shell'>bash_shell</a></h2>
+<pre>my $shell = Shell::Guess-&gt;bash_shell;</pre>
+<p class="Pp">Retourne une instance de Shell::Guess pour bash.</p>
+<p class="Pp">Les méthodes d'instance suivantes retourneront :</p>
+<ul class="Bl-bullet">
+  <li><span class="Li">$shell</span>-&gt;name = bash</li>
+  <li><span class="Li">$shell</span>-&gt;is_bash = 1</li>
+  <li><span class="Li">$shell</span>-&gt;is_bourne = 1</li>
+  <li><span class="Li">$shell</span>-&gt;is_unix = 1</li>
+  <li><span class="Li">$shell</span>-&gt;default_location = /bin/bash</li>
+</ul>
+<p class="Pp">Toutes les autres méthodes d'instance retourneront false.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='bourne_shell'><a class='permalink' href='#bourne_shell'>bourne_shell</a></h2>
+<pre>my $shell = Shell::Guess-&gt;bourne_shell;</pre>
+<p class="Pp">Retourne une instance de Shell::Guess pour le shell Bourne.</p>
+<p class="Pp">Les méthodes d'instance suivantes retourneront :</p>
+<ul class="Bl-bullet">
+  <li><span class="Li">$shell</span>-&gt;name = bourne</li>
+  <li><span class="Li">$shell</span>-&gt;is_bourne = 1</li>
+  <li><span class="Li">$shell</span>-&gt;is_unix = 1</li>
+  <li><span class="Li">$shell</span>-&gt;default_location = /bin/sh</li>
+</ul>
+<p class="Pp">Toutes les autres méthodes d'instance retourneront false.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='c_shell'><a class='permalink' href='#c_shell'>c_shell</a></h2>
+<pre>my $shell = Shell::Guess-&gt;c_shell;</pre>
+<p class="Pp">Retourne une instance de Shell::Guess pour le shell c.</p>
+<p class="Pp">Les méthodes d'instance suivantes retourneront :</p>
+<ul class="Bl-bullet">
+  <li><span class="Li">$shell</span>-&gt;name = c</li>
+  <li><span class="Li">$shell</span>-&gt;is_c = 1</li>
+  <li><span class="Li">$shell</span>-&gt;is_unix = 1</li>
+  <li><span class="Li">$shell</span>-&gt;default_location = /bin/csh</li>
+</ul>
+<p class="Pp">Toutes les autres méthodes d'instance retourneront false.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='cmd_shell'><a class='permalink' href='#cmd_shell'>cmd_shell</a></h2>
+<pre>my $shell = Shell::Guess-&gt;cmd_shell;</pre>
+<p class="Pp">Retourne une instance de Shell::Guess pour le shell cmd de Windows NT
+    (cmd.exe).</p>
+<p class="Pp">Les méthodes d'instance suivantes retourneront :</p>
+<ul class="Bl-bullet">
+  <li><span class="Li">$shell</span>-&gt;name = cmd</li>
+  <li><span class="Li">$shell</span>-&gt;is_cmd = 1</li>
+  <li><span class="Li">$shell</span>-&gt;is_win32 = 1</li>
+  <li><span class="Li">$shell</span>-&gt;default_location =
+      C:\Windows\system32\cmd.exe</li>
+</ul>
+<p class="Pp">Toutes les autres méthodes d'instance retourneront false.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='command_shell'><a class='permalink' href='#command_shell'>command_shell</a></h2>
+<pre>my $shell = Shell::Guess-&gt;command_shell;</pre>
+<p class="Pp">Retourne une instance de Shell::Guess pour le shell de commande de
+    Windows 95 (command.com).</p>
+<p class="Pp">Les méthodes d'instance suivantes retourneront :</p>
+<ul class="Bl-bullet">
+  <li><span class="Li">$shell</span>-&gt;name = command</li>
+  <li><span class="Li">$shell</span>-&gt;is_command = 1</li>
+  <li><span class="Li">$shell</span>-&gt;is_win32 = 1</li>
+  <li><span class="Li">$shell</span>-&gt;default_location =
+      C:\Windows\system32\command.com</li>
+</ul>
+<p class="Pp">Toutes les autres méthodes d'instance retourneront false.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='dcl_shell'><a class='permalink' href='#dcl_shell'>dcl_shell</a></h2>
+<pre>my $shell = Shell::Guess-&gt;dcl_shell;</pre>
+<p class="Pp">Retourne une instance de Shell::Guess pour le shell dcl d'OpenVMS.</p>
+<p class="Pp">Les méthodes d'instance suivantes retourneront :</p>
+<ul class="Bl-bullet">
+  <li><span class="Li">$shell</span>-&gt;name = dcl</li>
+  <li><span class="Li">$shell</span>-&gt;is_dcl = 1</li>
+  <li><span class="Li">$shell</span>-&gt;is_vms = 1</li>
+</ul>
+<p class="Pp">Toutes les autres méthodes d'instance retourneront false.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='fish_shell'><a class='permalink' href='#fish_shell'>fish_shell</a></h2>
+<pre>my $shell = Shell::Guess-&gt;fish_shell;</pre>
+<p class="Pp">Retourne une instance de Shell::Guess pour le shell fish.</p>
+<p class="Pp">La méthode d'instance suivante</p>
+Mantén toda la estructura del archivo.
+
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VERSION'><a class='permalink' href='#VERSION'>VERSION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INDEX'><a class='permalink' href='#INDEX'>INDEX</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_DE_CLASSE'><a class='permalink' href='#MÉTHODES_DE_CLASSE'>MÉTHODES DE CLASSE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_D_INSTANCE'><a class='permalink' href='#MÉTHODES_D_INSTANCE'>MÉTHODES D'INSTANCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MISE_EN_GARDE'><a class='permalink' href='#MISE_EN_GARDE'>MISE EN GARDE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_D_AUTEUR_ET_LICENCE'><a class='permalink' href='#DROITS_D_AUTEUR_ET_LICENCE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Shell::Guess</p>
+</section>
+</section>
+<section class<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Page de test</title>
+    </head>
+    <body>
+        <main>
+            <h1>Contenu principal</h1>
+            <p>Ceci est un exemple de paragraphe dans le contenu principal.</p>
+        </main>
+        <footer>
+            <p>
+               qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

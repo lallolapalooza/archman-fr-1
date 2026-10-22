@@ -1,0 +1,218 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>dictzip(1) — Pages manuelles </title>d'Arch
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">dictzip(1)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/dictd/">dictd</a></p>
+
+        nt
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">DICTZIP</td>(1)
+    <td class="head-vol"></td>
+    <td class="head-rtitle">DI</td>CTZ</tr>IP(</table>1)
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NO</a></h1>M
+<p class="Pp">dictzip, dictunzip - compresser</p> (ou décompresser) des fichiers</section>, permettant un accès aléatoire
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSI</a></h1>S
+<pre><b>dictzip [</b><i>options</i><b>]</b> <i>nam</i>e
+<b>dictunzip [</b><i>options</i><b>]</b> <i>n</i></pre>am</section>e
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTIO</a></h1>N
+<p class="Pp"><b>dictzip </b>compresse des fichiers en utilisant l' <a href='/man/gzip.1.en'>algorithme </a>gzip(1) (LZ77) d'une manière entièrement compatible avec le
+    format de fichier <b>gzip.</b> Une extension du <b>format </b>de fichier gzip (Extra Field, décrit dans la section 2.3.1.1 de la RFC 1952) permet de stocker des données supplémentaires dans l'en-tête d'un fichier compressé. Des programmes comme <b>gzip </b>et <b>zcat </b>ignoreront ces
+    données supplémentaires. Cependant, <a href='/man/dictd.8.en'>dictd(8),</a> le serveur de dictionnaires du protocole DICT, utilisera ces données pour effectuer un accès pseudo-aléatoire sur le fichier.
+    Les fichiers au format <b>dictzip </b>doivent se terminer par ".dz" afin de pouvoir être distingués des fichiers <b>gzip </b>courants qui ne contiennent pas les informations d'en-tête </p>spéciales.
+<p class="Pp">D'après la RFC 1952, le champ extra est spécifié comme suit </p>:
+<div class="Bd-indent">Si le bit FLG.FEXTRA est défini, un « extra field »
+  est présent dans l'en-tête, avec une longueur totale de XLEN octets. Il se compose d'une série de sous-champs, chacun de la forme :
+<pre>+---+---+---+---+==================================+
+|SI1|SI2|  LEN  |... données du sous-champ sur LEN octets ...|
++---+---+---+---+==================================</pre>+
+<p class="Pp">SI1 et SI2 fournissent un identifiant de sous-champ, généralement deux lettres ASCII avec une valeur mnémonique. Jean-Loup Gailly &lt;gzip@prep.ai.mit.edu&gt; maintient un registre des identifiants de sous-champs ; veuillez lui envoyer tout identifiant de sous-champ que vous souhaitez utiliser. Les identifiants de sous-champs avec SI2 = 0 sont réservés pour une utilisation </p>future.
+<p class="Pp">LEN donne la longueur des do</p>nnées du sous-champ, à l'excl</div>usion des 4 octets initiaux.
+<p class="Pp">Le <b>programme </b>dictzip utilise 'R' pour SI1 et 'A' pour SI2 (c'est-à-dire « Random Access »). Après le champ LEN, les données sont organisées comme suit </p>:
+<pre>+---+---+---+---+---+---+===============================+
+|  VER  | CHLEN | CHCNT |  ... CHCNT mots de données ...  |
++---+---+---+---+---+---+===============================</pre>+
+<p class="Pp">Conformément à la RFC 1952, toutes les données sont stockées avec l'octet de poids faible en premier. Pour la version VER 1 des données, toutes les valeurs font 16 bits (2 octets) et sont des entiers non </p>signés.
+<p class="Pp">XLEN (qui est spécifié plus tôt dans l'en-tête) est un entier sur deux octets, donc le champ extra peut faire 0xffff octets, dont 2 octets sont utilisés pour l'identifiant du sous-champ (SI1 et SI1) et 2 octets pour la longueur du sous-champ (LEN). Cela laisse 0xfffb octets (0x7ffd entrées de 2 octets ou 0x3ffe entrées de 4 octets). Étant donné que le tampon de sortie zip doit être 10 % + 12 octets plus grand que le tampon d'entrée, nous pouvons stocker 58969 octets par entrée, soit environ 1,8 Go si les entrées de 2 octets sont utilisées. Si cela devient un facteur limitant, une autre version de format peut être sélectionnée et définie pour les entrées de 4 </p>octets.
+<p class="Pp">Pour la compression, le fichier est divisé en « chunks » de données, chaque chunk faisant moins de 64 ko, et pouvant être compressé dans une zone faisant elle aussi moins de 64 ko de long (en prenant en compte les données incompressibles — généralement, les données sont compressées dans un bloc beaucoup plus petit que l'original). Le champ CHLEN spécifie la longueur d'un « chunk » de données. Le champ CHCNT spécifie combien de chunks sont prédéfinis, et les CHCNT mots de données spécifient la longueur de chaque chunk après compression (c'est-à-dire dans le fichier compressé actuel)</p>.
+<p class="Pp">Pour effectuer un accès aléatoire sur les données, l'offset et la longueur des données sont four</p>nis aux routines de bibliothèque. Ces routines déterminent le chunk dans lequel les données souh</section>aitées commencent et décompressent ce chunk. Les chunks conséquents sont décompressés au besoin.
+<section class="Sh">
+<h1 class="Sh" id='TRADEOFFS'><a class='permalink' href='#TRADEOFFS'>COMPROMI</a></h1>S
+<dl class="Bl-tag">
+  <dt id="Speed"><a class="permalink" href="#Speed"><b>Vite</b></a></dt>sse
+  <dd>L'accès aléatoire véritable au fichier n'est pas réalisé, car tout accès, même pour un seul octet, nécessite la lecture et la décompression d'un chunk de 64 ko. C'est plus lent que l'accès à un fichier texte brut, mais c'est beaucoup, beaucoup plus rapide que d'effectuer un accès séquentiel sur un fichier entièrement </dd>compressé.
+  <dt id="Space"><a class="permalink" href="#Space"><b>Espa</b></a></dt>ce
+  <dd>Pour les bases de données de dictionnaires textuels avec lesquel</dd>les nous travaillons, l'utilisation de chunks de 64 ko et de la </dl>compression LZ77 maximale produit un fichier qui n'est que d'envi</section>ron 4 % plus grand que le même fichier compressé d'un seul coup.
+<section class="Sh">
+<h1 class="Sh" id='OPTIONS'><a class='permalink' href='#OPTIONS'>OPTION</a></h1>S
+<dl class="Bl-tag">
+  <dt id="d"><a class="permalink" href="#d"><b>-d </b>ou
+    <b>--decompre</b></a></dt>ss
+  <dd>Décompresser. C'est le comportement par défaut si l'exécutable est appelé
+      <b>dictunz</b>i</dd>p.
+  <dt id="c"><a class="permalink" href="#c"><b>-c </b>ou
+    <b>--stdo</b></a></dt>ut
+  <dd>Écrire la sortie sur la sortie standard ; laisser les fichiers d'origine inchangés. Cela n'est disponible que lors de la décompression (car certaines parties de l'en-tête doivent être mises à jour après une écriture lors de la compression)</dd>.
+  <dt id="f"><a class="permalink" href="#f"><b>-f </b>ou <b>--for</b></a></dt>ce
+  <dd>Forcer la compression ou la décompression même si le fichier de sortie existe </dd>déjà.
+  <dt id="h"><a class="permalink" href="#h"><b>-h </b>ou <b>--he</b></a></dt>lp
+  <dd>Afficher </dd>l'aide.
+  <dt id="k"><a class="permalink" href="#k"><b>-k </b>ou <b>--ke</b></a></dt>ep
+  <dd>Ne pas supprimer le fichier </dd>d'origine.
+  <dt id="l"><a class="permalink" href="#l"><b>-l </b>ou <b>--li</b></a></dt>st
+  <dd>Pour chaque fichier compressé, lister les champs suivants :
+    <p class="Pp">
+      <br/>
+       type : dzip, gzip ou texte (inclut les fichiers aux formats inconnus)
+      <br/>
+       crc : somme de contrôle CRC
+      <br/>
+       date et heure : issues de l'en-tête
+      <br/>
+       chunks : nombre de chunks dans le fichier
+      <br/>
+       size : taille de chaque chunk décompressé
+      <br/>
+       compr. : taille compressée
+      <br/>
+       uncompr. : taille décompressée
+      <br/>
+       ratio : taux de compression (0,0 % si inconnu)
+      <br/>
+       name : nom du fichier </p>décompressé
+    <p class="Pp">Contrairement à <b>gzip, la méth</b>ode de compre</p>ssion n'est </dd>pas détectée.
+  <dt id="L"><a class="permalink" href="#L"><b>-L </b>ou
+    <b>--licen</b></a></dt>se
+  <dd>Afficher la licence de <b>dictzip </b>et </dd>quitter.
+  <dt id="t"><a class="permalink" href="#t"><b>-t </b>ou <b>--te</b></a></dt>st
+  <dd>Vérifier l'intégrité du fichier compressé. Cette option n'est pas implémentée. À la place, elle listera les informations de </dd>l'en-tête.
+  <dt id="v"><a class="permalink" href="#v"><b>-v </b>ou
+    <b>--verbo</b></a></dt>se
+  <dd>Verbeux. Afficher des informations supplémentaires pendant la </dd>compression.
+  <dt id="V"><a class="permalink" href="#V"><b>-V </b>ou
+    <b>--versi</b></a></dt>on
+  <dd>Version. Afficher le numéro de version et les options de compilation, puis </dd>quitter.
+  <dt id="s"><a class="permalink" href="#s"><b>-s</b><i> start ou</i>
+    <b>--start</b><i> sta</i></a></dt>rt
+  <dd>Spécifier le point de départ de la décompression, en utilisant des nombres décimaux. La valeur par défaut est le début du </dd>fichier.
+  <dt id="e"><a class="permalink" href="#e"><b>-e</b><i> size ou</i>
+    <b>--size</b><i> si</i></a></dt>ze
+  <dd>Spécifier la taille de la portion du fichier à décompresser, en utilisant des nombres décimaux. La valeur par défaut est le fichier </dd>entier.
+  <dt id="S"><a class="permalink" href="#S"><b>-S</b><i> start ou</i>
+    <b>--Start</b><i> sta</i></a></dt>rt
+  <dd>Spécifier le point de départ de la décompression, en utilisant des nombres base64. La valeur par défaut est le début du </dd>fichier.
+  <dt id="E"><a class="permalink" href="#E"><b>-E</b><i> size ou</i>
+    <b>--Size</b><i> sta</i></a></dt>rt
+  <dd>Spécifier la taille de la portion du fichier à décompresser, en utilisant des nombres base64. La valeur par défaut est le fichier </dd>entier.
+  <dt id="p"><a class="permalink" href="#p"><b>-p</b><i> prefilter ou</i>
+    <b>--pre</b><i> prefilt</i></a></dt>er
+  <dd>Spécifier une commande shell à exécuter comme filtre avant la compression ou la décompression d'un chunk. Les filtres pré- et post-compression peuvent être utilisés pour fournir une compression ou un formatage de sortie supplémentaires. Les filtres ne doivent pas augmenter significativement la taille du tampon. Les filtres pré- et post-compression ont été conçus pour fournir l'interface la plus générale </dd>possible.
+  <dt id="P"><a class="permalink" href="#P"><b>-P</b><i> postfilter ou</i>
+    <b>--post</b><i> postfilt</i></a></dt>er
+  <dd>Spécifier une commande s</dd>hell à exécuter comme f</dl>iltre après la compress</section>ion ou la décompression.
+<section class="Sh">
+<h1 class="Sh" id='CREDITS'><a class='permalink' href='#CREDITS'>CRÉDIT</a></h1>S
+<p class="Pp"><b>dictzip </b>a été écrit par Rik Faith (faith@cs.unc.edu) et est distribué selon les termes de la GNU General Public License. Si vous devez le distribuer selon d'autres termes, écrivez à </p>l'auteur.
+<p class="Pp">Les bibliothèques principales utilisées par ce programme (zlib, regex, libmaa) sont distribuées selon des termes différents ; vous pourriez donc être en mesure d'utiliser les bibliothèques pour des applications incompatibles avec la GPL — veuillez consulter les avis de copyright et les informations de licence fournis avec les bibliothèques pour plus de détails, et consultez votre avocat pour résoudre ces problèmes.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR </a></h1>AUSSI
+<p class="Pp"><a href='/man/dict.1.en'>dict(1)</a>, <a href='/man/dictd.8.en'>dictd(8)</a>, <a href='/man/gzip.1.en'>gzip(1)</a>, <a href='/man/gunzip.1.en'>gunzip(1)</a>,
+    <a href='/man/zcat.1.en'>zc</a></p>at</section>(</div>1)
+<table class="foot">
+  <tr>
+    <td class="foot-date">22 juin </td>1997
+    <td class="foot-os"></td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le </p>paquet :
+    <dl>
+        <dt>Nom du </dt>paquet :
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/dictd/">extra/</a></dd>dictd
+        <dt>Version </dt>:
+        <dd>1.13.</dd>3-1
+        <dt>Amont </dt>:
+        <dd><a href="https://sourceforge.net/projects/dict/">https://sourceforge.</a></dd>net/projects/dict/
+        <dt>Licences </dt>:
+        <dd>GPL-1.0-or-later, GPL-2.</dd>0-or-later
+        <dt>Manuels </dt>:
+        <dd><a href="/listing/extra/dictd/">/listing/extra/</a></dd>dict</dl>d</section>/
+
+<details>
+    <summary>Table des </summary>matières
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">N</a></li>OM
+        
+            <li><a href="#SYNOPSIS">SYN</a></li>OPSISSE
+        
+            <li><a href="#DESCRIPTION">DESC</a></li>RIPTION
+        
+            <li><a href="#TRADEOFFS">COM</a></li>PROMIS
+        
+            <li><a href="#OPTIONS">OP</a></li>TIONS
+        
+            <li><a href="#CREDITS">CR</a></li>ÉDITS
+        
+            <li><a href="#SEE_ALSO">VO</a></li>IR</ul> A</nav>US</details>SI
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/dictzip.1.en.txt">t</a>xt, 
+        
+            <a href="/man/dictzip.1.en.raw"></a>r</p>a</nav></aside></main>w
+        <footer>
+            de manuel.
+            <p>Le site web est disponible selon les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0
+               à l'</a>exception du contenu des pag</p>es de manuel, qui possède s</footer>a propre licence
+          </body>     spécifiée dans le paque</html>t Arch Linux correspondant.

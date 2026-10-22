@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>File::RsyncP::Digest(3pm) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">File__RsyncP__Digest(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/perl-file-rsyncp/">perl-file-rsyncp</a></p>
+<p class="lic">Licences: GPL, PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Digest(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">Digest(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">File::RsyncP::Digest - Interface Perl aux algorithmes de résumé rsync</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>use File::RsyncP::Digest;
+
+$rsDigest = new File::RsyncP::Digest;
+# spécifier la version du protocole rsync (par défaut &lt;= 26 -&gt; résumés bogués).
+$rsDigest-&gt;protocol(version);
+
+# résumés MD4 de fichier
+$rsDigest-&gt;reset();
+$rsDigest-&gt;add(LIST);
+$rsDigest-&gt;addfile(HANDLE);
+$digest = $rsDigest-&gt;digest();
+$string = $rsDigest-&gt;hexdigest();
+# Retourne une paire de 32 octets de résumés (protocole &lt;= 26 et &gt;= 27).
+$digestPair = $rsDigest-&gt;digest2();
+$digest = File::RsyncP::Digest-&gt;hash(SCALAR);
+$string = File::RsyncP::Digest-&gt;hexhash(SCALAR);
+
+# résumés de bloc
+$digests = $rsDigest-&gt;blockDigest($data, $blockSize, $md4DigestLen,
+                                  $checksumSeed);
+$digests = $rsDigest-&gt;blockDigestUpdate($state, $blockSize,
+                            $blockLastLen, $md4DigestLen, $checksumSeed);
+$digests2 = $rsDigest-&gt;blockDigestExtract($digests16, $md4DigestLen);</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Le module <b>File::RsyncP::Digest</b> vous permet de calculer les
+    résumés rsync, y compris l'algorithme de résumé de message MD4 de RSA Data
+    Security Inc., et les sommes de contrôle Adler32 depuis des programmes Perl.</p>
+<section class="Ss">
+<h2 class="Ss" id='Résumés_Rsync'><a class='permalink' href='#Résumés_Rsync'>Résumés Rsync</a></h2>
+<p class="Pp">Rsync utilise deux résumés principaux (ou sommes de contrôle), pour
+    vérifier avec une très haute probabilité que les données sous-jacentes sont
+    identiques, sans avoir besoin d'échanger les données sous-jacentes.</p>
+<p class="Pp">Le côté serveur (distant) de rsync génère une valeur
+    <code class="Nm">checksumSeed</code> (généralement
+    <code class="Nm">unix <b>time()</b></code>) qui est échangée pendant le
+    démarrage du protocole. Cette valeur est utilisée dans les calculs des sommes
+    de contrôle de fichier et MD4. Cela fait que les sommes de contrôle de bloc
+    et de fichier changent à chaque exécution de Rsync.</p>
+<dl class="Bl-tag">
+  <dt id="Fichier"><a class="permalink" href="#Fichier">Résumé de fichier</a></dt>
+  <dd>C'est un résumé MD4 de la <code class="Nm">checksumSeed</code>, suivi du
+      contenu entier du fichier. Ce résumé a une longueur de 128 bits. Le résumé
+      de fichier est envoyé à la fin des deltas d'un fichier pour garantir que
+      le fichier reconstruit est correct. Ce résumé est également calculé et envoyé
+      en option dans le cadre de la liste de fichiers si l'option --checksum
+      est spécifiée à rsync.</dd>
+  <dt id="Bloc"><a class="permalink" href="#Bloc">Résumé de bloc</a></dt>
+  <dd>Chaque fichier est divisé en blocs d'une longueur par défaut de 700 octets.
+      Le résumé de chaque bloc est formé en calculant la somme de contrôle Adler32
+      du bloc, et également le résumé MD4 du bloc suivi de la <code class="Nm">checksumSeed</code>.
+      Pendant la phase 1, seuls les deux premiers octets du résumé MD4 sont envoyés,
+      ce qui signifie que le résumé total est de 6 octets ou 48 bits (4 octets pour
+      Adler32 et les 2 premiers octets du résumé MD4). Pendant la phase 2 (qui est
+      nécessaire pour les fichiers reçus ayant un résumé de fichier incorrect), le
+      résumé MD4 complet est utilisé (128 bits), ce qui signifie que le résumé de
+      bloc est de 20 octets ou 160 bits. (Avant le protocole rsync XXX, le résumé
+      complet de 20 octets était envoyé à chaque fois et il n'y avait qu'une seule
+      phase.)</dd>
+</dl>
+<p class="Pp">Ce module contient des routines pour calculer les résumés de fichier
+    et de bloc d'une manière identique à rsync.</p>
+<p class="Pp">Soit dit en passant, rsync contient deux bugs dans son implémentation
+    de MD4 (jusqu'à et y compris la version 26 du protocole rsync) :</p>
+<ul class="Bl-bullet">
+  <li><b>MD4Final()</b> n'est pas appelé lorsque la taille des données (c'est-à-dire
+      la taille du fichier ou du bloc plus 4 octets pour la <code class="Nm">checksumSeed</code>)
+      est un multiple de 64.</li>
+  <li>MD4 n'est pas correct pour des tailles de données totales supérieures à
+      512 Mo (2^32 bits). Le MD4 de Rsync ne maintient la taille des données qu'à
+      l'aide d'un compteur de 32 bits, il déborde donc pour les tailles de fichier
+      supérieures à 512 Mo.</li>
+</ul>
+<p class="Pp">Les effets de ces bugs sont bénins : le résumé MD4 ne devrait pas
+    être affaibli cryptographiquement et les deux côtés sont cohérents.</p>
+<p class="Pp">Ce module implémente les deux versions du résumé MD4 : la version
+    boguée pour les versions de protocole &lt;= 26 et la version correcte pour les
+    versions de protocole &gt;= 27. Le mode par défaut est la version boguée (versions
+    de protocole &lt;= 26).</p>
+<p class="Pp">Vous pouvez spécifier la version du protocole rsync pour déterminer
+    quelle version de MD4 est utilisée :</p>
+<pre># spécifier la version du protocole rsync (par défaut &lt;= 26 -&gt; résumés bogués).
+$rsDigest-&gt;protocol(version);</pre>
+<p class="Pp">De plus, vous pouvez obtenir les deux résumés en un seul appel. Le
+    résultat est retourné comme un seul scalaire de 32 octets : les 16 premiers
+    octets constituent le résumé bogué et les 16 octets suivants le résumé
+    correct :</p>
+<pre># Retourne une paire de 32 octets de résumés (protocole &lt;= 26 et &gt;= 27).
+$digestPair = $rsDigest-&gt;digest2();</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Utilisation'><a class='permalink' href='#Utilisation'>Utilisation</a></h2>
+<p class="Pp">Un nouvel objet de contexte de résumé rsync est créé avec l'opération
+    <code class="Nm">new</code>. Plusieurs contextes de résumé simultanés peuvent
+    être maintenus, si désiré.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Calcul_des_résumés_de_bloc'><a class='permalink' href='#Calcul_des_résumés_de_bloc'>Calcul des résumés de bloc</a></h2>
+<p class="Pp">Après la création d'un contexte, la fonction pour calculer les sommes
+    de contrôle de bloc est :</p>
+<pre>$digests = $rsDigest-&gt;blockDigest($data, $blockSize, $md4DigestLen,
+                                  $checksumSeed)</pre>
+<p class="Pp">Le premier argument est la donnée, qui peut contenir autant de données
+    brutes que vous le souhaitez (c'est-à-dire plusieurs blocs). La somme de contrôle
+    Adler32 et le résumé MD4 sont calculés pour chaque bloc dans <code class="Nm">$data</code>.
+    Le bloc final partiel (s'il est présent) est également traité. Les 4 octets de
+    la <code class="Nm">checksumSeed</code> entière sont ajoutés à la fin de chaque
+    calcul de résumé de bloc si elle est non nulle. La <code class="Nm">$blockSize</code>
+    est spécifiée dans le deuxième argument (par défaut 700). Le troisième argument,
+    <code class="Nm">$md4DigestLen</code>, spécifie combien d'octets du résumé MD4
+    sont inclus dans les données retournées. Rsync utilise une valeur de 2 pour
+    la première passe (ce qui signifie que 6 octets de résumés totaux sont retournés
+    par bloc), et tous les 16 octets pour la seconde passe (ce qui signifie que
+    20 octets de résumés totaux sont retournés par bloc). Le nombre d'octets retourné
+    est le nombre d'octets dans chaque résumé (Alder32 + MD4 partiel/complet) multiplié
+    par le nombre de blocs :</p>
+<pre>(4 + md4DigestLen) * ceil(length(data) / blockSize);</pre>
+<p class="Pp">Pour permettre la mise en cache des sommes de contrôle de bloc (lorsque
+    la <code class="Nm">checksumSeed</code> est inconnue), puis leur mise à jour
+    rapide avec la <code class="Nm">checksumSeed</code> connue, les données de somme
+    de contrôle doivent d'abord être calculées avec une longueur de résumé de -1 et
+    une <code class="Nm">checksumSeed</code> de 0 :</p>
+<pre>$state = $rsDigest-&gt;blockDigest($data, $blockSize, -1, 0);</pre>
+<p class="Pp">Le <code class="Nm">$state</code> retourné doit être sauvegardé pour
+    une récupération ultérieure, avec la longueur du dernier bloc partiel (par
+    exemple, <code class="Nm">length($data) % <span class="Li">$blockSize</span></code>).
+    La longueur de <span class="Li">$state</span> dépend du nombre de blocs et de
+    la taille des blocs. En plus des 16 octets de l'état MD4, jusqu'à 63 octets
+    de données non traitées par bloc sont également enregistrés dans
+    <span class="Li">$state</span>. Pour chaque bloc,</p>
+<pre>16 + ($blockSize % 64)</pre>
+<p class="Pp">octets sont enregistrés dans <span class="Li">$state</span>, donc
+    <span class="Li">$state</span> est le plus compact lorsque
+    <span class="Li">$blockSize</span> est un multiple de 64. (Le dernier bloc, partiel,
+    peut avoir une taille de bloc plus petite, nécessitant jusqu'à 63 octets d'état
+    même si <span class="Li">$blockSize</span> est un multiple de 64.)</p>
+<p class="Pp">Une fois la <code class="Nm">checksumSeed</code> connue, les sommes de
+    contrôle mises à jour peuvent ensuite être calculées en utilisant :</p>
+<pre>$digests = $rsDigest-&gt;blockDigestUpdate($state, $blockSize,
+                            $blockLastLen, $md4DigestLen, $checksumSeed);</pre>
+<p class="Pp">Le premier argument est l'état des sommes de contrôle mises en cache
+    provenant de <code class="Nm">blockDigest</code>. Le troisième argument est la
+    longueur du dernier bloc (partiel).</p>
+<p class="Pp">Alternativement, j'espère ajouter une option --checksum-seed=n à
+    rsync qui permet de définir la <code class="Nm">checksumSeed</code> à 0. Cela
+    entraîne l'omission de la <code class="Nm">checksumSeed</code> du calcul MD4
+    et facilite grandement la mise en cache des sommes de contrôle. Une
+    <code class="Nm">checksumSeed</code> nulle n'affaiblit pas le résumé de bloc.
+    Je ne suis pas sûr que cela affaiblisse ou non le résumé de fichier (la
+    <code class="Nm">checksumSeed</code> est appliquée au début du résumé de fichier
+    et à la fin du résumé de bloc). Dans ce cas, les sommes de contrôle complètes
+    de 16 octets devraient être calculées en utilisant :</p>
+<pre>$digests16 = $rsDigest-&gt;blockDigest($data, $blockSize, 16, 0);</pre>
+<p class="Pp">et pour la phase 1 les sous-chaînes MD4 de 2 octets peuvent être extraites
+    avec :</p>
+<pre>$digests2  = $rsDigest-&gt;blockDigestExtract($digests16, 2);</pre>
+<p class="Pp"><span class="Li">$digests16</span> original n'a pas besoin de traitement
+    supplémentaire pour la phase 2.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Calcul_des_résumés_de_fichier'><a class='permalink' href='#Calcul_des_résumés_de_fichier'>Calcul des résumés de fichier</a></h2>
+<p class="Pp">De plus, des fonctions identiques à <b>Digest::MD4</b> sont fournies
+    pour permettre le calcul du résumé de fichier MD4 de rsync. La
+    <code class="Nm">checksumSeed</code>, si elle n'est pas nulle, est incluse au
+    début des données, avant que le contenu du fichier ne soit ajouté.</p>
+<p class="Pp">Le contexte est mis à jour avec l'opération <code class="Nm">add</code>
+    qui ajoute les chaînes contenues dans le paramètre <i>LIST</i>. Notez cependant
+    que <span class="Li">&quot;add('foo', 'bar')&quot;</span>,</p>
+</section>
+</div>
+</section>
+
+            </article>
+            
+        </main>
+        <footer>
+        </footer>
+    </body>
+</html>
+<span class="Li">add('foo')</span> suivi de
+    <span class="Li">add('bar')</span> et <span class="Li">add('foobar')</span>
+    devraient tous donner le même résultat.</p>
+<p class="Pp">La valeur finale de l'empreinte de message MD4 est retournée par l'opération
+    <b>digest</b> sous forme de chaîne binaire de 16 octets. Cette opération fournit
+    le résultat des opérations <b>add</b> effectuées depuis la dernière opération <b>new</b> ou
+    <b>reset</b> . Notez que l'opération <b>digest</b> est effectivement
+    une opération destructive, à lecture unique. Une fois qu'elle a été effectuée, le contexte
+    doit être <b>réinitialisé</b> avant d'être utilisé pour calculer une autre valeur
+  d'empreinte.</p>
+<p class="Pp">Plusieurs fonctions de commodité sont également fournies. L'opération
+    <b>addfile</b> prend un descripteur de fichier ouvert et le lit jusqu'à la fin
+    du fichier par blocs de 1024 octets, en ajoutant le contenu au contexte. Le descripteur
+    de fichier peut être spécifié par nom ou passé comme une référence de type-glob, comme montré
+    dans les exemples ci-dessous. L'opération <b>hexdigest</b> appelle <b>digest</b>
+    et retourne le résultat sous forme de chaîne imprimable de chiffres hexadécimaux. C'est
+    exactement la même opération que celle effectuée par l'opération <b>unpack</b> dans
+    les exemples ci-dessous.</p>
+<p class="Pp">L'opération <b>hash</b> peut agir soit comme une fonction membre statique
+    (c'est-à-dire que vous l'invoquez sur la classe MD4 comme dans le synopsis ci-dessus), soit comme
+    une fonction virtuelle normale. Dans les deux cas, elle effectue le cycle MD4 complet
+    (réinitialisation, ajout, empreinte) sur la valeur scalaire fournie. C'est pratique pour
+    traiter de petites quantités de données. Lorsqu'elle est invoquée sur la classe, un contexte temporaire
+    est créé. Lorsqu'elle est invoquée à travers un objet contexte déjà créé,
+    ce contexte est utilisé. Cette dernière forme est légèrement plus efficace. L'opération
+    <b>hexhash</b> est analogue à <b>hexdigest</b>.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXAMPLES'><a class='permalink' href='#EXAMPLES'>EXEMPLES</a></h1>
+<pre>use File::RsyncP::Digest;
+
+my $rsDigest = new File::RsyncP::Digest;
+$rsDigest-&gt;add('foo', 'bar');
+$rsDigest-&gt;add('baz');
+my $digest = $rsDigest-&gt;digest();
+
+print("Rsync MD4 Digest is " . unpack("H*", $digest) . "\n");</pre>
+<p class="Pp">L'exemple ci-dessus afficherait le message</p>
+<pre>Rsync MD4 Digest is 6df23dc03f9b54cc38a0fc1483df6e21</pre>
+<p class="Pp">Pour calculer les sommes de contrôle de bloc rsync de phase 1 (4 + 2 = 6 octets par
+    bloc) pour un fichier de 2000 octets contenant 700 a, 700 b et 600 c, avec une
+    graine de somme de contrôle de 0x12345678 :</p>
+<pre>use File::RsyncP::Digest;
+
+my $rsDigest = new File::RsyncP::Digest;
+my $data = ("a" x 700) . ("b" x 700) . ("c" x 600);
+my $digest = $rsDigest-&gt;rsyncChecksum($data, 700, 2, 0x12345678);
+
+print("Rsync block checksums are " . unpack("H*", $digest) . "\n");</pre>
+<p class="Pp">Cela affichera :</p>
+<pre>Rsync block checksums are 3c09a624641bf80b0ce3abd208e8645d5b49</pre>
+<p class="Pp">Le même résultat peut être obtenu en deux étapes en sauvegardant l'état,
+    puis en terminant le calcul :</p>
+<pre>my $state = $rsDigest-&gt;blockDigest($data, 700, -1, 0);
+my $digest = $rsDigest-&gt;blockDigestUpdate($state, 700,
+                                length($data) % 700, 2, 0x12345678);</pre>
+<p class="Pp">ou en calculant des empreintes MD4 de longueur complète, et en extrayant la version
+    de 2 octets :</p>
+<pre>my $digest16 = $rsDigest-&gt;blockDigest($data, 700, 16, 0x12345678);
+my $digest   = $rsDigest-&gt;blockDigestExtract($digest16, 2);</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='LICENSE'><a class='permalink' href='#LICENSE'>LICENCE</a></h1>
+<p class="Pp">Ce programme est un logiciel libre : vous pouvez le redistribuer et/ou
+    le modifier selon les termes de la Licence Publique Générale GNU telle que publiée par
+    la Free Software Foundation, soit la version 3 de la Licence, soit (à votre
+    choix) toute version ultérieure.</p>
+<p class="Pp">Ce programme est distribué dans l'espoir qu'il sera utile,
+    mais SANS AUCUNE GARANTIE ; sans même la garantie implicite de
+    COMMERCIALISATION ou d'ADÉQUATION À UN OBJET PARTICULIER. Voir la Licence Publique
+    Générale GNU pour plus de détails.</p>
+<p class="Pp">Vous devriez avoir reçu une copie de la Licence Publique Générale GNU
+    avec ce programme. Sinon, consultez
+  <a href='http://www.gnu.org/licenses/'>http://www.gnu.org/licenses/</a>.</p>
+<p class="Pp">L'algorithme MD4 est défini dans la RFC1320. Le code C de base
+    implémentant l'algorithme est dérivé de celui de la RFC et est couvert par
+    le copyright suivant :</p>
+<pre>MD4 est Copyright (C) 1990-2, RSA Data Security, Inc. Tous droits
+réservés.
+La licence de copie et d'utilisation de ce logiciel est accordée à condition qu'il
+soit identifié comme le "RSA Data Security, Inc. MD4 Message-Digest
+Algorithm" dans tout matériel mentionnant ou référençant ce logiciel
+ou cette fonction.
+Une licence est également accordée pour créer et utiliser des œuvres dérivées à condition
+que ces œuvres soient identifiées comme "derived from the RSA Data
+Security, Inc. MD4 Message-Digest Algorithm" dans tout matériel
+mentionnant ou référençant l'œuvre dérivée.
+RSA Data Security, Inc. ne fait aucune déclaration concernant la
+vendabilité de ce logiciel ou l'adéquation de ce
+logiciel à un usage particulier. Il est fourni "en l'état"
+sans garantie expresse ou implicite de quelque nature que ce soit.
+Ces avis doivent être conservés dans toute copie de toute partie de cette
+documentation et/ou de ce logiciel.</pre>
+<p class="Pp">Ce copyright n'interdit pas la distribution de toute version de
+    Perl contenant cette extension selon les termes des licences GNU ou Artistic.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTEUR</a></h1>
+<p class="Pp">File::RsyncP::Digest a été écrit par Craig Barratt
+    &lt;cbarratt@users.sourceforge.net&gt; basé sur Digest::MD4 et l'implémentation Adler32
+    était basée sur rsync 2.5.5.</p>
+<p class="Pp">Digest::MD4 a été adapté par Mike McCauley
+    (<span class="Li">"mikem@open.com.au"</span>), basé entièrement sur
+    MD5-1.7, écrit par Neil Winton
+    (<span class="Li">"N.Winton@axion.bt.co.uk"</span>).</p>
+<p class="Pp">Rsync a été écrit par Andrew Tridgell &lt;tridge@samba.org&gt; et
+    Paul Mackerras. Il est disponible sous une licence GPL. Voir
+    <a href='http://rsync.samba.org'>http://rsync.samba.org</a>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR   AUSSI</a></h1>
+<p class="Pp">Voir <a href='http://perlrsync.sourceforge.net'>http://perlrsync.sourceforge.net</a> pour la page d'accueil SourceForge de File::RsyncP.</p>
+<p class="Pp">Voir File::RsyncP, File::RsyncP::FileIO et
+  File::RsyncP::FileList.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/perl-file-rsyncp/">extra/perl-file-rsyncp</a></dd>
+        <dt>Version :</dt>
+        <dd>0.76-7</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://search.cpan.org/dist/File-RsyncP">https://search.cpan.org/dist/File-RsyncP</a></dd>
+        <dt>Licences :</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-file-rsyncp/">/listing/extra/perl-file-rsyncp/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#EXAMPLES">EXEMPLES</a></li>
+        
+            <li><a href="#LICENSE">LICENCE</a></li>
+        
+            <li><a href="#AUTHOR">AUTEUR</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/File::RsyncP::Digest.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/File::RsyncP::Digest.3pm.en.raw">brut</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible selon les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               , à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

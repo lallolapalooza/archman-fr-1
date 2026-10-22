@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Shell::Config::Generate(3) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Shell__Config__Generate(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-shell-config-generate/">perl-shell-config-generate</a></p>
+<p class="lic">Licences: PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Shell::Config::Generate(3)</td>
+    <td class="head-vol">Documentation des paquets contribués Perl</td>
+    <td class="head-rtitle">Shell::Config::Generate(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">Shell::Config::Generate - Générer des configurations portables pour n'importe quel shell</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VERSION'><a class='permalink' href='#VERSION'>VERSION</a></h1>
+<p class="Pp">version 0.34</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<p class="Pp">Avec cette entrée en matière :</p>
+<pre>use Shell::Guess;
+use Shell::Config::Generate;
+
+my $config = Shell::Config::Generate-&gt;new;
+$config-&gt;comment( 'ceci est mon fichier de configuration' );
+$config-&gt;set( FOO =&gt; 'bar' );
+$config-&gt;set_path(
+  PERL5LIB =&gt; '/foo/bar/lib/perl5',
+              '/foo/bar/lib/perl5/perl5/site',
+);
+$config-&gt;append_path(
+  PATH =&gt; '/foo/bar/bin',
+          '/bar/foo/bin',
+);</pre>
+<p class="Pp">Ceci :</p>
+<pre>$config-&gt;generate_file(Shell::Guess-&gt;bourne_shell, 'config.sh');</pre>
+<p class="Pp">générera un fichier config.sh avec ce contenu :</p>
+<pre># ceci est mon fichier de configuration
+FOO='bar';
+export FOO;
+PERL5LIB='/foo/bar/lib/perl5:/foo/bar/lib/perl5/perl5/site';
+export PERL5LIB;
+if [ -n "$PATH" ] ; then
+  PATH=$PATH:'/foo/bar/bin:/bar/foo/bin';
+  export PATH
+else
+  PATH='/foo/bar/bin:/bar/foo/bin';
+  export PATH;
+fi;</pre>
+<p class="Pp">et ceci :</p>
+<pre>$config-&gt;generate_file(Shell::Guess-&gt;c_shell, 'config.csh');</pre>
+<p class="Pp">générera un fichier config.csh avec ce contenu :</p>
+<pre># ceci est mon fichier de configuration
+setenv FOO 'bar';
+setenv PERL5LIB '/foo/bar/lib/perl5:/foo/bar/lib/perl5/perl5/site';
+test "$?PATH" = 0 &amp;&amp; setenv PATH '/foo/bar/bin:/bar/foo/bin' || setenv PATH "$PATH"/'foo/bar/bin:/bar/foo/bin';</pre>
+<p class="Pp">et ceci :</p>
+<pre>$config-&gt;generate_file(Shell::Guess-&gt;cmd_shell, 'config.cmd');</pre>
+<p class="Pp">générera un fichier config.cmd (script cmd.exe Windows) avec ce contenu :</p>
+<pre>rem ceci est mon fichier de configuration
+set FOO=bar
+set PERL5LIB=/foo/bar/lib/perl5:/foo/bar/lib/perl5/perl5/site
+if defined PATH (set PATH=%PATH%;/foo/bar/bin;/bar/foo/bin) else (set PATH=/foo/bar/bin;/bar/foo/bin)</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Ce module fournit une interface pour spécifier des configurations de shell pour différents environnements de shell sans avoir à se soucier des différences archaïques entre les shells comme csh, sh, cmd.exe et command.com.</p>
+<p class="Pp">Il ne modifie pas l'environnement actuel, mais peut être utilisé pour créer des configurations de shell qui modifient l'environnement.</p>
+<p class="Pp">Ce module utilise Shell::Guess pour représenter les différents types de shells pris en charge. De cette façon, vous pouvez spécifier statiquement un ou plusieurs shells :</p>
+<pre>#!/usr/bin/perl
+use Shell::Guess;
+use Shell::Config::Generate;
+my $config = Shell::Config::Generate-&gt;new;
+# ... configuration configuration ...
+$config-&gt;generate_file(Shell::Guess-&gt;bourne_shell,  'foo.sh' );
+$config-&gt;generate_file(Shell::Guess-&gt;c_shell,       'foo.csh');
+$config-&gt;generate_file(Shell::Guess-&gt;cmd_shell,     'foo.cmd');
+$config-&gt;generate_file(Shell::Guess-&gt;command_shell, 'foo.bat');</pre>
+<p class="Pp">Ceci créera des versions foo.sh et foo.csh des configurations, qui peuvent être sourcées comme suit :</p>
+<pre>#!/bin/sh
+. ./foo.sh</pre>
+<p class="Pp">ou</p>
+<pre>#!/bin/csh
+source foo.csh</pre>
+<p class="Pp">Il crée également des fichiers .cmd et .bat avec la même configuration qui peuvent être utilisés sous Windows. La configuration peut être importée dans votre shell simplement en exécutant ces fichiers :</p>
+<pre>C:\&gt; foo.cmd</pre>
+<p class="Pp">ou</p>
+<pre>C:\&gt; foo.bat</pre>
+<p class="Pp">Alternativement, vous pouvez utiliser le shell qui a appelé votre script Perl en utilisant la méthode Shell::Guess-&gt;running_shell, et écrire la sortie sur la sortie standard.</p>
+<pre>#!/usr/bin/perl
+use Shell::Guess;
+use Shell::Config::Generate;
+my $config = Shell::Config::Generate-&gt;new;
+# ... configuration configuration ...
+print $config-&gt;generate(Shell::Guess-&gt;running_shell);</pre>
+<p class="Pp">Si vous utilisez ce modèle, vous pouvez évaluer la sortie de votre script en utilisant la méthode backticks de votre shell pour importer la configuration dans votre shell.</p>
+<pre>#!/bin/sh
+eval `script.pl`</pre>
+<p class="Pp">ou</p>
+<pre>#!/bin/csh
+eval `script.pl`</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CONSTRUCTOR'><a class='permalink' href='#CONSTRUCTOR'>CONSTRUCTEUR</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='new'><a class='permalink' href='#new'>new</a></h2>
+<pre>my $config = Shell::Config::Generate-&gt;new;</pre>
+<p class="Pp">crée une instance de Shell::Config::Generate.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='METHODS'><a class='permalink' href='#METHODS'>MÉTHODES</a></h1>
+<p class="Pp">Il existe deux types de méthodes d'instance pour cette classe :</p>
+<ul class="Bl-bullet">
+  <li>modificateurs
+    <p class="Pp">ajustent la configuration dans un format portable interne</p>
+  </li>
+  <li>générateurs
+    <p class="Pp">génèrent des configurations de shell dans un format spécifique compte tenu du format portable interne stocké dans l'instance.</p>
+  </li>
+</ul>
+<p class="Pp">L'idée est que vous pouvez apporter plusieurs modifications à l'environnement sans vous soucier des différents shells, puis lorsque vous êtes prêt, vous pouvez créer des versions spécifiques de ces modifications en utilisant les générateurs.</p>
+<p class="Pp">Cela peut être utile pour les administrateurs système qui doivent prendre en charge des utilisateurs utilisant différents shells, avec un seul script de génération de configuration écrit en Perl.</p>
+<section class="Ss">
+<h2 class="Ss" id='set'><a class='permalink' href='#set'>set</a></h2>
+<pre>$config-&gt;set( $name =&gt; $value );</pre>
+<p class="Pp">Définit une variable d'environnement.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='set_path'><a class='permalink' href='#set_path'>set_path</a></h2>
+<pre>$config-&gt;set_path( $name =&gt; @values );</pre>
+<p class="Pp">Définit une variable d'environnement qui est stockée dans un format de type chemin standard (comme PATH ou PERL5LIB). Dans l'environnement UNIX, il s'agit d'une liste séparée par des deux-points stockée sous forme de chaîne. Sous Windows, il s'agit d'une liste séparée par des points-virgules stockée sous forme de chaîne. Vous pouvez faire la même chose en utilisant la méthode <span class="Li">&quot;set&quot;</span>, mais si vous le faites, vous devez déterminer le séparateur correct.</p>
+<p class="Pp">Ceci remplacera la valeur existante de la variable d'environnement si elle existe déjà.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='append_path'><a class='permalink' href='#append_path'>append_path</a></h2>
+<pre>$config-&gt;append_path( $name =&gt; @values );</pre>
+<p class="Pp">Ajoute à une variable d'environnement qui est stockée dans un format de type chemin standard. Ceci créera une nouvelle variable d'environnement si elle n'existe pas, ou ajoutera à une valeur existante.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='prepend_path'><a class='permalink' href='#prepend_path'>prepend_path</a></h2>
+<pre>$config-&gt;prepend_path( $name =&gt; @values );</pre>
+<p class="Pp">Ajoute à une variable d'environnement qui est stockée dans un format de type chemin standard. Ceci créera une nouvelle variable d'environnement si elle n'existe pas, ou ajoutera à une valeur existante.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='comment'><a class='permalink' href='#comment'>comment</a></h2>
+<pre>$config-&gt;comment( $comment );</pre>
+<p class="Pp">Génère un commentaire dans le format approprié.</p>
+<p class="Pp"><b>notez</b> que l'inclusion de commentaires dans votre configuration peut signifier qu'elle ne fonctionnera pas avec la méthode backticks <span class="Li">&quot;eval&quot;</span> pour importer des configurations dans votre shell.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='shebang'><a class='permalink' href='#shebang'>shebang</a></h2>
+<pre>$config-&gt;shebang;
+$config-&gt;shebang($location);</pre>
+<p class="Pp">Génère un shebang au début de la configuration, la rendant appropriée pour une utilisation en tant que script. Pour les shells non UNIX, il sera ignoré. Si spécifié, <span class="Li">$location</span> sera utilisé comme emplacement de l'interpréteur. S'il n'est pas spécifié, l'emplacement par défaut du shell sera utilisé.</p>
+<p class="Pp"><b>notez</b> que le shebang dans votre configuration peut signifier qu'elle ne fonctionnera pas avec la méthode backticks <span class="Li">&quot;eval&quot;</span> pour importer des configurations dans votre shell.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='echo_off'><a class='permalink' href='#echo_off'>echo_off</a></h2>
+<pre>$config-&gt;echo_off;</pre>
+<p class="Pp">Pour les configurations DOS/Windows (<span class="Li">&quot;command.com&quot;</span> ou <span class="Li">&quot;cmd.exe&quot;</span>), émettez ceci comme première ligne de la configuration :</p>
+<pre>@echo off</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='echo_on'><a class='permalink' href='#echo_on'>echo_on</a></h2>
+<pre>$config-&gt;echo_on;</pre>
+<p class="Pp">Désactive le echo off (c'est-à-dire, ne met rien au début de la configuration) pour les configurations DOS/Windows (<span class="Li">&quot;command.com&quot;</span> ou <span class="Li">&quot;cmd.exe&quot;</span>).</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='set_alias'><a class='permalink' href='#set_alias'>set_alias</a></h2>
+<pre>$config-&gt;set_alias( $alias =&gt; $command )</pre>
+<p class="Pp">Définit l'alias donné sur la commande donnée.</p>
+<p class="Pp">Remarque : certains anciens shells ne prennent pas en charge les alias, comme les originaux.</p>
+</section>
+</section>
+</article>
+</main>
+</body>
+</html><!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+        <title>Shell::Config::Generate(3pm)</title>
+        <link rel="stylesheet" href="/style.css" type="text/css"/>
+        <link rel="icon" href="/favicon.ico" type="image/x-icon"/>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" type="text/css"/>
+    </head>
+    <body>
+        <main>
+            <article>
+                
+                <section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">Shell::Config::Generate - generate shell configuration for common shells</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="VERSION"><a class="permalink" href="#VERSION">VERSION</a></h1>
+<p class="Pp">This document describes version 0.34 of Shell::Config::Generate.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<pre>    use Shell::Config::Generate;
+
+    my $config = Shell::Config::Generate-&gt;new(
+        aliases =&gt; {
+            'll' =&gt; 'ls -CF',
+            'la' =&gt; 'ls -A',
+        },
+        paths =&gt; [qw(
+            /usr/local/bin
+            /opt/local/bin
+        )],
+        path_sep =&gt; ':', # Or ';',
+        debug =&gt; 1,
+    );
+
+    # Guess the shell that's running this script
+    my $shell = Shell::Guess-&gt;new;
+    my $command_text = $config-&gt;generate($shell);
+    print $command_text;
+
+    # Or generate for a specific shell
+    my $command_text = $config-&gt;generate('tcsh');
+    print $command_text;
+
+    # Or write to a file
+    $config-&gt;generate_file('bash', 'my_bash_config.sh');
+
+    # Escape paths
+    my @escaped = cmd_escape_path(@path_list);
+    my @escaped = powershell_escape_path(@path_list);
+    my @escaped = win32_space_be_gone(@path_list);</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">This module generates shell configuration code for various shells. It
+    can generate code for aliasing commands, prepending or appending directories
+    to the PATH environment variable, and exporting variables.</p>
+<p class="Pp">This module relies on <span class="Li">Shell::Guess</span> to
+    determine the current shell, or to guess it if you are running it in a
+    different shell.</p>
+<p class="Pp">The primary goal is to generate files which can be sourced by the
+    user's shell initialization files (e.g.
+    <span class="Li">~/.bashrc</span>,
+    <span class="Li">~/.tcshrc</span>,
+    <span class="Li">~/.config/fish/config.fish</span>).</p>
+<p class="Pp">Some shells do not support aliases directly, for example the standard
+    bourne shell. In such cases, this module will try to emulate aliases using
+    shell functions.</p>
+<p class="Pp">For <span class="Li">cmd.exe</span> and
+    <span class="Li">command.com</span>, aliases are implemented as functions. This
+    is because <span class="Li">cmd.exe</span> and
+    <span class="Li">command.com</span> do not support aliases in the same way
+    as bourne shell. They do not support passing arguments to aliases.</p>
+<p class="Pp">For <span class="Li">PowerShell</span>, a simple function is used
+    instead of an alias so that arguments may be specified.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="CONSTRUCTOR"><a class="permalink" href="#CONSTRUCTOR">CONSTRUCTOR</a></h1>
+<section class="Ss">
+<h2 class="Ss" id="new"><a class="permalink" href="#new">new</a></h2>
+<pre>my $config = Shell::Config::Generate-&gt;new(%args);</pre>
+<p class="Pp">Creates a new <span class="Li">Shell::Config::Generate</span>
+    object. The following arguments are accepted:</p>
+<dl class="Bl-tag">
+  <dt><span class="Li">aliases</span></dt>
+  <dd>A hash reference where keys are the alias names and values are the commands
+      to execute. For example:
+      <pre>    aliases =&gt; {
+        'll' =&gt; 'ls -CF',
+        'la' =&gt; 'ls -A',
+    }</pre>
+  </dd>
+  <dt><span class="Li">paths</span></dt>
+  <dd>An array reference of paths to add to the PATH environment variable. These
+      will be prepended to the PATH by default. If you want them appended, you
+      will need to configure that separately, or use the
+      <span class="Li">path_sep</span> option carefully.</dd>
+  <dt><span class="Li">path_sep</span></dt>
+  <dd>The path separator to use. Defaults to the shell's default (usually ':' for
+      Unix, ';' for Windows). See <a href="#set_path_sep">set_path_sep</a>.</dd>
+  <dt><span class="Li">exports</span></dt>
+  <dd>A hash reference of environment variables to export. For example:
+      <pre>    exports =&gt; {
+        'MY_VARIABLE' =&gt; 'some_value',
+        'ANOTHER_VAR' =&gt; $some_other_value,
+    }</pre>
+  </dd>
+  <dt><span class="Li">debug</span></dt>
+  <dd>If true, enables debug output. Defaults to false.</dd>
+  <dt><span class="Li">comment</span></dt>
+  <dd>A string that will be added as a comment at the beginning of the generated
+      configuration file. Defaults to undef.</dd>
+</dl>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="METHODS"><a class="permalink" href="#METHODS">METHODS</a></h1>
+<section class="Ss">
+<h2 class="Ss" id="set_path_sep"><a class="permalink" href="#set_path_sep">set_path_sep</a></h2>
+<pre>$config-&gt;set_path_sep( $sep );</pre>
+<p class="Pp">Use <span class="Li">$sep</span> as the path separator instead of
+    the shell default path separator (generally
+    <span class="Li">&quot;:&quot;</span> for Unix shells and
+    <span class="Li">&quot;;&quot;</span> for Windows shells).</p>
+<p class="Pp">Not all characters are supported, it is usually best to stick with
+    the shell default or to use <span class="Li">&quot;:&quot;</span> or
+    <span class="Li">&quot;;&quot;</span>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id="generate"><a class="permalink" href="#generate">generate</a></h2>
+<pre>my $command_text = $config-&gt;generate;
+my $command_text = $config-&gt;generate( $shell );</pre>
+<p class="Pp">Generate shell configuration code for the given shell.
+    <span class="Li">$shell</span> is an instance of Shell::Guess. If
+    <span class="Li">$shell</span> is not provided, then this method will use
+    Shell::Guess to guess the shell that called your perl script.</p>
+<p class="Pp">You can also pass in the shell name as a string for
+    <span class="Li">$shell</span>. This should correspond to the appropriate
+    <i>name</i>_shell from Shell::Guess. So for csh you would pass in
+    <span class="Li">&quot;c&quot;</span> and for tcsh you would pass in
+    <span class="Li">&quot;tc&quot;</span>, etc.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id="generate_file"><a class="permalink" href="#generate_file">generate_file</a></h2>
+<pre>$config-&gt;generate_file( $shell, $filename );</pre>
+<p class="Pp">Generate shell configuration code for the given shell and write it
+    to the given file. <span class="Li">$shell</span> is an instance of
+    Shell::Guess. If there is an IO error it will throw an exception.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="FUNCTIONS"><a class="permalink" href="#FUNCTIONS">FUNCTIONS</a></h1>
+<section class="Ss">
+<h2 class="Ss" id="win32_space_be_gone"><a class="permalink" href="#win32_space_be_gone">win32_space_be_gone</a></h2>
+<pre>my @new_path_list = win32_space_be_gone( @orig_path_list );</pre>
+<p class="Pp">On <span class="Li">&quot;MSWin32&quot;</span> and
+    <span class="Li">&quot;cygwin&quot;</span>:</p>
+<p class="Pp">Given a list of directory paths (or filenames), this will return
+    an equivalent list of paths pointing to the same file system objects without
+    spaces. To do this <span class="Li">Win32::GetShortPathName()</span> is used
+    on to find alternative path names without spaces.</p>
+<p class="Pp">NOTE that this breaks when Windows is told not to create short
+    (<span class="Li">&quot;8+3&quot;</span>) filenames; see
+    <a href="http://www.perlmonks.org/?node_id=333930">http://www.perlmonks.org/?node_id=333930</a> for a discussion of this
+    behaviour.</p>
+<p class="Pp">In addition, on just
+    <span class="Li">&quot;Cygwin&quot;</span>:</p>
+<p class="Pp">The input paths are first converted from POSIX to Windows paths
+    using <span class="Li">&quot;Cygwin::posix_to_win_path&quot;</span>, and
+    then converted back to POSIX paths using
+    <span class="Li">&quot;Cygwin::win_to_posix_path&quot;</span>.</p>
+<p class="Pp">Elsewhere:</p>
+<p class="Pp">Returns the same list passed into it</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id="cmd_escape_path"><a class="permalink" href="#cmd_escape_path">cmd_escape_path</a></h2>
+<pre>my @new_path_list = cmd_escape_path( @orig_path_list )</pre>
+<p class="Pp">Given a list of directory paths (or filenames), this will return
+    an equivalent list of paths escaped for cmd.exe and command.com.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id="powershell_escape_path"><a class="permalink" href="#powershell_escape_path">powershell_escape_path</a></h2>
+<pre>my @new_path_list = powershell_escape_path( @orig_path_list )</pre>
+<p class="Pp">Given a list of directory paths (or filenames), this will return
+    an equivalent list of paths escaped for PowerShell.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="CAVEATS"><a class="permalink" href="#CAVEATS">CAVEATS</a></h1>
+<p class="Pp">The test suite tests this module's output against the actual
+    shells that should understand them, if they can be found in the path. You
+    can generate configurations for shells which are not available (for example
+    <span class="Li">&quot;cmd.exe&quot;</span> configurations from UNIX or
+    bourne configurations under windows), but the test suite only tests them if
+    they are found during the build of this module.</p>
+<p class="Pp">The implementation for <span class="Li">&quot;csh&quot;</span>
+    depends on the external command <span class="Li">&quot;test&quot;</span>. As
+    far as I can tell <span class="Li">&quot;test&quot;</span> should be
+    available on all modern flavors of UNIX which are using
+    <span class="Li">&quot;csh&quot;</span>. If anyone can figure out how to
+    prepend or append to path type environment variable without an external
+    command in <span class="Li">&quot;csh&quot;</span>, then a patch would be
+    appreciated.</p>
+<p class="Pp">The incantation for prepending and appending elements to a path on
+    csh probably deserve a comment here. It looks like this:</p>
+<pre>test &quot;$?PATH&quot; = 0 &amp;&amp; setenv PATH '/foo/bar/bin:/bar/foo/bin' || setenv PATH &quot;$PATH&quot;:'/foo/bar/bin:/bar/foo/bin';</pre>
+<dl class="Bl-tag">
+  <dt>&#x2022;</dt>
+  <dd>one line
+    <p class="Pp">The command is all on one line, and doesn't use if, which is
+        probably more clear and ideomatic. This for example, might make more
+        sense:</p>
+        <pre>if ( $?PATH == 0 ) then
+  setenv PATH '/foo/bar/bin:/bar/foo/bin'
+else
+  setenv PATH &quot;$PATH&quot;:'/foo/bar/bin:/bar/foo/bin'
+endif
+</pre>
+    <p class="Pp">However, this only works if the code interpreted using the csh
+        <span class="Li">&quot;source&quot;</span> command or is included in a
+        csh script inline. If you try to invoke this code using csh
+        <span class="Li">&quot;eval&quot;</span> then it will helpfully convert
+        it to one line and if does not work under csh in one line.</p>
+  </dd>
+</dl>
+<p class="Pp">There are probably more clever or prettier ways to append/prepend
+    path environment variables as I am not a shell programmer. Patches
+    welcome.</p>
+<p class="Pp">Only UNIX (bourne, bash, csh, ksh, fish and their derivatives) and
+    Windows (command.com, cmd.exe and PowerShell) are supported so far.</p>
+<p class="Pp">Fish shell support should be considered a tech preview. The Fish
+    shell itself is somewhat in flux, and thus some tests are skipped for the
+    Fish shell since behavior is different for different versions. In
+    particular, new lines in environment variables may not work on newer
+    versions.</p>
+<p class="Pp">Patches welcome for your favorite shell / operating system.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">Author: Graham Ollis &lt;plicease@cpan.org&gt;</p>
+<p class="Pp">Contributors:</p>
+<p class="Pp">Brad Macpherson (BRAD, brad-mac)</p>
+<p class="Pp">mohawk</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="COPYRIGHT_AND_LICENSE"><a class="permalink" href="#COPYRIGHT_AND_LICENSE">COPYRIGHT AND LICENSE</a></h1>
+<p class="Pp">This software is copyright (c) 2017 by Graham Ollis.</p>
+<p class="Pp">This is free software; you can redistribute it and/or modify it
+    under the same terms as the Perl 5 programming language system itself.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Package information:</p>
+    <dl>
+        <dt>Package name:</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-shell-config-generate/">extra/perl-shell-config-generate</a></dd>
+        <dt>Version:</dt>
+        <dd>0.34-9</dd>
+        <dt>Upstream:</dt>
+        <dd><a href="https://metacpan.org/release/Shell-Config-Generate">https://metacpan.org/release/Shell-Config-Generate</a></dd>
+        <dt>Licenses:</dt>
+        <dd>PerlArtistic</dd>
+        <dt>Manuals:</dt>
+        <dd><a href="/listing/extra/perl-shell-config-generate/">/listing/extra/perl-shell-config-generate/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table of contents</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NAME</a></li>
+        
+            <li><a href="#VERSION">VERSION</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#CONSTRUCTOR">CONSTRUCTOR</a></li>
+        
+            <li><a href="#METHODS">METHODS</a></li>
+        
+            <li><a href="#FUNCTIONS">FUNCTIONS</a></li>
+        
+            <li><a href="#CAVEATS">CAVEATS</a></li>
+        
+            <li><a href="#AUTHOR">AUTHOR</a></li>
+        
+            <li><a href="#COPYRIGHT_AND_LICENSE">COPYRIGHT AND LICENSE</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Other formats:
+        
+            <a href="/man/Shell::Config::Generate.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/Shell::Config::Generate.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>The website is available under the terms of the <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               license, except for the contents of the manual pages, which have their own license
+               specified in the corresponding Arch Linux package.
+            </p>
+        </footer>
+    </body>
+</html>

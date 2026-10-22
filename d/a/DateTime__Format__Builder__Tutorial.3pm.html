@@ -1,0 +1,348 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>DateTime::Format::Builder::Tutorial(3pm) — Pages man d'Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">DateTime__Format__Builder__Tutorial(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/perl-datetime-format-builder/">perl-datetime-format-builder</a></p>
+<p class="lic">Licences: PerlArtistic, GPL</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">DateTime::Format::Builder::Tutorial(3)</td>
+    <td class="head-vol">Documentation Perl contribuée par les utilisateurs</td>
+    <td class="head-rtitle">DateTime::Format::Builder::Tutorial(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">DateTime::Format::Builder::Tutorial - Cours rapide sur l'utilisation de Builder</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VERSION'><a class='permalink' href='#VERSION'>VERSION</a></h1>
+<p class="Pp">version 0.83</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CREATING_A_CLASS'><a class='permalink' href='#CREATING_A_CLASS'>CRÉER UNE CLASSE</a></h1>
+<p class="Pp">Comme la plupart des personnes qui écrivent des modules le savent, vous commencez un paquet par une déclaration de paquet et une indication de la version du module :</p>
+<pre>package DateTime::Format::ICal; our $VERSION = '0.04';</pre>
+<p class="Pp">Ensuite, vous appelez Builder avec quelques options. Il n'y en a que quelques-unes (détaillées plus tard). Pour l'instant, nous ne sommes intéressés que par
+  <i>parsers</i>.</p>
+<pre>use DateTime::Format::Builder ( parsers =&gt; {...} );</pre>
+<p class="Pp">L'option <i>parsers</i> prend une référence à un hash de noms de méthodes et de spécifications :</p>
+<pre>parsers =&gt; {
+        parse_datetime =&gt; ... ,
+        parse_datetime_with_timezone =&gt; ... ,
+        ...
+    }</pre>
+<p class="Pp">Builder créera des méthodes dans votre classe, chaque méthode étant un analyseur qui suit les spécifications données. Il est <b>fortement</b>
+    recommandé qu'une méthode soit appelée <i>parse_datetime</i>, qu'il s'agisse d'une méthode créée par Builder ou de l'une des vôtres.</p>
+<p class="Pp">En plus de créer toutes les méthodes d'analyse, il crée également une méthode <span class="Li">"new"</span> qui peut instancier (ou cloner) des objets de cette classe. Ce comportement peut être modifié avec l'option
+    <i>constructor</i> , mais nous n'avons pas encore besoin de le savoir.</p>
+<p class="Pp">Chaque valeur correspondant à un nom de méthode dans la liste parsers est soit une spécification unique, soit une liste de spécifications. Nous commencerons par le cas simple.</p>
+<pre>parse_briefdate =&gt; { params =&gt; [qw( year month day )], regex =&gt; qr/^(\d\d\d\d)(\d\d)(\d\d)$/, },</pre>
+<p class="Pp">Cela créera une méthode nommée <i>parse_briefdate</i> qui prendra des chaînes de la forme <span class="Li">20040716</span> et renverra des objets DateTime représentant cette date. Un utilisateur de la classe pourrait écrire :</p>
+<pre>use DateTime::Format::ICal;
+my $date = '19790716';
+my $dt   = DateTime::Format::ICal-&gt;parse_briefdate($date);
+print "My birth month is ", $dt-&gt;month_name, "\n";</pre>
+<p class="Pp">Le <span class="Li">"regex"</span> est appliqué à la chaîne d'entrée, et s'il correspond, alors <span class="Li">$1</span>,
+    <span class="Li">$2</span>, ... sont mappés aux <i>params</i> donnés et transmis à <span class="Li">"DateTime-&gt;new"</span>. Essentiellement :</p>
+<pre>my $rv = DateTime-&gt;new( year =&gt; $1, month =&gt; $2, day =&gt; $3 );</pre>
+<p class="Pp">Il y a des choses plus compliquées que l'on peut faire au sein d'une seule spécification, mais nous les couvrirons plus tard.</p>
+<p class="Pp">Souvent, vous voudrez qu'une méthode puisse prendre une chaîne et la tester contre plusieurs spécifications d'analyse. Ce serait très irritant si l'utilisateur devait déterminer dans quel format la chaîne datetime se trouve et ensuite quelle méthode est la plus appropriée.</p>
+<p class="Pp">Ainsi, Builder vous permet de spécifier plusieurs spécifications :</p>
+<pre>parse_datetime =&gt; [
+    {
+        params =&gt; [qw( year month day hour minute second )],
+        regex  =&gt; qr/^(\d\d\d\d)(\d\d)(\d\d)T(\d\d)(\d\d)(\d\d)$/,
+    },
+    {
+        params =&gt; [qw( year month day hour minute )],
+        regex  =&gt; qr/^(\d\d\d\d)(\d\d)(\d\d)T(\d\d)(\d\d)$/,
+    },
+    {
+        params =&gt; [qw( year month day hour )],
+        regex  =&gt; qr/^(\d\d\d\d)(\d\d)(\d\d)T(\d\d)$/,
+    },
+    {
+        params =&gt; [qw( year month day )],
+        regex  =&gt; qr/^(\d\d\d\d)(\d\d)(\d\d)$/,
+    },
+],</pre>
+<p class="Pp">C'est un arrayref de spécifications. Un analyseur sera créé qui essaiera chacune de ces spécifications séquentiellement, dans l'ordre que vous avez spécifié.</p>
+<p class="Pp">Il y a cependant un défaut dans cela. Dans cet exemple, nous construisons un analyseur pour les datetimes ICal. On peut placer un identifiant de fuseau horaire au début d'un datetime ICal. Vous pourriez extraire un tel identifiant avec le code suivant :</p>
+<pre>if ( $date =~ s/^TZID=([^:]+):// ) {
+    $time_zone = $1;
+}
+# Z at end means UTC
+elsif ( $date =~ s/Z$// ) {
+    $time_zone = 'UTC';
+}
+else {
+    $time_zone = 'floating';
+}</pre>
+<p class="Pp"><span class="Li">$date</span> se retrouverait sans l'identifiant, et
+    <span class="Li">$time_zone</span> contiendrait quelque chose d'adapté à donner à la méthode <i>set_time_zone</i> de DateTime, ou à l'argument <i>time_zone</i>
+    .</p>
+<p class="Pp">Mais comment intégrer ce morceau de code dans votre analyseur ? Vous pourriez être tenté d'appeler l'analyseur autrement et de construire un petit wrapper. Il n'y a pas besoin cependant car une option est fournie pour le prétraitement des dates :</p>
+<pre>parse_datetime =&gt; [
+    [ preprocess =&gt; \&amp;_parse_tz ],    # Only changed line!
+    {
+        params =&gt; [qw( year month day hour minute second )],
+        regex  =&gt; qr/^(\d\d\d\d)(\d\d)(\d\d)T(\d\d)(\d\d)(\d\d)$/,
+    },
+    {
+        params =&gt; [qw( year month day hour minute )],
+        regex  =&gt; qr/^(\d\d\d\d)(\d\d)(\d\d)T(\d\d)(\d\d)$/,
+    },
+    {
+        params =&gt; [qw( year month day hour )],
+        regex  =&gt; qr/^(\d\d\d\d)(\d\d)(\d\d)T(\d\d)$/,
+    },
+    {
+        params =&gt; [qw( year month day )],
+        regex  =&gt; qr/^(\d\d\d\d)(\d\d)(\d\d)$/,
+    },
+],</pre>
+<p class="Pp">Cela nécessitera que <i>_parse_tz</i> soit écrit, et cette routine ressemble à ceci :</p>
+<pre>sub _parse_tz {
+    my %args = @_;
+    my ( $date, $p ) = @args{qw( input parsed )};
+    if ( $date =~ s/^TZID=([^:]+):// ) {
+        $p-&gt;{time_zone} = $1;
+    }
+    # Z at end means UTC
+    elsif ( $date =~ s/Z$// ) {
+        $p-&gt;{time_zone} = 'UTC';
+    }
+    else {
+        $p-&gt;{time_zone} = 'floating';
+    }
+    return $date;
+}</pre>
+<p class="Pp">En entrée, on lui donne un hash contenant deux éléments : la date d'entrée et un hashref qui sera utilisé dans l'analyse. La valeur de retour de la routine est ce contre quoi les spécifications d'analyse seront exécutées, et tout ce qui est dans le hash <i>parsed</i> (<span class="Li">$p</span> dans l'exemple) sera mis dans l'appel à
+    <span class="Li">"DateTime-&gt;new(...)"</span>.</p>
+<p class="Pp">Ainsi, nous avons maintenant un analyseur ICal qui fonctionne joyeusement. Il analyse les formats divers et peut aussi gérer les fuseaux horaires. Y a-t-il autre chose qu'il doit faire ? Non. Mais nous pouvons le faire fonctionner plus efficacement.</p>
+<p class="Pp">Actuellement, les spécifications sont testées séquentiellement. Cependant, chacune s'applique à des chaînes de longueurs particulières. Ainsi, nous pourrions être efficaces et faire en sorte que l'analyseur ne teste les chaînes données que contre un analyseur qui gère cette longueur de chaîne. Encore une fois, Builder le rend facile :</p>
+<pre>parse_datetime =&gt; [
+    [ preprocess =&gt; \&amp;_parse_tz ],
+    {
+        length =&gt; 15,    # We handle strings of exactly 15 chars
+        params =&gt; [qw( year month day hour minute second )],
+        regex  =&gt; qr/^(\d\d\d\d)(\d\d)(\d\d)T(\d\d)(\d\d)(\d\d)$/,
+    },
+    {
+        length =&gt; 13,                                # exactly 13 chars...
+        params =&gt; [qw( year month day hour minute )],
+        regex =&gt; qr/^(\d\d\d\d)(\d\d)(\d\d)T(\d\d)(\d\d)$/,
+    },
+    {
+        length =&gt; 11,                                    # 11..
+        params =&gt; [qw( year month day hour )],
+        regex  =&gt; qr/^(\d\d\d\d)(\d\d)(\d\d)T(\d\d)$/,
+    },
+    {
+        length =&gt; 8,                                     # yes.
+        params =&gt; [qw( year month day )],
+        regex  =&gt; qr/^(\d\d\d\d)(\d\d)(\d\d)$/,
+    },
+],</pre>
+<p class="Pp">Maintenant, l'analyseur créé créera un analyseur qui n'exécute les spécifications que contre les chaînes appropriées.</p>
+<p class="Pp">Ainsi, notre code complet ressemble à :</p>
+<pre>package DateTime::Format::ICal;
+use strict;
+our $VERSION = '0.04';
+use DateTime::Format::Builder (
+    parsers =&gt; {
+        parse_datetime =&gt; [
+            [ preprocess =&gt; \&amp;_parse_tz ],
+            {
+                length =&gt; 15,
+                params =&gt; [qw( year month day hour minute second )],
+                regex  =&gt; qr/^(\d\d\d\d)(\d\d)(\d\d)T(\d\d)(\d\d)(\d\d)$/,
+            },
+            {
+                length =&gt; 13,
+                params =&gt; [qw( year month day hour minute )],
+                regex  =&gt; qr/^(\d\d\d\d)(\d\d)(\d\d)T(\d\d)(\d\d)$/,
+            },
+            {
+                length =&gt; 11,
+                params =&gt; [qw( year month day hour )],
+                regex  =&gt; qr/^(\d\d\d\d)(\d\d)(\d\d)T(\d\d)$/,
+            },
+            {
+                length =&gt; 8,
+                params =&gt; [qw( year month day )],
+                regex  =&gt; qr/^(\d\d\d\d)(\d\d)(\d\d)$/,
+            },
+        ],
+    },
+);
+sub _parse_tz {
+    my %args = @_;
+    my ( $date, $p ) = @args{qw( input parsed )};
+    if ( $date =~ s/^TZID=([^:]+):// ) {
+        $p-&gt;{time_zone} = $1;
+    }
+    # Z at end means UTC
+    elsif ( $date =~ s/Z$// ) {
+        $p-&gt;{time_zone} = 'UTC';
+    }
+    else {
+        $p-&gt;{time_zone} = 'floating';
+    }
+    return $date;
+}
+1;</pre>
+<p class="Pp">Et c'est un analyseur ICal. Le module DateTime::Format::ICal réel inclut aussi des méthodes de formatage et l'analyse des durées, mais Builder ne les prend pas encore en charge. Un remplacement direct (au moment de l'écriture du remplacement) peut être trouvé dans le répertoire <i>examples</i> de la distribution Builder, avec des variantes similaires deautres modules courants.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR   AUSSI</a></h1>
+<p class="Pp"><span class="Li">"datetime@perl.org"</span> liste de diffusion.</p>
+<p class="Pp"><a href='http://datetime.perl.org/'>http://datetime.perl.org/</a></p>
+<p class="Pp">perl, DateTime, DateTime::Format::Builder</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SUPPORT'><a class='permalink' href='#SUPPORT'>ASSISTANCE</a></h1>
+<p class="Pp">Les bogues peuvent être signalés sur
+    <a href='https://github.com/houseabsolute/DateTime-Format-Builder/issues'>https://github.com/houseabsolute/DateTime-Format-Builder/issues</a>.</p>
+<p class="Pp">Je suis aussi généralement actif sur IRC sous le nom 'autarch' sur
+    <span class="Li">"irc://irc.perl.org"</span>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SOURCE'><a class='permalink' href='#SOURCE'>SOURCE</a></h1>
+<p class="Pp">Le dépôt du code source de DateTime-Format-Builder peut être
+    trouvé sur
+  <a href='https://github.com/houseabsolute/DateTime-Format-Builder'>https://github.com/houseabsolute/DateTime-Format-Builder</a>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHORS'><a class='permalink' href='#AUTHORS'>AUTEURS</a></h1>
+<ul class="Bl-bullet">
+  <li>Dave Rolsky &lt;autarch@urth.org&gt;</li>
+  <li>Iain Truskett &lt;spoon@cpan.org&gt;</li>
+</ul>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT_AND_LICENSE'><a class='permalink' href='#COPYRIGHT_AND_LICENSE'>DROITS   D'AUTEUR   ET   LICENCE</a></h1>
+<p class="Pp">Ce logiciel est Copyright (c) 2020 par Dave Rolsky.</p>
+<p class="Pp">C'est un logiciel libre, sous licence :</p>
+<pre>The Artistic License 2.0 (GPL Compatible)</pre>
+<p class="Pp">Le texte intégral de la licence se trouve dans le <i>fichier</i>
+    LICENSE inclus avec cette distribution.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-13</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/perl-datetime-format-builder/">extra/perl-datetime-format-builder</a></dd>
+        <dt>Version :</dt>
+        <dd>1:0.83-7</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://search.cpan.org/dist/DateTime-Format-Builder">https://search.cpan.org/dist/DateTime-Format-Builder</a></dd>
+        <dt>Licences :</dt>
+        <dd>PerlArtistic, GPL</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-datetime-format-builder/">/listing/extra/perl-datetime-format-builder/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#VERSION">VERSION</a></li>
+        
+            <li><a href="#CREATING_A_CLASS">CRÉATION   D'UNE   CLASSE</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+            <li><a href="#SUPPORT">ASSISTANCE</a></li>
+        
+            <li><a href="#SOURCE">SOURCE</a></li>
+        
+            <li><a href="#AUTHORS">AUTEURS</a></li>
+        
+            <li><a href="#COPYRIGHT_AND_LICENSE">DROITS D'AUTEUR ET LICENCE</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/DateTime::Format::Builder::Tutorial.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/DateTime::Format::Builder::Tutorial.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible selon les termes de la <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">licence</a>
+               GPL-3.0, à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

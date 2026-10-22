@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>POE::Component::Server::TCP(3pm) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">POE__Component__Server__TCP(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-poe/">perl-poe</a></p>
+<p class="lic">Licences: GPL, PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">POE::Component::Server::TCP(3)</td>
+    <td class="head-vol">Documentation Perl Contribuée par l'Utilisateur</td>
+    <td class="head-rtitle">POE::Component::Server::TCP(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">POE::Component::Server::TCP - un serveur TCP simplifié</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<pre>#!perl
+use warnings;
+use strict;
+use POE qw(Component::Server::TCP);
+POE::Component::Server::TCP-&gt;new(
+  Port =&gt; 12345,
+  ClientConnected =&gt; sub {
+    print &quot;connexion reçue de $_[HEAP]{remote_ip}\n&quot;;
+    $_[HEAP]{client}-&gt;put(&quot;Smile from the server!&quot;);
+  },
+  ClientInput =&gt; sub {
+    my $client_input = $_[ARG0];
+    $client_input =~ tr[a-zA-Z][n-za-mN-ZA-M];
+    $_[HEAP]{client}-&gt;put($client_input);
+  },
+);
+POE::Kernel-&gt;run;
+exit;</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">POE::Component::Server::TCP implémente un serveur générique multi-sessions. Des services simples peuvent être assemblés en quelques lignes de code. Par exemple, un serveur qui renvoie l'entrée au client :</p>
+<pre>use POE qw(Component::Server::TCP);
+POE::Component::Server::TCP-&gt;new(
+  Port =&gt; 12345,
+  ClientInput =&gt; sub { $_[HEAP]{client}-&gt;put($_[ARG0]) },
+);
+POE::Kernel-&gt;run();</pre>
+<section class="Ss">
+<h2 class="Ss" id='Accepter_les_connexions_soi-m%C3%AAme'><a class='permalink' href='#Accepter_les_connexions_soi-m%C3%AAme'>Accepter les connexions soi-même</a></h2>
+<p class="Pp">POE::Component::Server::TCP a un mode par défaut où il accepte les nouvelles connexions et crée les sessions pour les gérer. Les programmes peuvent le faire eux-mêmes en fournissant leurs propres callbacks
+    <span class="Li">&quot;Acceptor&quot;</span>. Voir &quot;Acceptor&quot; pour les détails.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Session_d%C3%A9coute_ma%C3%AEtresse'><a class='permalink' href='#Session_d%C3%A9coute_ma%C3%AEtresse'>Session d'écoute maîtresse</a></h2>
+<p class="Pp">Lors de la création, POE::Component::Server::TCP démarre une
+    POE::Session pour écouter les nouvelles connexions. L'<span class="Li">&quot;Alias&quot;</span> du composant fait référence à cette session maîtresse.</p>
+<p class="Pp">Si <span class="Li">&quot;Acceptor&quot;</span> est spécifié, alors il appartient à ce callback de traiter les sockets nouvellement acceptés. Ses paramètres sont ceux de
+    <span class="Li">&quot;SuccessEvent&quot;</span> de POE::Wheel::SocketFactory.</p>
+<p class="Pp">Sinon, le callback par défaut
+    <span class="Li">&quot;Acceptor&quot;</span> démarrera une nouvelle session pour gérer chaque connexion. Ces sessions enfants n'ont pas leurs propres alias, mais leurs callbacks
+    <span class="Li">&quot;ClientConnected&quot;</span> et
+    <span class="Li">&quot;ClientDisconnected&quot;</span> peuvent être utilisés pour enregistrer et désenregistrer les sessions avec un espace de noms partagé, comme une table indexée par les identifiants de session, ou un objet qui gère une telle table.</p>
+<pre>my %client_namespace;
+sub handle_client_connected {
+  my $client_session_id = $_[SESSION]-&gt;ID;
+  $client_namespace{$client_session_id} = \%anything;
+}
+sub handle_client_disconnected {
+  my $client_session_id = $_[SESSION]-&gt;ID;
+  $client_namespace{$client_session_id} = \%anything;
+}</pre>
+<p class="Pp">Le callback <span class="Li">&quot;Started&quot;</span> du composant est invoqué à la fin de la routine de démarrage de la session maîtresse. Les paramètres
+    <span class="Li">@_</span>[ARG0..$#_] sont définis à une copie des valeurs du paramètre de constructeur
+    <span class="Li">&quot;ListenerArgs&quot;</span> du serveur. Les autres paramètres sont standards pour les gestionnaires _start de POE::Session.</p>
+<p class="Pp">Le callback <span class="Li">&quot;Stopped&quot;</span> du composant est invoqué au début de la routine _stop de la session maîtresse. Les paramètres sont standards pour les gestionnaires _stop de POE::Session.</p>
+<p class="Pp">Le callback <span class="Li">&quot;Error&quot;</span> du composant est invoqué lorsque le serveur rencontre un problème d'écoute des connexions.
+    <span class="Li">&quot;Error&quot;</span> peut également être appelé si l'accepteur par défaut du composant a des difficultés à accepter une connexion.
+    <span class="Li">&quot;Error&quot;</span> reçoit les paramètres habituels pour &quot;FailureEvent&quot; dans POE::Wheel::SocketFactory et &quot;ErrorEvent&quot; dans POE::Wheel::ReadWrite.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Sessions_enfants_de_connexion_par_d%C3%A9faut'><a class='permalink' href='#Sessions_enfants_de_connexion_par_d%C3%A9faut'>Sessions enfants de connexion par défaut</a></h2>
+<p class="Pp">Si <span class="Li">&quot;Acceptor&quot;</span> n'est pas spécifié, le gestionnaire par défaut de POE::Component::Server::TCP démarrera une nouvelle session pour chaque nouvelle connexion client. Comme mentionné ci-dessus, ces sessions enfants n'ont pas d'alias propres, mais elles peuvent définir des alias ou s'enregistrer d'une autre manière lors de leurs callbacks
+    <span class="Li">&quot;ClientConnected&quot;</span> et
+    <span class="Li">&quot;ClientDisconnected&quot;</span>.</p>
+<p class="Pp">On ne saurait trop insister sur le fait que les callbacks suivants sont exécutés dans le contexte de sessions enfants dynamiques---une par connexion client---et non dans la session d'écoute maîtresse. Cela a été un point majeur de confusion. Nous accueillons les suggestions pour rendre cela plus clair.</p>
+<p class="Pp">Le callback <span class="Li">&quot;ClientInput&quot;</span> du composant définit comment les sessions enfants géreront les entrées de leurs clients. Ses paramètres sont ceux de
+    <span class="Li">&quot;InputEvent&quot;</span> de POE::Wheel::ReadWrite.</p>
+<p class="Pp">Comme mentionné, <span class="Li">&quot;ClientConnected&quot;</span> est appelé à la fin de la routine
+    <span class="Li">&quot;_start&quot;</span> de la session enfant. Le callback
+    <span class="Li">&quot;ClientConneted&quot;</span> reçoit les mêmes paramètres que le _start de la session client. Le tableau passé au paramètre
+    <span class="Li">&quot;Args&quot;</span> du constructeur est aplati et inclus dans les paramètres de
+    <span class="Li">&quot;ClientConnected&quot;</span> comme
+    <span class="Li">@_</span>[ARG0..$#_].</p>
+<pre>sub handle_client_connected {
+  my @constructor_args = @_[ARG0..$#_];
+  ...
+}</pre>
+<p class="Pp"><span class="Li">&quot;ClientPreConnect&quot;</span> est appelé avant
+    <span class="Li">&quot;ClientConnected&quot;</span>, et son but est de permettre aux programmes de rejeter des connexions ou de conditionner des sockets avant qu'ils ne soient gérés par POE::Wheel::ReadWrite.</p>
+<p class="Pp">Le gestionnaire
+    <span class="Li">&quot;ClientPreConnect&quot;</span> est appelé avec le socket client dans <span class="Li">$_</span>[ARG0], et sa valeur de retour est significative. Il doit retourner un socket client valide si la connexion est acceptable. Il doit retourner undef pour rejeter la connexion.</p>
+<p class="Pp">La plupart des valeurs de
+    <span class="Li">$_</span>[HEAP] sont valides dans le gestionnaire
+    <span class="Li">&quot;ClientPreConnect&quot;</span>. Évidemment,
+    <span class="Li">$_</span>[HEAP]{client} ne l'est pas car cette roue n'a pas encore été créée.</p>
+<p class="Pp">Dans l'exemple suivant, le gestionnaire
+    <span class="Li">&quot;ClientPreConnect&quot;</span> retourne le socket client après qu'il ait été mis à niveau vers une connexion SSL.</p>
+<pre>sub handle_client_pre_connect {
+  # Assurez-vous que l'adresse et le port distants sont valides.
+  return undef unless validate(
+    $_[HEAP]{remote_ip}, $_[HEAP]{remote_port}
+  );
+  # SSLify le socket, qui est dans $_[ARG0].
+  my $socket = eval { Server_SSLify($_[ARG0]) };
+  return undef if $@;
+  # Retourne le socket SSLifié.
+  return $socket;
+}</pre>
+<p class="Pp"><span class="Li">&quot;ClientDisconnected&quot;</span> est appelé lorsque le client s'est déconnecté, soit parce que le point d'extrémité distant du socket a été fermé, soit parce que le point d'extrémité local a été fermé par le serveur. Cela ne signifie pas que la session du client est terminée, mais la session le sera très probablement très bientôt.
+    <span class="Li">&quot;ClientDisconnected&quot;</span> est appelé depuis plusieurs endroits distincts au sein du composant, donc ses paramètres ne sont ni cohérents ni généralement utiles.</p>
+<p class="Pp"><span class="Li">&quot;ClientError&quot;</span> est appelé lorsqu'une erreur s'est produite sur le socket. Ses paramètres sont ceux de
+    <span class="Li">&quot;ErrorEvent&quot;</span> de POE::Wheel::ReadWrite.</p>
+<p class="Pp"><span class="Li">&quot;ClientFlushed&quot;</span> est appelé lorsque toutes les sorties en attente ont été envoyées vers le socket client. Ses paramètres proviennent de
+    <span class="Li">&quot;ErrorEvent&quot;</span> de POE::Wheel::ReadWrite.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Consid%C3%A9rations_de_performance'><a class='permalink' href='#Consid%C3%A9rations_de_performance'>Considérations de performance</a></h2>
+<p class="Pp">Cette facilité d'utilisation a un prix : POE::Component::Server::TCP est souvent significativement plus lent qu'un serveur comparable écrit avec POE::Wheel::SocketFactory et POE::Wheel::ReadWrite.</p>
+<p class="Pp">Si la performance est votre objectif principal,
+    <b>select_read()</b> et
+    <b>select_write()</b> de POE::Kernel ont des performances similaires à IO::Select, mais votre code sera portable sur toutes les boucles d'événements supportées par POE.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Consid%C3%A9rations_pour_besoins_sp%C3%A9ciaux'><a class='permalink' href='#Consid%C3%A9rations_pour_besoins_sp%C3%A9ciaux'>Considérations pour besoins spéciaux</a></h2>
+<p class="Pp">POE::Component::Server::TCP est écrit pour être facile à utiliser dans les cas les plus courants. Les programmes ayant des besoins plus spécifiques devraient plutôt envisager d'utiliser POE::Wheel::SocketFactory et POE::Wheel::ReadWrite. Ce sont des modules de plus bas niveau, et leur utilisation demande plus d'efforts. Ils sont plus flexibles et personnalisables, h</p>
+</section>
+</div>
+</section>
+            </article>
+        </main>
+    </body>
+</html>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_PUBLIQUES'><a class='permalink' href='#MÉTHODES_PUBLIQUES'>MÉTHODES PUBLIQUES</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='new'><a class='permalink' href='#new'>new</a></h2>
+<p class="Pp"><b>new()</b> démarre un serveur basé sur POE::Component::Server::TCP
+    et renvoie un ID de session pour la session maître d'écoute. Toute la gestion
+    des erreurs est effectuée à l'intérieur du serveur, via les rappels
+    <span class="Li">&quot;Error&quot;</span> et <span class="Li">&quot;ClientError&quot;</span>.</p>
+<p class="Pp">Le serveur peut être arrêté en envoyant un événement
+    &quot;shutdown&quot; à la session maître, soit par son ID, soit par le nom qui lui
+    a été donné par le paramètre <span class="Li">&quot;Alias&quot;</span>.</p>
+<p class="Pp">POE::Component::Server::TCP effectue beaucoup de travail dans son
+    constructeur. L'objectif de conception est de reporter autant de frais généraux
+    que possible dans la construction unique, de sorte que l'exécution continue
+    ait moins de frais généraux. Pour cette raison, le constructeur du serveur
+    peut prendre un nombre de paramètres assez impressionnant.</p>
+<p class="Pp">POE::Component::Server::TCP renvoie toujours un ID de session POE::Session pour la session qui écoutera les nouvelles connexions.</p>
+<p class="Pp">Beaucoup des paramètres du constructeur ont déjà été décrits. Ils
+    sont brièvement repris ci-dessous.</p>
+<p class="Pp"><i>Configuration de la session serveur</i></p>
+<p class="Pp">Ces paramètres du constructeur affectent la session d'écoute principale
+    de POE::Component::Server::TCP.</p>
+<p class="Pp">Acceptor</p>
+<p class="Pp"><span class="Li">&quot;Acceptor&quot;</span> définit une référence de
+    CODE qui déclenchera l'événement <span class="Li">&quot;SuccessEvent&quot;</span>
+    de POE::Wheel::SocketFactory pour gérer les nouvelles connexions. Par conséquent,
+    les paramètres passés à <span class="Li">&quot;Acceptor&quot;</span> sont identiques
+    à ceux donnés à <span class="Li">&quot;SuccessEvent&quot;</span>.</p>
+<p class="Pp"><span class="Li">&quot;Acceptor&quot;</span> est facultatif ; le
+    gestionnaire par défaut créera une nouvelle session pour chaque connexion. Tous
+    les paramètres du constructeur &quot;Client&quot; sont utilisés pour personnaliser
+    cette session. En d'autres termes, <span class="Li">&quot;ClientInput&quot;</span> et
+    ainsi de suite **ne sont pas utilisés lorsque** <span class="Li"><b>&quot;Acceptor&quot;</b></span>
+    **est défini**.</p>
+<p class="Pp">L'<span class="Li">&quot;Acceptor&quot;</span> par défaut ajoute une
+    commodité et une flexibilité considérables à POE::Component::Server::TCP, mais
+    il ne convient pas toujours à toutes les applications. Dans certains cas, un
+    <span class="Li">&quot;Acceptor&quot;</span> personnalisé ou même la création
+    de son propre serveur avec POE::Wheel::SocketFactory et POE::Wheel::ReadWrite
+    peuvent être meilleurs et/ou plus rapides.</p>
+<pre>Acceptor =&gt; sub {
+  my ($socket, $remote_address, $remote_port) = @_[ARG0..ARG2];
+  # Configurer quelque chose pour interagir avec le client.
+}</pre>
+<p class="Pp">Address</p>
+<p class="Pp"><span class="Li">&quot;Address&quot;</span> définit une adresse
+    d'interface unique à laquelle le serveur sera lié. Il utilise par défaut
+    INADDR_ANY ou INADDR6_ANY, lors de l'utilisation d'IPv4 ou d'IPv6, respectivement.
+    Il est souvent utilisé avec <span class="Li">&quot;Port&quot;</span>.</p>
+<p class="Pp">La valeur dans <span class="Li">&quot;Address&quot;</span> est passée
+    au paramètre <span class="Li">&quot;BindAddress&quot;</span> de POE::Wheel::SocketFactory,
+    elle peut donc être sous quelque forme que ce module supporte. Au moment de la
+    rédaction, cela peut être un quad IPv4 pointé, une adresse IPv6, un nom
+    d'hôte, ou une adresse Internet packée. Voir également &quot;Hostname&quot;.</p>
+<pre>Address =&gt; '127.0.0.1'   # Localhost IPv4
+Address =&gt; &quot;::1&quot;         # Localhost IPv6</pre>
+<p class="Pp">Alias</p>
+<p class="Pp"><span class="Li">&quot;Alias&quot;</span> est un nom facultatif
+    qui sera donné à la session d'écoute maître du serveur. Les événements envoyés
+    à ce nom ne seront pas livrés aux connexions individuelles.</p>
+<p class="Pp">L'<span class="Li">&quot;Alias&quot;</span> du serveur peut être
+    important s'il est nécessaire d'arrêter un serveur.</p>
+<pre>sub sigusr1_handler {
+  $_[KERNEL]-&gt;post(chargen_server =&gt; 'shutdown');
+  $_[KERNEL]-&gt;sig_handled();
+}</pre>
+<p class="Pp">Concurrency</p>
+<p class="Pp"><span class="Li">&quot;Concurrency&quot;</span> contrôle combien de
+    connexions peuvent être actives en même temps. Il est par défaut à -1, ce qui
+    permet à POE::Component::Server::TCP d'accepter des connexions simultanées
+    jusqu'à ce que le processus manque de ressources.</p>
+<p class="Pp">Définir <span class="Li">&quot;Concurrency&quot;</span> à 0 empêche
+    le serveur d'accepter de nouvelles connexions. Cela peut être utile si un serveur
+    doit effectuer une initialisation longue avant d'autoriser les connexions. Une
+    fois l'initialisation terminée, il peut faire un yield(set_concurrency =&gt;
+    -1) pour activer les connexions. De même, un serveur en cours d'exécution peut
+    faire un yield(set_concurrency =&gt; 0) ou tout autre nombre pour ajuster
+    dynamiquement sa concurrence. Voir &quot;EVENTS&quot; pour plus d'informations
+    sur l'événement set_concurrency.</p>
+<p class="Pp">Remarque : Pour que <span class="Li">&quot;Concurrency&quot;</span>
+    fonctionne avec un <span class="Li">&quot;Acceptor&quot;</span> personnalisé, la
+    session d'écoute du serveur doit recevoir un événement
+    <span class="Li">&quot;disconnected&quot;</span> chaque fois que les clients
+    se déconnectent. Sinon, l'écouteur ne pourra pas médiatiser entre ses
+    connexions.</p>
+<p class="Pp">Exemple :</p>
+<pre>Acceptor =&gt; sub {
+  # ....
+  POE::Session-&gt;create(
+    # ....
+    inline_states =&gt; {
+      _start =&gt; sub {
+        # ....
+        # se souvenir de qui est son parent
+        $_[HEAP]-&gt;{server_tcp} = $_[SENDER]-&gt;ID;
+        # ....
+      },
+      got_client_disconnect =&gt; sub {
+        # ....
+        $_[KERNEL]-&gt;post( $_[HEAP]-&gt;{server_tcp} =&gt; 'disconnected' );
+        # ....
+      }
+    }
+  );
+}</pre>
+<p class="Pp">Domain</p>
+<p class="Pp"><span class="Li">&quot;Domain&quot;</span> définit l'espace
+    d'adressage ou la famille de protocoles dans laquelle opérer. Le
+    <span class="Li">&quot;Domain&quot;</span> peut être toute valeur supportée
+    par POE::Wheel::SocketFactory. AF_INET (espace d'adressage Internet) est utilisé
+    par défaut.</p>
+<p class="Pp">Utilisez AF_INET6 pour le support IPv6. Cette constante est exportée
+    par Socket ou Socket6, selon votre version de Perl. Assurez-vous également d'avoir
+    installé Socket::GetAddrInfo, qui est requis par POE::Wheel::SocketFactory pour
+    le support IPv6.</p>
+<p class="Pp">Error</p>
+<p class="Pp"><span class="Li">&quot;Error&quot;</span> est le rappel qui sera
+    invoqué lorsque le socket serveur signalera une erreur. Le rappel Error sera
+    utilisé pour gérer l'événement FailureEvent de POE::Wheel::SocketFactory, il
+    recevra donc les mêmes paramètres que ceux décrits là.</p>
+<p class="Pp">Un gestionnaire d'erreurs par défaut sera fourni si Error est omis.
+    Le gestionnaire par défaut enregistrera l'erreur dans STDERR et arrêtera le
+    serveur. Les connexions actives seront autorisées à terminer leurs transactions.</p>
+<pre>Error =&gt; sub {
+  my ($syscall_name, $err_num, $err_str) = @_[ARG0..ARG2];
+  # Gérer l'erreur.
+}</pre>
+<p class="Pp">Hostname</p>
+<p class="Pp"><span class="Li">&quot;Hostname&quot;</span> est le nom facultatif
+    non packé de l'interface à laquelle le serveur TCP sera lié. Le nom d'hôte
+    sera toujours résolu via <b>inet_aton()</b> et peut donc être un quad pointé
+    ou un nom. La résolution de noms est une action de démarrage unique ; il n'y a
+    pas de pénalité d'exécution continue à l'utiliser.</p>
+<p class="Pp"><span class="Li">&quot;Hostname&quot;</span> garantit la résolution
+    de noms, là où <span class="Li">&quot;Address&quot;</span> ne le fait pas. Il est
+    donc préférable d'utiliser <span class="Li">&quot;Hostname&quot;</span> dans les
+    cas où la résolution doit toujours être effectuée.</p>
+<p class="Pp">InlineStates</p>
+<p class="Pp"><span class="Li">&quot;InlineStates&quot;</span> est facultatif.
+    S'il est spécifié, il doit contenir un hashref de rappels nommés. Sa syntaxe est
+    celle du paramètre inline_states de POE:Session-&gt;<b>create()</b>.</p>
+<p class="Pp">Rappel : Ces gestionnaires InlineStates seront ajoutés aux sessions
+    clients, pas à la session d'écoute principale. Un <b>yield()</b> dans l'écouteur
+    n'atteindra pas ces gestionnaires.</p>
+<p class="Pp">Si POE::Kernel::ASSERT_USAGE est activé, le constructeur fera
+    un <b>croak()</b> s'il détecte un état qu'il utilise en interne. Par exemple,
+    veuillez utiliser les rappels &quot;Started&quot; et &quot;Stopped&quot; si vous
+    souhaitez spécifier vos propres événements &quot;_start&quot; et &quot;_stop&quot;
+    respectivement.</p>
+<p class="Pp">ObjectStates</p>
+<p class="Pp">Si <span class="Li">&quot;ObjectStates&quot;</span> est spécifié, il
+    doit contenir un arrayref d'objets et les événements qu'ils géreront. L'arrayref
+    doit suivre la syntaxe du paramètre object_states de POE::Session-&gt;<b>create()</b>.</p>
+<p class="Pp">Rappel : Ces gestionnaires ObjectStates seront ajoutés aux sessions
+    clients, pas à la session d'écoute principale. Un <b>yield()</b> dans l'écouteur
+    n'atteindra pas ces gestionnaires.</p>
+<p class="Pp">Si POE::Kernel::ASSERT_USAGE est activé, le constructeur fera
+    un <b>croak()</b> s'il détecte un état qu'il utilise en interne. Par exemple,
+    veuillez utiliser les rappels &quot;Started&quot; et &quot;Stopped&quot; si vous
+    souhaitez spécifier vos propres événements &quot;_start&quot; et &quot;_stop&quot;
+    respectivement.</p>
+<p class="Pp">PackageStates</p>
+<p class="Pp">Lorsque <span class="Li">&quot;PackageStates&quot;</span> facultatif
+    est défini, il doit contenir un arrayref de noms de paquets et les événements
+    qu'ils géreront. L'arrayref doit suivre la syntaxe du paramètre package_states
+    de POE::Session-&gt;<b>create()</b>.</p>
+<p class="Pp">Rappel : Ces gestionnaires PackageStates seront ajoutés aux sessions
+    clients, pas à la session d'écoute principale. Un <b>yield()</b> dans l'écouteur
+    n'atteindra pas ces gestionnaires.</p>
+<p class="Pp">Si POE::Kernel::ASSERT_USAGE est activé, le constructeur fera
+    un <b>croak()</b> s'il détecte un état qu'il utilise en interne. Par exemple,
+    veuillez utiliser les rappels &quot;Started&quot; et &quot;Stopped&quot; si vous
+    souhaitez spécifier vos propres événements &quot;_start&quot; et &quot;_stop&quot;
+    respectivement.</p>
+<p class="Pp">Port</p>
+<p class="Pp"><span class="Li">&quot;Port&quot;</span> contient le port auquel le
+    socket d'écoute sera lié. Il est par défaut à 0, ce qui permet généralement au
+    système d'exploitation de choisir un port au hasard.</p>
+<pre>Port =&gt; 30023</pre>
+<p class="Pp">Il est souvent utilisé avec
+    <span class="Li">&quot;Address&quot;</span>.</p>
+<p class="Pp">Started</p>
+<p class="Pp"><span class="Li">&quot;Started&quot;</span> définit un rappel
+    facultatif qui sera invoqué dans le contexte de la session serveur principale.
+    Il notifie le serveur qu'il a complètement démarré. Les paramètres du rappel
+    sont les habituels pour un gestionnaire _start de session.</p>
+<p class="Pp">Stopped</p>
+<p class="Pp"><span class="Li">&quot;Stopped&quot;</span> définit un rappel
+    facultatif qui sera invoqué dans le contexte de la session serveur principale.
+    Il notifie le serveur qu'il s'est complètement arrêté. Les paramètres du rappel
+    sont les habituels pour un gestionnaire _stop de session.</p>
+<p class="Pp">ListenerArgs</p>
+<p class="Pp"><span class="Li">&quot;ListenerArgs&quot;</span> est passé à la
+    session d'écoute en tant que paramètre <span class="Li">&quot;args&quot;</span>.
+    En d'autres termes, il doit s'agir d'un arrayref, et les valeurs sont passées
+    dans le gestionnaire <span class="Li">&quot;Started&quot;</span> sous forme de
+    ARG0, ARG1, etc.</p>
+<p class="Pp"><i>Configuration de la session de connexion</i></p>
+<p class="Pp">Ces paramètres du constructeur affectent les sessions individuelles qui
+    interagissent avec les connexions établies.</p>
+<p class="Pp">ClientArgs</p>
+<p class="Pp"><span class="Li">&quot;ClientArgs&quot;</span> est facultatif. Lorsqu'il
+    est spécifié, il contient un ARRAYREF qui sera développé d'un niveau et passé
+    au rappel <span class="Li">&quot;ClientConnected&quot;</span> dans
+    <span class="Li">@_</span>[A</p>
+RG0..$#_].</p>
+<p class="Pp">ClientConnected</p>
+<p class="Pp">Chaque nouvelle connexion client est gérée par une nouvelle instance de POE::Session. 
+    <span class="Li">&quot;ClientConnected&quot;</span> est une fonction de rappel qui notifie l'application lorsque la session d'un client est démarrée et prête à fonctionner. Des bannières sont souvent envoyées au client distant à partir de cette fonction de rappel.</p>
+<p class="Pp">Les paramètres <span class="Li">@_</span>[ARG0..$#_] pour 
+    <span class="Li">&quot;ClientConnected&quot;</span> sont une copie des valeurs de la référence de tableau du paramètre de constructeur 
+    <span class="Li">&quot;ClientArgs&quot;</span>. Les autres membres de 
+    <span class="Li">@_</span> sont standard pour un gestionnaire _start de POE::Session.</p>
+<p class="Pp"><span class="Li">&quot;ClientConnected&quot;</span> est appelée une fois par démarrage de session. Elle ne sera jamais appelée deux fois pour la même connexion.</p>
+<pre>ClientConnected =&gt; sub {
+  $_[HEAP]{client}-&gt;put(&quot;Bonjour, client !&quot;);
+  # Autre initialisation client ici.
+},</pre>
+<p class="Pp">ClientDisconnected</p>
+<p class="Pp"><span class="Li">&quot;ClientDisconnected&quot;</span> est une fonction de rappel qui sera invoquée lorsque le client se déconnectera ou aura été déconnecté par le serveur. Elle est utile pour nettoyer les informations globales du client, telles que les structures de salon de discussion. 
+    Les fonctions de rappel <span class="Li">&quot;ClientDisconnected&quot;</span> reçoivent les paramètres POE habituels, mais rien de spécial n'est inclus.</p>
+<pre>ClientDisconnected =&gt; sub {
+  warn &quot;Client déconnecté&quot;; # le journaliser
+}</pre>
+<p class="Pp">ClientError</p>
+<p class="Pp">La fonction de rappel <span class="Li">&quot;ClientError&quot;</span> est invoquée lorsqu'un socket client signale une erreur. 
+    <span class="Li">&quot;ClientError&quot;</span> est appelée avec les paramètres habituels de POE, plus les paramètres d'erreur courants : 
+    <span class="Li">$_</span>[ARG0] décrit ce qui se passait au moment de l'échec. 
+    <span class="Li">$_</span>[ARG1] et 
+    <span class="Li">$_</span>[ARG2] contiennent les versions numérique et textuelle de $!, respectivement.</p>
+<p class="Pp"><span class="Li">&quot;ClientError&quot;</span> est facultative. Si elle est omise, POE::Component::Server::TCP fournira une fonction de rappel par défaut qui enregistre la plupart des erreurs sur STDERR.</p>
+<p class="Pp">Si 
+    <span class="Li">&quot;ClientShutdownOnError&quot;</span> est défini, la connexion sera fermée après le retour de 
+    <span class="Li">&quot;ClientError&quot;</span>. Si 
+    <span class="Li">&quot;ClientDisconnected&quot;</span> est spécifié, il sera appelé lors du nettoyage de la session client.</p>
+<p class="Pp"><span class="Li">&quot;ClientError&quot;</span> est déclenchée par l'événement ErrorEvent de POE::Wheel::ReadWrite, elle suit donc le format de cet événement. Veuillez consulter la documentation d'ErrorEvent dans POE::Wheel::ReadWrite pour plus de détails.</p>
+<pre>ClientError =&gt; sub {
+  my ($syscall_name, $error_num, $error_str) = @_[ARG0..ARG2];
+  # Gérer l'erreur client ici.
+}</pre>
+<p class="Pp">ClientFilter</p>
+<p class="Pp"><span class="Li">&quot;ClientFilter&quot;</span> spécifie l'objet POE::Filter ou la classe qui analysera l'entrée de chaque client et sérialisera la sortie avant qu'elle ne soit envoyée à chaque client.</p>
+<p class="Pp"><span class="Li">&quot;ClientFilter&quot;</span> peut être un SCALAR, auquel cas il doit nommer la classe POE::Filter à utiliser. Chaque nouvelle connexion recevra un filtre fraîchement instancié de cette classe. Aucun paramètre de constructeur ne sera passé.</p>
+<pre>ClientFilter =&gt; &quot;POE::Filter::Stream&quot;,</pre>
+<p class="Pp">Certains filtres nécessitent des paramètres de constructeur. Ceux-ci peuvent être spécifiés par un ARRAYREF. Le premier élément est le nom de la classe POE::Filter, et les éléments suivants sont passés au constructeur de la classe.</p>
+<pre>ClientFilter =&gt; [ &quot;POE::Filter::Line&quot;, Literal =&gt; &quot;\n&quot; ],</pre>
+<p class="Pp"><span class="Li">&quot;ClientFilter&quot;</span> peut également se voir attribuer un OBJET POE::Filter archétypal. Dans ce cas, chaque nouvelle session client recevra un <b>clone()</b> de l'objet donné.</p>
+<pre>ClientFilter =&gt; POE::Filter::Line-&gt;new(Literal =&gt; &quot;\n&quot;),</pre>
+<p class="Pp"><span class="Li">&quot;ClientFilter&quot;</span> est facultatif. Le composant utilisera &quot;POE::Filter::Line&quot; s'il est omis. Il existe &quot;ClientInputFilter&quot; et &quot;ClientOutputFilter&quot; si vous souhaitez spécifier un filtre différent pour les deux directions.</p>
+<p class="Pp">Les modules de filtre ne sont pas chargés automatiquement. Assurez-vous que le programme charge la classe avant de l'utiliser.</p>
+<p class="Pp">ClientFlushed</p>
+<p class="Pp"><span class="Li">&quot;ClientFlushed&quot;</span> expose l' 
+    <span class="Li">&quot;FlushedEvent&quot;</span> de POE::Wheel::ReadWrite sous forme de fonction de rappel. Elle est appelée chaque fois que le tampon de sortie du client a été complètement vidé vers le socket client. À ce stade, il est sûr de fermer le socket sans perdre de données.</p>
+<p class="Pp"><span class="Li">&quot;ClientFlushed&quot;</span> est utile pour les serveurs de streaming, où un événement &quot;flushed&quot; signale la nécessité d'envoyer plus de données.</p>
+<pre>ClientFlushed =&gt; sub {
+  my $data_source = $_[HEAP]{file_handle};
+  my $read_count = sysread($data_source, my $buffer = &quot;&quot;, 65536);
+  if ($read_count) {
+    $_[HEAP]{client}-&gt;put($buffer);
+  }
+  else {
+    $_[KERNEL]-&gt;yield(&quot;shutdown&quot;);
+  }
+},</pre>
+<p class="Pp">L' 
+    <span class="Li">&quot;Acceptor&quot;</span> par défaut de POE::Component::Server::TCP garantit que les données sont vidées avant de terminer une fermeture de client.</p>
+<p class="Pp">ClientInput</p>
+<p class="Pp"><span class="Li">&quot;ClientInput&quot;</span> définit une fonction de rappel par connexion pour gérer l'entrée client. Cette fonction de rappel reçoit ses paramètres directement de l' 
+    <span class="Li">&quot;InputEvent&quot;</span> de POE::Wheel::ReadWrite. ARG0 contient l'enregistrement d'entrée, dont le format est défini par 
+    <span class="Li">&quot;ClientFilter&quot;</span> ou 
+    <span class="Li">&quot;ClientInputFilter&quot;</span>. ARG1 contient l'ID unique de la roue, et ainsi de suite. Veuillez consulter POE:Wheel::ReadWrite pour une description approfondie de l' 
+    <span class="Li">&quot;InputEvent&quot;</span>.</p>
+<p class="Pp"><span class="Li">&quot;ClientInput&quot;</span> et 
+    <span class="Li">&quot;Acceptor&quot;</span> sont mutuellement exclusifs. L'activation de l'un interdit l'autre.</p>
+<pre>ClientInput =&gt; sub {
+  my $input = $_[ARG0];
+  $_[HEAP]{wheel}-&gt;put(&quot;Vous avez dit : $input&quot;);
+},</pre>
+<p class="Pp">ClientInputFilter</p>
+<p class="Pp"><span class="Li">&quot;ClientInputFilter&quot;</span> est utilisé avec 
+    <span class="Li">&quot;ClientOutputFilter&quot;</span> pour spécifier différents protocoles pour l'entrée et la sortie. Les deux doivent être utilisés ensemble. Les deux suivent la même utilisation que &quot;ClientFilter&quot;. Remplace le filtre défini par &quot;ClientFilter&quot;.</p>
+<pre>ClientInputFilter  =&gt; [ &quot;POE::Filter::Line&quot;, Literal =&gt; &quot;\n&quot; ],
+ClientOutputFilter =&gt; 'POE::Filter::Stream',</pre>
+<p class="Pp">ClientOutputFilter</p>
+<p class="Pp"><span class="Li">&quot;ClientOutputFilter&quot;</span> est utilisé avec 
+    <span class="Li">&quot;ClientInputFilter&quot;</span> pour spécifier différents protocoles pour l'entrée et la sortie. Les deux doivent être utilisés ensemble. Les deux suivent la même utilisation que &quot;ClientFilter&quot;. Remplace le filtre défini par &quot;ClientFilter&quot;.</p>
+<pre>ClientInputFilter  =&gt; POE::Filter::Line-&gt;new(Literal =&gt; &quot;\n&quot;),
+ClientOutputFilter =&gt; 'POE::Filter::Stream',</pre>
+<p class="Pp">ClientShutdownOnError</p>
+<p class="Pp"><span class="Li">&quot;ClientShutdownOnError&quot;</span> indique au composant si les connexions client doivent être fermées automatiquement en cas d'erreur détectée. La valeur par défaut est &quot;true&quot;. Le définir sur false (0, undef, &quot;&quot;) désactive cette fonctionnalité.</p>
+<p class="Pp">L'application est responsable de la gestion des erreurs client si cette fonctionnalité est désactivée. Ne pas le faire peut amener le composant à émettre un flux constant d'erreurs, finissant par ralentir l'application avec des connexions mortes qui s'emballent.</p>
+<p class="Pp">Oui, c'est terrible. Vous avez été prévenu.</p>
+<p class="Pp">SessionParams</p>
+<p class="Pp"><span class="Li">&quot;SessionParams&quot;</span> spécifie des paramètres supplémentaires qui seront passés au constructeur de 
+    <span class="Li">&quot;SessionType&quot;</span> au moment de la création. Ce doit être une référence de tableau.</p>
+<pre>SessionParams =&gt; [ options =&gt; { debug =&gt; 1, trace =&gt; 1 } ],</pre>
+<p class="Pp">Remarque : POE::Component::Server::TCP fournit ses propres paramètres de constructeur POE::Session. Les conflits entre ceux-ci et 
+    <span class="Li">&quot;SessionParams&quot;</span> peuvent entraîner un comportement erratique du composant. Pour éviter de tels problèmes, veuillez limiter SessionParams à la table de hachage 
+    <span class="Li">&quot;options&quot;</span>. Voir POE::Session pour les options connues.</p>
+<p class="Pp">Nous pourrons activer d'autres options plus tard. Veuillez nous faire savoir si vous avez besoin de quelque chose.</p>
+<p class="Pp">SessionType</p>
+<p class="Pp"><span class="Li">&quot;SessionType&quot;</span> spécifie la sous-classe POE::Session qui sera créée pour chaque nouvelle connexion client. 
+    &quot;POE::Session&quot; est la valeur par défaut.</p>
+<pre>SessionType =&gt; &quot;POE::Session::MultiDispatch&quot;</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EVENTS'><a class='permalink' href='#EVENTS'>ÉVÉNEMENTS</a></h1>
+<p class="Pp">Il est possible de manipuler un composant serveur TCP en lui envoyant des messages.</p>
+<section class="Ss">
+<h2 class="Ss" id='Main_Server_Commands'><a class='permalink' href='#Main_Server_Commands'>Commandes principales du serveur</a></h2>
+<p class="Pp">Ces événements doivent être envoyés au serveur principal, généralement par l'alias défini dans son paramètre Alias.</p>
+<p class="Pp"><i>disconnected</i></p>
+<p class="Pp">L'événement &quot;disconnected&quot; informe le serveur TCP qu'une connexion a été fermée. Il est nécessaire lorsque vous utilisez &quot;Concurrency&quot; avec une fonction de rappel &quot;Acceptor&quot;. L'Acceptor personnalisé doit fournir sa propre notification de déconnexion afin que la logique de comptage des connexions du serveur fonctionne.</p>
+<p class="Pp">Sinon, les clients Concurrency seront acceptés, puis plus aucun. Le serveur ne saura jamais quand les clients se sont déconnectés.</p>
+<p class="Pp"><i>set_concurrency</i></p>
+<p class="Pp">&quot;set_concurrency&quot; définit le nombre de connexions simultanées que le serveur acceptera. Voir &quot;Concurrency&quot; pour plus de détails. &quot;set_concurrency&quot; doit avoir un paramètre : le nouveau nombre maximum de connexions.</p>
+<pre>$kernel-&gt;call(&quot;mon_alias_serveur&quot;, &quot;set_concurrency&quot;, $max_count);</pre>
+<p class="Pp"><i>shutdown</i></p>
+<p class="Pp">L'événement &quot;shutdown&quot; démarre une fermeture de serveur gracieuse. Aucune nouvelle connexion ne sera acceptée. Les connexions existantes seront autorisées à se terminer. Le serveur sera détruit après la fin de la dernière connexion.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Per-Connection_Commands'><a class='permalink' href='#Per-Connection_Commands'>Commandes par connexion</a></h2>
+<p class="Pp">Ces commandes affectent chaque session de connexion client.</p>
+<p class="Pp"><i>shutdown</i></p>
+<p class="Pp">Envoyer &quot;shutdown&quot; à une session client individuelle demande au serveur de fermer gracieusement cette connexion. Aucune nouvelle entrée ne sera reçue, et toute sortie mise en mémoire tampon sera envoyée avant la fin de la session.</p>
+<p class="Pp">Les sessions client font généralement yield(&quot;shutdown&quot;) lorsqu'elles souhaitent déconnecter le client.</p>
+<pre>ClientInput =&gt; sub {
+  if ($_[ARG0] eq &quot;quit&quot;) {
+    $_[HEAP]{client}-&gt;put(&quot;Au revoir !&quot;);
+    $_[KERNEL]-&gt;yield(&quot;shutdown&quot;);
+    return;
+  }
+  # Gérer d'autres entrées ici.
+},</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Reserved_HEAP_Me</h1>
+<div>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">POE::Component::Server::TCP - Un serveur TCP simple mais extensible</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>
+  use POE::Component::Server::TCP;
+
+  #
+  # Démarrer un serveur TCP sur le port 8080.  Les clients seront
+  # gérés par un gestionnaire d'événements de session de POE qui
+  # sera créé pour chaque connexion.
+  #
+  POE::Component::Server::TCP-&gt;new(
+      Port =&gt; 8080,
+      ClientConnected =&gt; \&client_connected,
+      ClientDisconnected =&gt; \&client_disconnected,
+      ClientInput =&gt; \&client_input,
+  );
+
+  #
+  # Démarrer un autre serveur TCP, mais cette fois pour écouter
+  # sur un port de socket spécifique.
+  #
+  POE::Component::Server::TCP-&gt;new(
+      SocketDomain =&gt; AF_UNIX,
+      SocketPath   =&gt; '/tmp/myserver.sock',
+      ClientConnected =&gt; \&client_connected,
+      ClientDisconnected =&gt; \&client_disconnected,
+      ClientInput =&gt; \&client_input,
+  );
+
+  #
+  # Démarrer un serveur TCP qui utilise des alias pour
+  # identifier différentes configurations de serveur.
+  #
+  POE::Component::Server::TCP-&gt;new(
+      Alias        =&gt; 'my_tcp_server',
+      Port         =&gt; 1234,
+      ClientInput  =&gt; \&my_server_handler,
+  );
+
+  #
+  # Démarrer plusieurs serveurs avec des alias
+  #
+  POE::Component::Server::TCP-&gt;new(
+      Alias        =&gt; 'server1',
+      Port         =&gt; 8001,
+      ClientInput  =&gt; \&handler1,
+  );
+  POE::Component::Server::TCP-&gt;new(
+      Alias        =&gt; 'server2',
+      Port         =&gt; 8002,
+      ClientInput  =&gt; \&handler2,
+  );
+
+  # La boucle d'événements principale de POE
+  POE::Kernel-&gt;run();
+
+  sub client_connected {
+      my ($session, $client_heap) = @_;
+      # $session->{heap}{alias} contiendra l'alias du serveur (si défini)
+      # $session->{heap}{remote_ip} contiendra l'adresse IP du client
+      # $session->{heap}{remote_port} contiendra le port du client
+      printf "Client connecté: %s:%d\n", $session->{heap}{remote_ip}, $session->{heap}{remote_port};
+      # Envoyer un message au client
+      $client_heap-&gt;{client}-&gt;put("Bienvenue !\n");
+      return 1; # Retourner une valeur vraie pour continuer la session
+  }
+
+  sub client_disconnected {
+      my ($session, $reason) = @_;
+      printf "Client déconnecté: %s\n", $reason;
+      return 1; # Retourner une valeur vraie pour continuer la session
+  }
+
+  sub client_input {
+      my ($session, $input) = @_;
+      printf "Données reçues du client: %s\n", $input;
+      # Répondre au client
+      $session-&gt;{heap}{client}-&gt;put("Vous avez dit: $input\n");
+      return 1; # Retourner une valeur vraie pour continuer la session
+  }
+
+  sub handler1 {
+      # Gestionnaire pour server1
+      return 1;
+  }
+
+  sub handler2 {
+      # Gestionnaire pour server2
+      return 1;
+  }
+</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">POE::Component::Server::TCP est un composant POE qui permet de
+    créer des serveurs TCP. Il gère l'acceptation des connexions entrantes et
+    l'envoi de rappels à votre code de gestion des événements pour chaque
+    connexion.</p>
+<p class="Pp">Il s'agit d'un composant simple, mais extensible. La plupart des
+    fonctionnalités sont implémentées dans le noyau POE.</p>
+<p class="Pp">Ce composant utilise <span class="Li">POE::Wheel::SocketFactory</span>
+    pour écouter les connexions entrantes et <span class="Li">POE::Wheel::ReadWrite</span>
+    pour interagir avec les clients connectés.</p>
+<p class="Pp">Les gestionnaires d'événements (par exemple, <code class="Nm">ClientInput</code>,
+    <code class="Nm">ClientConnected</code>, <code class="Nm">ClientDisconnected</code>)
+    sont appelés avec la session du client comme premier argument et les données
+    spécifiques à l'événement comme arguments suivants.</p>
+<p class="Pp">Les sessions du client reçoivent un objet <span class="Li">POE::Wheel::ReadWrite</span>
+    dans leur HEAP sous la clé <code class="Li">client</code>, qui peut être utilisé
+    pour lire et écrire des données pour cette connexion client spécifique.</p>
+<p class="Pp">La gestion des erreurs est gérée par le paramètre <code class="Li">ShutdownOnError</code>.
+    Si ce paramètre est défini sur une valeur vraie, la connexion client sera
+    fermée lorsqu'une erreur se produira.</p>
+<p class="Pp">Le composant prend en charge l'utilisation d'alias pour différents
+    serveurs, vous permettant de définir plusieurs configurations de serveurs avec
+    des gestionnaires d'événements distincts.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PUBLIC_METHODS'><a class='permalink' href='#PUBLIC_METHODS'>PUBLIC METHODS</a></h1>
+<dl class="Bl Dx">
+  <dt id="new"><a class="permalink" href="#new">new</a></dt>
+  <dd>
+<p class="Pp">Crée un nouveau composant de serveur TCP.</p>
+<p class="Pp">Les options suivantes sont acceptées :</p>
+<dl class="Bl-tag">
+  <dt><span class="Li">Alias</span></dt>
+  <dd>Un alias pour ce serveur. Peut être utilisé pour identifier le serveur
+      dans les gestionnaires d'événements.</dd>
+  <dt><span class="Li">Concurrency</span></dt>
+  <dd>Le nombre maximum de connexions simultanées autorisées. Par défaut, il n'y a
+      pas de limite.</dd>
+  <dt><span class="Li">ClientConnected</span></dt>
+  <dd>Un rappel à appeler lorsque un client se connecte.</dd>
+  <dt><span class="Li">ClientDisconnected</span></dt>
+  <dd>Un rappel à appeler lorsqu'un client se déconnecte.</dd>
+  <dt><span class="Li">ClientInput</span></dt>
+  <dd>Un rappel à appeler lorsqu'un client envoie des données.</dd>
+  <dt><span class="Li">DefaultHandler</span></dt>
+  <dd>Le gestionnaire d'événements par défaut à utiliser si aucun gestionnaire
+      spécifique n'est fourni pour les événements. Il sera appelé avec
+      l'événement et les arguments passés à <code class="Nm">post_event</code>.</dd>
+  <dt><span class="Li">HandleListenError</span></dt>
+  <dd>Un rappel à appeler lorsqu'une erreur se produit lors de l'écoute des
+      connexions. Il sera appelé avec l'erreur.</dd>
+  <dt><span class="Li">HandleReadError</span></dt>
+  <dd>Un rappel à appeler lorsqu'une erreur se produit lors de la lecture à partir
+      d'un client.</dd>
+  <dt><span class="Li">HandleWriteError</span></dt>
+  <dd>Un rappel à appeler lorsqu'une erreur se produit lors de l'écriture sur un
+      client.</dd>
+  <dt><span class="Li">ListenArgs</span></dt>
+  <dd>Une liste d'arguments à passer à <span class="Li">POE::Wheel::SocketFactory::new</span>.
+      Les options <code class="Li">SocketDomain</code>, <code class="Li">SocketPath</code>,
+      <code class="Li">Port</code>, et <code class="Li">Address</code> peuvent être
+      spécifiées ici.</dd>
+  <dt><span class="Li">Port</span></dt>
+  <dd>Le port sur lequel écouter. Peut être spécifié ici ou dans <code class="Li">ListenArgs</code>.</dd>
+  <dt><span class="Li">Address</span></dt>
+  <dd>L'adresse IP sur laquelle écouter. Par défaut, toutes les interfaces sont
+      écoutées. Peut être spécifié ici ou dans <code class="Li">ListenArgs</code>.</dd>
+  <dt><span class="Li">SocketDomain</span></dt>
+  <dd>Le domaine de socket à utiliser (par exemple, <span class="Li">AF_INET</span>,
+      <span class="Li">AF_UNIX</span>). Par défaut, <span class="Li">AF_INET</span>.
+      Peut être spécifié ici ou dans <code class="Li">ListenArgs</code>.</dd>
+  <dt><span class="Li">SocketPath</span></dt>
+  <dd>Le chemin du socket à utiliser pour les sockets de domaine Unix. Peut être
+      spécifié ici ou dans <code class="Li">ListenArgs</code>.</dd>
+  <dt><span class="Li">ShutdownOnError</span></dt>
+  <dd>Si cette valeur est définie sur une valeur vraie, la connexion client sera
+      fermée lorsqu'une erreur se produit. Par défaut, une valeur vraie.</dd>
+  <dt><span class="Li">SessionParams</span></dt>
+  <dd>Une référence à une table de hachage contenant les paramètres à passer à
+      la création de la session du client.</dd>
+  <dt><span class="Li">ReuseAddr</span></dt>
+  <dd>Définit l'option de socket <span class="Li">SO_REUSEADDR</span>. Par défaut,
+      une valeur vraie.</dd>
+</dl>
+</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EVENTS'><a class='permalink' href='#EVENTS'>EVENTS</a></h1>
+<p class="Pp"><span class="Li">POE::Component::Server::TCP</span> génère les
+    événements suivants :</p>
+<dl class="Bl-tag">
+  <dt><span class="Li">ClientConnected</span></dt>
+  <dd>Appelé lorsqu'un nouveau client se connecte. Les arguments sont la session du
+      client et un pointeur vers le HEAP de la session du client.</dd>
+  <dt><span class="Li">ClientDisconnected</span></dt>
+  <dd>Appelé lorsqu'un client se déconnecte. Les arguments sont la session du client
+      et la raison de la déconnexion.</dd>
+  <dt><span class="Li">ClientInput</span></dt>
+  <dd>Appelé lorsqu'un client envoie des données. Les arguments sont la session du
+      client et les données reçues.</dd>
+  <dt><span class="Li">HandleListenError</span></dt>
+  <dd>Appelé lorsqu'une erreur se produit lors de l'écoute des connexions. L'argument
+      est l'erreur.</dd>
+  <dt><span class="Li">HandleReadError</span></dt>
+  <dd>Appelé lorsqu'une erreur se produit lors de la lecture à partir d'un client.
+      Les arguments sont la session du client et l'erreur.</dd>
+  <dt><span class="Li">HandleWriteError</span></dt>
+  <dd>Appelé lorsqu'une erreur se produit lors de l'écriture sur un client. Les
+      arguments sont la session du client et l'erreur.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Reserved_HEAP_Members'><a class='permalink' href='#Reserved_HEAP_Members'>Reserved   HEAP Members</a></h1>
+<p class="Pp">Contrairement à la plupart des modules POE, POE::Component::Server::TCP
+    stocke des données dans les HEAPs des sessions client. Ces valeurs sont fournies
+    comme commodités pour les développeurs d'applications.</p>
+<section class="Ss">
+<h2 class="Ss" id='HEAP_Members_for_Master_Listening_Sessions'><a class='permalink' href='#HEAP_Members_for_Master_Listening_Sessions'>HEAP   Members for Master Listening Sessions</a></h2>
+<p class="Pp">La session d'écoute principale détient des données différentes de celles
+    des connexions client.</p>
+<p class="Pp"><i>alias</i></p>
+<p class="Pp"><span class="Li">$_</span>[HEAP]{alias} contient l'Alias du
+    serveur.</p>
+<p class="Pp"><i>concurrency</i></p>
+<p class="Pp"><span class="Li">$_</span>[HEAP]{concurrency} se souvient du
+    paramètre <span class="Li">&quot;Concurrency&quot;</span> du serveur.</p>
+<p class="Pp"><i>connections</i></p>
+<p class="Pp"><span class="Li">$_</span>[HEAP]{connections} est utilisé pour
+    suivre le nombre actuel de connexions client simultanées. Il est incrémenté
+    chaque fois qu'une nouvelle connexion est acceptée et décrémenté chaque fois
+    qu'un client se déconnecte.</p>
+<p class="Pp"><i>listener</i></p>
+<p class="Pp"><span class="Li">$_</span>[HEAP]{listener} contient l'objet
+    <span class="Li">POE::Wheel::SocketFactory</span> utilisé pour écouter les
+    connexions et les accepter.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='HEAP_Members_for_Connection_Sessions'><a class='permalink' href='#HEAP_Members_for_Connection_Sessions'>HEAP   Members for Connection Sessions</a></h2>
+<p class="Pp">Ces membres de données existent au sein des sessions des connexions
+    individuelles.</p>
+<p class="Pp"><i>client</i></p>
+<p class="Pp"><span class="Li">$_</span>[HEAP]{client} contient un objet
+    <span class="Li">POE::Wheel::ReadWrite</span> utilisé pour interagir avec le
+    client. Toutes les méthodes <span class="Li">POE::Wheel::ReadWrite</span>
+    fonctionnent.</p>
+<p class="Pp"><i>got_an_error</i></p>
+<p class="Pp"><span class="Li">$_</span>[HEAP]{got_an_error} se souvient si la
+    connexion client a déjà rencontré une erreur. Il fait partie de la procédure
+    d'arrêt en cas d'erreur.</p>
+<p class="Pp"><i>remote_ip</i></p>
+<p class="Pp"><span class="Li">$_</span>[HEAP]{remote_ip} contient l'adresse
+    numérique du client distant sous forme lisible par l'homme.</p>
+<p class="Pp"><i>remote_port</i></p>
+<p class="Pp"><span class="Li">$_</span>[HEAP]{remote_port} contient le port
+    numérique de la socket du client distant sous forme lisible par l'homme.</p>
+<p class="Pp"><i>remote_addr</i></p>
+<p class="Pp"><span class="Li">$_</span>[HEAP]{remote_addr} contient l'adresse
+    de socket packagée du client distant sous forme lisible par l'ordinateur.</p>
+<p class="Pp"><i>shutdown</i></p>
+<p class="Pp"><span class="Li">$_</span>[HEAP]{shutdown} est vrai si le client
+    est en cours de fermeture. Le composant l'utilise pour ignorer les entrées
+    client pendant la fermeture et pour fermer la connexion après que la sortie
+    en attente ait été vidée.</p>
+<p class="Pp"><i>shutdown_on_error</i></p>
+<p class="Pp"><span class="Li">$_</span>[HEAP]{shutdown_on_error} se souvient si
+    la connexion client doit se fermer automatiquement en cas d'erreur.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>SEE   ALSO</a></h1>
+<p class="Pp">La section SEE ALSO de POE contient une table des matières couvrant
+    l'intégralité de la distribution POE.</p>
+<p class="Pp">POE::Component::Client::TCP est le pendant côté client de ce
+    module.</p>
+<p class="Pp">Ce composant utilise et expose des fonctionnalités de POE::Filter,
+    POE::Wheel::SocketFactory et POE::Wheel::ReadWrite.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BUGS'><a class='permalink' href='#BUGS'>BUGS</a></h1>
+<p class="Pp">Cela ne ressemble en rien à ce qu'Ann avait imaginé.</p>
+<p class="Pp">Ce composant n'accepte actuellement pas plusieurs des options que
+    POE::Wheel::SocketFactory accepte.</p>
+<p class="Pp">Ce composant ne se liera pas à plusieurs adresses à la fois. Il peut
+    s'agir d'une limitation de SocketFactory, mais ce n'est pas intentionnel.</p>
+<p class="Pp">Ce composant a besoin d'une meilleure gestion des erreurs.</p>
+<p class="Pp">Certains cas d'utilisation nécessitent des classes de session
+    différentes pour l'écouteur et les gestionnaires de connexion. Ceci n'est pas
+    actuellement pris en charge. S'il vous plaît, envoyez des patchs. :)</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHORS_&amp;amp;_COPYRIGHTS'><a class='permalink' href='#AUTHORS_&amp;amp;_COPYRIGHTS'>AUTHORS   &amp; COPYRIGHTS</a></h1>
+<p class="Pp">POE::Component::Server::TCP est Copyright 2000-2013 par Rocco
+    Caputo. Tous droits réservés. POE::Component::Server::TCP est un logiciel
+    libre, et il peut être redistribué et/ou modifié sous les mêmes termes que
+    Perl lui-même.</p>
+<p class="Pp">POE::Component::Server::TCP est basé sur du code, utilisé avec
+    permission, d'Ann Barcomb &lt;kudra@domaintje.com&gt;.</p>
+<p class="Pp">POE::Component::Server::TCP est basé sur du code, utilisé avec
+    permission, de Jos Boumans &lt;kane@cpan.org&gt;.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2024-07-13</td>
+    <td class="foot-os">perl v5.38.2</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Package information:</p>
+    <dl>
+        <dt>Package name:</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-poe/">extra/perl-poe</a></dd>
+        <dt>Version:</dt>
+        <dd>1.370-2</dd>
+        <dt>Upstream:</dt>
+        <dd><a href="https://search.cpan.org/dist/POE">https://search.cpan.org/dist/POE</a></dd>
+        <dt>Licenses:</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuals:</dt>
+        <dd><a href="/listing/extra/perl-poe/">/listing/extra/perl-poe/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table of contents</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#PUBLIC_METHODS">PUBLIC METHODS</a></li>
+        
+            <li><a href="#EVENTS">EVENTS</a></li>
+        
+            <li><a href="#Reserved_HEAP_Members">Reserved HEAP Members</a></li>
+        
+            <li><a href="#SEE_ALSO">SEE ALSO</a></li>
+        
+            <li><a href="#BUGS">BUGS</a></li>
+        
+            <li><a href="#AUTHORS_&amp;amp;_COPYRIGHTS">AUTHORS &amp; COPYRIGHTS</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Other formats:
+        
+            <a href="/man/POE::Component::Server::TCP.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/POE::Component::Server::TCP.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>The website is available under the terms of the <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               license, except for the contents of the manual pages, which have their own license
+               specified in the corresponding Arch Linux package.
+            </p>
+        </footer>
+    </body>
+</html>

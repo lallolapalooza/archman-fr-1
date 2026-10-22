@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Sub::HandlesVia::Manual::WithGeneric(3pm) — Pages man Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Sub__HandlesVia__Manual__WithGeneric(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-sub-handlesvia/">perl-sub-handlesvia</a></p>
+<p class="lic">Licences: PerlArtistic, GPL</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Sub::HandlesVia::Manual::WithGeneric(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">Sub::HandlesVia::Manual::WithGeneric(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Sub::HandlesVia::Manual::WithGeneric - utiliser Sub::HandlesVia avec des
+    classes Perl génériques</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MANUEL'><a class='permalink' href='#MANUEL'>MANUEL</a></h1>
+<p class="Pp">Sub::HandlesVia vous permet de déléguer des méthodes de votre classe
+    aux valeurs des attributs de vos objets.</p>
+<p class="Pp">Conceptuellement, cela vous permet de définir
+    <span class="Li">&quot;$objet-&gt;push_nombre($n)&quot;</span> comme un raccourci
+    pour
+    <span class="Li">&quot;$objet-&gt;nombres-&gt;push($n)&quot;</span>, sauf que
+    <span class="Li">&quot;$objet-&gt;nombres&quot;</span> est un tableau référencé,
+    il n'a donc pas de méthodes que vous pouvez appeler dessus comme
+    <span class="Li">&quot;push&quot;</span>.</p>
+<p class="Pp">Pour Moose et Mouse, Sub::HandlesVia peut utiliser leurs protocoles
+    de méta-objets pour saisir la définition d'un attribut et installer les
+    méthodes dont il a besoin. Pour Moo, il peut envelopper
+    <span class="Li">&quot;has&quot;</span> et faire son travail de cette façon. Pour
+    d'autres classes, vous devez être plus explicite et lui dire quelles méthodes
+    déléguer à quels attributs.</p>
+<pre>package Cuisine {
+
+  # constructeur
+  sub new {
+    my ( $class, %arg ) = @_;
+    $arg{nourriture} ||= [];
+    return bless( \%arg, $class );
+  }
+
+  # getter/setter pour `nourriture`
+  sub nourriture {
+    (@_ == 1) ? $_[0]{nourriture} : ( $_[0]{nourriture} = $_[1] );
+  }
+
+  use Sub::HandlesVia qw( delegations );
+
+  delegations(
+    attribute   =&gt; 'nourriture'
+    handles_via =&gt; 'Array',
+    handles     =&gt; {
+      'ajouter_nourriture'    =&gt; 'push',
+      'trouver_nourriture'   =&gt; 'grep',
+    },
+  );
+}</pre>
+<p class="Pp">Définir
+    <span class="Li">&quot;attribute&quot;</span> sur
+    &quot;nourriture&quot; signifie que lorsque Sub::HandlesVia a besoin de récupérer
+    la liste des aliments, il appellera
+    <span class="Li">&quot;$cuisine-&gt;nourriture&quot;</span> et lorsqu'il aura
+    besoin de définir la liste des aliments, il appellera
+    <span class="Li">&quot;$cuisine-&gt;nourriture($valeur)&quot;</span>. Si vous
+    avez des méthodes getter et setter séparées, faites simplement :</p>
+<pre>attribute   =&gt; [ 'get_nourriture', 'set_nourriture' ],</pre>
+<p class="Pp">Ou si vous n'avez pas d'accesseurs et que vous voulez que
+    Sub::HandlesVia accède directement au hashref sous-jacent :</p>
+<pre>attribute   =&gt; '{nourriture}',</pre>
+<p class="Pp">Ou peut-être avez-vous un setter, mais vous voulez utiliser l'accès
+    hashref pour le getter :</p>
+<pre>attribute   =&gt; [ '{nourriture}', 'set_nourriture' ],</pre>
+<p class="Pp">Ou peut-être voulez-vous toujours un accès direct pour le getter,
+    mais votre objet est un tableau référencé béni au lieu d'un hashref béni :</p>
+<pre>attribute   =&gt; [ '[7]', 'set_nourriture' ],</pre>
+<p class="Pp">Ou peut-être que vos besoins sont uniques et fous :</p>
+<pre>attribute   =&gt; [ \&amp;getter, \&amp;setter ],</pre>
+<p class="Pp">Les références de code reçoivent l'instance comme premier argument,
+    et le setter reçoit également une valeur à définir.</p>
+<p class="Pp">Vraiment, je ne pense pas qu'il existe de système objet pour lequel
+    cela ne fonctionnera pas !</p>
+<p class="Pp">Si vous fournissez un tableau référencé avec un getter et un setter,
+    il est également possible de fournir un troisième argument qui est une référence
+    de code ou une chaîne qui sera appelée comme méthode si besoin est de
+    &quot;réinitialiser&quot; la valeur. Cela peut être considéré comme une valeur
+    par défaut ou un constructeur.</p>
+<p class="Pp">(La fonction
+    <span class="Li">&quot;delegations&quot;</span> peut également être importée dans
+    les classes Moo/Mouse/Moose, auquel cas l'<span class="Li">&quot;attribute&quot;</span>
+    doit être le même nom d'attribut que celui que vous avez passé à
+    <span class="Li">&quot;has&quot;</span>. Vous ne pouvez pas utiliser un tableau
+    référencé, une référence de code, une clé de hachage ou un index de tableau.)</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BOGUES'><a class='permalink' href='#BOGUES'>BOGUES</a></h1>
+<p class="Pp">Veuillez signaler tout bogue à
+    <a href='https://github.com/tobyink/p5-sub-handlesvia/issues'>https://github.com/tobyink/p5-sub-handlesvia/issues</a>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR   AUSSI</a></h1>
+<p class="Pp">Documentation avancée diverse :
+  Sub::HandlesVia::Manual::Advanced.</p>
+<p class="Pp">Sub::HandlesVia.</p>
+<p class="Pp">Documentation des méthodes délégables :
+    Sub::HandlesVia::HandlerLibrary::Array,
+    Sub::HandlesVia::HandlerLibrary::Blessed,
+    Sub::HandlesVia::HandlerLibrary::Bool,
+    Sub::HandlesVia::HandlerLibrary::Code,
+    Sub::HandlesVia::HandlerLibrary::Counter,
+    Sub::HandlesVia::HandlerLibrary::Enum,
+    Sub::HandlesVia::HandlerLibrary::Hash,
+    Sub::HandlesVia::HandlerLibrary::Number,
+    Sub::HandlesVia::HandlerLibrary::Scalar, et
+    Sub::HandlesVia::HandlerLibrary::String.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Toby Inkster &lt;tobyink@cpan.org&gt;.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROIT_DAUTOR_ET_LICENCE'><a class='permalink' href='#DROIT_DAUTOR_ET_LICENCE'>DROIT   D'AUTOR ET LICENCE</a></h1>
+<p class="Pp">Ce logiciel est protégé par copyright (c) 2022 par Toby Inkster.</p>
+<p class="Pp">C'est un logiciel libre ; vous pouvez le redistribuer et/ou le modifier
+    selon les mêmes termes que le système de programmation Perl 5 lui-même.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXCLUSION_DE_GARANTIES'><a class='permalink' href='#EXCLUSION_DE_GARANTIES'>EXCLUSION   DE GARANTIES</a></h1>
+<p class="Pp">CE PAQUET EST FOURNI &quot;TEL QUEL&quot; ET SANS AUCUNE GARANTIE, EXPRESSE
+    OU IMPLICITE, Y COMPRIS, SANS LIMITATION, LES GARANTIES IMPLICITES DE
+    COMMERCIABILITÉ ET D'ADÉQUATION À UN USAGE PARTICULIER.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-09-27</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher une page man" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-sub-handlesvia/">extra/perl-sub-handlesvia</a></dd>
+        <dt>Version :</dt>
+        <dd>0.050003-1</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://metacpan.org/release/Sub-HandlesVia">https://metacpan.org/release/Sub-HandlesVia</a></dd>
+        <dt>Licences :</dt>
+        <dd>PerlArtistic, GPL</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-sub-handlesvia/">/listing/extra/perl-sub-handlesvia/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#MANUEL">MANUEL</a></li>
+        
+            <li><a href="#BOGUES">BOGUES</a></li>
+        
+            <li><a href="#VOIR_AUSSI">VOIR AUSSI</a></li>
+        
+            <li><a href="#AUTEUR">AUTEUR</a></li>
+        
+            <li><a href="#DROIT_DAUTOR_ET_LICENCE">DROIT D'AUTOR ET LICENCE</a></li>
+        
+            <li><a href="#EXCLUSION_DE_GARANTIES">EXCLUSION DE GARANTIES</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Sub::HandlesVia::Manual::WithGeneric.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/Sub::HandlesVia::Manual::WithGeneric.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages man, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

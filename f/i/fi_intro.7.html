@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>fi_intro(7) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">fi_intro(7)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/libfabric/">libfabric</a></p>
+<p class="lic">Licences: BSD-2-Clause OR GPL-2.0-or-later</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">fi_intro(7)</td>
+    <td class="head-vol">Libfabric v2.3.1</td>
+    <td class="head-rtitle">fi_intro(7)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">fi_intro - Introduction à libfabric</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='APERÇU'><a class='permalink' href='#APERÇU'>APERÇU</a></h1>
+<p class="Pp">Cette introduction fait partie du guide du programmeur de
+    libfabric. Voir fi_guide(7). Cette section donne un aperçu de la motivation
+    derrière la conception de libfabric et des fonctionnalités réseau sous-jacentes
+    qui sont exposées via l'API.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Revue_de_la_communication_par_sockets'><a class='permalink' href='#Revue_de_la_communication_par_sockets'>Revue de la communication par sockets</a></h1>
+<p class="Pp">L'API des sockets est une API réseau largement utilisée. Ce guide
+    suppose que le lecteur possède une connaissance pratique de la programmation
+    aux sockets. Il fait référence tout au long aux communications basées sur les
+    sockets afin d'aider à expliquer les concepts de libfabric et comment ils
+    se rapportent ou diffèrent de l'API des sockets. Pour être clair, l'intention
+    de ce guide n'est pas de critiquer l'API des sockets, mais de référencer les
+    sockets comme point de départ afin d'expliquer certaines fonctionnalités ou
+    limitations réseau. Les sections suivantes fournissent un aperçu général des
+    sémantiques des sockets à titre de référence.</p>
+<section class="Ss">
+<h2 class="Ss" id='Communication_connectée_(TCP)'><a class='permalink' href='#Communication_connectée_(TCP)'>Communication connectée (TCP)</a></h2>
+<p class="Pp">Le type de socket le plus utilisé est SOCK_STREAM. Ce type de
+    socket fonctionne généralement sur TCP/IP, et en conséquence, il est souvent
+    appelé un socket « TCP ». Les sockets TCP sont orientés connexion, nécessitant
+    une configuration de connexion explicite avant que les transferts de données
+    puissent avoir lieu. Un seul socket TCP ne peut transférer des données qu'à un
+    seul socket pair. Communiquer avec plusieurs pairs nécessite l'utilisation
+    d'un socket par pair.</p>
+<p class="Pp">Les applications utilisant des sockets TCP sont généralement
+    étiquetées soit comme client, soit comme serveur. Les applications serveur
+    attendent les requêtes de connexion et les acceptent lorsqu'elles se
+    produisent. Les clients, en revanche, initient les connexions vers le
+    serveur. Dans le jargon de l'API des sockets, un serveur appelle listen(),
+    et le client appelle connect(). Après l'établissement d'une connexion, les
+    transferts de données entre un client et un serveur sont similaires. Les
+    segments de code suivants mettent en évidence le flux général pour un client
+    et un serveur d'exemple. La gestion des erreurs et certaines subtilités de
+    l'API des sockets sont omises pour des raisons de brièveté.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>/* Flux de code exemple du serveur pour initialiser l'écoute */
+struct addrinfo *ai, hints;
+int listen_fd;
+memset(&amp;hints, 0, sizeof hints);
+hints.ai_socktype = SOCK_STREAM;
+hints.ai_flags = AI_PASSIVE;
+getaddrinfo(NULL, "7471", &amp;hints, &amp;ai);
+listen_fd = socket(ai-&gt;ai_family, SOCK_STREAM, 0);
+bind(listen_fd, ai-&gt;ai_addr, ai-&gt;ai_addrlen);
+freeaddrinfo(ai);
+fcntl(listen_fd, F_SETFL, O_NONBLOCK);
+listen(listen_fd, 128);
+</pre>
+  </dd>
+</dl>
+<p class="Pp">Dans cet exemple, le serveur écoutera les requêtes de connexion
+    sur le port 7471 sur toutes les adresses du système. L'appel à getaddrinfo()
+    est utilisé pour former l'adresse locale du socket. Le paramètre node est
+    mis à NULL, ce qui donne une adresse IP générique en retour. Le port est codé
+    en dur à 7471. Le drapeau AI_PASSIVE signifie que l'adresse sera utilisée
+    par le côté écoute de la connexion. C'est-à-dire que les informations d'adresse
+    doivent être relatives au nœud local.</p>
+<p class="Pp">Cet exemple fonctionnera avec IPv4 et IPv6. L'appel
+    getaddrinfo() abstrait le format d'adresse du serveur, améliorant sa
+    portabilité. En utilisant les données retournées par getaddrinfo(), le
+    serveur alloue un socket de type SOCK_STREAM et lie le socket au port
+    7471.</p>
+<p class="Pp">En pratique, la plupart des applications d'entreprise utilisent des
+    sockets non bloquants. Ceci est nécessaire pour qu'un seul thread d'application
+    puisse gérer plusieurs connexions socket. La commande fcntl() met le socket
+    d'écoute en mode non bloquant. Cela affectera la manière dont le serveur
+    traite les requêtes de connexion (voir ci-dessous). Enfin, le serveur commence
+    à écouter les requêtes de connexion en appelant listen. Tant que listen n'est
+    pas appelé, les requêtes de connexion qui arrivent au serveur seront rejetées
+    par le système d'exploitation.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>/* Flux de code exemple du client pour démarrer la connexion */
+struct addrinfo *ai, hints;
+int client_fd;
+memset(&amp;hints, 0, sizeof hints);
+hints.ai_socktype = SOCK_STREAM;
+getaddrinfo("10.31.20.04", "7471", &amp;hints, &amp;ai);
+client_fd = socket(ai-&gt;ai_family, SOCK_STREAM, 0);
+fcntl(client_fd, F_SETFL, O_NONBLOCK);
+connect(client_fd, ai-&gt;ai_addr, ai-&gt;ai_addrlen);
+freeaddrinfo(ai);
+</pre>
+  </dd>
+</dl>
+<p class="Pp">Similaire au serveur, le client utilise getaddrinfo(). Comme le
+    drapeau AI_PASSIVE n'est pas spécifié, l'adresse donnée est traitée comme
+    celle de la destination. Le client s'attend à atteindre le serveur à l'adresse
+    IP 10.31.20.04, port 7471. Pour cet exemple, l'adresse est codée en dur dans
+    le client. Plus typiquement, l'adresse sera fournie au client via la ligne
+    de commande, par un fichier de configuration, ou depuis un service. Souvent,
+    le numéro de port sera bien connu, et le client trouvera le serveur par son
+    nom, le DNS (service de noms de domaine) assurant la résolution nom vers
+    adresse. Heureusement, l'appel getaddrinfo() peut être utilisé pour convertir
+    les noms d'hôte en adresses IP.</p>
+<p class="Pp">Que le client reçoive directement l'adresse réseau du serveur ou un
+    nom qui doit être traduit en adresse réseau, le mécanisme utilisé pour
+    fournir ces informations au client varie considérablement. Un mécanisme simple
+    couramment utilisé est que les utilisateurs fournissent l'adresse du serveur
+    via une option de ligne de commande. Le problème de dire aux applications où
+    se trouvent leurs pairs augmente considérablement pour les applications qui
+    communiquent avec des centaines, voire des millions de processus pairs,
+    nécessitant souvent une application séparée et dédiée pour le résoudre. Pour
+    une application client-serveur socket typique, ce n'est pas un problème, nous
+    donc reportons toute discussion ultérieure à plus tard.</p>
+<p class="Pp">En utilisant les résultats de getaddrinfo(), le client ouvre un
+    socket, le configure en mode non bloquant et initie la requête de connexion.
+    À ce stade, la pile réseau a envoyé une requête au serveur pour établir la
+    connexion. Comme le socket a été configuré en mode non bloquant, l'appel
+    connect() retournera immédiatement et n'attendra pas que la connexion soit
+    établie. Par conséquent, toute tentative d'envoi de données à ce stade
+    échouera probablement.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>/* Flux de code exemple du serveur pour accepter une connexion */
+struct pollfd fds;
+int server_fd;
+fds.fd = listen_fd;
+fds.events = POLLIN;
+poll(&amp;fds, -1);
+server_fd = accept(listen_fd, NULL, 0);
+fcntl(server_fd, F_SETFL, O_NONBLOCK);
+</pre>
+  </dd>
+</dl>
+<p class="Pp">Les applications qui utilisent des sockets non bloquants utilisent
+    select(), poll(), ou un équivalent comme epoll() pour recevoir des
+    notifications lorsque le socket est prêt à envoyer ou recevoir des données.
+    Dans ce cas, le serveur souhaite savoir quand le socket d'écoute a une requête
+    de connexion à traiter. Il ajoute le socket d'écoute à un ensemble de sondage,
+    puis attend qu'une requête de connexion arrive (c'est-à-dire que POLLIN est
+    vrai). L'appel poll() se bloque jusqu'à ce que POLLIN soit défini sur le
+    socket. POLLIN indique que le socket a des données à accepter. Comme il s'agit
+    d'un socket d'écoute, les données sont une requête de connexion. Le serveur
+    accepte la requête en appelant accept(). Cela renvoie un nouveau socket au
+    serveur, qui est prêt pour les transferts de données. Enfin, le serveur met le
+    nouveau socket en mode non bloquant.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>/* Flux de code exemple du client pour établir une connexion */
+struct pollfd fds;
+int err;
+socklen_t len;
+fds.fd = client_fd;
+fds.events = POLLOUT;
+poll(&amp;fds, -1);
+len = sizeof err;
+getsockopt(client_fd, SOL_SOCKET, SO_ERROR, &amp;err, &amp;len);
+</pre>
+  </dd>
+</dl>
+<p class="Pp">Le client est informé que sa requête de connexion est terminée
+    lorsque son socket de connexion est « prêt à envoyer des données » (c'est-à-dire
+    que POLLOUT est vrai). L'appel poll() se bloque jusqu'à ce que POLLOUT soit
+    défini sur le socket, indiquant que la tentative de connexion est terminée.
+    Notez que la requête de connexion peut s'être terminée avec une erreur, et le
+    client doit toujours vérifier si la tentative de connexion a réussi. Cela
+    n'est pas transmis à l'application par l'appel poll(). L'appel
+    getsockopt() est utilisé pour récupérer le résultat de la tentative de
+    connexion. Si err dans cet exemple est défini sur 0, alors la tentative de
+    connexion a réussi. Le socket est maintenant prêt à envoyer et recevoir des
+    données.</p>
+<p class="Pp">Après l'établissement d'une connexion, le processus d'envoi ou de
+    réception de données est le même pour le client et le serveur. Les exemples
+    ci-dessous ne diffèrent que par le nom de la variable socket utilisée par
+    l'application client ou serveur.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>/* Exemple d'envoi de données par le client au serveur */
+struct pollfd fds;
+size_t offset, size, ret;
+char buf[4096];
+fds.fd = client_fd;
+fds.events = POLLOUT;
+size = sizeof(buf);
+for (offset = 0; offset &lt; size; ) {
+    poll(&amp;fds, -1);
+    ret = send(client_fd, buf + offset, size - offset, 0);
+    offset += ret;
+}
+</pre>
+  </dd>
+</dl>
+<p class="Pp">La communication réseau implique la mise en mémoire tampon des
+    données aux deux extrémités de la connexion. TCP utilise un schéma basé sur des
+    crédits pour gérer le contrôle de flux afin de s'assurer qu'il y a suffisamment
+    d'espace tampon</p>
+</div>
+</section>
+
+            </article>
+        </main>
+    </body>
+</html>
+e du côté récepteur d'une connexion pour accepter les données entrantes. Ce contrôle de flux est masqué à l'application par l'API socket. Par conséquent, les sockets de type flux peuvent ne pas transférer toutes les données que l'application demande à envoyer dans le cadre d'une seule opération.</p>
+<p class="Pp">Dans cet exemple, le client maintient un décalage (offset) dans le tampon qu'il souhaite envoyer. À mesure que le réseau accepte les données, le décalage augmente. Le client attend ensuite que le réseau soit prêt à accepter plus de données avant de tenter un autre transfert. L'opération poll() prend en charge ce mécanisme. Lorsque le socket du client est prêt pour les données, il définit POLLOUT à vrai. Cela indique que send() transférera une certaine quantité supplémentaire de données. Le client émet une requête send() pour le montant restant du tampon qu'il souhaite transférer. Si send() transfère moins de données que demandé, le client met à jour le décalage, attend que le réseau soit prêt, puis réessaie.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>/* Exemple de serveur recevant des données du client */
+struct pollfd fds;
+size_t offset, size, ret;
+char buf[4096];
+fds.fd = server_fd;
+fds.events = POLLIN;
+size = sizeof(buf);
+for (offset = 0; offset &lt; size; ) {
+    poll(&amp;fds, -1);
+    ret = recv(client_fd, buf + offset, size - offset, 0);
+    offset += ret;
+}
+</pre>
+  </dd>
+</dl>
+<p class="Pp">Le flux pour la réception des données est similaire à celui utilisé pour l'envoi. En raison de la nature en flux du socket, il n'y a aucune garantie que le récepteur obtiendra toutes les données disponibles dans le cadre d'un seul appel. Le serveur doit plutôt attendre que le socket soit prêt à recevoir des données (POLLIN) avant d'appeler receive pour obtenir les données disponibles. Dans cet exemple, le serveur sait qu'il doit s'attendre à exactement 4 Ko de données de la part du client. Plus généralement, un client et un serveur échangeront des en-têtes de protocole de communication au début de tous les messages, et l'en-tête inclura la taille du message.</p>
+<p class="Pp">Il est à noter que les deux exemples précédents sont écrits de manière à être simples à comprendre. Ils sont mal construits en termes de performance. Dans les deux cas, l'application précède toujours un appel de transfert de données (send ou recv) par poll(). L'impact est que même si le réseau est prêt à transférer des données ou a des données en file d'attente pour la réception, l'expérience de l'application sera toujours la latence et le surcoût de traitement de poll(). Une meilleure approche consiste à appeler send() ou recv() avant d'entrer dans les boucles for(), et à n'entrer dans les boucles que si nécessaire.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Connection-less_(UDP)_Communication'><a class='permalink' href='#Connection-less_(UDP)_Communication'>Communication sans connexion (UDP)</a></h2>
+<p class="Pp">Comme mentionné, les sockets TCP sont orientés connexion. Ils peuvent être utilisés pour communiquer entre exactement 2 processus. Pour les applications parallèles qui doivent communiquer avec des milliers de processus pairs, le surcoût de gestion de ce nombre de sockets simultanées peut être significatif, au point où les performances de l'application peuvent diminuer à mesure que plus de processus sont ajoutés.</p>
+<p class="Pp">Pour prendre en charge la communication avec un grand nombre de pairs, ou pour les applications qui n'ont pas besoin du surcoût d'une communication fiable, les sockets offrent une autre option couramment utilisée, SOCK_DGRAM. Les datagrammes sont des messages non fiables et sans connexion. Le type de socket SOCK_DGRAM le plus courant fonctionne sur UDP/IP. Par conséquent, les sockets de datagramme sont souvent appelés sockets UDP.</p>
+<p class="Pp">Les sockets UDP utilisent la même API socket que celle décrite ci-dessus pour les sockets TCP ; cependant, le comportement de communication diffère. Premièrement, une application utilisant des sockets UDP n'a pas besoin de se connecter à un pair avant de lui envoyer un message. L'adresse de destination est spécifiée dans le cadre de l'opération d'envoi. Une deuxième différence majeure est que le message n'est pas garanti d'arriver au pair. La congestion du réseau dans les commutateurs, les routeurs ou la NIC distante peut abandonner le message, et aucune tentative ne sera faite pour renvoyer le message. L'expéditeur ne sera pas informé que le message est arrivé ou a été abandonné. Une autre différence entre les sockets TCP et UDP est la taille maximale de transfert autorisée. Les sockets UDP limitent les messages à au plus 64k, bien qu'en pratique, les applications utilisent une taille beaucoup plus petite, généralement alignée sur la taille MTU du réseau (par exemple, 1500 octets).</p>
+<p class="Pp">La plupart des utilisations des sockets UDP remplacent les appels socket send() / recv() par sendto() et recvfrom().</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>/* Exemple d'envoi à un pair à l'adresse IP et au port UDP donnés */
+struct addrinfo *ai, hints;
+memset(&amp;hints, 0, sizeof hints);
+hints.ai_socktype = SOCK_DGRAM;
+getaddrinfo("10.31.20.04", "7471", &amp;hints, &amp;ai);
+ret = sendto(client_fd, buf, size, 0, ai-&gt;ai_addr, ai-&gt;ai_addrlen);
+</pre>
+  </dd>
+</dl>
+<p class="Pp">Dans l'exemple ci-dessus, nous utilisons getadddrinfo() pour convertir l'adresse IP et le numéro de port UDP donnés en un sockaddr. Celui-ci est passé à l'appel sendto() afin de spécifier la destination du message. Notez les similitudes entre ce flux et le flux du socket TCP. L'appel recvfrom() nous permet de recevoir l'adresse de l'expéditeur d'un message. Contrairement aux sockets en flux, l'intégralité du message est acceptée par le réseau en cas de succès. Tout le contenu du paramètre buf, spécifié par le paramètre size, a été mis en file d'attente par la couche réseau.</p>
+<p class="Pp">Bien que non montré, l'application pourrait appeler poll() ou un équivalent avant d'appeler sendto() pour s'assurer que le socket est prêt à accepter de nouvelles données. De même, poll() peut être utilisé avant d'appeler recvfrom() pour vérifier s'il y a des données prêtes à être lues depuis le socket.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>/* Exemple de réception d'un message d'un pair */
+struct sockaddr_in addr;
+socklen_t addrlen;
+addrlen = sizeof(addr);
+ret = recvfrom(client_fd, buf, size, 0, &amp;addr, &amp;addrlen);
+</pre>
+  </dd>
+</dl>
+<p class="Pp">Cet exemple recevra tout message entrant de n'importe quel pair. L'adresse du pair sera fournie dans le paramètre addr. Dans ce cas, nous ne fournissons que suffisamment d'espace pour enregistrer une adresse IPv4 (limité par notre utilisation de struct sockaddr_in). Prise en charge d'une adresse IPv6 nécessiterait simplement de passer un tampon d'adresse plus grand (mappé vers struct sockaddr_in6 par exemple).</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Advantages'><a class='permalink' href='#Advantages'>Avantages</a></h2>
+<p class="Pp">L'API socket a deux avantages significatifs. Premièrement, elle est disponible sur une grande variété de systèmes d'exploitation et de plateformes, et fonctionne sur la grande majorité du matériel réseau disponible. Elle peut même fonctionner pour la communication entre processus sur le même système sans aucun matériel réseau. C'est facilement l'API réseau de facto. Cela en soi la rend attrayante à utiliser.</p>
+<p class="Pp">Le deuxième avantage clé est qu'elle est relativement facile à programmer. L'importance de cela ne doit pas être négligée. Les API réseau qui offrent l'accès à des fonctionnalités plus performantes, mais qui sont difficiles à programmer correctement ou bien, entraînent souvent des performances d'application inférieures. Cela n'est pas sans rappeler la programmation d'une application dans un langage de haut niveau comme C ou C++, par opposition à l'assembleur. Bien que l'écriture directe en langage assembleur offre la <i>promesse</i> d'être plus performante, pour la grande majorité des développeurs, leurs applications seront plus performantes si elles sont écrites en C ou C++, et en utilisant un compilateur optimisé. Les applications devraient avoir un besoin clair de réseaux haute performance avant de sélectionner une API alternative aux sockets.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Disadvantages'><a class='permalink' href='#Disadvantages'>Inconvénients</a></h2>
+<p class="Pp">Lors de l'examen des problèmes de l'API socket en ce qui concerne les réseaux haute performance, nous limitons notre discussion aux deux types de sockets les plus courants : le flux (TCP) et le datagramme (UDP).</p>
+<p class="Pp">La plupart des applications nécessitent que les données réseau soient envoyées de manière fiable. Cela signifie invariablement l'utilisation d'un socket TCP orienté connexion. Les sockets TCP transfèrent les données sous forme d'un flux d'octets. Cependant, de nombreuses applications opèrent sur des messages. Le résultat est que les applications insèrent souvent des en-têtes qui sont simplement utilisés pour convertir les messages de l'application vers / depuis un flux d'octets. Ces en-têtes consomment une bande passante réseau et un traitement supplémentaires. La nature en flux de l'interface entraîne également l'utilisation de boucles par l'application, comme montré dans les exemples ci-dessus, pour envoyer et recevoir des messages plus grands. La complexité de ces boucles peut être significative si l'application gère des sockets vers des centaines ou des milliers de pairs.</p>
+<p class="Pp">Un autre problème mis en évidence par les exemples ci-dessus concerne la nature asynchrone du trafic réseau. Lors de l'utilisation d'un transport fiable, il ne suffit pas de placer les données de l'application sur le réseau. Si le réseau est occupé, il pourrait abandonner le paquet, ou les données pourraient être corrompues pendant un transfert. Les données doivent être conservées jusqu'à ce qu'elles aient été accusées de réception par le pair, afin de pouvoir être renvoyées si nécessaire. L'API socket est définie de telle sorte que l'application est propriétaire du contenu de ses tampons mémoire après le retour d'un appel socket.</p>
+<p class="Pp">À titre d'exemple, si nous examinons l'appel socket send(), une fois que send() est retourné, l'application est libre de modifier son tampon. L'implémentation réseau a quelques options. Une option est que l'appel send place les données directement sur le réseau. L'appel doit alors se bloquer avant de retourner à l'utilisateur jusqu'à ce que le pair accuse réception des données, auquel point send() peut retourner. Le problème évident de cette approche est que l'application est bloquée dans l'appel send() jusqu'à ce que la pile réseau du pair puisse traiter les données et générer un accusé de réception. Cela peut être une quantité de temps considérable pendant laquelle l'application est bloquée et incapable de traiter d'autres travaux, comme répondre à des messages d'autres clients. Une telle approche n'est pas faisable.</p>
+<p class="Pp">Une meilleure option est que l'appel send() copie les données de l'application dans un tampon interne. Le transfert de données est ensuite émis depuis ce tampon, ce qui permet de réessayer l'opération en cas d'échec. L'appel send() dans ce cas n'est pas bloqué, mais toutes les données qui traversent le réseau entraîneront une copie mémoire vers un tampon local, même en l'absence de toute erreur.</p>
+<p class="Pp">Permettre la réutilisation immédiate d'un tampon de données est une fonctionnalité de l'API socket qui la maintient simple et facile à programmer. Cependant, une telle fonctionnalité peut potentiellement avoir un impact négatif sur les performances du réseau. Pour les applications limitées par le réseau ou la mémoire, ou même les applications préoccupées par la consommation d'énergie, une API alternative peut être attractive.</p>
+<p class="Pp">Un problème légèrement plus caché survient dans les API socket conçues pour les sockets UDP. Ce problème est une inefficience dans l'implémentation résultant du fait que le design de l'API a été conçu pour la facilité d'utilisation. Afin que l'application envoie des données à un pair, elle doit fournir l'adresse IP et le numéro de port UDP du pair. Cela implique de passer une structure sockaddr aux appels sendto() et recvfrom(). Cependant, les adresses IP sont des adresses de couche réseau de niveau supérieur. Afin de transférer des données entre des systèmes, des adresses de couche liaison de bas niveau sont nécessaires, par exemple les adresses Ethernet. La couche réseau doit faire correspondre les adresses IP aux adresses Ethernet à chaque opération d'envoi. Lorsqu'on passe à l'échelle de milliers de pairs, ce surcoût sur chaque appel d'envoi peut être significatif.</p>
+<p class="Pp">Enfin, parce que l'API socketest souvent considéré en conjonction avec les protocoles TCP et UDP, il est intentionnellement détaché de l'implémentation matérielle du réseau sous-jacente, y compris les NIC, les commutateurs et les routeurs. L'accès aux fonctionnalités réseau disponibles est donc contraint par ce que l'API peut prendre en charge.</p>
+<p class="Pp">Il convient de noter ici que certains systèmes d'exploitation prennent en charge des API améliorées qui peuvent être utilisées pour interagir avec les sockets TCP et UDP. Par exemple, Linux prend en charge une interface connue sous le nom de io_uring, et Windows dispose d'une API de socket asynchrone. Ces API peuvent aider à atténuer certains des problèmes décrits ci-dessus. Cependant, une application sera toujours limitée par les fonctionnalités que fournissent les protocoles TCP et UDP.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='High-Performance_Networking'><a class='permalink' href='#High-Performance_Networking'>Réseautage haute performance</a></h1>
+<p class="Pp">En analysant l'API socket dans le contexte du réseautage haute performance, nous pouvons commencer à voir certaines fonctionnalités souhaitables pour une API réseau.</p>
+<section class="Ss">
+<h2 class="Ss" id='Avoiding_Memory_Copies'><a class='permalink' href='#Avoiding_Memory_Copies'>Éviter les copies mémoire</a></h2>
+<p class="Pp">L'implémentation de l'API socket entraîne généralement des copies de données à la fois à l'émetteur et au récepteur. C'est un compromis entre le maintien d'une interface facile à utiliser et la fourniture de fiabilité. Idéalement, toutes les copies mémoire seraient évitées lors du transfert de données sur le réseau. Il existe des techniques et des API qui peuvent être utilisées pour éviter les copies mémoire, mais en pratique, le coût de l'évitement d'une copie peut souvent être supérieur à la copie elle-même, en particulier pour les petits transferts (mesurés en octets, par opposition à des kiloctets ou plus).</p>
+<p class="Pp">Pour éviter une copie mémoire à l'émetteur, nous devons placer les données de l'application directement sur le réseau. Si nous voulons également éviter de bloquer l'application émettrice, nous avons besoin d'un moyen pour la couche réseau de communiquer avec l'application lorsque le tampon peut être réutilisé en toute sécurité. Cela permettrait de réutiliser le tampon original au cas où les données devraient être retransmises. Cela nous amène à concevoir une interface réseau qui se comporte de manière asynchrone. L'application devra émettre une requête, puis recevoir une sorte de notification lorsque la requête est terminée.</p>
+<p class="Pp">Éviter une copie mémoire au récepteur est plus difficile. Lorsque des données arrivent du réseau, elles doivent atterrir dans un tampon mémoire disponible, sinon elles seront abandonnées, ce qui entraînera la retransmission des données par l'émetteur. Si nous utilisons la sémantique recv() des sockets, la seule façon d'éviter une copie au récepteur est que recv() soit appelé avant send(). Recv() devrait alors se bloquer jusqu'à ce que les données arrivent. Non seulement cela bloque le récepteur, mais c'est aussi impraticable à utiliser en dehors d'une application avec un protocole simple requête-réponse.</p>
+<p class="Pp">À la place, ce qui est nécessaire est un moyen pour l'application réceptrice de fournir un ou plusieurs tampons au réseau pour que les données reçues y atterrissent. Le réseau doit ensuite notifier l'application lorsque des données sont disponibles. Ce type de mécanisme fonctionne bien si le récepteur ne se soucie pas de l'endroit où les données sont situées dans son espace mémoire ; il a seulement besoin de pouvoir traiter le message entrant.</p>
+<p class="Pp">En alternative, il est possible d'inverser ce flux et de faire en sorte que la couche réseau remette son tampon à l'application. L'application serait alors responsable de retourner le tampon à la couche réseau lorsqu'elle a terminé son traitement. Bien que cette approche puisse éviter les copies mémoire, elle présente quelques inconvénients. Premièrement, la couche réseau ne sait pas quelle taille de messages attendre, ce qui peut entraîner une utilisation inefficace de la mémoire. Deuxièmement, beaucoup considéreraient cela comme un modèle de programmation plus difficile à utiliser. Et enfin, les tampons réseau devraient être mappés dans l'espace mémoire du processus de l'application, ce qui a un impact négatif sur les performances.</p>
+<p class="Pp">En plus du traitement des messages, certaines applications souhaitent recevoir des données et les stocker à un emplacement spécifique en mémoire. Par exemple, une base de données peut souhaiter fusionner les enregistrements de données reçus dans une table existante. Dans de tels cas, même si les données provenant du réseau vont directement dans les tampons de réception de l'application, elles peuvent encore avoir besoin d'être copiées vers leur emplacement final. Il serait idéal si le réseau prenait en charge le placement des données provenant du réseau dans un tampon mémoire spécifique, le tampon étant déterminé en fonction du contenu des données.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Network_Buffers'><a class='permalink' href='#Network_Buffers'>Tampons réseau</a></h2>
+<p class="Pp">Sur la base des problèmes décrits ci-dessus, nous pouvons commencer à voir que l'évitement des copies mémoire dépend de la propriété des tampons mémoire utilisés pour le trafic réseau. Avec les transports basés sur les sockets, les tampons réseau sont détenus et gérés par la pile réseau. Cela est généralement géré par le noyau du système d'exploitation. Cependant, cela entraîne des données qui « rebondissent » entre les tampons de l'application et les tampons réseau. En donnant à l'application le contrôle de la gestion des tampons réseau, nous pouvons éviter cette surcharge. Le coût de cette opération est une complexité supplémentaire dans l'application.</p>
+<p class="Pp">Notez que même si nous voulons que l'application possède les tampons réseau, nous aimerions toujours éviter la situation où l'application implémente un protocole réseau complexe. Le compromis est que l'application fournit les tampons de données à la pile réseau, mais la pile réseau continue de gérer des choses comme le contrôle de flux, la fiabilité, ainsi que la segmentation et le réassemblage.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Resource_Management'><a class='permalink' href='#Resource_Management'>Gestion des ressources</a></h2>
+<p class="Pp">Nous définissons la gestion des ressources comme l'allocation appropriée des ressources réseau afin d'éviter le débordement des tampons de données ou des files d'attente. Le contrôle de flux est un aspect courant de la gestion des ressources. Sans contrôle de flux approprié, un émetteur peut submerger un récepteur lent ou occupé. Cela peut entraîner des paquets abandonnés, des retransmissions et une congestion accrue du réseau. Des recherches et des développements importants ont été consacrés à la mise en œuvre d'algorithmes de contrôle de flux. En raison de sa complexité, ce n'est pas quelque chose dont un développeur d'application devrait avoir à s'occuper. Cela dit, il existe certaines applications où le contrôle de flux découle simplement du protocole réseau. Par exemple, un protocole requête-réponse a naturellement un contrôle de flux intégré.</p>
+<p class="Pp">Pour nos besoins, nous élargissons la définition de la gestion des ressources au-delà du contrôle de flux. Le contrôle de flux ne traite généralement que du tamponnage réseau disponible au niveau d'un pair. Nous voulons également nous préoccuper de l'espace disponible dans les files de transfert de données sortantes. C'est-à-dire que lorsque nous émettons des commandes à la NIC locale pour envoyer des données, ces commandes peuvent être mises en file d'attente à la NIC. Lorsque nous prenons en compte la fiabilité, cela signifie suivre les requêtes en attente jusqu'à ce qu'elles soient acquittées. La gestion des ressources devra s'assurer que nous ne débordons pas cette file de requêtes.</p>
+<p class="Pp">De plus, la prise en charge des opérations asynchrones (décrites en détail ci-dessous) introduira de nouvelles files d'attente potentielles. Ces files d'attente ne doivent pas non plus déborder.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Asynchronous_Operations'><a class='permalink' href='#Asynchronous_Operations'>Opérations asynchrones</a></h2>
+<p class="Pp">On peut dire que la fonctionnalité clé pour atteindre les hautes performances est la prise en charge des opérations asynchrones, ou la capacité de superposer différentes communications et la communication avec le calcul. L'API socket prend en charge les transferts asynchrones avec son mode non bloquant. Cependant, comme l'API elle-même fonctionne de manière synchrone, le résultat est des copies de données supplémentaires. Pour qu'une API soit asynchrone, une application doit pouvoir soumettre du travail, puis recevoir plus tard une sorte de notification indiquant que le travail est terminé. Afin d'éviter des copies mémoire supplémentaires, l'application doit accepter de ne pas modifier ses tampons de données jusqu'à la fin de l'opération.</p>
+<p class="Pp">Il existe deux façons principales de notifier à une application qu'il est sûr de réutiliser ses tampons de données. Un mécanisme consiste à ce que la couche réseau invoque une sorte de rappel (callback) ou envoie un signal à l'application indiquant que la requête est terminée. Certaines API asynchrones utilisent ce mécanisme. L'inconvénient de cette approche est que les signaux interrompent le traitement de l'application. Cela peut avoir un impact négatif sur les caches CPU, et nécessite en plus un traitement d'interruption. De plus, il est souvent difficile de développer une application capable de gérer le traitement d'un signal qui peut survenir à tout moment.</p>
+<p class="Pp">Un mécanisme alternatif pour prendre en charge les opérations asynchrones consiste à écrire des événements dans une sorte de file d'achèvement (completion queue) lorsqu'une opération se termine. Cela fournit un moyen d'indiquer à une application lorsqu'un transfert de données est terminé, et donne également à l'application le contrôle sur le moment et la manière de traiter les requêtes terminées. Par exemple, elle peut traiter les requêtes par lots pour améliorer la localité du code et les performances.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Interrupts_and_Signals'><a class='permalink' href='#Interrupts_and_Signals'>Interruptions et signaux</a></h2>
+<p class="Pp">Les interruptions sont une extension naturelle de la prise en charge des opérations asynchrones. Cependant, lorsqu'elles sont utilisées avec une API asynchrone, elles peuvent avoir un impact négatif sur les performances. Les interruptions, même lorsqu'elles sont dirigées vers un agent du noyau, peuvent interférer avec le traitement de l'application.</p>
+<p class="Pp">Si une application dispose d'une interface asynchrone avec des opérations terminées écrites dans une file d'achèvement, il est souvent suffisant pour l'application de simplement vérifier la file pour les événements. Tant que l'application a d'autres travaux à effectuer, elle n'a pas besoin de se bloquer. Cela élimine la nécessité de générer des interruptions. Une NIC a simplement besoin d'écrire une entrée dans la file d'achèvement et de mettre à jour un pointeur de queue pour signaler qu'une requête est terminée.</p>
+<p class="Pp">Si nous suivons cet argument, il peut être bénéfique de donner à l'application le contrôle sur le moment où les interruptions doivent se produire et sur le moment où écrire des événements vers une sorte d'objet d'attente. En faisant en sorte que l'application notifie à la couche réseau qu'elle attendra jusqu'à ce qu'un achèvement se produise, nous pouvons mieux gérer le nombre et le type d'interruptions générées.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Event_Queues'><a class='permalink' href='#Event_Queues'>Files d'événements</a></h2>
+<p class="Pp">Comme décrit ci-dessus, il y a des avantages en performance à avoir une API qui rapporte les achèvements ou fournit d'autres types de notifications à l'aide d'une file d'événements. Un type de file d'événements très simple suit simplement les opérations terminées. Lorsque des données sont reçues ou qu'un envoi se termine, une entrée est écrite dans la file d'événements.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Direct_Hardware_Access'><a class='permalink' href='#Direct_Hardware_Access'>Accès direct au matériel</a></h2>
+<p class="Pp">Lors de la discussion sur la couche réseau, la plupart des implémentations logicielles font référence aux modules du noyau responsables de la mise en œuvre des protocoles de transport et de réseau nécessaires. Cependant, si nous voulons que la latence du réseau approche des vitesses inférieures à la microseconde, nous devons alors supprimer autant de logiciels que possible entre l'application et son accès au matériel. Une façon de faire cela est de donner à l'application un accès direct aux files de commandes du contrôleur d'interface réseau. De même, la NIC nécessite un accès direct aux tampons de données et aux structures de contrôle de l'application, comme les <p> des files d'achèvement.</p>
+ <p class="Pp">Notez que lorsque nous parlons d'une application ayant un accès direct au matériel réseau, nous faisons référence au processus de l'application. Naturellement, il est très peu probable qu'un développeur d'applications code pour une carte réseau (NIC) matérielle spécifique. Ce travail serait laissé à une sorte de bibliothèque réseau spécifiquement ciblée sur la NIC. La couche réseau réelle, qui implémente le transport réseau, pourrait faire partie de la bibliothèque réseau ou être déchargée sur le matériel ou le micrologiciel de la NIC.</p>
+</section>
+<section class="Ss">
+ <h2 class="Ss" id='Kernel_Bypass'><a class='permalink' href='#Kernel_Bypass'>Contournement   du noyau</a></h2>
+ <p class="Pp">Le contournement du noyau est une fonctionnalité qui permet à l'application d'éviter d'appeler le noyau pour les opérations de transfert de données. Ceci est possible lorsqu'elle a un accès direct au matériel de la NIC. Un contournement complet du noyau est irréalisable en raison de problèmes de sécurité et de contraintes de gestion des ressources. Cependant, il est possible d'éviter les appels au noyau pour ce que l'on appelle les opérations de « chemin rapide » (fast-path), telles que l'envoi ou la réception.</p>
+ <p class="Pp">Pour des raisons de sécurité et de stabilité, les noyaux des systèmes d'exploitation ne peuvent pas se fier aux données provenant des applications de l'espace utilisateur. Par conséquent, même un simple appel au noyau nécessite souvent l'acquisition et la libération de verrous, couplées à des vérifications de données. Si nous pouvons limiter les effets d'une application mal écrite ou malveillante à son propre espace de processus, nous pouvons éviter la surcharge qui accompagne la validation du noyau sans impacter la stabilité du système.</p>
+</section>
+<section class="Ss">
+ <h2 class="Ss" id='Direct_Data_Placement'><a class='permalink' href='#Direct_Data_Placement'>Placement   direct des données</a></h2>
+ <p class="Pp">Le placement direct des données signifie éviter les copies de données lors de l'envoi et de la réception de données, ainsi que placer les données reçues dans le bon tampon mémoire là où elles sont nécessaires. À plus grande échelle, cela fait partie de l'accès direct au matériel, l'application et la NIC communiquant directement avec des tampons mémoire partagés et des files d'attente.</p>
+ <p class="Pp">Le placement direct des données est souvent évoqué par ceux qui connaissent le RDMA - accès direct à la mémoire à distance (remote direct memory access). Le RDMA est une technique qui permet de lire et d'écrire dans la mémoire appartenant à un processus pair s'exécutant sur un nœud distant sur le réseau. Le matériel RDMA avancé est capable d'accéder aux tampons mémoire cibles sans impliquer l'exécution du processus pair. Le RDMA repose sur le déchargement du transport réseau sur la NIC afin d'éviter d'interrompre le processus cible.</p>
+ <p class="Pp">Les principaux avantages du support du placement direct des données sont d'éviter les copies mémoire et de minimiser la surcharge de traitement.</p>
+</section>
+</section>
+<section class="Sh">
+ <h1 class="Sh" id='Conception_d_interfaces_pour_la_performance'><a class='permalink' href='#Conception_d_interfaces_pour_la_performance'>Conception   d'interfaces pour la performance</a></h1>
+ <p class="Pp">Nous voulons concevoir une interface réseau capable de répondre aux exigences décrites ci-dessus. De plus, nous voulons également tenir compte des performances de l'interface elle-même. Il n'est souvent pas évident de savoir comment une interface peut affecter négativement les performances, par rapport aux performances résultant de l'implémentation sous-jacente. Les sections suivantes décrivent comment les choix d'interface peuvent impacter les performances. Bien entendu, lorsque nous commencerons à définir les API réelles qu'une application utilisera, nous devrons faire des compromis entre les performances brutes et la facilité d'utilisation lorsque cela est judicieux.</p>
+ <p class="Pp">Lorsque nous considérons les objectifs de performance d'une API, nous devons tenir compte des cas d'utilisation cibles de l'application. Aux fins de cette discussion, nous voulons considérer des applications qui communiquent avec des milliers à des millions de processus pairs. Les transferts de données comprendront des millions de petits messages par seconde par pair, et des transferts importants pouvant atteindre des gigaoctets de données. À de telles échelles extrêmes, même de petites optimisations sont mesurables, en termes de performances et de consommation d'énergie. Si nous avons un million de pairs envoyant un million de messages par seconde, éliminer ne serait-ce qu'une seule instruction du chemin de code se multiplie rapidement pour économiser des milliards d'instructions par seconde sur l'exécution globale, lorsque l'on considère le fonctionnement de l'application entière.</p>
+ <p class="Pp">Nous nous référons une fois de plus à l'API des sockets dans le cadre de cette discussion afin d'illustrer comment une API peut affecter les performances.</p>
+ <dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+   <pre>/* Prototypes de fonctions de sockets notables */
+/* Fonctions de « contrôle » */
+int socket(int domain, int type, int protocol);
+int bind(int socket, const struct sockaddr *addr, socklen_t addrlen);
+int listen(int socket, int backlog);
+int accept(int socket, struct sockaddr *addr, socklen_t *addrlen);
+int connect(int socket, const struct sockaddr *addr, socklen_t addrlen);
+int shutdown(int socket, int how);
+int close(int socket);
+/* Opérations de données « chemin rapide » - envoi uniquement (appels de réception non montrés) */
+ssize_t send(int socket, const void *buf, size_t len, int flags);
+ssize_t sendto(int socket, const void *buf, size_t len, int flags,
+    const struct sockaddr *dest_addr, socklen_t addrlen);
+ssize_t sendmsg(int socket, const struct msghdr *msg, int flags);
+ssize_t write(int socket, const void *buf, size_t count);
+ssize_t writev(int socket, const struct iovec *iov, int iovcnt);
+/* Opérations de données « indirectes » */
+int poll(struct pollfd *fds, nfds_t nfds, int timeout);
+int select(int nfds, fd_set *readfds, fd_set *writefds,
+    fd_set *exceptfds, struct timeval *timeout);
+</pre>
+  </dd>
+ </dl>
+ <p class="Pp">En examinant cette liste, il y a quelques caractéristiques à noter. Premièrement, il existe plusieurs appels qui peuvent être utilisés pour envoyer des données, ainsi que plusieurs appels qui peuvent être utilisés pour attendre qu'un socket non bloquant devienne prêt. Ceci sera discuté plus en détail par la suite. Deuxièmement, les opérations ont été divisées en différents groupes (terminologie qui nous est propre). Les opérations de contrôle sont les fonctions que l'application invoque rarement pendant l'exécution. Elles ne se produisent souvent que dans le cadre de l'initialisation.</p>
+ <p class="Pp">Les opérations de données, en revanche, peuvent être appelées des centaines à des millions de fois au cours de la vie d'une application. Elles traitent directement ou indirectement du transfert ou de la réception de données sur le réseau. Les opérations de données peuvent être divisées en deux groupes. Les appels de chemin rapide interagissent avec la pile réseau pour envoyer ou recevoir immédiatement des données. Afin d'atteindre une bande passante élevée et une faible latence, ces opérations doivent être aussi rapides que possible. Les opérations qui ne sont pas en chemin rapide mais qui traitent toujours des transferts de données sont ces appels qui, bien que toujours fréquemment appelés par l'application, ne sont pas aussi critiques en termes de performances. Par exemple, les appels select() et poll() sont utilisés pour bloquer un thread d'application jusqu'à ce qu'un socket soit prêt. Comme ces appels suspendent l'exécution du thread, les performances sont une préoccupation moindre. (Les performances de ces opérations sont toujours préoccupantes, mais le coût de l'exécution de l'ordonnanceur du système d'exploitation submerge tous les gains de performance, sauf les plus substantiels.)</p>
+ <section class="Ss">
+  <h2 class="Ss" id='Call_Setup_Costs'><a class='permalink' href='#Call_Setup_Costs'>Coûts   de configuration des appels</a></h2>
+  <p class="Pp">La quantité de travail qu'une application doit effectuer avant d'émettre une opération de transfert de données peut affecter les performances, en particulier les taux de messages. De toute évidence, plus une application doit pousser de paramètres sur la pile pour appeler une fonction, plus son nombre d'instructions augmente. Cependant, remplacer les variables de pile par une seule structure de données n'aide pas à réduire les coûts de configuration.</p>
+  <p class="Pp">Supposons qu'une application souhaite envoyer un seul tampon de données d'une taille donnée à un pair. Si nous examinons l'API des sockets, l'appel write() est le mieux adapté à une telle opération. Cet appel ne prend que les valeurs nécessaires pour effectuer le transfert de données. L'appel send() est un second choix proche, et send() est un nom de fonction plus naturel pour la communication réseau, mais send() nécessite un argument supplémentaire par rapport à write(). D'autres fonctions sont encore pires en termes de coûts de configuration. La fonction sendmsg(), par exemple, exige que l'application formate une structure de données, dont l'adresse est passée à l'appel. Cela nécessite beaucoup plus d'instructions de la part de l'application si cela est fait pour chaque transfert de données.</p>
+  <p class="Pp">Même si toutes les autres fonctions d'envoi peuvent être remplacées par sendmsg(), il est utile de disposer de plusieurs moyens pour que l'application émette des requêtes d'envoi. Non seulement les autres appels sont plus faciles à lire et à utiliser (ce qui réduit les coûts de maintenance logicielle), mais ils peuvent également améliorer les performances.</p>
+ </section>
+ <section class="Ss">
+  <h2 class="Ss" id='Branches_and_Loops'><a class='permalink' href='#Branches_and_Loops'>Branchements   et boucles</a></h2>
+  <p class="Pp">Lors de la conception d'une API, les développeurs tiennent rarement compte de la manière dont l'API impacte l'implémentation sous-jacente. Cependant, la sélection des paramètres de l'API peut obliger l'implémentation sous-jacente à ajouter des branchements ou à utiliser des boucles de contrôle. Considérez la différence entre les appels write() et writev(). Ce dernier passe un tableau de vecteurs d'E/S, qui peuvent être traités à l'aide d'une boucle telle que celle-ci:</p>
+  <dl class="Bl-tag">
+   <dt></dt>
+   <dd>
+    <pre>/* Exemple d'implémentation pour le traitement d'un tableau */
+for (i = 0; i &lt; iovcnt; i++) {
+    ...
+}
+</pre>
+   </dd>
+  </dl>
+  <p class="Pp">Pour traiter le tableau iovec, la construction logicielle naturelle serait d'utiliser une boucle pour itérer sur les entrées. Les boucles entraînent un traitement supplémentaire. Typiquement, une boucle nécessite l'initialisation d'une variable de contrôle de boucle (par exemple, i = 0), ajoute des opérations ALU (par exemple, i++) et une comparaison (par exemple, i &lt; iovcnt). Cette surcharge est nécessaire pour gérer un nombre arbitraire d'entrées iovec. Si le cas courant est que l'application souhaite envoyer un seul tampon de données, write() est une meilleure option.</p>
+  <p class="Pp">En plus des boucles de contrôle, une API peut amener l'implémentation à avoir besoin de branchements. Les branchements peuvent modifier le flux d'exécution d'un programme, impactant les techniques de pipelining du processeur. La prédiction de branchement du processeur aide à atténuer ce problème. Cependant, bien que la prédiction de branchement puisse être correcte près de 100 % du temps lors de l'exécution d'un micro-benchmark, tel qu'un test de bande passante ou de latence réseau, avec un trafic réseau plus réaliste, l'impact peut devenir mesurable.</p>
+  <p class="Pp">Nous pouvons facilement voir comment une API peut introduire des branchements dans le flux de code si nous examinons l'appel send(). Send() prend un paramètre de drapeaux supplémentaire par rapport à l'appel write(). Cela permet à l'application de modifier le comportement de send(). Du point de vue de l'implémentation de send(), le paramètre de drapeaux doit être vérifié. Dans le meilleur des cas, cela ajoute une vérification supplémentaire (les drapeaux sont non nuls). Dans le pire des cas, chaque drapeau valide peut nécessiter une vérification distincte, ce qui entraîne potentiellement des dizaines de vérifications.</p>
+  <p class="Pp">Dans l'ensemble, l'API des sockets est bien conçue en tenant compte de ces implications de performance. Elle fournit des appels complexes lorsque cela est nécessaire, avec des fonctions plus simples disponibles qui peuvent éviter une partie de la surcharge inhérente à d'autres appels.</p>
+ </section>
+ <section class="Ss">
+  <h2 class="Ss" id='Command_Formatting'><a class='permalink' href='#Command_Formatting'>Formatage   des commandes</a></h2>
+  <p class="Pp">L'objectif final de l'invocation d'une fonction réseau est de transférer des données depuis ou vers le réseau. Dans cette section, nous descendons tout en bas de la pile logicielle vers le composant responsable de l'accès direct au matériel. C'est ce qu'on appelle généralement le pilote réseau, et son implémentation est souvent liée à une pièce matérielle spécifique, ou à une série de NIC d'un même fournisseur matériel.</p>
+  <p class="Pp">Afin de</p>
+pour signaler à une carte réseau (NIC) qu'elle doit lire un tampon de mémoire et copier ces données sur le réseau, le pilote logiciel doit généralement écrire une sorte de commande vers la NIC. Afin de limiter la complexité et le coût du matériel, une NIC peut ne prendre en charge que quelques formats de commande. Cela diffère des interfaces logicielles que nous avons discutées, où nous pouvons avoir différentes API de complexité variable afin de réduire la surcharge. Il peut y avoir des coûts importants associés au formatage de la commande et à sa publication vers le matériel.</p>
+<p class="Pp">Avec une NIC standard, la commande est formatée par un pilote du noyau. Ce pilote se trouve au bas de la pile réseau et traite les requêtes provenant de plusieurs applications. Il doit généralement formater chaque commande seulement après qu'une requête a traversé la pile réseau.</p>
+<p class="Pp">Avec les appareils qui sont directement accessibles par une seule application, il existe des opportunités d'utiliser des structures de commandes pré-formatées. Plus la commande peut être initialisée avant que l'application ne soumette une requête réseau, plus le processus est simplifié et meilleure est la performance.</p>
+<p class="Pp">Par exemple, une NIC doit avoir l'adresse de destination comme partie d'une opération d'envoi. Si une application envoie à un seul pair, cette information peut être mise en cache et faire partie d'un en-tête réseau pré-formaté. Cela n'est possible que si le pilote de la NIC sait que la destination ne changera pas entre les envois. Plus le pilote peut être proche de l'application, plus les chances d'optimisation sont grandes. Une approche optimale est que le pilote fasse partie d'une bibliothèque qui s'exécute entièrement dans l'espace de processus de l'application.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Memory_Footprint'><a class='permalink' href='#Memory_Footprint'>Empreinte   Mémoire</a></h2>
+<p class="Pp">Les préoccupations concernant l'empreinte mémoire sont les plus notables parmi les applications de calcul haute performance (HPC) qui communiquent avec des milliers de pairs. Une consommation mémoire excessive impacte la scalabilité de l'application, limitant le nombre de pairs qui peuvent fonctionner en parallèle pour résoudre des problèmes. Il y a souvent un compromis entre la minimisation de l'empreinte mémoire nécessaire pour la communication réseau, les performances de l'application et la facilité d'utilisation de l'interface réseau.</p>
+<p class="Pp">Comme nous l'avons discuté avec la sémantique de l'API socket, une partie de la facilité d'utilisation des sockets vient du fait que la couche réseau copie le tampon de l'utilisateur dans un tampon interne appartenant à la pile réseau. La quantité de tamponnement interne mise à disposition de l'application est directement corrélée à la bande passante qu'une application peut atteindre. En général, un tamponnement interne plus important augmente les performances du réseau, au prix d'une augmentation de l'empreinte mémoire consommée par l'application. Cette empreinte mémoire existe indépendamment de la quantité de mémoire allouée directement par l'application. Éliminer le tamponnement réseau aide non seulement les performances, mais aussi la scalabilité, en réduisant l'empreinte mémoire nécessaire pour prendre en charge l'application.</p>
+<p class="Pp">Alors que le tamponnement mémoire réseau augmente à mesure qu'une application évolue, il peut souvent être configuré à une taille fixe. La quantité de tamponnement nécessaire dépend du nombre de flux de communication actifs utilisés à un moment donné. Ce nombre est souvent nettement inférieur au nombre total de pairs avec lesquels une application peut avoir besoin de communiquer. La quantité de mémoire requise pour <i>adresser</i> les pairs, cependant, a généralement une relation linéaire avec le nombre total de pairs.</p>
+<p class="Pp">Avec l'API socket, chaque pair est identifié en utilisant une struct sockaddr. Si nous considérons une application socket basée sur UDP utilisant des adresses IPv4, un pair est identifié par l'adresse suivante.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>/* IPv4 socket address - with typedefs removed */
+struct sockaddr_in {
+    uint16_t sin_family; /* AF_INET */
+    uint16_t sin_port;
+    struct {
+        uint32_t sin_addr;
+    } in_addr;
+};
+</pre>
+  </dd>
+</dl>
+<p class="Pp">Au total, l'application nécessite 8 octets d'adressage pour chaque pair. Si l'application communique avec un million de pairs, cela explose à environ 8 Mo d'espace mémoire consommé juste pour maintenir la liste d'adresses. Si l'adressage IPv6 est nécessaire, alors l'exigence augmente d'un facteur 4.</p>
+<p class="Pp">Heureusement, il existe quelques astuces qui peuvent être utilisées pour aider à réduire l'empreinte mémoire d'adressage, bien que cela introduise plus d'instructions dans le chemin d'accès au code pour accéder à la pile réseau. Par exemple, nous pouvons remarquer que toutes les adresses dans l'exemple ci-dessus ont la même valeur sin_family (AF_INET). Il n'y a pas besoin de stocker cela pour chaque adresse. Cela réduit potentiellement chaque adresse de 8 octets à 6. (Nous pouvons être laissés avec des données non alignées, mais c'est un compromis pour réduire la consommation mémoire). Selon la façon dont les adresses sont attribuées, une réduction supplémentaire peut être possible. Par exemple, si l'application utilise le même ensemble d'adresses de port sur chaque nœud, alors nous pouvons éliminer le stockage du port, et au lieu de cela le calculer à partir d'une certaine valeur de base. Ce type d'astuce peut être appliqué à la partie IP de l'adresse si l'application a la chance de fonctionner sur des adresses IP séquentielles.</p>
+<p class="Pp">Le principal problème avec ce type de réduction d'adresse est qu'il est difficile à réaliser. Cela nécessite que chaque application vérifie et gère la compression d'exposition, exposant l'application au format d'adressage utilisé par la pile réseau. Il faut garder à l'esprit que les adresses TCP/IP et UDP/IP sont des adresses logiques, pas physiques. Lors de l'exécution sur Ethernet, les adresses qui apparaissent à la couche liaison sont des adresses MAC, pas des adresses IP. L'association IP à MAC est gérée par le logiciel réseau. Nous aimerions fournir un adressage qui est simple pour une application à utiliser, mais qui peut en même temps fournir une empreinte mémoire minimale.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Communication_Resources'><a class='permalink' href='#Communication_Resources'>Ressources   de Communication</a></h2>
+<p class="Pp">Nous avons besoin de faire une brève pause dans la discussion afin de nous plonger plus profondément dans l'espace des problèmes et des solutions réseau. Au lieu de continuer à penser à un socket comme une entité unique, avec à la fois des capacités d'envoi et de réception, nous voulons considérer ses composants séparément. Un socket réseau peut être vu comme trois constructions de base : une adresse de niveau transport, une file d'attente d'envoi ou de transmission, et une file de réception. Parce que notre discussion va commencer à pivoter loin de la sémantique pure des sockets, nous appellerons notre `socket' réseau un point de terminaison (endpoint).</p>
+<p class="Pp">Afin de réduire l'empreinte mémoire d'une application, nous devons considérer des fonctionnalités qui tombent en dehors de l'API socket. Jusqu'ici, une grande partie de la discussion a été autour de l'envoi de données à un pair. Nous voulons maintenant nous concentrer sur les meilleurs mécanismes pour recevoir des données.</p>
+<p class="Pp">Avec les sockets, lorsqu'une application a des données à recevoir (indiquées, par exemple, par un événement POLLIN), nous appelons recv(). La pile réseau copie les données reçues dans son tampon et retourne. Si nous voulons éviter la copie de données côté réception, nous avons besoin d'un moyen pour l'application de poster ses tampons à la pile réseau <i>avant</i> que les données n'arrivent.</p>
+<p class="Pp">On peut dire qu'une façon naturelle d'étendre l'API socket pour prendre en charge cette fonctionnalité est d'avoir chaque appel à recv() qui poste simplement le tampon à la couche réseau. À mesure que les données sont reçues, les tampons de réception sont retirés dans l'ordre où ils ont été postés. Les données sont copiées dans le tampon posté et retournées à l'utilisateur. Il serait noté que la taille du tampon de réception posté peut être plus grande (ou plus petite) que la quantité de données reçues. Si l'espace de tampon disponible est plus grand, hypothétiquement, la couche réseau pourrait attendre un court moment pour voir si plus de données arrivent. Si rien de plus n'arrive, la réception se termine avec le tampon retourné à l'application.</p>
+<p class="Pp">Cela soulève un problème concernant la manière de gérer le tamponnement côté réception. Jusqu'ici, avec les sockets, nous avons principalement considéré un protocole de flux. Cependant, de nombreuses applications traitent des messages qui se retrouvent superposés sur le flux de données. Si elles envoient un message de 8 Ko, elles veulent que le récepteur reçoive un message de 8 Ko. Les limites de messages doivent être maintenues.</p>
+<p class="Pp">Si une application envoie et reçoit un message de taille fixe, l'allocation de tampon devient triviale. L'application peut poster X nombre de tampons, chacun d'une taille optimale. Cependant, s'il y a un large mélange de tailles de messages, des difficultés surgissent. Il n'est pas rare qu'une application ait 80% de ses messages de quelques centaines d'octets ou moins, mais 80% des données totales qu'elle envoie dans de grands transferts qui sont, disons, un mégaoctet ou plus. Poster à l'avance des tampons de réception dans une telle situation est difficile.</p>
+<p class="Pp">Une technique couramment utilisée pour gérer cette situation est d'implémenter un protocole de niveau application pour les plus petits messages, et d'utiliser un protocole séparé pour les transferts plus grands qu'un certain seuil donné. Cela permettrait à une application de poster un tas de plus petits messages, disons 4 Ko, pour recevoir des données. Pour les transferts plus grands que 4 Ko, un protocole de communication différent est utilisé, possiblement sur un socket ou un point de terminaison différent.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Shared_Receive_Queues'><a class='permalink' href='#Shared_Receive_Queues'>Files de Réception Partagées</a></h2>
+<p class="Pp">Si une application pré-poste des tampons de réception à une file réseau, elle doit équilibrer la taille de chaque tampon posté, le nombre de tampons postés à chaque file, et le nombre de files utilisées. Avec une approche semblable à celle des sockets, chaque socket maintiendrait une file de réception indépendante où les données sont placées. Si une application utilise 1000 points de terminaison et poste 100 tampons, chacun de 4 Ko, cela résulte en 400 Mo d'espace mémoire consommés pour recevoir des données. (Nous commençons à réaliser qu'en éliminant les copies mémoire, l'un des compromis est une consommation mémoire accrue.) Bien que 400 Mo semble être beaucoup de mémoire, il y a moins d'un demi-mégaoctet alloué à une seule file de réception. Aux vitesses réseau actuelles, cette quantité d'espace peut être consommée en quelques millisecondes. Le résultat est que si seulement quelques points de terminaison sont utilisés, l'application connaîtra de longs délais où le contrôle de flux interviendra et ralentira les transferts.</p>
+<p class="Pp">Il y a quelques observations que nous pouvons faire ici. La première est que pour atteindre une haute scalabilité, nous devons nous éloigner d'un protocole orienté connexion, comme les sockets de flux. Deuxièmement, nous devons réduire le nombre de files de réception qu'une application utilise.</p>
+<p class="Pp">Une file de réception partagée est une file réseau qui peut recevoir des données pour beaucoup de points de terminaison différents à la fois. Avec les files de réception partagées, nous n'associons plus une file de réception à une adresse de transport spécifique. Au lieu de cela, les données réseau cibleront une adresse de point de terminaison spécifique. À mesure que les données arrivent, le point de terminaison retirera une entrée de la file de réception partagée, placera les données dans le tampon posté par l'application, et le retournera à l'utilisateur. Les files de réception partagées peuvent grandement réduire la quantité d'espace de tampon nécessaire par les applications. Dans l'exemple précédent, si une file de réception partagée était utilisée, l'application pourrait poster 10 fois le nombre de tampons (1000 au total), pourtant consommer 100 fois moins de mémoire (4 Mo au total). C'est bien plus scalable. L'inconvénient est que l'application doit maintenant être consciente des files de réception et des files de réception partagées, plutôten considérant le réseau uniquement au niveau d'un socket.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Multi-Receive_Buffers'><a class='permalink' href='#Multi-Receive_Buffers'>Tampons de réception
+    multiples</a></h2>
+<p class="Pp">Les files de réception partagées améliorent considérablement la
+    scalabilité des applications ; cependant, cela entraîne encore certaines
+    inefficacités telles que définies jusqu'ici. Nous n'avons considéré que le
+    cas de la publication d'une série de tampons mémoire de taille fixe sur la
+    file de réception. Comme mentionné, la détermination de la taille de
+    chaque tampon est difficile. Les transferts plus grands que la taille fixe
+    nécessitent l'utilisation d'un autre protocole pour être complétés. Si les
+    transferts sont généralement beaucoup plus petits que la taille fixe, alors
+    l'espace de tampon supplémentaire reste inutilisé.</p>
+<p class="Pp">En reprenant notre exemple, si l'application publie 1000 tampons, elle
+    ne peut recevoir que 1000 messages avant que la file ne soit vidée. À des
+    débits de données mesurés en millions de messages par seconde, cela
+    introduira des interruptions dans le flux de données. Une solution évidente
+    est d'augmenter le nombre de tampons publiés. Le problème est de gérer les
+    messages de taille variable, y compris certains qui ne font que quelques
+    centaines d'octets de long. Par exemple, si la taille moyenne du message
+    dans notre cas est de 256 octets ou moins, alors même si nous avons alloué
+    4 Mo d'espace de tampon, nous n'utilisons que 6 % de cet espace. Le reste
+    est gaspillé afin de gérer des messages qui ne peuvent atteindre que
+    occasionnellement 4 Ko.</p>
+<p class="Pp">Une deuxième optimisation que nous pouvons faire est de remplir chaque
+    tampon de réception publié à mesure que les messages arrivent. Ainsi, au
+    lieu qu'un tampon de 4 Ko soit retiré de l'utilisation dès qu'un seul
+    message de 256 octets arrive, il peut à la place recevoir jusqu'à 16
+    messages de 256 octets. Nous appelons cette fonctionnalité des tampons
+    « multi-réception ».</p>
+<p class="Pp">Avec les tampons multi-réception, au lieu de publier un ensemble de
+    tampons plus petits, nous publions un seul tampon plus grand, disons les 4
+    Mo entiers, d'un coup. À mesure que les données sont reçues, elles sont
+    placées dans le tampon publié. Contrairement aux flux TCP, nous maintenons
+    toujours les limites des messages. Les avantages ici sont doubles. Non
+    seulement la mémoire est utilisée plus efficacement, nous permettant de
+    recevoir plus de petits messages à la fois et des messages plus grands dans
+    l'ensemble, mais nous réduisons également le nombre d'appels de fonctions
+    que l'application doit faire pour maintenir son approvisionnement en
+    tampons de réception disponibles.</p>
+<p class="Pp">Lorsqu'ils sont combinés avec des files de réception partagées, les
+    tampons multi-réception aident à soutenir un tamponnement et un traitement
+    optimaux côté réception. L'inconvénient principal du support des tampons
+    multi-réception est que l'application ne sait pas nécessairement à l'avance
+    combien de messages peuvent être associés à un seul tampon mémoire publié.
+    Ceci est rarement un problème pour les applications.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Optimal_Hardware_Allocation'><a class='permalink' href='#Optimal_Hardware_Allocation'>Allocation
+    optimale du matériel</a></h2>
+<p class="Pp">Dans le cadre des considérations de scalabilité, nous devons non
+    seulement considérer les ressources de traitement et de mémoire du système
+    hôte, mais aussi l'allocation et l'utilisation du matériel de la carte
+    réseau (NIC). Nous avons qualifié les points de terminaison réseau de
+    combinaison d'adressage de transport, de files d'émission et de files de
+    réception. Ces deux dernières files sont souvent implémentées en tant que
+    files de commandes matérielles. Les files de commandes sont utilisées pour
+    signaler à la NIC d'effectuer un certain type de travail. Une file
+    d'émission indique que la NIC doit transférer des données. Une commande
+    d'émission contient souvent des informations telles que l'adresse du tampon
+    à transmettre, la longueur du tampon et les données d'adressage de
+    destination. Le format réel et le contenu des données varient en fonction
+    de l'implémentation matérielle.</p>
+<p class="Pp">Les NIC ont des ressources limitées. Seules les applications les plus
+    scalables et haute performance ont probablement besoin de s'inquiéter de
+    l'utilisation optimale du matériel de la NIC. Cependant, de telles
+    applications sont un focus important et spécifique de libfabric. La gestion
+    des ressources de la NIC est souvent gérée par une application de gestion
+    des ressources, qui est responsable de l'allocation de systèmes à des
+    applications concurrentes, entre autres activités.</p>
+<p class="Pp">Soutenir les applications qui souhaitent faire un usage optimal du
+    matériel nécessite que des abstractions liées au matériel soient exposées à
+    l'application. De telles abstractions ne peuvent pas exiger une
+    implémentation matérielle spécifique, et il faut veiller à ce que l'API
+    résultante reste utilisable par les développeurs peu familiers avec la
+    gestion de ces détails de bas niveau. Exposer des concepts tels que les
+    files de réception partagées est un exemple de la manière de donner à une
+    application plus de contrôle sur l'utilisation des ressources matérielles.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Sharing_Command_Queues'><a class='permalink' href='#Sharing_Command_Queues'>Partage des
+    files de commandes</a></h2>
+<p class="Pp">En exposant les files d'émission et de réception à l'application,
+    nous ouvrons la possibilité pour l'application qui utilise plusieurs points
+    de terminaison de déterminer comment ces files peuvent être partagées. Nous
+    avons parlé des avantages du partage d'une file de réception entre les
+    points de terminaison. Les avantages du partage des files d'émission ne
+    sont pas aussi évidents.</p>
+<p class="Pp">Une application qui utilise plus de points de terminaison adressables
+    qu'il n'y a de files d'émission devra partager les files d'émission entre
+    les points de terminaison. En contrôlant quel point de terminaison utilise
+    quelle file d'émission, l'application peut prioriser le trafic. Une file
+    d'émission peut également être configurée pour optimiser un type
+    spécifique de transfert de données, comme les transferts volumineux
+    uniquement.</p>
+<p class="Pp">Du point de vue d'une API logicielle, le partage de files d'émission
+    ou de réception implique d'exposer ces constructions à l'application et de
+    leur permettre d'être associées à différentes adresses de point de
+    terminaison.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Multiple_Queues'><a class='permalink' href='#Multiple_Queues'>Files
+    multiples</a></h2>
+<p class="Pp">L'opposé d'une file de commandes partagée sont les points de
+    terminaison qui ont plusieurs files. Une application qui peut tirer parti de
+    plusieurs files d'émission ou de réception peut augmenter le traitement
+    parallèle des messages sans contraintes de synchronisation. La capacité
+    d'utiliser plusieurs files de commandes via un seul point de terminaison a
+    des avantages par rapport à l'utilisation de plusieurs points de
+    terminaison. Plusieurs points de terminaison nécessitent des adresses
+    séparées, ce qui augmente l'utilisation de la mémoire. Un seul point de
+    terminaison avec plusieurs files peut continuer à exposer une seule
+    adresse, tout en tirant pleinement parti des ressources disponibles de la
+    NIC.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Progress_Model_Considerations'><a class='permalink' href='#Progress_Model_Considerations'>Considérations sur le modèle de
+    progression</a></h2>
+<p class="Pp">Un aspect de l'interface de programmation des sockets que les
+    développeurs ne considèrent souvent pas est l'emplacement de
+    l'implémentation du protocole. Cela est généralement géré par le noyau du
+    système d'exploitation. La pile réseau est responsable du traitement des
+    messages de contrôle de flux, de l'expiration des transferts, de la
+    retransmission des transferts non acquittés, du traitement des données
+    reçues et de l'envoi des accusés de réception. Ce traitement nécessite que
+    la pile réseau consomme des cycles CPU. Des parties de ce traitement peuvent
+    être effectuées dans le contexte du thread de l'application, mais beaucoup
+    doivent être gérées par des threads du noyau dédiés au traitement réseau.</p>
+<p class="Pp">En déplaçant le traitement réseau directement dans le processus de
+    l'application, nous devons nous soucier de la manière dont la communication
+    réseau progresse. Par exemple, comment et quand les accusés de réception
+    sont-ils envoyés ? Comment les expirations et les retransmissions de
+    messages sont-elles gérées ? Le modèle de progression définit ce
+    comportement, et il dépend de la quantité de traitement réseau qui a été
+    déchargée sur la NIC.</p>
+<p class="Pp">Plus généralement, la progression est la capacité de l'implémentation
+    réseau sous-jacente à terminer le traitement d'une requête asynchrone. Dans
+    de nombreux cas, le traitement d'une requête asynchrone nécessite
+    l'utilisation du processeur hôte. Pour des raisons de performance, il peut
+    être indésirable pour le fournisseur d'allouer un thread à cette fin, qui
+    entrerait en concurrence avec le(s) thread(s) de l'application. Nous pouvons
+    éviter les changements de contexte de thread si le thread de l'application
+    peut être utilisé pour faire progresser les requêtes – vérifier les accusés
+    de réception, réessayer les opérations expirées, etc. Cela nécessite que
+    l'application appelle périodiquement la pile réseau.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Ordering'><a class='permalink' href='#Ordering'>Ordre</a></h2>
+<p class="Pp">L'ordre réseau est un sujet complexe. Avec les sockets TCP, les
+    données sont envoyées et reçues dans le même ordre. Les tampons sont
+    réutilisables par l'application immédiatement après le retour d'un appel de
+    fonction. Par conséquent, l'ordre est simple à comprendre et à utiliser.
+    Les sockets UDP compliquent légèrement les choses. Avec les sockets UDP,
+    les messages peuvent être reçus hors de l'ordre dans lequel ils ont été
+    envoyés. En pratique, cela ne se produit souvent pas, en particulier si
+    l'application ne communique que sur un réseau local, comme Ethernet.</p>
+<p class="Pp">Avec notre API réseau en évolution, il y a des situations où l'exposition
+    de sémantiques d'ordre différentes peut améliorer les performances. Ces
+    détails seront discutés plus en détail ci-dessous.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Messages'><a class='permalink' href='#Messages'>Messages</a></h2>
+<p class="Pp">Les sockets UDP permettent aux messages d'arriver hors de l'ordre
+    car chaque message est acheminé du destinataire à l'émetteur de manière
+    indépendante. Cela permet aux paquets de prendre des chemins réseau
+    différents, pour éviter la congestion ou tirer parti de plusieurs liens
+    réseau pour une bande passante améliorée. Nous aimerions tirer parti des
+    mêmes fonctionnalités dans les cas où l'application ne se soucie pas de
+    l'ordre dans lequel les messages arrivent.</p>
+<p class="Pp">Cependant, contrairement aux sockets UDP, notre définition de l'ordre
+    des messages est plus subtile. Les messages UDP sont de petits paquets de
+    la taille de l'MTU. Dans notre cas, les messages peuvent atteindre plusieurs
+    gigaoctets. Nous définissons l'ordre des messages pour indiquer si le début
+    de chaque message est traité dans l'ordre ou hors de l'ordre. Cela est lié
+    mais distinct de l'ordre dans lequel le contenu du message est reçu.</p>
+<p class="Pp">Un exemple aidera à clarifier cette distinction. Supposons qu'une
+    application a publié deux messages sur sa file de réception. La première
+    réception pointe vers un tampon de 4 Ko. La deuxième réception pointe vers
+    un tampon de 64 Ko. L'émetteur transmettra un message de 4 Ko suivi d'un
+    message de 64 Ko. Si les messages sont traités dans l'ordre, alors l'envoi
+    de 4 Ko correspondra à la réception de 4 Ko, et l'envoi de 64 Ko
+    correspondra à la réception de 64 Ko. Cependant, si les messages peuvent
+    être traités hors de l'ordre, alors les envois et les réceptions peuvent ne
+    pas correspondre, ce qui entraîne la troncature de l'envoi de 64 Ko.</p>
+<p class="Pp">Dans cet exemple, nous ne nous soucions pas de l'ordre dans lequel les
+    données sont reçues. L'envoi de 64 Ko pourrait être divisé en 64 transferts
+    de 1 Ko qui prennent des routes différentes vers la destination. Ainsi, les
+    octets 2k-3k pourraient être reçus avant les octets 1k-2k. L'ordre des
+    messages ne concerne pas l'ordre
+    <i>à l'intérieur</i> d'un message, mais seulement <i>entre</i> les messages. Avec des messages ordonnés, les messages eux-mêmes
+    doivent être traités dans l'ordre.</p>
+<p class="Pp">Plus l'ordre des messages peut être détendu, plus la pile réseau peut
+    utiliser d'optimisations pour transférer les données. Cependant, l'application
+    doit être consciente de la sémantique de l'ordre des messages et être
+    capable de sélectionner la sémantique souhaitée pour ses besoins. Aux fins
+    de cette section, messages fait référence aux opérations au niveau du
+    transport, ce qui inclut RDMA et des opérations similaires (certaines
+    n'ayant pas encore été discutées).</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Data'><a class='permalink' href='#Data'>Données</a></h2>
+<p class="Pp">L'ordre des données fait référence à la réception et le placement des données à la fois
+    <i>au sein et entre</i> les messages. L'ordre des données est particulièrement important pour les
+    messages susceptibles de mettre à jour le même tampon mémoire cible. Par exemple,
+    imaginez une application qui écrit une série d'enregistrements de base de données
+    directement dans une zone mémoire du pair. L'ordre des données, combiné à l'ordre
+    des messages, garantit que les données de la deuxième écriture mettent à jour la
+    mémoire après que la première écriture soit terminée. Le résultat est que la zone
+    mémoire contiendra les enregistrements portés par la deuxième écriture.</p>
+<p class="Pp">Faire respecter l'ordre des données entre les messages nécessite que les
+    messages eux-mêmes soient ordonnés. L'ordre des données peut également s'appliquer
+    au sein d'un seul message, bien que ce niveau d'ordre soit généralement moins
+    important pour les applications. L'ordre des données intra-message indique que les
+    données d'un message unique sont reçues dans l'ordre. Certaines applications
+    utilisent cette fonctionnalité pour « tourner » en lisant le dernier octet d'un
+    tampon de réception. Une fois que l'octet change, l'application sait que
+    l'opération est terminée et que toutes les données précédentes ont été reçues.
+    (Notez que bien qu'un tel comportement soit intéressant à des fins de mesure de
+    performance, l'utilisation d'une telle fonctionnalité de cette manière est fortement
+    déconseillée. Elle n'est pas portable entre les réseaux ou les plateformes.)</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Completions'><a class='permalink' href='#Completions'>Complétions</a></h2>
+<p class="Pp">L'ordre des complétions fait référence à la séquence dans laquelle les
+    opérations asynchrones signalent leur complétion à l'application. Typiquement, le
+    transfert de données non fiable se termine naturellement dans l'ordre où elles
+    sont soumises à une file de transmission. Chaque opération est transmise au réseau,
+    la complétion survenant immédiatement après. Pour les transferts de données
+    fiables, une opération ne peut se terminer tant qu'elle n'a pas été accusée de
+    réception par le pair. Puisque les paquets d'accusé de réception peuvent être perdus
+    ou emprunter potentiellement des chemins différents à travers le réseau, les
+    opérations peuvent être marquées comme terminées hors de l'ordre. Des accusés de
+    réception hors de l'ordre sont plus probables si les messages peuvent être traités
+    hors de l'ordre.</p>
+<p class="Pp">Les interfaces asynchrones nécessitent que l'application suive ses requêtes
+    en attente. Le traitement des complétions hors de l'ordre peut augmenter la
+    complexité de l'application, mais permet d'optimiser l'utilisation du réseau.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='lifabric_Architecture'><a class='permalink' href='#lifabric_Architecture'>lifabric   Architecture</a></h1>
+<p class="Pp">Libfabric est bien architecturé pour prendre en charge les fonctionnalités
+    discutées précédemment. Pour plus d'informations sur l'architecture de libfabric,
+    consultez la section suivante du guide de programmation : fi_arch(7).</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHORS'><a class='permalink' href='#AUTHORS'>AUTEURS</a></h1>
+<p class="Pp">OpenFabrics.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2024-12-10</td>
+    <td class="foot-os">Manuel du programmeur Libfabric</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/libfabric/">extra/libfabric</a></dd>
+        <dt>Version :</dt>
+        <dd>2.3.1-1</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://ofiwg.github.io/libfabric/">https://ofiwg.github.io/libfabric/</a></dd>
+        <dt>Licences :</dt>
+        <dd>BSD-2-Clause OR GPL-2.0-or-later</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/libfabric/">/listing/extra/libfabric/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#OVERVIEW">VUE D'ENSEMBLE</a></li>
+        
+            <li><a href="#Review_of_Sockets_Communication">Rappel sur la communication par sockets</a></li>
+        
+            <li><a href="#High-Performance_Networking">Réseaux haute performance</a></li>
+        
+            <li><a href="#Designing_Interfaces_for_Performance">Concevoir des interfaces pour la performance</a></li>
+        
+            <li><a href="#lifabric_Architecture">Architecture lifabric</a></li>
+        
+            <li><a href="#AUTHORS">AUTEURS</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/fi_intro.7.en.txt">txt</a>, 
+        
+            <a href="/man/fi_intro.7.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible selon les termes de la <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               licence, à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

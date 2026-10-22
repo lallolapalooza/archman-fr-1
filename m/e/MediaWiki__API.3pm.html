@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>MediaWiki::API(3pm) — Pages man Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">MediaWiki__API(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-mediawiki-api/">perl-mediawiki-api</a></p>
+<p class="lic">Licences: GPL3</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">MediaWiki::API(3)</td>
+    <td class="head-vol">Documentation Perl contribuée par l'utilisateur</td>
+    <td class="head-rtitle">MediaWiki::API(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">MediaWiki::API - Fournit une interface Perl pour l'API MediaWiki
+    (<a href='https://www.mediawiki.org/wiki/API'>https://www.mediawiki.org/wiki/API</a>)</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VERSION'><a class='permalink' href='#VERSION'>VERSION</a></h1>
+<p class="Pp">Version 0.52</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<p class="Pp">Ce module fournit une interface entre Perl et l'API MediaWiki
+    (<a href='https://www.mediawiki.org/wiki/API'>https://www.mediawiki.org/wiki/API</a>) permettant la création de scripts pour
+    automatiser l'édition et l'extraction de données à partir de sites pilotés par
+    MediaWiki comme Wikipedia.</p>
+<pre>use MediaWiki::API;
+my $mw = MediaWiki::API-&gt;new();
+$mw-&gt;{config}-&gt;{api_url} = 'https://fr.wikipedia.org/w/api.php'; # Exemple pour Wikipedia en français
+# se connecter au wiki
+$mw-&gt;login( { lgname =&gt; 'nom_utilisateur', lgpassword =&gt; 'mot_de_passe' } )
+  || die $mw-&gt;{error}-&gt;{code} . ': ' . $mw-&gt;{error}-&gt;{details};
+# obtenir une liste d'articles dans une catégorie
+my $articles = $mw-&gt;list ( {
+  action =&gt; 'query',
+  list =&gt; 'categorymembers',
+  cmtitle =&gt; 'Catégorie:Perl',
+  cmlimit =&gt; 'max' } )
+  || die $mw-&gt;{error}-&gt;{code} . ': ' . $mw-&gt;{error}-&gt;{details};
+# et imprimer les titres des articles
+foreach (@{$articles}) {
+    print &quot;$_-&gt;{title}\n&quot;;
+}
+# obtenir des informations sur l'utilisateur
+my $userinfo = $mw-&gt;api( {
+  action =&gt; 'query',
+  meta =&gt; 'userinfo',
+  uiprop =&gt; 'blockinfo|hasmsg|groups|rights|options|editcount|ratelimits' } );
+  ...</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='FONCTIONS'><a class='permalink' href='#FONCTIONS'>FONCTIONS</a></h1>
+<section class="Ss">
+<h2 class="Ss">MediaWiki::API-&gt;new( $config_hashref )</h2>
+<p class="Pp">Retourne un objet API MediaWiki. Vous pouvez passer une configuration
+    sous forme de hashref lors de l'appel de new, ou définir la configuration plus
+    tard. Lors de la création d'un nouvel objet, les valeurs par défaut pour le
+    délai maximum et les nouvelles tentatives sont définies.</p>
+<pre>my $mw = MediaWiki::API-&gt;new( { api_url =&gt; 'https://fr.wikipedia.org/w/api.php' }  );</pre>
+<p class="Pp">Les options de configuration sont :</p>
+<ul class="Bl-bullet">
+  <li>api_url = 'Chemin vers api.php de MediaWiki' ;</li>
+  <li>files_url = 'URL de base pour les fichiers' ; (nécessaire si l'api renvoie une URL relative pour les images comme /images/a/picture.jpg)</li>
+  <li>upload_url = '<a href='https://fr.wikipedia.org/wiki/Spécial:Téléverser'>https://fr.wikipedia.org/wiki/Spécial:Téléverser</a>' ; (chemin vers la page spéciale de téléversement requise si vous souhaitez téléverser des images)</li>
+  <li>on_error = Référence de fonction à appeler si une erreur se produit dans le
+    module.</li>
+  <li>use_http_get = Booléen 0 ou 1 (par défaut 0). Si défini à 1, le module Perl
+      utilisera la méthode GET http pour accéder à l'api. Par défaut, il utilise
+      la méthode POST. Notez que le module utilisera toujours POST pour les appels
+      d'api qui nécessitent POST, quelle que soit la valeur de cette option de
+      configuration. Actuellement, les actions suivantes fonctionneront avec GET :
+      query, logout, paraminfo - voir la configuration get_actions ci-dessous.</li>
+  <li>get_actions = Hashref (par défaut { 'query' =&gt; 1, 'logout' =&gt; 1,
+      'paraminfo' =&gt; 1 } ). Ceci contient les actions de l'API qui sont prises
+      en charge par la méthode GET http si elle est activée. Certains wikis peuvent
+      avoir des extensions qui ajoutent plus de fonctions qui fonctionnent avec
+      une requête http GET. Si c'est le cas, vous pouvez ajouter des actions au
+      besoin.</li>
+  <li>retries = Valeur entière ; Le nombre de nouvelles tentatives pour envoyer une requête API si une erreur http ou une erreur de décodage JSON se produit. Par défaut 0 (essayer une seule fois - ne pas réessayer). Si max_retries est défini à 4 et que le wiki est indisponible, l'erreur ne sera signalée qu'après la 5ème tentative de connexion.</li>
+  <li>retry_delay = Valeur entière en secondes ; Le temps d'attente avant de réessayer une requête en cas d'erreur HTTP ou d'erreur de décodage JSON.</li>
+  <li>max_lag = Valeur entière en secondes ; Wikipedia fonctionne sur un cluster de bases de données et, par conséquent, des taux d'édition élevés entraînent un décalage des serveurs esclaves. Si cette option de configuration est définie, et que le décalage est supérieur à la valeur de max_lag, l'api attendra avant de réessayer la requête. 5 est une valeur recommandée. Plus d'informations sur ce sujet peuvent être trouvées sur
+      <a href='https://www.mediawiki.org/wiki/Manual:Maxlag_parameter'>https://www.mediawiki.org/wiki/Manual:Maxlag_parameter</a>. Notez que l'option de configuration inclut un trait de soulignement, donc faites correspondre le schéma de nommage des autres options de configuration.</li>
+  <li>max_lag_delay = Valeur entière en secondes ; Cette option de configuration spécifie le délai d'attente avant de réessayer une requête lorsque le serveur a signalé un décalage supérieur à la valeur de max_lag. Par défaut, il est de 5 si l'option de configuration max_lag est utilisée.</li>
+  <li>max_lag_retries = Valeur entière ; Le nombre de nouvelles tentatives pour envoyer une requête API si le serveur a signalé un décalage supérieur à la valeur de max_lag. Si le nombre maximum de nouvelles tentatives est atteint, une erreur est renvoyée. Définir ceci à une valeur négative comme -1 signifie que la requête est renvoyée jusqu'à ce que le max_lag des serveurs soit inférieur au seuil ou qu'une autre erreur se produise. Par défaut 4.</li>
+  <li>no_proxy = Booléen ; Défini à 1 pour désactiver l'utilisation de tout proxy défini dans l'environnement. Notez que par défaut, si vous avez des variables d'environnement proxy définies, le module tentera de les utiliser. Cette fonctionnalité a été ajoutée à la version 0.29. Les versions antérieures ignorent tous les paramètres proxy, mais vous pouvez le définir vous-même en appelant MediaWiki::API-&gt;{ua}-&gt;<b>env_proxy()</b> après avoir créé une nouvelle instance de la classe API. Plus d'informations sur env_proxy peuvent être trouvées sur
+      <a href='http://search.cpan.org/~gaas/libwww-perl-5.834/lib/LWP/UserAgent.pm#Proxy_attributes'>http://search.cpan.org/~gaas/libwww-perl-5.834/lib/LWP/UserAgent.pm#Proxy_attributes</a></li>
+</ul>
+<p class="Pp">Un exemple pour la configuration on_error pourrait être quelque chose
+    comme :</p>
+<pre>$mw-&gt;{config}-&gt;{on_error} = \&amp;on_error;
+sub on_error {
+  print &quot;Code d'erreur : &quot; . $mw-&gt;{error}-&gt;{code} . &quot;\n&quot;;
+  print $mw-&gt;{error}-&gt;{stacktrace}.&quot;\n&quot;;
+  die;
+}</pre>
+<p class="Pp">Les erreurs sont stockées dans
+    <span class="Li">$mw</span>-&gt;{error}-&gt;{code} avec plus d'informations dans
+    <span class="Li">$mw</span>-&gt;{error}-&gt;{details}.
+    <span class="Li">$mw</span>-&gt;{error}-&gt;{stacktrace} comprend les
+    détails et une trace de pile pour localiser d'où proviennent les problèmes (dans
+    un code qui utilise ce module, par exemple).</p>
+<p class="Pp">Les codes d'erreur sont les suivants :</p>
+<ul class="Bl-bullet">
+  <li>ERR_NO_ERROR = 0 (Aucune erreur)</li>
+  <li>ERR_CONFIG = 1 (Erreur de configuration)</li>
+  <li>ERR_HTTP = 2 (Erreur de connexion liée à HTTP)</li>
+  <li>ERR_API = 3 (Erreur renvoyée par l'API MediaWiki)</li>
+  <li>ERR_LOGIN = 4 (Erreur de connexion à MediaWiki)</li>
+  <li>ERR_EDIT = 5 (Erreur avec une fonction d'édition)</li>
+  <li>ERR_PARAMS = 6 (Erreur avec les paramètres passés à une fonction d'aide)</li>
+  <li>ERR_UPLOAD = 7 (Erreur avec la fonction de téléversement de fichiers)</li>
+  <li>ERR_DOWNLOAD = 8 (Erreur lors du téléchargement d'un fichier)</li>
+</ul>
+<p class="Pp">Autres paramètres et objets utiles dans l'objet MediaWiki::API :</p>
+<ul class="Bl-bullet">
+  <li>MediaWiki::API-&gt;{ua} = L'objet LWP::UserAgent. Vous pourriez le modifier pour obtenir ou modifier les cookies (MediaWiki::API-&gt;{ua}-&gt;cookie_jar) ou pour changer la chaîne UserAgent envoyée par ce module Perl (MediaWiki::API-&gt;{ua}-&gt;agent)</li>
+  <li>MediaWiki::API-&gt;{response} = L'objet de réponse dernier renvoyé par LWP::UserAgent après une requête API.</li>
+</ul>
+</section>
+<section class="Ss">
+<h2 class="Ss">MediaWiki::API-&gt;login( $query_hashref )</h2>
+<p class="Pp">Se connecte à un MediaWiki. Les paramètres sont ceux utilisés par l'API
+    MediaWiki (<a href='https://www.mediawiki.org/wiki/API:Login'>https://www.mediawiki.org/wiki/API:Login</a>). Renvoie un hashref avec certains
+    détails de connexion, ou undef en cas d'échec de connexion. Si Mediawiki demande
+    un LoginToken, la connexion est retentée, mais avec le token envoyé lors de la
+    première connexion. Les erreurs sont stockées dans MediaWiki::API-&gt;{error}-&gt;{code}
+    et MediaWiki::API-&gt;{error}-&gt;{details}.</p>
+<pre>my $mw = MediaWiki::API-&gt;new( { api_url =&gt; 'https://fr.wikipedia.org/w/api.php' }  );
+# se connecter au wiki
+$mw-&gt;login( {lgname =&gt; 'nom_utilisateur', lgpassword =&gt; 'mot_de_passe' } )
+  || die $mw-&gt;{error}-&gt;{code} . ': ' . $mw-&gt;{error}-&gt;{details};</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss">MediaWiki::API-&gt;api( $query_hashref, $options_hashref )</h2>
+<p class="Pp">Appelle l'interface API MediaWiki. Les paramètres sont passés sous forme de
+    hashref décrits sur la page de l'API MediaWiki
+    (<a href='https://www.mediawiki.org/wiki/API'>https://www.mediawiki.org/wiki/API</a>). Renvoie un hashref avec les résultats de
+    l'appel ou undef en cas d'échec, avec le code d'erreur et les détails stockés dans
+    MediaWiki::API-&gt;{error}-&gt;{code} et
+    MediaWiki::API-&gt;{error}-&gt;{details}. MediaWiki::API utilise le
+    module LWP::UserAgent pour envoyer les requêtes http à l'API MediaWiki. Après
+    tout appel API, l'objet de réponse renvoyé par LWP::UserAgent est disponible dans
+    <span class="Li">$mw</span>-&gt;{response}. Cette fonction ne modifiera PAS
+    le query_hashref d'entrée de quelque manière que ce soit.</p>
+<pre>binmode STDOUT, ':utf8';
+# obtenir le nom du site
+if ( my $ref = $mw-&gt;api( { action =&gt; 'query', meta =&gt; 'siteinfo' } ) ) {
+  print $ref-&gt;{query}-&gt;{general}-&gt;{sitename};
+}
+# liste des titres pour &quot;Albert Einstein&quot; dans différentes langues.
+my $titles </pre>
+</div>
+</section>
+
+            </article>
+            
+        </main>
+    </body>
+</html>
+= $mw-&gt;api( {
+  action =&gt; 'query',
+  titles =&gt; 'Albert Einstein',
+  prop =&gt; 'langlinks',
+  lllimit =&gt; 'max' } )
+  || die $mw-&gt;{error}-&gt;{code} . ': ' . $mw-&gt;{error}-&gt;{details};
+my ($pageid,$langlinks) = each ( %{ $titles-&gt;{query}-&gt;{pages} } );
+foreach ( @{ $langlinks-&gt;{langlinks} } ) {
+  print &quot;$_-&gt;{'*'}\n&quot;;
+}</pre>
+<p class="Pp">L'API de MediaWiki utilise UTF-8 et les chaînes de paramètres à 8
+    bits sont encodées automatiquement par l'appel API. Si vos paramètres sont
+    déjà en UTF-8, cela sera détecté et l'encodage sera ignoré. Si vos
+    paramètres contiennent pour une raison quelconque des données UTF-8 mais qu'aucun
+    indicateur UTF-8 n'est défini (c'est-à-dire que vous n'avez pas utilisé le
+    pragma &quot;use utf8;&quot;), vous devriez empêcher le ré-encodage en passant une
+    option skip_encoding =&gt; 1 dans le <span class="Li">$options_hash</span>. Par
+    exemple :</p>
+<pre>my $mw = MediaWiki::API-&gt;new();
+$mw-&gt;{config}-&gt;{api_url} = 'https://fr.wiktionary.org/w/api.php';
+my $query = {action =&gt; 'query',
+  list =&gt; 'categorymembers',
+  cmlimit =&gt; 'max'};
+$query-&gt;{cmtitle} =&quot;Cat\x{e9}gorie:moyen_fran\x{e7}ais&quot;; # chaîne latin1
+$mw-&gt;list ( $query ); # ok 
+$query-&gt;{cmtitle} = &quot;Cat&quot;. pack(&quot;U&quot;, 0xe9).&quot;gorie:moyen_fran&quot;.pack(&quot;U&quot;,0xe7).&quot;ais&quot;; # chaîne unicode
+$mw-&gt;list ( $query ); # ok
+$query-&gt;{cmtitle} =&quot;Cat\x{c3}\x{a9}gorie:moyen_fran\x{c3}\x{a7}ais&quot;;  # données unicode sans indicateur utf-8
+# $mw-&gt;list ( $query ); # PAS OK
+$mw-&gt;list ( $query, {skip_encoding =&gt; 1} ); # ok</pre>
+<p class="Pp">Si vous appelez une fonction API qui nécessite le téléchargement d'un
+    fichier, par exemple import ou upload, spécifiez le fichier à télécharger comme
+    un arrayref contenant le nom du fichier local. L'API peut renvoyer un avertissement,
+    par exemple pour indiquer que le fichier est un doublon. Pour ignorer les
+    avertissements et forcer le téléchargement, utilisez ignorewarnings =&gt; 1. Tous
+    les paramètres, comme tout le reste, peuvent être trouvés sur la page API de
+    MediaWiki.</p>
+<pre>$mw-&gt;api( {
+  action =&gt; 'import',
+  xml =&gt; ['wiki_dump.xml']
+ } );
+$mw-&gt;api( {
+  action =&gt; 'upload',
+  filename =&gt; 'test.png',
+  comment =&gt; 'a test image',
+  file =&gt; ['test.png'],
+ } );</pre>
+<p class="Pp">Vous pouvez également fournir les données à télécharger directement, si
+    vous souhaitez lire les données vous-même. Dans ce cas, fournissez un arrayref
+    avec trois paramètres, commençant par un &quot;undef&quot;, suivi du nom du
+    fichier, puis d'une paire Content =&gt; <span class="Li">$data</span> contenant
+    les données.</p>
+<pre>$mw-&gt;api( {
+  action =&gt; 'import',
+  xml =&gt; [ undef, 'wiki_dump.xml', Content =&gt; $data ]
+ } );
+$mw-&gt;api( {
+  action =&gt; 'upload',
+  filename =&gt; 'test.png',
+  comment =&gt; 'a test image',
+  file =&gt; [ undef, 'test.png', Content =&gt; $data ],
+ } );</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='MediaWiki::API-&amp;gt;&lt;b&gt;logout()&lt;/b&gt;'><a class='permalink' href='#MediaWiki::API-&amp;gt;&lt;b&gt;logout()&lt;/b&gt;'>MediaWiki::API-&gt;<b>logout()</b></a></h2>
+<p class="Pp">Déconnecte l'utilisateur actuel et efface les cookies et jetons de
+    modification associés.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss">MediaWiki::API-&gt;edit( $query_hashref, $options_hashref )</h2>
+<p class="Pp">Une fonction d'aide pour effectuer des modifications en utilisant l'API
+    de MediaWiki. Les paramètres sont passés sous forme de hashref décrits sur la
+    page d'édition de l'API de MediaWiki (<a href='https://www.mediawiki.org/wiki/API:Changing_wiki_content'>https://www.mediawiki.org/wiki/API:Changing_wiki_content</a>).
+    Notez que vous avez besoin de <span class="Li">$wgEnableWriteAPI</span> = true
+    dans votre LocalSettings.php pour utiliser ces fonctionnalités. Cette fonction
+    modifiera le hashref d'entrée.</p>
+<p class="Pp">Actuellement</p>
+<ul class="Bl-bullet">
+  <li>Créer/Modifier des pages (Mediawiki &gt;= 1.13 )</li>
+  <li>Déplacer des pages (Mediawiki &gt;= 1.12 )</li>
+  <li>Annuler (Rollback) (Mediawiki &gt;= 1.12 )</li>
+  <li>Supprimer des pages (Mediawiki &gt;= 1.12 )</li>
+  <li>Télécharger des images (Mediawiki &gt;= 1.16 )</li>
+  <li>Importer des pages (Mediawiki &gt;= 1.15 )</li>
+  <li>(Dé)protéger des pages (Mediawiki &gt;= 1.12 )</li>
+  <li>(Dé)bloquer des utilisateurs (Mediawiki &gt;= 1.12 )</li>
+  <li>(Ne pas) mettre une page en suivi (Mediawiki &gt;= 1.18 )</li>
+  <li>Envoyer un e-mail à un utilisateur (Mediawiki &gt;= 1.14 )</li>
+  <li>Patrouiller les modifications (Mediawiki &gt;= 1.14 )</li>
+</ul>
+<p class="Pp">sont pris en charge via cet appel. Utilisez cet appel pour modifier
+    des pages sans avoir à vous soucier d'obtenir d'abord un jeton de modification
+    de l'API. La fonction mettra en cache les jetons de modification pour accélérer
+    les modifications futures.</p>
+<p class="Pp">Retourne un hashref avec les résultats de l'appel ou undef en cas
+    d'échec avec le code d'erreur et les détails stockés dans
+    MediaWiki::API-&gt;{error}-&gt;{code} et
+    MediaWiki::API-&gt;{error}-&gt;{details}.</p>
+<p class="Pp">Le hashref d'options contient actuellement un paramètre optionnel
+    (skip_encoding =&gt; 1). Ceci est décrit ci-dessus dans la documentation de
+    l'appel MediaWiki::API-&gt;api.</p>
+<p class="Pp">Voici quelques exemples d'extraits de code. Le premier exemple consiste
+    à ajouter du texte à une page existante (si la page n'existe pas, rien ne se
+    passera). Notez que l'horodatage de la révision que nous modifions est sauvegardé.
+    Cela nous permet d'éviter les conflits de modification. La valeur est renvoyée
+    à la fonction d'édition, et si quelqu'un avait modifié la page entre-temps, une
+    erreur sera renvoyée.</p>
+<pre>my $pagename = &quot;Wikipedia:Sandbox&quot;;
+my $ref = $mw-&gt;get_page( { title =&gt; $pagename } );
+unless ( $ref-&gt;{missing} ) {
+  my $timestamp = $ref-&gt;{timestamp};
+  $mw-&gt;edit( {
+    action =&gt; 'edit',
+    title =&gt; $pagename,
+    basetimestamp =&gt; $timestamp, # pour éviter les conflits d'édition
+    text =&gt; $ref-&gt;{'*'} . &quot;\nTexte supplémentaire&quot; } )
+    || die $mw-&gt;{error}-&gt;{code} . ': ' . $mw-&gt;{error}-&gt;{details};
+}</pre>
+<p class="Pp">Le code suivant supprime une page nommée &quot;DeleteMe&quot;. Vous
+    pouvez spécifier une raison pour la suppression, sinon une raison générée sera
+    utilisée.</p>
+<pre># supprimer une page
+$mw-&gt;edit( {
+  action =&gt; 'delete', title =&gt; 'DeleteMe', reason =&gt; 'ne plus être nécessaire' } ) 
+  || die $mw-&gt;{error}-&gt;{code} . ': ' . $mw-&gt;{error}-&gt;{details};</pre>
+<p class="Pp">Ce code déplace une page de MoveMe à MoveMe2.</p>
+<pre># déplacer une page
+$mw-&gt;edit( {
+  action =&gt; 'move', from =&gt; 'MoveMe', to =&gt; 'MoveMe2' } )
+  || die $mw-&gt;{error}-&gt;{code} . ': ' . $mw-&gt;{error}-&gt;{details};</pre>
+<p class="Pp">Le script suivant annule une ou plusieurs modifications de l'utilisateur
+    MrVandal. Si l'utilisateur n'est pas le dernier éditeur de la page, une erreur
+    sera renvoyée. Si aucun utilisateur n'est passé, les modifications de celui qui a
+    modifié la page en dernier seront annulées.</p>
+<pre>$mw-&gt;edit( {
+  action =&gt; 'rollback', title =&gt; 'Sandbox', user =&gt; 'MrVandal' } )
+  || die $mw-&gt;{error}-&gt;{code} . ': ' . $mw-&gt;{error}-&gt;{details};</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss">MediaWiki::API-&gt;get_page( $params_hashref )</h2>
+<p class="Pp">Une fonction d'aide pour obtenir le contenu le plus récent de la page
+    (et d'autres métadonnées) pour une page. Elle appelle la fonction api de plus bas
+    niveau avec une requête de révisions pour obtenir la révision la plus récente.</p>
+<pre># obtenir le contenu d'une page
+my $page = $mw-&gt;get_page( { title =&gt; 'Main Page' } );
+# imprimer le contenu de la page
+print $page-&gt;{'*'};</pre>
+<p class="Pp">Retourne un hashref avec les clés suivantes ou undef en cas d'erreur. Si
+    la page est manquante, le hashref retourné ne contiendra que ns, title et une
+    clé appelée &quot;missing&quot;.</p>
+<ul class="Bl-bullet">
+  <li>'*' - contenu de la page</li>
+  <li>'pageid' - id de la page</li>
+  <li>'revid' - id de la révision</li>
+  <li>'timestamp' - horodatage de la révision</li>
+  <li>'user' - utilisateur qui a effectué la révision</li>
+  <li>'title' - titre de la page</li>
+  <li>'ns' - espace de noms dans lequel se trouve la page</li>
+  <li>'size' - taille de la page en octets</li>
+</ul>
+<p class="Pp">Des informations complètes à leur sujet peuvent être lues sur
+    (<a href='https://www.mediawiki.org/wiki/API:Query_-_Properties#revisions_.2F_rv'>https://www.mediawiki.org/wiki/API:Query_-_Properties#revisions_.2F_rv</a>)</p>
+</section>
+<section class="Ss">
+<h2 class="Ss">MediaWiki::API-&gt;list( $query_hashref, $options_hashref )</h2>
+<p class="Pp">Une fonction d'aide pour obtenir des listes en utilisant l'API de
+    MediaWiki. Les paramètres sont passés sous forme de hashref qui sont décrits sur
+    la page d'édition de l'API de MediaWiki (<a href='https://www.mediawiki.org/wiki/API:Query_-_Lists'>https://www.mediawiki.org/wiki/API:Query_-_Lists</a>). Cette
+    fonction modifie le query_hashref d'entrée.</p>
+<p class="Pp">Cette fonction retournera une référence à un tableau de hachages ou
+    undef en cas d'échec. Elle gère l'obtention de listes de données à partir de l'API
+    de MediaWiki, en continuant la requête avec une autre connexion si nécessaire. Le
+    options_hashref contient actuellement trois paramètres :</p>
+<ul class="Bl-bullet">
+  <li>max =&gt; valeur</li>
+  <li>hook =&gt; \&amp;fonction_hook</li>
+  <li>skip_encoding =&gt; 1</li>
+</ul>
+<p class="Pp">La valeur de max spécifie le nombre maximum de &quot;requêtes&quot; qui
+    seront utilisées pour extraire les données. Par exemple, la limite par défaut par
+    requête est de 10 éléments, mais cela peut être augmenté à 500 pour les utilisateurs
+    normaux et plus pour les administrateurs et les bots. Si la limite est augmentée à
+    500 et que max était défini à 2, un maximum de 1000 résultats serait retourné.</p>
+<p class="Pp">Si vous souhaitez traiter de grandes listes, par exemple les articles
+    d'une grande catégorie, vous pouvez passer une fonction hook, qui recevra une
+    référence à un tableau de résultats pour chaque connexion de requête.</p>
+<p class="Pp">Le paramètre skip_encoding fonctionne comme décrit ci-dessus dans la
+    documentation de l'appel MediaWiki::API-&gt;api.</p>
+<pre>binmode STDOUT, ':utf8';
+# traiter les 400 premiers articles dans l'espace de noms principal de la catégorie &quot;Surnames&quot;.
+# obtenir 100 à la fois, avec un maximum de 4 et passer chaque 100 à notre hook.
+$mw-&gt;list ( { action =&gt; 'query',
+              list =&gt; 'categorymembers',
+              cmtitle =&gt; 'Category:Surnames',
+              cmnamespace =&gt; 0,
+              cmlimit=&gt;'100' },
+            { max =&gt; 4, hook =&gt; \&amp;print_articles } )
+|| die $mw-&gt;{error}-&gt;{code} . ': ' . $mw-&gt;{error}-&gt;{details};
+# imprimer le nom de chaque article
+sub print_articles {
+  my ($ref) = @_;
+  foreach (@$ref) {
+    print &quot;$_-&gt;{title}\n&quot;;
+  }
+}</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss">MediaWiki::API-&gt;upload( $params_hashref )</h2>
+<p class="Pp">Cette fonction est dépréciée. Pour les téléchargements sur les
+    versions 1.16 ou ultérieures de mediawiki, il est recommandé d'utiliser
+    MediaWiki::API-&gt;edit ou MediaWiki::API-&gt;api directement, qui a une bien
+    meilleure gestion des erreurs et prend en charge le téléchargement de fichiers
+    en passant simplement un nom de fichier.</p>
+<p class="Pp">Une fonction pour télécharger des fichiers sur un MediaWiki. Cette
+    fonction n'utilise pas l'API MediaWiki actuellement car la prise en charge du
+    téléchargement de fichiers n'est pas encore implémentée. Au lieu de cela, elle
+    télécharge en utilisant la page Special:Upload, et à ce titre une valeur de
+    configuration supplémentaire est nécessaire.</p>
+<pre>my $mw = MediaWiki::API-&gt;new( {
+ api_url =&gt; 'https://en.wikipedia.org/w/api.php' }  );
+# configurer l'emplacement spécial de téléchargement.
+$mw-&gt;{config}-&gt;{upload_url} = 'https://en.wikipedia.org/wiki/Special:Upload';</pre>
+<p class="Pp">La fonction upload est ensuite appelée comme suit</p>
+<pre># télécharger un fichier sur MediaWiki
+open FILE, &quot;myfile.jpg&quot; or die $!;
+binmode FILE;
+my ($buffer, $data);
+while ( read(FILE, $buffer, 65536) )  {
+  $data .= $buffer;
+}
+close(FILE);
+$mw-&gt;upload( { title =&gt; 'file.jpg',
+               summary =&gt; 'Ceci est le résumé pour la page Image:file.jpg',
+               data =&gt; $data } ) || die $mw-&gt;{error}-&gt;{code} . ': ' . $mw-&gt;{error}-&gt;{details};</pre>
+<p class="Pp">La vérification des erreurs est limitée. Notez également que le module
+    forcera un téléchargement de fichier, ignorant tout avertissement concernant la
+    taille du fichier ou l'écrasement d'un ancien fichier.</p>
+</section>
+<section class="Ss">
+<h2 class=<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">MediaWiki::API-&gt;download( $params_hashref )</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VERSION'><a class='permalink' href='#VERSION'>VERSION</a></h1>
+<p class="Pp">Une fonction pour télécharger des images/fichiers depuis un MediaWiki. Une URL de fichier peut devoir être configurée si l'API renvoie une URL relative.</p>
+<pre>my $mw = MediaWiki::API-&gt;new( {
+  api_url =&gt; 'https://www.exotica.org.uk/mediawiki/api.php' }  );
+# configurer l'URL du fichier. Wikipedia n'en a pas besoin mais le wiki ExoticA en a besoin.
+$mw-&gt;{config}-&gt;{files_url} = 'https://www.exotica.org.uk';</pre>
+<p class="Pp">La fonction de téléchargement est ensuite appelée comme suit :</p>
+<pre>my $file = $mw-&gt;download( { title =&gt; 'Image:Mythic-Beasts_Logo.png'} )
+  || die $mw-&gt;{error}-&gt;{code} . ': ' . $mw-&gt;{error}-&gt;{details};</pre>
+<p class="Pp">Si le fichier n'existe pas (sur le wiki), une chaîne vide est retournée. Si le fichier ne peut pas être téléchargé, undef est retourné.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Jools 'BuZz' Wills, <span class="Li">&quot;&lt;buzz [at]
+    exotica.org.uk&gt;&quot;</span></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BOGUES'><a class='permalink' href='#BOGUES'>BOGUES</a></h1>
+<p class="Pp">Veuillez signaler tout bogue ou demande de fonctionnalité à
+    <span class="Li">&quot;bug-mediawiki-api at rt.cpan.org&quot;</span>, ou via
+    l'interface web à
+    <a href='http://rt.cpan.org/NoAuth/ReportBug.html?Queue=MediaWiki-API'>http://rt.cpan.org/NoAuth/ReportBug.html?Queue=MediaWiki-API</a>. Je serai notifié, et vous serez ensuite automatiquement notifié des progrès sur votre bogue au fur et à mesure que j'apporterai des modifications.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SUPPORT'><a class='permalink' href='#SUPPORT'>SUPPORT</a></h1>
+<p class="Pp">Vous pouvez trouver la documentation de ce module avec la commande perldoc.</p>
+<pre>perldoc MediaWiki::API</pre>
+<p class="Pp">Vous pouvez également trouver des informations sur :</p>
+<ul class="Bl-bullet">
+  <li>RT : le traqueur de bogues de CPAN
+    <p class="Pp"><a href='http://rt.cpan.org/NoAuth/Bugs.html?Dist=MediaWiki-API'>http://rt.cpan.org/NoAuth/Bugs.html?Dist=MediaWiki-API</a></p>
+  </li>
+  <li>AnnoCPAN : documentation CPAN annotée
+    <p class="Pp"><a href='http://annocpan.org/dist/MediaWiki-API'>http://annocpan.org/dist/MediaWiki-API</a></p>
+  </li>
+  <li>Évaluations CPAN
+    <p class="Pp"><a href='http://cpanratings.perl.org/d/MediaWiki-API'>http://cpanratings.perl.org/d/MediaWiki-API</a></p>
+  </li>
+  <li>Recherche CPAN
+    <p class="Pp"><a href='http://search.cpan.org/dist/MediaWiki-API'>http://search.cpan.org/dist/MediaWiki-API</a></p>
+  </li>
+</ul>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='REMERCIEMENTS'><a class='permalink' href='#REMERCIEMENTS'>REMERCIEMENTS</a></h1>
+<ul class="Bl-bullet">
+  <li>Carl Beckhorn (cbeckhorn [at] fastmail.fm) pour les idées et le soutien</li>
+  <li>Stuart 'Kyzer' Caie (kyzer [at] 4u.net) pour le code Perl UnExoticA et le
+      soutien</li>
+  <li>Edward Chernenko (edwardspec [at] gmail.com) pour son module MediaWiki précédent</li>
+  <li>Dan Collins (EN.WP.ST47 [at] gmail.com) pour les rapports de bogues et les correctifs</li>
+  <li>Jonas 'Spectral' Nyren (spectral [at] ludd.luth.se) pour les astuces et
+      conseils !</li>
+  <li>Jason 'XtC' Skelly (xtc [at] amigaguide.org) pour le soutien moral</li>
+  <li>Nikolay Shaplov (n [at] shaplov.ru) pour les correctifs utf-8 et les tests</li>
+  <li>Jeremy Muhlich (jmuhlich [at] bitflood.org) pour les correctifs utf-8 et les tests
+      pour le correctif de prise en charge de l'upload via API</li>
+</ul>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROIT_D_AUTEUR_&amp;amp;_LICENCE'><a class='permalink' href='#DROIT_D_AUTEUR_&amp;amp;_LICENCE'>DROIT D'AUTEUR   &amp; LICENCE</a></h1>
+<p class="Pp">Copyright 2008 - 2012 Jools Wills, tous droits réservés.</p>
+<p class="Pp">Ce programme est un logiciel libre : vous pouvez le redistribuer et/ou le modifier selon les termes de la Licence Publique Générale GNU, telle que publiée par la Free Software Foundation, soit la version 3 de la Licence, ou (à votre choix) toute version ultérieure.</p>
+<p class="Pp">Ce programme est distribué dans l'espoir qu'il sera utile, mais SANS AUCUNE GARANTIE ; sans même la garantie implicite de COMMERCIALISABILITÉ ou d'ADÉQUATION À UN USAGE PARTICULIER. Voir la Licence Publique Générale GNU pour plus de détails.</p>
+<p class="Pp">Vous devriez avoir reçu une copie de la Licence Publique Générale GNU avec ce programme. Sinon, voir
+  <a href='http://www.gnu.org/licenses/'>http://www.gnu.org/licenses/</a>.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2024-07-13</td>
+    <td class="foot-os">perl v5.38.2</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page man" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-mediawiki-api/">extra/perl-mediawiki-api</a></dd>
+        <dt>Version :</dt>
+        <dd>0.52-4</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://search.cpan.org/dist/MediaWiki-API/">https://search.cpan.org/dist/MediaWiki-API/</a></dd>
+        <dt>Licences :</dt>
+        <dd>GPL3</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-mediawiki-api/">/listing/extra/perl-mediawiki-api/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#VERSION">VERSION</a></li>
+        
+            <li><a href="#SYNOPIS">SYNOPIS</a></li>
+        
+            <li><a href="#FONCTIONS">FONCTIONS</a></li>
+        
+            <li><a href="#AUTEUR">AUTEUR</a></li>
+        
+            <li><a href="#BOGUES">BOGUES</a></li>
+        
+            <li><a href="#SUPPORT">SUPPORT</a></li>
+        
+            <li><a href="#REMERCIEMENTS">REMERCIEMENTS</a></li>
+        
+            <li><a href="#DROIT_D_AUTEUR_&amp;amp;_LICENCE">DROIT D'AUTEUR &amp; LICENCE</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/MediaWiki::API.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/MediaWiki::API.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages man, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

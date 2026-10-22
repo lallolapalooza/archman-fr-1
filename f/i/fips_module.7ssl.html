@@ -1,0 +1,638 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>fips_module(7ssl) — Pages manuelles d'Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">fips_module(7ssl)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/core/x86_64/openssl/">openssl</a></p>
+<p class="lic">Licences: Apache-2.0</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">FIPS_MODULE(7ssl)</td>
+    <td class="head-vol">OpenSSL</td>
+    <td class="head-rtitle">FIPS_MODULE(7ssl)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">fips_module - Guide du module FIPS d'OpenSSL</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<p class="Pp">Voir les pages de manuel individuelles pour plus de détails.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Ce guide détaille différentes façons dont OpenSSL peut être utilisé en
+    conjonction avec le module FIPS. L'approche correcte à utiliser dépendra
+    de vos circonstances spécifiques et de ce que vous essayez d'atteindre.</p>
+<p class="Pp">Pour des informations relatives à l'installation du module FIPS, voir
+    <a href='https://github.com/openssl/openssl/blob/master/README-FIPS.md'>https://github.com/openssl/openssl/blob/master/README-FIPS.md</a>.</p>
+<p class="Pp">Notez que les anciennes fonctions <b>FIPS_mode()</b> et
+    <b>FIPS_mode_set()</b> ne sont plus présentes, vous devez donc les supprimer de
+    votre application si vous les utilisez.</p>
+<p class="Pp">Les applications écrites pour utiliser le module FIPS d'OpenSSL 3.0 ne doivent
+    utiliser aucune API ou fonctionnalité héritée qui contourne le module FIPS. Plus
+    précisément, cela inclut :</p>
+<ul class="Bl-bullet">
+  <li>Les API cryptographiques de bas niveau (utilisez plutôt les API de haut niveau, telles qu'EVP)</li>
+  <li>Les Engines</li>
+  <li>Toute fonction qui crée ou modifie des "METHODS" personnalisées (par
+      exemple <b>EVP_MD_meth_new()</b>, <b>EVP_CIPHER_meth_new()</b>,
+      <b>EVP_PKEY_meth_new()</b>, <b>RSA_meth_new()</b>,
+      <b>EC_KEY_METHOD_new()</b>, etc.)</li>
+</ul>
+<p class="Pp">Toutes les API ci-dessus sont dépréciées dans OpenSSL 3.0 - une règle simple est donc d'éviter d'utiliser toutes les fonctions dépréciées. Voir
+    <a href='/man/ossl-guide-migration.7.en'>ossl-guide-migration(7)</a> pour une liste des fonctions dépréciées.</p>
+<section class="Ss">
+<h2 class="Ss" id='Making_all_applications_use_the_FIPS_module_by_default'><a class='permalink' href='#Making_all_applications_use_the_FIPS_module_by_default'>Faire   utiliser le module FIPS par toutes les applications par défaut</a></h2>
+<p class="Pp">Une approche simple est de faire en sorte que toutes les applications utilisant
+    OpenSSL n'utilisent que le module FIPS pour les algorithmes cryptographiques par
+  défaut.</p>
+<p class="Pp">Cette approche peut être réalisée purement par configuration. Tant que les
+    applications sont compilées et liées contre OpenSSL 3.0 et ne remplacent pas le
+    chargement du fichier de configuration par défaut ou ses paramètres, elles peuvent
+    automatiquement commencer à utiliser le module FIPS sans nécessiter de modifications
+    de code supplémentaires.</p>
+<p class="Pp">Pour ce faire, le fichier de configuration OpenSSL par défaut devra être
+    modifié. L'emplacement de ce fichier de configuration dépendra de la plateforme et
+    des options qui ont été données pendant le processus de compilation. Vous pouvez vérifier
+    l'emplacement du fichier de configuration en exécutant cette commande :</p>
+<pre>$ openssl version -d
+OPENSSLDIR: "/usr/local/ssl"</pre>
+<p class="Pp">Attention : De nombreux systèmes d'exploitation installent OpenSSL par défaut. Il est
+    courant de ne pas avoir la bonne version d'OpenSSL dans votre
+    <span class="Li">$PATH</span>. Vérifiez que vous exécutez une version OpenSSL 3.0
+    comme ceci :</p>
+<pre>$ openssl version -v
+OpenSSL 3.0.0-dev xx XXX xxxx (Library: OpenSSL 3.0.0-dev xx XXX xxxx)</pre>
+<p class="Pp">La <b>OPENSSLDIR</b> valeur ci-dessus donne le nom du répertoire où
+    le fichier de configuration par défaut est stocké. Dans ce cas, le fichier de configuration
+    par défaut sera donc appelé <i>/usr/local/ssl/openssl.cnf</i>.</p>
+<p class="Pp">Modifiez le fichier de configuration pour ajouter les lignes suivantes près du
+    début :</p>
+<pre>config_diagnostics = 1
+openssl_conf = openssl_init
+.include /usr/local/ssl/fipsmodule.cnf
+[openssl_init]
+providers = provider_sect
+alg_section = algorithm_sect
+[provider_sect]
+fips = fips_sect
+base = base_sect
+[base_sect]
+activate = 1
+[algorithm_sect]
+default_properties = fips=yes</pre>
+<p class="Pp">Évidemment, l'emplacement du fichier include ci-dessus doit correspondre au chemin
+    et au nom du fichier de configuration du module FIPS que vous avez installé précédemment. Voir
+    <a href='https://github.com/openssl/openssl/blob/master/README-FIPS.md'>https://github.com/openssl/openssl/blob/master/README-FIPS.md</a>.</p>
+<p class="Pp">Pour une utilisation FIPS, il est recommandé que l'option
+    <b>config_diagnostics</b> soit activée pour empêcher l'utilisation accidentelle
+    d'algorithmes non validés FIPS via une configuration cassée ou erronée. Voir
+    <a href='/man/config.5.en'>config(5)</a>.</p>
+<p class="Pp">Toutes les applications qui utilisent OpenSSL 3.0 et qui sont démarrées après ces
+    changements utiliseront uniquement le module FIPS, sauf si ces applications prennent
+    des mesures explicites pour éviter ce comportement par défaut. Notez que cette
+    configuration active également le fournisseur "base". Le fournisseur base
+    n'inclut aucun algorithme cryptographique (et n'affecte donc pas le statut de validation
+    des opérations cryptographiques), mais inclut d'autres algorithmes de support qui peuvent
+    être nécessaires. Il est conçu pour être utilisé en conjonction avec le module FIPS.</p>
+<p class="Pp">L'avantage principal de cette approche est qu'elle est simple et qu'aucune modification
+    de code n'est requise dans les applications pour bénéficier du module FIPS. Il y a
+    quelques inconvénients à cette approche :</p>
+<ul class="Bl-bullet">
+  <li>Vous ne voudrez peut-être pas que toutes les applications utilisent le module FIPS.
+    <p class="Pp">Il se peut que certaines applications devraient utiliser le module FIPS et que d'autres non.</p>
+  </li>
+  <li>Si les applications prennent des mesures explicites pour ne pas charger le fichier de configuration par défaut ou
+      définir des paramètres différents.
+    <p class="Pp">Cette méthode ne fonctionnera pas dans ces cas.</p>
+  </li>
+  <li>Les algorithmes disponibles dans le module FIPS sont un sous-ensemble des algorithmes
+      disponibles dans le fournisseur OpenSSL par défaut.
+    <p class="Pp">Si des applications tentent d'utiliser des algorithmes qui ne sont pas
+        présents, elles échoueront.</p>
+  </li>
+  <li>L'utilisation de certaines API dépréciées évite l'utilisation du module FIPS.
+    <p class="Pp">Si des applications utilisent ces API, le module FIPS ne sera
+        pas utilisé.</p>
+  </li>
+</ul>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Selectively_making_applications_use_the_FIPS_module_by_default'><a class='permalink' href='#Selectively_making_applications_use_the_FIPS_module_by_default'>Faire   utiliser le module FIPS par des applications sélectionnées par défaut</a></h2>
+<p class="Pp">Une variation de l'approche ci-dessus consiste à faire la même chose au niveau de chaque
+    application individuelle. Le fichier de configuration OpenSSL par défaut dépend de la
+    valeur compilée pour <b>OPENSSLDIR</b> comme décrit dans la section ci-dessus.
+    Cependant, il est également possible de remplacer le fichier de configuration à utiliser via la variable
+    d'environnement
+    <b>OPENSSL_CONF</b> . Par exemple, ce qui suit, sur Unix, fera en sorte que l'application soit exécutée avec un emplacement de fichier de configuration non standard :</p>
+<pre>$ OPENSSL_CONF=/my/nondefault/openssl.cnf myapplication</pre>
+<p class="Pp">En utilisant ce mécanisme, vous pouvez contrôler quel fichier de configuration est chargé
+    (et donc si le module FIPS est chargé) application par
+    application.</p>
+<p class="Pp">Cela élimine l'inconvénient listé ci-dessus selon lequel vous ne voudrez peut-être pas
+    que toutes les applications utilisent le module FIPS. Tous les autres avantages et
+    inconvénients s'appliquent toujours.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Programmatically_loading_the_FIPS_module_(default_library_context)'><a class='permalink' href='#Programmatically_loading_the_FIPS_module_(default_library_context)'>Chargement   programmatique du module FIPS (contexte de bibliothèque par défaut)</a></h2>
+<p class="Pp">Les applications peuvent choisir de charger le fournisseur FIPS explicitement
+    plutôt que de s'appuyer sur la configuration pour le faire. Le fichier de configuration est toujours nécessaire
+    pour stocker les données de configuration du module FIPS (telles que son statut de test d'intégrité
+    et ses données d'intégrité). Mais dans ce cas, nous n'activons pas automatiquement le
+    fournisseur FIPS via ce fichier de configuration.</p>
+<p class="Pp">Pour faire les choses de cette manière, configurez comme pour "Faire utiliser le module FIPS par toutes les applications par défaut" ci-dessus, mais modifiez le fichier
+    <i>fipsmodule.cnf</i> pour supprimer ou mettre en commentaire la ligne qui dit
+    <span class="Li">"activate = 1"</span> (notez que définir cette
+    valeur à 0 n'est <i>pas</i> suffisant). Cela signifie que toutes les informations de configuration requises seront disponibles pour charger le module FIPS, mais qu'il ne sera pas automatiquement chargé au démarrage de l'application. Le fournisseur FIPS peut alors être chargé programmatiquement comme ceci :</p>
+<pre>#include &lt;openssl/provider.h&gt;
+int main(void)
+{
+    OSSL_PROVIDER *fips;
+    OSSL_PROVIDER *base;
+    fips = OSSL_PROVIDER_load(NULL, "fips");
+    if (fips == NULL) {
+        printf("Failed to load FIPS provider\n");
+        exit(EXIT_FAILURE);
+    }
+    base = OSSL_PROVIDER_load(NULL, "base");
+    if (base == NULL) {
+        OSSL_PROVIDER_unload(fips);
+        printf("Failed to load base provider\n");
+        exit(EXIT_FAILURE);
+    }
+    /* Rest of application */
+    OSSL_PROVIDER_unload(base);
+    OSSL_PROVIDER_unload(fips);
+    exit(EXIT_SUCCESS);
+}</pre>
+<p class="Pp">Notez que cela devrait être l'une des premières choses que vous faites dans
+    votre application. Si des fonctions OpenSSL sont appelées qui nécessitent l'utilisation
+    de fonctions cryptographiques avant que cela ne se produise, alors, si aucun fournisseur n'a encore été
+    chargé, le fournisseur par défaut sera automatiquement chargé. Si vous chargez ensuite explicitement le fournisseur FIPS, vous aurez à la fois le fournisseur FIPS et le fournisseur par défaut chargés en même temps. Il n'est pas spécifié quelle implémentation d'un algorithme sera utilisée si plusieurs implémentations sont disponibles et que vous n'avez pas explicitement spécifiée via une
+    requête de propriété (voir ci-dessous) pour déterminer laquelle utiliser.</p>
+<p class="Pp">Notez également que dans cet exemple, nous avons chargé en plus le
+    fournisseur « base ». Celui-ci charge un sous-ensemble d'algorithmes également
+    disponibles dans le fournisseur par défaut - en particulier les algorithmes non
+    cryptographiques qui peuvent être utilisés en conjonction avec le fournisseur FIPS. Par exemple, celui-ci
+    contient des algorithmes pour l'encodage et le décodage des clés. Si vous décidez de ne pas
+    charger le fournisseur par défaut, vous voudrez généralement charger le
+    fournisseur base à la place.</p>
+<p class="Pp">Dans cet exemple, nous utilisons le contexte de bibliothèque
+    « default ». Les fonctions OpenSSL opèrent dans la portée d'un contexte de bibliothèque. Si
+    aucun contexte de bibliothèque n'est explicitement spécifié, le contexte de bibliothèque
+    par défaut est utilisé. Pour plus de détails sur les contextes de bibliothèque, voir la
+    <a href='/man/OSSL_LIB_CTX.3.en'>OSSL_LIB_CTX(3)</a> page de manuel.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Loading_the_FIPS_module_at_the_same_time_as_other_providers'><a class='permalink' href='#Loading_the_FIPS_module_at_the_same_time_as_other_providers'>Charger le module FIPS en même temps que d'autres fournisseurs</a></h2>
+<p class="Pp">Il est possible d'avoir le fournisseur FIPS et d'autres fournisseurs (comme
+    le fournisseur par défaut) tous chargés en même temps dans le même contexte
+    de bibliothèque. Vous pouvez utiliser une chaîne de requête de propriété lors des récupérations d'algorithmes pour
+    spécifier quelle implémentation vous souhaitez utiliser.</p>
+<p class="Pp">Par exemple, pour récupérer une implémentation de SHA256 conforme
+    aux normes FIPS, vous pouvez spécifier la requête de propriété
+    <span class="Li">« fips=yes »</span> comme ceci :</p>
+<pre>EVP_MD *sha256;
+sha256 = EVP_MD_fetch(NULL, "SHA2-256", "fips=yes");</pre>
+<p class="Pp">Si aucune requête de propriété n'est spécifiée, ou si plus d'une implémentation
+    correspond à la requête de propriété, il n'est pas spécifié quelle implémentation d'un
+    algorithme particulier sera retournée.</p>
+<p class="Pp">Cet exemple montre une demande explicite pour une implémentation de
+    SHA256 du fournisseur par défaut :</p>
+<pre>EVP_MD *sha256;
+sha256 = EVP_MD_fetch(NULL, "SHA2-256", "provider=default");</pre>
+<p class="Pp">Il est également possible de définir une chaîne de requête de propriété par défaut. L'
+    exemple suivant définit la requête de propriété par défaut de
+    <span class="Li">« fips=yes »</span> pour toutes les récupérations dans le
+    contexte de bibliothèque par défaut :</p>
+<pre>EVP_set_default_properties(NULL, "fips=yes");</pre>
+<p class="Pp">Si une fonction de récupération a à la fois une requête de propriété explicite spécifiée
+    et une requête de propriété par défaut définie, les deux requêtes sont fusionnées
+    et s'appliquent toutes les deux. La requête de propriété locale remplace les propriétés
+    par défaut si le même nom de propriété est spécifié dans les deux.</p>
+<p class="Pp">Il existe deux propriétés intégrées importantes que vous devez
+    connaître :</p>
+<p class="Pp">La propriété « provider » vous permet de spécifier à partir de quel
+    fournisseur vous voulez qu'une implémentation soit récupérée, par ex.
+    <span class="Li">« provider=default »</span> ou
+    <span class="Li">« provider=fips »</span>. Tous les algorithmes
+    implémentés dans un fournisseur ont cette propriété définie.</p>
+<p class="Pp">Il existe aussi la <span class="Li">propriété « fips »</span>
+    . Tous les algorithmes FIPS correspondent à la requête de propriété
+    <span class="Li">« fips=yes »</span>. Il existe également quelques
+    algorithmes non cryptographiques disponibles dans les fournisseurs par défaut et base
+    qui ont aussi la <span class="Li">propriété « fips=yes »</span> définie pour eux. Ce sont les algorithmes d'encodage et de décodage qui peuvent (par
+    exemple) être utilisés pour écrire une clé générée dans le fournisseur FIPS sur
+    un fichier. Les algorithmes d'encodage et de décodage ne sont pas dans le module FIPS lui-même
+    mais sont autorisés à être utilisés en conjonction avec les algorithmes FIPS.</p>
+<p class="Pp">Il est possible de spécifier des propriétés par défaut dans un fichier de configuration.
+    Par exemple, le fichier de configuration suivant charge automatiquement les fournisseurs par défaut et
+    FIPS et définit la valeur de propriété par défaut à
+    <span class="Li">« fips=yes »</span>. Notez que ce fichier de configuration
+    ne charge pas le fournisseur « base ». Tous les algorithmes de soutien qui
+    sont dans « base » sont aussi dans « default », il est donc
+    inutile dans ce cas :</p>
+<pre>config_diagnostics = 1
+openssl_conf = openssl_init
+.include /usr/local/ssl/fipsmodule.cnf
+[openssl_init]
+providers = provider_sect
+alg_section = algorithm_sect
+[provider_sect]
+fips = fips_sect
+default = default_sect
+[default_sect]
+activate = 1
+[algorithm_sect]
+default_properties = fips=yes</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Programmatically_loading_the_FIPS_module_(nondefault_library_context)'><a class='permalink' href='#Programmatically_loading_the_FIPS_module_(nondefault_library_context)'>Charger le module FIPS par programmation (contexte de bibliothèque non par défaut)</a></h2>
+<p class="Pp">En plus d'utiliser des propriétés pour séparer l'utilisation du module
+    FIPS des autres utilisations, cela peut également être réalisé à l'aide de contextes de bibliothèque.
+    Dans cet exemple, nous créons deux contextes de bibliothèque. Dans l'un, nous supposons
+    l'existence d'un fichier de configuration appelé <i>openssl-fips.cnf</i> qui charge et configure automatiquement les fournisseurs FIPS et base. L'autre contexte de bibliothèque
+    utilisera simplement le fournisseur par défaut.</p>
+<pre>OSSL_LIB_CTX *fips_libctx, *nonfips_libctx;
+OSSL_PROVIDER *defctxnull = NULL;
+EVP_MD *fipssha256 = NULL, *nonfipssha256 = NULL;
+int ret = 1;
+/*
+ * Créer deux contextes de bibliothèque non par défaut. Un pour l'usage FIPS et
+ * un pour l'usage non-FIPS
+ */
+fips_libctx = OSSL_LIB_CTX_new();
+nonfips_libctx = OSSL_LIB_CTX_new();
+if (fips_libctx == NULL || nonfips_libctx == NULL)
+    goto err;
+/* Empêcher quoi que ce soit d'utiliser le contexte de bibliothèque par défaut */
+defctxnull = OSSL_PROVIDER_load(NULL, "null");
+/*
+ * Charger le fichier de configuration pour le contexte de bibliothèque FIPS. Nous supposons que
+ * ce fichier de configuration activera automatiquement les fournisseurs FIPS et base
+ * donc nous n'avons pas besoin de les charger explicitement ici.
+ */
+if (!OSSL_LIB_CTX_load_config(fips_libctx, "openssl-fips.cnf"))
+    goto err;
+/*
+ * Définir la requête de propriété par défaut sur le contexte de bibliothèque FIPS pour
+ * garantir que seuls les algorithmes FIPS peuvent être utilisés. Il y a quelques algorithmes non approuvés
+ * FIPS dans le fournisseur FIPS pour des raisons de rétrocompatibilité.
+ */
+if (!EVP_set_default_properties(fips_libctx, "fips=yes"))
+    goto err;
+/*
+ * Nous n'avons rien de spécial à faire pour charger le fournisseur
+ * par défaut dans nonfips_libctx. Cela se produit automatiquement si aucun
+ * autre fournisseur n'est chargé.
+ * Parce que nous n'appelons pas OSSL_LIB_CTX_load_config() explicitement pour
+ * nonfips_libctx, il utilisera simplement le fichier de configuration par défaut.
+ */
+/* À titre d'exemple, obtenir quelques fonctions de hachage */
+/* Obtenir une fonction de hachage validée FIPS */
+fipssha256 = EVP_MD_fetch(fips_libctx, "SHA2-256", NULL);
+if (fipssha256 == NULL)
+    goto err;
+/* Obtenir une fonction de hachage non validée FIPS */
+nonfipssha256 = EVP_MD_fetch(nonfips_libctx, "SHA2-256", NULL);
+if (nonfipssha256 == NULL)
+    goto err;
+/* Utiliser les fonctions de hachage */
+printf("Success\n");
+ret = 0;
+err:
+EVP_MD_free(fipssha256);
+EVP_MD_free(nonfipssha256);
+OSSL_LIB_CTX_free(fips_libctx);
+OSSL_LIB_CTX_free(nonfips_libctx);
+OSSL_PROVIDER_unload(defctxnull);
+return ret;</pre>
+<p class="Pp">Notez que nous avons utilisé le fournisseur spécial « null »
+    ici que nous chargeons dans le contexte de bibliothèque par défaut. Nous aurions pu
+    choisir d'utiliser le contexte de bibliothèque par défaut pour l'usage FIPS et de simplement créer
+    un contexte de bibliothèque supplémentaire pour les autres usages - ou l'inverse. Cependant, si le
+    code n'a pas été converti pour utiliser des contextes de bibliothèque, le contexte de bibliothèque
+    par défaut sera automatiquement utilisé. Cela pourrait être le cas pour vos propres
+    applications existantes ainsi que pour certaines parties d'OpenSSL lui-même. Toutes les
+    parties d'OpenSSL ne sont pas conscientes du contexte de bibliothèque. Si cela se produit, vous pourriez
+    « accidentellement » utiliser le mauvais contexte de bibliothèque pour une opération
+    particulière. Pour être sûr que cela n'arrive pas, vous pouvez charger le fournisseur « null »
+    dans le contexte de bibliothèque par défaut. Parce qu'un fournisseur a été
+    explicitement chargé, le fournisseur par défaut ne sera pas chargé automatiquement.
+    Cela signifie que le code utilisant le contexte par défaut par accident échouera car aucun
+    algorithme ne sera disponible.</p>
+<p class="Pp">Voir « Library Context » dans <a href='/man/ossl-guide-migration.7.en'>ossl-guide-migration(7)</a>
+    pour des informations supplémentaires sur le contexte de bibliothèque.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Using_Encoders_and_Decoders_with_the_FIPS_module'><a class='permalink' href='#Using_Encoders_and_Decoders_with_the_FIPS_module'>Utiliser les encodeurs et décodeurs avec le module FIPS</a></h2>
+<p class="Pp">Les encodeurs et décodeurs sont utilisés pour lire et écrire des clés ou
+    des paramètres depuis ou vers un format externe (par exemple un fichier PEM). Si votre
+    application génère des clés ou des paramètres qui doivent ensuite être écrits en
+    format PEM ou DER, il est probable que vous devrez utiliser un encodeur pour
+    cela. De même, vous avez besoin d'un décodeur pour lire les clés et
+    les paramètres précédemment enregistrés. Dans la plupart des cas, cela sera invisible pour vous si vous utilisez des
+    API qui existaient dans OpenSSL 1.1.1 ou antérieur telles que
+    <a href='/man/i2d_PrivateKey.3.en'>i2d_PrivateKey(3)</a>. Cependant, l'encodeur/décodeur approprié devra
+    être disponible dans le contexte de bibliothèque associé à l'objet clé ou paramètre.
+    Les encodeurs et décodeurs OpenSSL intégrés sont implémentés à la fois
+    dans les fournisseurs par défaut et base et ne sont pas dans la frontière du module FIPS.
+    Cependant, comme ce ne sont pas des algorithmes cryptographiques en soi, il est toujours
+    possible de les utiliser en conjonction avec le module FIPS, et par conséquent
+    ces encodeurs/décodeurs ont la
+    <span class="Li">propriété « fips=yes »</span> définie pour eux. Vous
+    devez vous assurer que soit le fournisseur par défaut soit le fournisseur base est chargé dans le
+    contexte de bibliothèque dans ce cas.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Using_the_FIPS_module_in_SSL/TLS'><a class='permalink' href='#Using_the_FIPS_module_in_SSL/TLS'>Utiliser le module FIPS dans SSL/TLS</a></h2>
+<p class="Pp">Écrire une application qui utilise libssl en conjonction avec le
+    module FIPS est très similaire à écrire une application libssl normale. Si vous
+    utilisez des propriétés globales et le contexte de bibliothèque par défaut pour spécifier l'utilisation
+    d'algorithmes validés FIPS, cela se produira automatiquement pour tous les algorithmes
+    cryptographiques dans libssl. Si vous utilisez un contexte de bibliothèque non par défaut
+    pour charger le fournisseur FIPS, vous pouvez le fournir à libssl en utilisant la fonction <a href='/man/SSL_CTX_new_ex.3.en'>SSL_CTX_new_ex(3)</a>. Cela fonctionne comme un remplacement direct
+    pour la fonction <a href='/man/SSL_CTX_new.3.en'>SSL_CTX_new(3)</a> sauf qu'elle vous fournit la
+    capacité de spécifier le contexte de bibliothèque à utiliser. Vous pouvez également utiliser la
+    même fonction pour spécifier des propriétés spécifiques à libssl à utiliser.</p>
+<p class="Pp">Dans ce premier exemple, nous créons deux objets SSL_CTX en utilisant deux
+    contextes de bibliothèque différents.</p>
+<pre>/*
+ * Nous supposons qu'un contexte de bibliothèque non par défaut avec le fournisseur
+ * FIPS chargé a été créé appelé fips_libctx.
+ */
+SSL_CTX *fips_ssl_ctx = SSL_CTX_new_ex(fips_libctx, "fips=yes", TLS_method());
+/*
+ * Nous supposons qu'un contexte de bibliothèque non par défaut avec le fournisseur
+ * par défaut chargé a été créé appelé non_fips_libctx.
+ */
+SSL_CTX *non_fips_ssl_ctx = SSL_CTX_new_ex(non_fips_libctx, NULL,
+                                           TLS_method());</pre>
+<p class="Pp">Dans ce deuxième exemple, nous créons deux objets SSL_CTX en utilisant
+    des propriétés différentes pour spécifier l'utilisation FIPS :</p>
+<pre>/*
+ * La propriété « fips=yes » inclut tous les algorithmes approuvés FIPS
+ * ainsi que les encodeurs du fournisseur par défaut qui sont autorisés
+ * à être utilisés. Le NULL ci-dessous indiquees que nous utilisons le
+ * contexte de bibliothèque par défaut.
+ */
+SSL_CTX *fips_ssl_ctx = SSL_CTX_new_ex(NULL, "fips=yes", TLS_method());
+/*
+ * La propriété "provider!=fips" permet les algorithmes de tous les
+ * fournisseurs sauf le fournisseur FIPS
+ */
+SSL_CTX *non_fips_ssl_ctx = SSL_CTX_new_ex(NULL, "provider!=fips",
+                                           TLS_method());</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Confirming_that_an_algorithm_is_being_provided_by_the_FIPS_module'><a class='permalink' href='#Confirming_that_an_algorithm_is_being_provided_by_the_FIPS_module'>Confirmer qu'un algorithme est fourni par le module FIPS</a></h2>
+<p class="Pp">Une chaîne de liens doit être suivie pour passer d'une instance
+    d'algorithme au fournisseur qui l'implémente. Le processus est similaire pour
+    tous les algorithmes. L'exemple d'une fonction de hachage est utilisé ici.</p>
+<p class="Pp">Pour passer d'un <b>EVP_MD_CTX</b> à un <b>EVP_MD</b>, utilisez
+    <a href='/man/EVP_MD_CTX_md.3.en'>EVP_MD_CTX_md(3)</a> . Pour passer du <b>EVP_MD</b> à son
+    <b>OSSL_PROVIDER</b>, utilisez <a href='/man/EVP_MD_get0_provider.3.en'>EVP_MD_get0_provider(3)</a>. Pour extraire le
+    nom du <b>OSSL_PROVIDER</b>, utilisez
+  <a href='/man/OSSL_PROVIDER_get0_name.3.en'>OSSL_PROVIDER_get0_name(3)</a>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='FIPS_indicators'><a class='permalink' href='#FIPS_indicators'>Indicateurs FIPS</a></h2>
+<p class="Pp">Des indicateurs FIPS ont été ajoutés au fournisseur FIPS dans OpenSSL
+    3.4. FIPS 140-3 exige l'utilisation d'indicateurs si le fournisseur FIPS
+    autorise des algorithmes non approuvés. Un algorithme est approuvé s'il
+    passe toutes les vérifications requises telles que la taille minimale de la
+    clé. Par défaut, une erreur se produira si une vérification échoue. Pour
+    des raisons de compatibilité ascendante, certains algorithmes individuels
+    peuvent contourner les vérifications en utilisant soit une option dans la
+    configuration FIPS (voir « FIPS indicator options » dans <a href='/man/fips_config.5.en'>fips_config(5)</a>) SOIT dans le code en utilisant un
+    « context setter » d'algorithme. Contourner la vérification signifie que
+    l'algorithme n'est pas conforme FIPS. <a href='/man/OSSL_INDICATOR_set_callback.3.en'>OSSL_INDICATOR_set_callback(3)</a> peut être appelé pour
+    enregistrer un rappel pour journaliser les algorithmes non approuvés. À la
+    fin de toute opération d'algorithme, le statut approuvé peut être interrogé
+    en utilisant un « context getter » d'algorithme pour récupérer l'indicateur
+    (par exemple « fips-indicator »). Un exemple de « context setter »
+    d'algorithme est « key-check » dans
+    « Supported parameters » dans <a href='/man/EVP_KDF-HKDF.7.en'>EVP_KDF-HKDF(7)</a>.</p>
+<p class="Pp">Les algorithmes suivants utilisent « fips-indicator » pour interroger
+    si l'algorithme est approuvé :</p>
+<dl class="Bl-tag">
+  <dt id="DSA"><a class="permalink" href="#DSA">Génération de clés DSA</a></dt>
+  <dd>La génération de clés DSA n'est plus approuvée. Voir « DSA parameters »
+      dans <a href='/man/EVP_PKEY-DSA.7.en'>EVP_PKEY-DSA(7)</a></dd>
+  <dt id="DSA~2"><a class="permalink" href="#DSA~2">Signatures DSA</a></dt>
+  <dd>La génération de signatures DSA n'est plus approuvée. Voir « Signature
+      Parameters » dans <a href='/man/EVP_SIGNATURE-DSA.7.en'>EVP_SIGNATURE-DSA(7)</a></dd>
+  <dt id="ECDSA"><a class="permalink" href="#ECDSA">Signatures ECDSA</a></dt>
+  <dd>Voir « ECDSA Signature Parameters » dans
+      <a href='/man/EVP_SIGNATURE-ECDSA.7.en'>EVP_SIGNATURE-ECDSA(7)</a></dd>
+  <dt id="EC"><a class="permalink" href="#EC">Génération de clés EC</a></dt>
+  <dd>Voir « Common EC parameters » dans <a href='/man/EVP_PKEY-EC.7.en'>EVP_PKEY-EC(7)</a></dd>
+  <dt id="RSA"><a class="permalink" href="#RSA">Chiffrement RSA</a></dt>
+  <dd>Le remplissage « pkcs1 » n'est plus approuvé.
+    <p class="Pp">Voir « RSA Asymmetric Cipher parameters » dans
+        <a href='/man/EVP_ASYM_CIPHER-RSA.7.en'>EVP_ASYM_CIPHER-RSA(7)</a> et « RSA KEM parameters » dans
+        <a href='/man/EVP_KEM-RSA.7.en'>EVP_KEM-RSA(7)</a></p>
+  </dd>
+  <dt id="RSA~2"><a class="permalink" href="#RSA~2">Signatures RSA</a></dt>
+  <dd>Voir « Signature Parameters » dans <a href='/man/EVP_SIGNATURE-RSA.7.en'>EVP_SIGNATURE-RSA(7)</a></dd>
+  <dt id="DRBGS"><a class="permalink" href="#DRBGS">DRBG</a></dt>
+  <dd>Voir « Supported parameters » dans <a href='/man/EVP_RAND-HASH-DRBG.7.en'>EVP_RAND-HASH-DRBG(7)</a> et
+      <a href='/man/EVP_RAND-HMAC-DRBG.7.en'>EVP_RAND-HMAC-DRBG(7)</a>/Supported parameters&gt;</dd>
+  <dt id="DES"><a class="permalink" href="#DES">DES</a></dt>
+  <dd>Le Triple-DES n'est plus approuvé pour le chiffrement. Voir
+      « Parameters » dans <a href='/man/EVP_CIPHER-DES.7.en'>EVP_CIPHER-DES(7)</a></dd>
+  <dt id="DH"><a class="permalink" href="#DH">DH</a></dt>
+  <dd>Voir « DH and DHX key exchange parameters » dans
+      <a href='/man/EVP_KEYEXCH-DH.7.en'>EVP_KEYEXCH-DH(7)</a></dd>
+  <dt id="ECDH"><a class="permalink" href="#ECDH">ECDH</a></dt>
+  <dd>Voir « ECDH Key Exchange parameters » dans
+    <a href='/man/EVP_KEYEXCH-ECDH.7.en'>EVP_KEYEXCH-ECDH(7)</a></dd>
+  <dt id="KDFS"><a class="permalink" href="#KDFS">KDF</a></dt>
+  <dd>Voir la documentation pertinente sur les KDF, par exemple « Supported
+    parameters » dans
+      <a href='/man/EVP_KDF-HKDF.7.en'>EVP_KDF-HKDF(7)</a></dd>
+  <dt id="CMAC"><a class="permalink" href="#CMAC">CMAC et KMAC</a></dt>
+  <dd>Voir « Supported parameters » dans <a href='/man/EVP_MAC-CMAC.7.en'>EVP_MAC-CMAC(7)</a> et
+      « Supported parameters » dans <a href='/man/EVP_MAC-KMAC.7.en'>EVP_MAC-KMAC(7)</a></dd>
+</dl>
+<p class="Pp">Les algorithmes FIPS suivants ne sont pas approuvés et utilisent le
+    « fips-indicator ».</p>
+<dl class="Bl-tag">
+  <dt id="RAND"><a class="permalink" href="#RAND">RAND-TEST-RAND</a></dt>
+  <dd>Voir « Supported parameters » dans <a href='/man/EVP_RAND-TEST-RAND.7.en'>EVP_RAND-TEST-RAND(7)</a> Le
+      rappel d'indicateur n'est PAS déclenché pour cet algorithme car il est
+      utilisé en interne à des fins non sécuritaires.</dd>
+  <dt id="X25519"><a class="permalink" href="#X25519">Génération de clés et échange de clés
+    X25519 et X448</a></dt>
+  <dd></dd>
+</dl>
+<p class="Pp">Les algorithmes non approuvés (non validés FIPS) ont une valeur de
+    requête de propriété de « fips=no ».</p>
+<p class="Pp">Les algorithmes suivants utilisent un indicateur unique et ne
+    déclenchent pas le rappel d'indicateur.</p>
+<dl class="Bl-tag">
+  <dt id="AES"><a class="permalink" href="#AES">Les chiffrements AES-GCM prennent en charge l'indicateur
+    « iv-generated »</a></dt>
+  <dd>Voir « PARAMETERS » dans <a href='/man/EVP_EncryptInit.3.en'>EVP_EncryptInit(3)</a> pour plus
+      d'informations.</dd>
+  <dt id="ECDSA~2"><a class="permalink" href="#ECDSA~2">Les signatures ECDSA et RSA prennent en charge l'indicateur
+    « verify-message ».</a></dt>
+  <dd>Voir « ECDSA Signature Parameters » dans
+      <a href='/man/EVP_SIGNATURE-ECDSA.7.en'>EVP_SIGNATURE-ECDSA(7)</a> et « Signature Parameters » dans
+      <a href='/man/EVP_SIGNATURE-RSA.7.en'>EVP_SIGNATURE-RSA(7)</a> /pour plus d'informations.</dd>
+</dl>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='NOTES'><a class='permalink' href='#NOTES'>NOTES</a></h1>
+<p class="Pp">Certaines versions publiées d'OpenSSL ne contiennent pas de fournisseur
+    FIPS validé. Pour déterminer quelles versions ont subi le processus de
+    validation, veuillez consulter la page de téléchargements d'OpenSSL
+    <a href='https://www.openssl.org/source/'>https://www.openssl.org/source/</a>. Si vous avez besoin de fonctionnalités approuvées FIPS, il est
+    essentiel de construire votre fournisseur FIPS à l'aide de l'une des
+    versions validées listées là-bas. Normalement, il est possible d'utiliser un
+    fournisseur FIPS construit à partir de l'une des versions validées
+    aux côtés de
+    <i>libcrypto</i> et <i>libssl</i> compilés à partir de n'importe quelle version au sein de la même
+    série de version majeure. Cette flexibilité vous permet de traiter les
+    correctifs de bogues et les CVE qui se situent en dehors de la limite FIPS.</p>
+<p class="Pp">Comme le fournisseur FIPS prend toujours en charge les algorithmes non
+    validés FIPS, la requête de propriété <span class="Li">"fips=yes"</span> est obligatoire
+    pour les applications qui souhaitent fonctionner de manière approuvée FIPS.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR AUSSI</a></h1>
+<p class="Pp"><a href='/man/ossl-guide-migration.7.en'>ossl-guide-migration(7)</a>, <a href='/man/crypto.7.en'>crypto(7)</a>,
+    <a href='/man/fips_config.5.en'>fips_config(5)</a>, <a href='https://www.openssl.org/source/'>https://www.openssl.org/source/</a></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='HISTORY'><a class='permalink' href='#HISTORY'>HISTORIQUE</a></h1>
+<p class="Pp">Le guide du module FIPS a été créé pour être utilisé avec le nouveau
+    fournisseur FIPS dans OpenSSL 3.0. Les indicateurs FIPS ont été ajoutés dans
+    OpenSSL 3.4.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT'><a class='permalink' href='#COPYRIGHT'>COPYRIGHT</a></h1>
+<p class="Pp">Copyright 2021-2025 The OpenSSL Project Authors. Tous droits
+    réservés.</p>
+<p class="Pp">Sous licence Apache License 2.0 (la « License »).
+    Vous ne pouvez pas utiliser ce fichier sauf en conformité avec la licence. Vous
+    pouvez obtenir une copie dans le fichier LICENSE dans la distribution source ou à
+    <a href='https://www.openssl.org/source/license.html'>https://www.openssl.org/source/license.html</a>.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-10-01</td>
+    <td class="foot-os">3.6.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/core/x86_64/openssl/">core/openssl</a></dd>
+        <dt>Version :</dt>
+        <dd>3.6.0-1</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://www.openssl.org">https://www.openssl.org</a></dd>
+        <dt>Licences :</dt>
+        <dd>Apache-2.0</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/core/openssl/">/listing/core/openssl/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#NOTES">NOTES</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+            <li><a href="#HISTORY">HISTORIQUE</a></li>
+        
+            <li><a href="#COPYRIGHT">COPYRIGHT</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/fips_module.7ssl.en.txt">txt</a>, 
+        
+            <a href="/man/fips_module.7ssl.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible selon les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               , sauf pour le contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

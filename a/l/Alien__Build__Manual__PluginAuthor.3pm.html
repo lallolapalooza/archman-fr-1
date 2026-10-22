@@ -1,0 +1,752 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Alien::Build::Manual::PluginAuthor(3pm) — Pages manuelles </title>de l'arche
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Alien__Build__Manual__PluginAuthor(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-alien-build/">perl-alien-build</a></p>
+
+        er
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Alien::Build::Manual::</td>PluginAuthor(3)
+    <td class="head-vol">Documentation contribuée par les utilisateurs </td>de Perl
+    <td class="head-rtitle">Alien::Bu</td>ild::Manu</tr>al::Plugin</table>Author(3)
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NO</a></h1>M
+<p class="Pp">Alien::Build::Manual::PluginAuth</p>or - Documentation pour les aut</section>eurs de
+    plugins Alien::Build
+<section class="Sh">
+<h1 class="Sh" id='VERSION'><a class='permalink' href='#VERSION'>VERSIO</a></h1>N
+<p class="Pp">vers</p>ion </section>2.84
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>RÉSUM</a></h1>É
+<p class="Pp">votre plugin </p>:
+<pre>package Alien::Build::Plugin::Build::MyPlugin;
+
+use strict;
+use warnings;
+use Alien::Build::Plugin;
+
+has arg1 =&gt; 'default_for arg1';
+has arg2 =&gt; sub { [ 'default', 'for', 'arg2' ] };
+
+sub init
+{
+  my($self, $meta) = @_;
+  ...
+}
+
+</pre>1;
+<p class="Pp">et puis depuis un alienfile </p>:
+<pre>use alienfile;
+plugin 'Build::MyPlugin' =&gt; (
+  arg1 =&gt; 'override for arg1',
+  arg2 =&gt; [ 'something', 'else' ],
+)</pre>;
+<p class="Pp">Code pseudo Perl montrant comment les plugins sont appelés </p>:
+<pre>my $probe;
+my $override = override();
+
+if($override eq 'system') {
+
+  $probe = probe();
+
+  if($probe ne 'system') {
+    die 'system tool or library not found';
+  }
+
+}
+
+elsif($override eq 'default') {
+  $probe = probe();
+
+} else { # $override eq 'share'
+  # notez que dans ce cas-ci, le
+  # hook probe n'est jamais appelé
+  $probe = 'share';
+}
+
+if($probe eq 'system') {
+  gather_system();
+
+} else { # $probe eq 'share'
+
+  download();
+  extract();
+  patch();
+  build();
+  gather_share();
+
+  # Vérifiez s'il existe un hook build_ffi
+  if(defined &amp;build_ffi) {
+    patch_ffi();
+    build_ffi();
+    gather_ffi();
+  }
+}
+
+# Par défaut, ceci renvoie simplement la valeur de $ENV{ALIEN_INSTALL_TYPE}
+sub override {
+  return $ENV{ALIEN_INSTALL_TYPE};
+}
+
+# Implémentation par défaut de download ; peut être
+# remplacée en spécifiant un hook download
+# différent. Voir Alien::Build::Plugin::Core::Download
+# pour l'implémentation détaillée.
+sub download {
+
+  my $response = fetch();
+
+  if($response-&gt;{type} eq 'html' || $response-&gt;{type} eq 'dir_listing') {
+    # decode transformera un listage HTML (html) ou un listage de
+    # répertoire FTP (dir_listing) en une liste régulière
+    $response = decode($response);
+  }
+
+  if($response-&gt;{type} eq 'list') {
+
+    # prefer filtrera les mauvaises entrées de la liste
+    # et les triera de sorte que la première soit
+    # celle que nous voulons
+    $response = prefer($response);
+
+    my $first_preferred = $res-&gt;{list}-&gt;[0];
+
+    # prefer peut parfois inférer la version à partir du
+    # nom de fichier.
+    if(defined $first_preferred-&gt;{version}) {
+      # pas un hook
+      runtime_prop-&gt;{version} = $first_preferred-&gt;{version};
+    }
+
+    $response = fetch($first_preferred);
+
+  }
+
+  if($response-&gt;{type} eq 'file') {
+    # pas un hook
+    write_file_to_disk $response;
+  }
+</pre>
+</section>}
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTIO</a></h1>N
+<p class="Pp">Ce document explique comment écrire des plugins Alien::Build en
+    utilisant la classe de base Alien::Build::</p>Plugin.
+<section class="Ss">
+<h2 class="Ss" id='Writing_plugins'><a class='permalink' href='#Writing_plugins'>Écrire   des </a></h2>plugins
+<p class="Pp">Les plugins utilisent Alien::Build::Plugin, qui définit la classe de
+    base appropriée et vous fournit le constructeur de propriétés <span class="Li">"</span>has". <span class="Li">"has" </span>prend deux
+    arguments, le nom de la propriété et la valeur par défaut. (Comme avec
+    Moose et Moo, vous devriez utiliser une référence de code pour spécifier
+    les valeurs par défaut non chaînes). Non <b>définissez </b>ceci comme classe de base de votre plugin
+    directement </p>:
+<pre>use parent qw( Alien::Build::Plugin );  # incorrect
+use Alien::Build::Plugin;               # </pre>correct
+<p class="Pp">La seule méthode que vous devez implémenter est
+    <span class="Li">"init".</span> Depuis cette méthode, vous pouvez ajouter des
+    hooks pour modifier le comportement de la recette alienfile. Voici un
+    exemple très simple d'un hook probe, avec la logique de probe réelle
+    supprimée </p>:
+<pre>sub init
+{
+  my($self, $meta) = @_;
+  $meta-&gt;register_hook(
+    probe =&gt; sub {
+      my($build) = @_;
+      if( ... )
+      {
+        return 'system';
+      }
+      else
+      {
+        return 'share';
+      }
+    },
+  );
+</pre>}
+<p class="Pp">Les hooks reçoivent l'instance Alien::Build comme premier argument et,
+    selon le hook, peuvent recevoir des arguments </p>supplémentaires</section>.
+<section class="Ss">
+<h2 class="Ss" id='Modifying_hooks'><a class='permalink' href='#Modifying_hooks'>Modifier   des </a></h2>hooks
+<p class="Pp">Vous pouvez aussi modifier des hooks en utilisant
+    <span class="Li">"before_ho</span>ok",
+    <span class="Li">"around_hook" </span>et
+    <span class="Li">"after_hook", de </span>manière similaire aux
+  modificateurs de Moose </p>:
+<pre>sub init
+{
+  my($self, $meta) = @_;
+
+  $meta-&gt;before_hook(
+    build =&gt; sub {
+      my($build) = @_;
+      $build-&gt;log('this runs before the build');
+    },
+  );
+
+  $meta-&gt;after_hook(
+    build =&gt; sub {
+      my($build) = @_;
+      $build-&gt;log('this runs after the build');
+    },
+  );
+
+  $meta-&gt;around_hook(
+    build =&gt; sub {
+      my $orig = shift;
+
+      # Les hooks around sont utiles pour définir des variables d'environnement
+      local $ENV{CPPFLAGS} = '-I/foo/include';
+
+      $orig-&gt;(@_);
+    },
+  );</pre>
+</section>}
+<section class="Ss">
+<h2 class="Ss" id='Testing_plugins'><a class='permalink' href='#Testing_plugins'>Tester   des </a></h2>plugins
+<p class="Pp">Vous pouvez et devriez écrire des tests pour votre plugin. La meilleure
+    façon de le faire est d'utiliser Test::Alien::Build, qui vous permet
+    d'écrire un alienfile en ligne dans votre test. Voici un exemple </p>:
+<pre>use Test::V0;
+use Test::Alien::Build;
+
+my $build = alienfile_ok q{
+  use alienfile;
+  plugin 'Build::MyPlugin' =&gt; (
+    arg1</pre> =&gt; 'override for arg1',
+    arg2 =&gt; [ 'something', 'else' ],
+  );
+  ...
+};
+
+# vous pouvez interroger $build, c'est une insta</section>nce de L&lt;Alien::Build&gt;.
+
+my $alien = alien_build_ok;
+
+# vous pouvez interroger $alien, c'est une instance de L&lt;Alien::Base&gt;.
+<section class="Ss">
+<h2 class="Ss" id='Negotiator_plugins'><a class='permalink' href='#Negotiator_plugins'>Plugins   </a></h2>négociateurs
+<p class="Pp">Un plugin négociateur n'implémente généralement rien par lui-même, mais
+    choisit le meilleur plugin pour atteindre un objectif </p>particulier.
+<p class="Pp">Le plugin « meilleur » peut dans certains cas varier selon la
+    plateforme ou les outils disponibles. Par exemple, le négociateur de
+    téléchargement pourrait choisir d'utiliser le plugin fetch qui repose sur
+    la commande en ligne <span class="Li">"curl",</span> ou il pourrait choisir le plugin
+    fetch qui repose sur le module Perl HTTP::Tiny selon la plateforme et ce
+    qui est déjà installé. (Pour que l'un ou l'autre soit utile, ils doivent
+    prendre en charge SSL)</p>.
+<p class="Pp">Le plugin négociateur est par convention nommé quelque chose comme
+    <span class="Li">"Alien::Build::Plugin::*::Negotiate", </span>mais
+    est généralement invoqué sans le suffixe
+    <span class="Li">"::Negotiate".</span> Par exemple </p>:
+<pre>plugin 'Download'; # est une abréviation pour Alien::Build::Plugin::Download::</pre>Negotiator
+<p class="Pp">Voici un exemple simple d'un négociateur qui choisit
+    <span class="Li">"curl" </span>s'il est déjà installé et HTTP::Tiny
+    sinon. (Le plugin de téléchargement réel est beaucoup plus intelligent et
+    complexe que ceci, mais c'est un bon exemple simplifié)</p>.
+<pre>package Alien::Build::Plugin::Download::Negotiate;
+
+use strict;
+use warnings;
+use Alien::Build::Plugin;
+use File::Which qw( which );
+
+sub init
+{
+  my($self, $meta) = @_;
+
+  if(which('curl')) {
+    $meta-&gt;apply_plugin('Fetch::Curl');
+  } else {
+    $meta-&gt;apply_plugin('Fetch::HTTPTiny');
+  }</pre>
+</section>}
+<section class="Ss">
+<h2 class="Ss" id='Hooks'><a class='permalink' href='#Hooks'>Hook</a></h2>s
+<p class="Pp">Le reste de ce document est une référence pour les hooks que vous
+    pouvez enregistrer. En général, vous pouvez enregistrer n'importe que</p>l
+    hook que vous voulez, mais certaines précautions doivent être prises car
+    certains hooks ont un comportement par défaut qui sera r</section>emplacé lorsque
+    vous enregistrez un hook. Les hooks sont présentés dans l'ordre
+    alphabétique. L'ordre d'exécution est montré dans l</section>e diagramme de flux ci-dessus (si
+    vous parcourez la version HTML de ce document), ou dans le code pseudo
+    Perl de la section résumé.
+<section class="Sh">
+<h1 class="Sh" id='HOOKS'><a class='permalink' href='#HOOKS'>HOOK</a></h1>S
+<section class="Ss">
+<h2 class="Ss" id='build_hook'><a class='permalink' href='#build_hook'>Hook   </a></h2>build
+<pre>$meta-&gt;register_hook( build =&gt; sub {
+  my($build) = @_;
+  ...
+})</pre>;
+<p class="Pp">Cela effectue la construction principale du projet alienisé et l'installe
+    dans l'espace de staging. Le répertoire courant est la racine de
+    construction. Vous devez exécuter les outils nécessaires pour le projet et
+    les installer dans
+    <span class="Li">"$build-"install_prop-&gt;</span>{prefix}&gt;
+    (<span class="Li">"%{.in</span>stall</p>.pref</section>ix}").
+<section class="Ss">
+<h2 class="Ss" id='build_ffi_hook'><a class='permalink' href='#build_ffi_hook'>Hook   </a></h2>build_ffi
+<pre>$meta-&gt;register_hook( build_ffi =&gt; sub {
+  my($build) = @_;
+  ...
+})</pre>;
+<p class="Pp">C'est la même chose que build, </p>sauf qu'il ne se déclenche que</section> lors d'une
+  construction FFI.
+<section class="Ss">
+<h2 class="Ss" id='decode_hook'><a class='permalink' href='#decode_hook'>Hook   </a></h2>decode
+<pre>$meta-&gt;register_hook( decode =&gt; sub {
+  my($build, $res) = @_;
+  ...
+</pre>}
+<p class="Pp">Ce hook prend une référence de hachage de réponse du
+    <span class="Li">"fetch" </span>hook ci-dessus avec un type de
+    <span class="Li">"html" </span>ou
+    <span class="Li">"dir_listing" </span>et la convertit en une
+    référence de hachage de réponse de type <span class="Li">"list". En
+    somme, il prend une réponse de répertoire HTML ou FTP d'un hook fetch</span> et la
+    convertit en une liste de noms de fichiers et de liens qui peut être
+    </p>utilisée par le hook prefer pour choisir le bon fichier à télécharger.
+    Voir le ho</section>ok fetch pour la spécification des références de hachage d'entrée
+    et de réponse.
+<section class="Ss">
+<h2 class="Ss" id='check_digest_hook'><a class='permalink' href='#check_digest_hook'>check_digest   </a></h2>hook
+<pre># implémenter le digest FOO-92 bien connu
+$meta-&gt;register_hook( check_digest =&gt; sub {
+  my($build, $file, $algorithm, $digest) = @_;
+  if($algorithm ne 'FOO92') {
+    return 0;
+  }
+  my $actual = foo92_hex_digest($file);
+  if($actual eq $digest) {
+    return 1;
+  } else {
+    die "Digest FOO92 does not match: got $actual, expected $digest";
+  }
+})</pre>;
+<p class="Pp">Ce hook doit vérifier que le <span class="Li">$file
+</span>    donné (le format est le même que celui utilisé par le hook fetch) correspond
+    au
+    <span class="Li">$digest </span>donné en utilisant l'
+    <span class="Li">$algorithm donné. Si le plugin ne prend pas en charge l'algor</span>ithme
+    donné, il doit retourner une valeur fausse. Si le d</p>igest ne correspond pas,
+    il doit lever une exception. Si </section>le digest correspond, il doit retourner une
+    valeur vraie.
+<section class="Ss">
+<h2 class="Ss" id='clean_install'><a class='permalink' href='#clean_install'>clean_instal</a></h2>l
+<pre>$meta-&gt;register_hook( clean_install =&gt; sub {
+  my($build) = @_;
+})</pre>;
+<p class="Pp">Ce hook vous permet de supprimer des fichiers de l'emplacement
+    d'installation final avant que les fichiers ne soient installés par la
+    couche d'installation (exemples : Alien::Build::MM, Alien::Build::MB ou
+    App::af). Ce hook n'est pas appelé par défaut et doit être activé via
+    l'interface de la couche d'installation (exemple : "clean_install" dans
+    Alien::Build::MM)</p>.
+<p class="Pp">Ce hook NE DOIT PAS supprimer le
+    <span class="Li">répertoire </span>"_alien" ou son contenu de
+    l'emplacement </p>d'installation.
+<p class="Pp">L'implémentation par défaut supprime tous les fichiers SAUF le
+    <span class="Li">répertoir</span>e "_alien</p>" et son</section> contenu.
+<section class="Ss">
+<h2 class="Ss" id='download_hook'><a class='permalink' href='#download_hook'>download   </a></h2>hook
+<pre>$meta-&gt;register_hook( download =&gt; sub {
+  my($build) = @_;
+  ...
+})</pre>;
+<p class="Pp">Ce hook est utilisé pour télécharger la source depuis Internet. Soit
+    sous forme d'archive (comme tar, zip, etc.), soit sous forme d'un répertoire
+    de fichiers (<span class="Li">"git clone",</span> etc). Lorsque le hook est
+    appelé, le répertoire de travail courant sera un nouveau répertoire vide,
+    vous pouvez donc enregistrer le téléchargement dans le répertoire courant.
+    Si vous enregistrez un seul fichier dans le répertoire, Alien::Build
+    supposera qu'il s'agit d'une archive, qui sera traitée par le hook extract.
+    Si vous enregistrez plusieurs fichiers, Alien::Build supposera que le
+    répertoire courant est la racine de la source. Si aucun fichier n'est
+    enregistré du tout, une exception avec un diagnostic approprié sera </p>levée.
+<p class="Pp"><b>Remarque : Si vous enregistrez ce hook, al</b>ors les hooks fetch, decode et
+    prefer </p>NE SERONT PAS appelés, à moins que vous ne </section>les appeliez vous-même
+    depuis ce hook.
+<section class="Ss">
+<h2 class="Ss" id='extract_hook'><a class='permalink' href='#extract_hook'>extract   </a></h2>hook
+<pre>$meta-&gt;register_hook( extract =&gt; sub {
+  my($build, $archive) = @_;
+  ...
+})</pre>;
+<p class="Pp">Ce hook est utilisé pour extraire une archive qui a déjà été
+    téléchargée. Alien::Build a déjà des plugins pour les formats d'archives les
+    plus courants, vous n'aurez donc probablement besoin de ceci que pour ajouter
+    la prise en charge de nouveaux formats d'archives ou de formats inhabituels.
+    Lorsque ce hook est appelé</p>, le répertoire de travail courant sera un nouveau
+    répertoire vide, vous pouvez donc enregistrer le contenu de l'archive dans le
+    répertoire courant. Si un seul répertoire est écrit dans le répertoire
+    courant, Alien::Build supposera qu'il s'agit du répertoire racine du paquet.
+    Si plusieurs fichiers et/ou répertoires so</section>nt présents, cela indiquera que le
+    répertoire de travail courant est la racine du paquet. La logique gère
+    généralement correctement le comportement par défaut pour tar (où les paquets
+    sont généralement extraits dans un sous-répertoire) et pour zip (où les
+    paquets sont généralement extraits dans le répertoire courant).
+<section class="Ss">
+<h2 class="Ss" id='fetch_hook'><a class='permalink' href='#fetch_hook'>fetch   </a></h2>hook
+<pre>package Alien::Build::Plugin::MyPlugin;
+
+use strict;
+use warnings;
+use Alien::Build::Plugin;
+use Carp ();
+
+has '+url' =&gt; sub { Carp::croak "url is required property" };
+
+sub init
+{
+  my($self, $meta) = @_;
+
+  $meta-&gt;register_hook( fetch =&gt; sub {
+    my($build, $url, %options) = @_;
+    ...
+  }
+}
+
+</pre>1;
+<p class="Pp">Utilisé pour récupérer une ressource. La première fois, il sera appelé
+    sans argument (ou avec <span class="Li">$url </span>défini à
+    <span class="Li">"undef",</span> la configuration utilisée pour trouver la ressource
+    devrait donc être spécifiée par les propriétés du plugin. Lors des appels
+    suivants, le premier argument sera une </p>URL.
+<p class="Pp">Le <span class="Li">hachage </span>%options peut contenir ces
+    options </p>:
+<dl class="Bl-tag">
+  <dt id="http_headers"><a class="permalink" href="#http_headers">http_heade</a></dt>rs
+  <dd>En-têtes de requête HTTP, si un protocole approprié est utilisé. Les
+      en-têtes sont fournis sous forme d'une référence de tableau de paires
+      clé/valeur, ce qui permet d'avoir des clés d'en-tête dupliquées avec
+      plusieurs valeurs.
+    <p class="Pp">Si un protocole non-HTTP est utilisé, ou si le plugin ne peut
+        pas autrement envoyer d'en-têtes de requête HTTP, le plugin DEVRAIT
+        émettre un avertissement en utilisant la <span class="Li">méthode "$build-&gt;log", mais
+        par</span>ce que cette option ne faisait pas part</p>ie de la spécification
+        original</dd>e, le plugin PEUT ne pas émettre cet av</dl>ertissement tout en
+        l'ignorant.
+<p class="Pp">Notez que les versions d'Alien::Build antérieures à 2.39 ne
+    passaient pas le hachage d'options au plugin </p>fetch.
+<p class="Pp">Normalement, le premier fetch sera soit vers un fichier, soit vers un
+    répertoire. S'il s'agit d'un fichier, le contenu doit être retourné sous
+    forme d'une référence de hachage avec les clés suivantes </p>:
+<pre># contenu du fichier stocké en Perl
+return {
+  type     =&gt; 'file',
+  filename =&gt; $filename,
+  content  =&gt; $content,
+  version  =&gt; $version,  # optionnel, si connu
+  protocol =&gt; $protocol, # AB 2.60 optionnel, mais recommandé
+};
+
+# contenu du fichier stocké dans le système de fichiers
+return {
+  type     =&gt; 'file',
+  filename =&gt; $filename,
+  path     =&gt; $path,     # chemin complet du système de fichiers vers le fichier
+  version  =&gt; $version,  # optionnel, si connu
+  tmp      =&gt; $tmp,      # optionnel
+  protocol =&gt; $protocol, # AB 2.60 optionnel, mais recommandé
+}</pre>;
+<p class="Pp"><span class="Li">$tmp </span>s'il est défini indiquera si le fichier est
+    temporaire ou non, et peut être utilisé par Alien::Build pour enregistrer une
+    copie dans certains cas. La valeur par défaut est vraie, Alien::Build suppose
+    donc que le fichier ou le répertoire est temporaire si vous ne lui dites pas
+    le contraire. La situation la plus courante où vous définiriez <span class="Li">"tmp" </span>à faux est lorsque le fichier est
+    inclus dans la distribution Alien. Voir
+    Alien::Build::Plugin::Fetch::Local par </p>exemple.
+<p class="Pp">Si l'URL pointe vers un répertoire, vous devez le retourner soit sous
+    forme d'une référence de hachage contenant une liste de fichiers </p>:
+<pre>return {
+  type =&gt; 'list',
+  list =&gt; [
+    # filename : chaque nom de fichier ne doit être que la
+    #   partie nom de fichier, sans chemin ni url.
+    # url : chaque url doit être l'url complète
+    #   nécessaire pour récupérer le fichier.
+    # version : OPTIONNEL, peut être fourni par certains hooks fetch ou prefer
+    { filename =&gt; $filename1, url =&gt; $url1, version =&gt; $version1 },
+    { filename =&gt; $filename2, url =&gt; $url2, version =&gt; $version2 },
+  ],
+  protocol =&gt; $protocol, # AB 2.60 optionnel, mais recommandé
+}</pre>;
+<p class="Pp">ou si la liste est au format HTML, sous forme d'une référence de
+    hachage contenant les informations HTML </p>:
+<pre>return {
+  type =&gt; 'html',
+  charset  =&gt; $charset, # optionnel
+  base     =&gt; $base,    # l'URL de base : utilisée pour calculer les URLs relatives
+  content  =&gt; $content, # le contenu HTML
+  protocol =&gt; $protocol, # optionnel, mais recommandé
+}</pre>;
+<p class="Pp">ou un répertoire (généralement produit par des serveurs FTP) sous
+    forme d'une référence de hachage </p>:
+<pre>return {
+  type     =&gt; 'dir_listing',
+  base     =&gt; $base,
+  content  =&gt; $content,
+  protocol =&gt; $protocol, # AB 2.60 optionnel, mais recommandé
+}</pre>;
+<p class="Pp">[version 2.</p>60]
+<p class="Pp">Pour toutes ces réponses, <span class="Li">$protocol </span>est
+    optionnel, car il ne faisait pas partie de la spécification originale,
+    cependant il est fortement recommandé d'inclure ce champ, car les futures
+    versions d'Alien::Build l'utiliseront pour déterminer si un fichier a été
+    téléchargé de manière sécurisée (c'est-à-dire via un protocole sécurisé
+    comme SSL)</p>.
+<p class="Pp">Certains plugins (comme les plugins decode) transforment un hachage de
+    fichier d'un type à un autre, ils doivent maintenir le
+    <span class="Li">$protocol de l'anc</span>ienne vers la nouv</p>elle représentati</section>on du
+    fichier.
+<section class="Ss">
+<h2 class="Ss" id='gather_ffi_hook'><a class='permalink' href='#gather_ffi_hook'>gather_ffi   </a></h2>hook
+<pre>$meta-&gt;register_hook( gather_ffi =&gt; sub {
+  my($build) = @_;
+  $build-&gt;runtime_prop-&gt;{cflags}  = ...;
+  $build-&gt;runtime_prop-&gt;{libs}    = ...;
+  $build-&gt;runtime_prop-&gt;{version} = ...;
+})</pre>;
+<p class="Pp">Ce hook est appelé pour une construction FFI afin de déterminer les
+    propriétés nécessaires pour utiliser la bibliothèque ou l'outil. Ces
+ </p>   propriétés doivent être stockées dans le hachage runtime_prop comme montré
+    ci-dessus. Les propriétés typiques nécessaires pour les bib</section>liothèques sont
+    cflags et libs. Si possible, vous devriez également essayer de déterminer la
+    version de la bibliothèque ou de l'outil.
+<section class="Ss">
+<h2 class="Ss" id='gather_share_hook'><a class='permalink' href='#gather_share_hook'>gather_share   </a></h2>hook
+<pre>$meta-&gt;register_hook( gather_share =&gt; sub {
+  my($build) = @_;
+  $build-&gt;runtime_prop-&gt;{cflags}  = ...;
+  $build-&gt;runtime_prop-&gt;{libs}    = ...;
+  $build-&gt;runtime_prop-&gt;{version} = ...;
+})</pre>;
+<p class="Pp">Ce hook est appelé pour une installation share afin de déterminer les
+    propriétés nécessaires pour utiliser la bibliothèque ou l'outil. Ces</p>
+    propriétés doivent être stockées dans le hachage runtime_prop comme montré
+    ci-dessus. Les propriétés typiques nécessaires pour les bib</section>liothèques sont
+    cflags et libs. Si possible, vous devriez également essayer de déterminer la
+    version de la bibliothèque ou de l'outil.
+<section class="Ss">
+<h2 class="Ss" id='gather_system_hook'><a class='permalink' href='#gather_system_hook'>gather_system   </a></h2>hook
+<pre>$meta-&gt;register_hook( gather_system =&gt; sub {
+  my($build) = @_;
+  $build-&gt;runtime_prop-&gt;{cflags}  = ...;
+  $build-&gt;runtime_prop-&gt;{libs}    = ...;
+  $build-&gt;runtime_prop-&gt;{version} = ...;
+})</pre>;
+<p class="Pp">Ce hook est appelé pour une installation système afin de déterminer les
+    propriétés nécessaires pour utiliser la bibliothèque ou l'outil. Ce</p>s
+    propriétés doivent être stockées dans le hachage runtime_prop comme montré
+    ci-dessus. Les propriétés typiques nécessaires pour les bi</section>bliothèques sont
+    cflags et libs. Si possible, vous devriez également essayer de déterminer la
+    version de la bibliothèque ou de l'outil.
+<section class="Ss">
+<h2 class="Ss" id='override_hook'><a class='permalink' href='#override_hook'>override   </a></h2>hook
+<pre>$meta-&gt;register_hook( override =&gt; sub {
+  my($build) = @_;
+  return $ENV{ALIEN_INSTALL_TYPE} || '';
+})</pre>;
+<p class="Pp">Cela vous permet de modifier la logique de surcharge. Elle doit retourner l'une
+    des valeurs <span class="Li">"sha</span>re",
+    <span class="Li">"syst</span>em",
+    <span class="Li">"default" </span>ou <span class="Li">''.
+    L'implémentation par défaut est montrée ci-des</span>sus.
+    Alien::Build::Plugin::Probe::Override et
+    A</p>lien::Build::Plugin::Probe::OverrideCI sont des exemple</section>s de la manière dont vous pouvez utiliser ce
+    hook.
+<section class="Ss">
+<h2 class="Ss" id='patch_hook'><a class='permalink' href='#patch_hook'>patch   </a></h2>hook
+<pre>$meta-&gt;register_hook( patch =&gt; sub {
+  my($build) = @_;
+  ...
+})</pre>;
+<p class="Pp">Ce hook est complètement optionnel. S'il est enregistré, il sera
+    déclenché a</p>près l'extraction et avant la construction. Il vous permet d'appliquer des
+    c</section>orrectifs ou d'apporter des modifications aux sources si elles sont nécessaires.
+<section class="Ss">
+<h2 class="Ss" id='patch_ffi_hook'><a class='permalink' href='#patch_ffi_hook'>patch_ffi   </a></h2>hook
+<pre>$meta-&gt;register_hook( patch_ffi =&gt; sub {
+  my($build) = @_;
+  ...
+})</pre>;
+<p class="Pp">Ce hook est exactement comme le hook</p> patch, sauf qu'il ne se déclenche </section>que lors
+    d'une construction FFI.
+<section class="Ss">
+<h2 class="Ss" id='prefer_hook'><a class='permalink' href='#prefer_hook'>prefer   </a></h2>hook
+<pre>$meta-&gt;register_hook( prefer =&gt; sub {
+  my($build, $res) = @_;
+  return {
+    type =&gt; 'list',
+    list =&gt; [sort @{ $res-&gt;{list} }],
+  };
+</pre>}
+<p class="Pp">Ce hook trie les candidats à partir d'une liste générée soit par le
+    hook <span class="Li">"fetch" </span>soit par le
+    <span class="Li">hook "decode". Il doit retourner une nouvelle
+   </span> référence de hachage de liste avec les candidats</p> triés du meilleur au pire. Il peut
+    également </section>supprimer les candidats totalement inacceptables.
+<section class="Ss">
+<h2 class="Ss" id='probe_hook'><a class='permalink' href='#probe_hook'>probe   </a></h2>hook
+<pre>$meta-&gt;register_hook( probe =&gt; sub {
+  my($build) = @_;
+  return 'system' if ...; # system install
+  return 'share';         # otherwise
+});
+
+$meta-&gt;register_hook( probe =&gt; [ $command ] )</pre>;
+<p class="Pp">Ce hook doit retourner la chaîne
+    <span class="Li">"system" </span>si le système d'exploitation fournit
+    la bibliothèque ou l'outil. Il doit retourner
+    <span class="Li">"shar</span>e" s</p>inon.
+<p class="Pp">Vous pouvez également utiliser une commande qui retourne vrai lorsque l'outil ou la
+    bibliothèque est disponible. Par exemple pour une utilisation avec
+    <span class="Li">"pkg-</span>conf</p>ig" :
+<pre>$meta-&gt;register_hook( probe =&gt;
+  [ '%{pkgconf} --exists libfoo' ] )</pre>;
+<p class="Pp">Ou si vous aviez besoin d'une version minimale </p>:
+<pre>$meta-&gt;register_hook( probe =&gt;
+  [ '%{pkgconf} --atleast-version=1.00 libfoo' ] )</pre>;
+<p class="Pp">Notez que ce hook NE DOIT PAS collecter les propriétés du système, telles que
+    cflags, libs, versions, etc., car le hook probe sera ignoré si la variable
+    d'environnement
+    <span class="Li">"ALIEN_INSTALL_TYPE" </span>est définie. La détection
+    de ces propriétés devrait plutôt être effectuée par le hook </p>gather_system.
+<p class="Pp">Plusieurs hooks probe peuvent être d</p>onnés. Ils seront utilisés en séque</section>nce,
+    en s'arrêtant au premier q</section>ui détecte une installation système.
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR   </a></h1>AUSSI
+<dl class="Bl-tag">
+  <dt id="Alien::Build::Manual"><a class="permalink" href="#Alien::Build::Manual">Alien::Build::</a></dt>Manual
+  <dd>Autres </dd>manuels</dl> Alien:</section>:Build.
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTEU</a></h1>R
+<p class="Pp">Auteur : Graham Ollis &lt;plicease@cpan.</p>org&gt;
+<p class="Pp">Contributeurs </p>:
+<p class="Pp">Diab Jerius </p>(DJERIUS)
+<p class="Pp">Roy Storey </p>(KIWIROY)
+<p class="Pp">Ilya </p>Pavlov
+<p class="Pp">David Mertens </p>(run4flat)
+<p class="Pp">Mark Nunberg (mordy, </p>mnunberg)
+<p class="Pp">Christian Walde </p>(Mithaldu)
+<p class="Pp">Brian Wightman </p>(MidLifeXis)
+<p class="Pp">Zaki Mughal </p>(zmughal)
+<p class="Pp">mohawk (mohawk2, </p>ETJ)
+<p class="Pp">Vikas N Kumar </p>(vikasnkumar)
+<p class="Pp">Flavio Poletti </p>(polettix)
+<p class="Pp">Salvador Fandiño </p>(salva)
+<p class="Pp">Gianni Ceccarelli </p>(dakkar)
+<p class="Pp">Pavel Shaydo (zwon, </p>trinitum)
+<p class="Pp">Kang-min Liu (劉康民, </p>gugod)
+<p class="Pp">Nicholas Shipp </p>(nshp)
+<p class="Pp">Juan Julián Merelo Guervós </p>(JJ)
+<p class="Pp">Joel Berger </p>(JBERGER)
+<p class="Pp">Petr Písař </p>(ppisar)
+<p class="Pp">Lance Wicks </p>(LANCEW)
+<p class="Pp">Ahmad Fatoum (a3f, </p>ATHREEF)
+<p class="Pp">José Joaquín Atria </p>(JJATRIA)
+<p class="Pp">Duke Leto </p>(LETO)
+<p class="Pp">Shoichi Kaji </p>(SKAJI)
+<p class="Pp">Shawn Laffan </p>(SLAFFAN)
+<p class="Pp">Paul Evans (leonerd, </p>PEVANS)
+<p class="Pp">Håkon Hægland (hakonhagland, </p>HAKONH)
+<p class="Pp">nick nauwelaerts </p>(INPHOBIA)
+<p class="Pp">Flori</p>an W</section>eimer
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT_AND_LICENSE'><a class='permalink' href='#COPYRIGHT_AND_LICENSE'>DROITS D'AUTEUR   ET </a></h1>LICENCE
+<p class="Pp">Ce logiciel est protégé par le droit d'auteur (c) 2011-2022 par Graham </p>Ollis.
+<p class="Pp">C'est un logiciel libre ; vous pouvez le</p> redistribuer et/ou le modifier
+    sel</section>on les mêmes termes que le système de l</div>angage de programmation Perl 5 lui-même.
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07</td>-14
+    <td class="foot-os">pe</td>rl</tr> v</table>5.</section>42</article>.0
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le </p>paquet :
+    <dl>
+        <dt>Nom du </dt>paquet :
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-alien-build/">extra/perl-alien</a></dd>-build
+        <dt>Version </dt>:
+        <dd>2.</dd>84-3
+        <dt>Amont </dt>:
+        <dd><a href="https://metacpan.org/release/Alien-Build">https://metacpan.org/release/Alie</a></dd>n-Build
+        <dt>Licences </dt>:
+        <dd>PerlArt</dd>istic
+        <dt>Manuels </dt>:
+        <dd><a href="/listing/extra/perl-alien-build/">/listing</a></dd>/extra/p</dl>erl-alie</section>n-build/
+
+<details>
+    <summary>Table des </summary>matières
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">N</a></li>OM
+        
+            <li><a href="#VERSION">VE</a></li>RSION
+        
+            <li><a href="#SYNOPSIS">SY</a></li>NOPSIS
+        
+            <li><a href="#DESCRIPTION">DESC</a></li>RIPTION
+        
+            <li><a href="#HOOKS">H</a></li>OOKS
+        
+            <li><a href="#SEE_ALSO">VOIR </a></li>AUSSI
+        
+            <li><a href="#AUTHOR">A</a></li>UTEUR
+        
+            <li><a href="#COPYRIGHT_AND_LICENSE">DROIT</a></li>S D'A</ul>UTEUR </nav>ET LI</details>CENCE
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Alien::Build::Manual::PluginAuthor.3pm.en.txt">t</a>xt, 
+        
+            <a href="/man/Alien::Build::Manual::PluginAuthor.3pm.en.raw"></a>r</p>a</nav></aside></main>w
+        <footer>
+            de manuel.
+            <p>Le site web est disponible selon les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0
+               , sa</a>uf pour le contenu des pag</p>es de manuel, qui ont leur </footer>propre licence
+            </body>   spécifiée dans le paque</html>t Arch Linux correspondant.

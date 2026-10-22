@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Test2::Manual::Anatomy::EndToEnd(3perl) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Test2__Manual__Anatomy__EndToEnd.3perl</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/core/x86_64/perl/">perl</a></p>
+<p class="lic">Licences: Artistic-1.0-Perl OU GPL-1.0-or-later</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Test2::Manual::Anatomy::EndToEnd(3perl)</td>
+    <td class="head-vol">Manuel du programmeur Perl</td>
+    <td class="head-rtitle">Test2::Manual::Anatomy::EndToEnd(3perl)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">Test2::Manual::Anatomy::EndToEnd - Vue d'ensemble de Test2 depuis le chargement jusqu'à la fin d'un script de test.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Voici une vue d'ensemble de tout ce qui se passe depuis le chargement de Test2 jusqu'à la fin d'un script de test.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='WHAT_HAPPENS_WHEN_I_LOAD_THE_API?'><a class='permalink' href='#WHAT_HAPPENS_WHEN_I_LOAD_THE_API?'>Que se passe-t-il lorsque je charge l'API ?</a></h1>
+<pre>use Test2::API qw/context/</pre>
+<dl class="Bl-tag">
+  <dt id="A"><a class="permalink" href="#A">Une instance singleton de Test2::API::Instance est créée.</a></dt>
+  <dd>Vous n'avez pas accès à cela, c'est un détail d'implémentation.</dd>
+  <dt id="Several"><a class="permalink" href="#Several">Plusieurs fonctions de l'API sont définies qui utilisent l'instance singleton.</a></dt>
+  <dd>Vous pouvez importer ces fonctions, ou les utiliser directement.</dd>
+  <dt id="Then"><a class="permalink" href="#Then">Quoi ?</a></dt>
+  <dd>Attendez...
+    <p class="Pp">L'API fait le moins possible. À ce stade, quelque chose peut encore changer le formateur, charger Test2::IPC, ou avoir des effets globaux qui doivent être effectués avant la création de la première instance de Test2::API::Context. Une fois la première instance de Test2::API::Context créée, l'API sera finalisée.</p>
+    <p class="Pp">Voir « Que se passe-t-il lorsque j'obtiens un contexte ? » pour plus d'informations.</p>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='WHAT_HAPPENS_WHEN_I_USE_A_TOOL?'><a class='permalink' href='#WHAT_HAPPENS_WHEN_I_USE_A_TOOL?'>Que se passe-t-il lorsque j'utilise un outil ?</a></h1>
+<p class="Pp">Cette section couvre le flux de base que tous les outils, tels que <span class="Li">ok()</span>, doivent suivre.</p>
+<pre>sub ok($$) {
+    my ($bool, $name) = @_;
+    my $ctx = context();
+    my $event = $ctx-&gt;send_event('Ok', pass =&gt; $bool, name =&gt; $name);
+    ...
+    $ctx-&gt;release;
+    return $bool;
+}</pre>
+<pre>ok(1, "1 est vrai");</pre>
+<dl class="Bl-tag">
+  <dt id="A~2"><a class="permalink" href="#A~2">Une fonction outil est exécutée.</a></dt>
+  <dd>
+    <pre>ok(1, "1 est vrai");
+</pre>
+  </dd>
+  <dt id="The"><a class="permalink" href="#The">L'outil obtient un objet contexte.</a></dt>
+  <dd>
+    <pre>my $ctx = context();
+</pre>
+    <p class="Pp">Voir « Que se passe-t-il lorsque j'obtiens un contexte ? » pour plus d'informations.</p>
+  </dd>
+  <dt id="The~2"><a class="permalink" href="#The~2">L'outil utilise l'objet contexte pour créer, envoyer et retourner des événements.</a></dt>
+  <dd>Voir « Que se passe-t-il lorsque j'envoie un événement ? » pour plus d'informations.
+        <pre>my $event = $ctx-&gt;send_event('Ok', pass =&gt; $bool, name =&gt; $name);
+</pre>
+  </dd>
+  <dt id="When"><a class="permalink" href="#When">Lorsqu'il a terminé, l'outil doit libérer le contexte.</a></dt>
+  <dd>Voir « Que se passe-t-il lorsque je libère un contexte ? » pour plus d'informations.
+        <pre>$ctx-&gt;release();
+</pre>
+  </dd>
+  <dt id="The~3"><a class="permalink" href="#The~3">L'outil retourne.</a></dt>
+  <dd>
+    <pre>return $bool;
+</pre>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='WHAT_HAPPENS_WHEN_I_ACQUIRE_A_CONTEXT?'><a class='permalink' href='#WHAT_HAPPENS_WHEN_I_ACQUIRE_A_CONTEXT?'>Que se passe-t-il lorsque j'obtiens un contexte ?</a></h1>
+<pre>my $ctx = context();</pre>
+<p class="Pp">Ces actions ne se produisent pas nécessairement exactement dans cet ordre, mais c'est un détail d'implémentation. Aux fins de ce document, cet ordre est utilisé pour aider le lecteur à comprendre le flux.</p>
+<dl class="Bl-tag">
+  <dt>$!, $@, $? et $^E sont capturés et conservés.</dt>
+  <dd>Test2 s'assure de préserver les valeurs de $!, $@, $? et $^E afin que les outils de test ne modifient pas ces variables de manière inattendue. Elles sont capturées en premier afin de pouvoir être restaurées plus tard.</dd>
+  <dt id="The~4"><a class="permalink" href="#The~4">L'état de l'API passe à 'loaded'.</a></dt>
+  <dd>L'état 'loaded' signifie que des outils de test ont déjà commencé à s'exécuter. C'est important car certains plugins doivent être activés avant que toute épreuve ne soit exécutée. Ce changement d'état ne se produit que la première fois qu'un contexte est obtenu, et peut déclencher certains hooks définis par des plugins.</dd>
+  <dt id="The~5"><a class="permalink" href="#The~5">Le hub actuel est trouvé.</a></dt>
+  <dd>Un contexte est attaché au hub actuel. S'il n'y a pas de hub actuel, le hub racine est initialisé. Cela démarre également la pile de hubs si nécessaire.</dd>
+  <dt id="Context"><a class="permalink" href="#Context">Les hooks d'acquisition de contexte sont déclenchés.</a></dt>
+  <dd>Il est possible de créer des hooks globaux ou spécifiques au hub qui se déclenchent lors de l'acquisition d'un contexte ; ces hooks sont déclenchés maintenant. Ces hooks sont déclenchés même s'il existe déjà un contexte.</dd>
+  <dt id="Any"><a class="permalink" href="#Any">Tout contexte existant est trouvé.</a></dt>
+  <dd>Si le hub actuel a déjà un contexte, une copie de celui-ci sera utilisée au lieu d'un contexte entièrement nouveau. Ceci est important car cela permet aux outils imbriqués d'hériter du contexte utilisé par les outils parents.</dd>
+  <dt id="Stack"><a class="permalink" href="#Stack">La profondeur de la pile est mesurée.</a></dt>
+  <dd>Test2 s'assure qu'il n'y a pas d'erreurs dans la façon dont le contexte est utilisé. La profondeur de la pile est utilisée pour y parvenir. S'il existe un contexte, sa profondeur sera comparée à celle trouvée ici. Si l'ancien contexte a la même profondeur ou une profondeur inférieure, cela indique qu'un outil est défectueux et n'a pas nettoyé son contexte lorsqu'il a terminé, ce qui entraînera le nettoyage de l'ancien contexte et l'émission d'un avertissement.</dd>
+  <dt id="A~3"><a class="permalink" href="#A~3">Un nouveau contexte est créé (s'il n'y en a pas d'existant).</a></dt>
+  <dd>S'il n'y a pas de contexte existant, un nouveau contexte est créé en utilisant les données collectées précédemment.</dd>
+  <dt id="Context~2"><a class="permalink" href="#Context~2">Les hooks d'initialisation de contexte sont déclenchés (s'il n'y en a pas d'existant).</a></dt>
+  <dd>Si un nouveau contexte a été créé, les hooks de création de contexte sont déclenchés.</dd>
+  <dt>$!, $@, $?, et $^E sont restaurés.</dt>
+  <dd>On s'assure que ces valeurs n'ont pas été modifiées à ce stade afin que les changements qui ont été effectués n'affectent rien d'autre. Ceci est fait au cas où quelque chose aurait accidentellement changé ces valeurs dans le contexte de construction.</dd>
+  <dt id="The~6"><a class="permalink" href="#The~6">Le contexte est retourné.</a></dt>
+  <dd>Vous avez un brillant nouvel objet contexte ou une copie du contexte existant.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='WHAT_HAPPENS_WHEN_I_SEND_AN_EVENT?'><a class='permalink' href='#WHAT_HAPPENS_WHEN_I_SEND_AN_EVENT?'>Que se passe-t-il lorsque j'envoie un événement ?</a></h1>
+<pre>my $event = $ctx-&gt;send_event('Ok', pass =&gt; $bool, name =&gt; $name);</pre>
+<dl class="Bl-tag">
+  <dt id="The~7"><a class="permalink" href="#The~7">Le module Test2::Event::Ok est chargé.</a></dt>
+  <dd>La méthode send_event() de Test2::Event::Ok est chargée automatiquement. Normalement, send_event() suppose que le premier argument est une classe d'événement sans le préfixe Test2::Event::, qu'elle ajoute pour vous. Si vous souhaitez utiliser une classe d'événement dans un espace de noms différent, vous pouvez préfixer le nom de la classe avec un + pour indiquer que vous fournissez un nom de classe entièrement qualifié :
+        <pre>my $event = $ctx-&gt;send_event('+Fully::Qualified::Event', pass =&gt; $bool, name =&gt; $name);
+</pre>
+  </dd>
+  <dt id="A~4"><a class="permalink" href="#A~4">Une nouvelle instance de Test2::Event::Ok est créée.</a></dt>
+  <dd>L'objet événement est instancié en utilisant les paramètres fournis.</dd>
+  <dt id="The~8"><a class="permalink" href="#The~8">L'objet événement est envoyé au hub.</a></dt>
+  <dd>Le hub prend le contrôle à partir d'ici.</dd>
+  <dt id="The~9"><a class="permalink" href="#The~9">Le hub fait passer l'événement à travers tous les filtres.</a></dt>
+  <dd>Les filtres peuvent modifier ou supprimer les événements. Les filtres sont exécutés en premier, avant que l'événement ne modifie l'état global des tests.</dd>
+  <dt id="The~10"><a class="permalink" href="#The~10">L'état global des tests est mis à jour pour refléter l'événement.</a></dt>
+  <dd>Si l'événement affecte le compteur de tests, le compteur est incrémenté. Si l'événement provoque un échec, le compteur d'échecs est incrémenté. L'état global peut être affecté de diverses autres manières.</dd>
+  <dt id="The~11"><a class="permalink" href="#The~11">L'événement est envoyé au formateur.</a></dt>
+  <dd>Après la mise à jour de l'état, le hub enverra l'événement au formateur pour le rendu. C'est là que le TAP est normalement généré.</dd>
+  <dt id="The~12"><a class="permalink" href="#The~12">L'événement est envoyé à tous les auditeurs.</a></dt>
+  <dd>Il existe n'importe quel nombre d'auditeurs qui agissent lors du traitement des événements. Cela se produit maintenant.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='WHAT_HAPPENS_WHEN_I_RELEASE_A_CONTEXT?'><a class='permalink' href='#WHAT_HAPPENS_WHEN_I_RELEASE_A_CONTEXT?'>Que se passe-t-il lorsque je libère un contexte ?</a></h1>
+<pre>$ctx-&gt;release;</pre>
+<dl class="Bl-tag">
+  <dt id="The~13"><a class="permalink" href="#The~13">Le clone de contexte actuel est libéré.</a></dt>
+  <dd>Si votre outil est imbriqué, la libération détruira simplement la copie du contexte, rien d'autre ne se produira.</dd>
+</dl>
+</section>
+</article>
+</main>
+</body>
+</html><div class="article">
+  <h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NOM</a></h1>
+  <pre>Test2::Manual</pre>
+  <dl class="Bl-tag">
+    <dt id="Any~1"><a class="permalink" href="#Any~1">Tous les événements IPC en attente seront élagués.</a></dt>
+    <dd>Si l'IPC est activé, un élagage final aura lieu.</dd>
+    <dt id="Follow"><a class="permalink" href="#Follow">Les hooks de suivi sont exécutés</a></dt>
+    <dd>Les hooks de suivi sont un moyen d'exécuter des actions lorsqu'un hub est terminé. Ceci est utile pour ajouter des tâches de nettoyage ou des tests finaux à la fin d'un test.</dd>
+    <dt id="The~14"><a class="permalink" href="#The~14">Le contexte est effacé</a></dt>
+    <dd>Les données de contexte principales sont effacées, permettant au prochain outil de créer un nouveau contexte. Ceci est important car le prochain outil aura très probablement un nouveau numéro de ligne.</dd>
+    <dt>$!, $@, $?, et $^E sont restaurés</dt>
+    <dd>Lorsqu'un outil Test2 est terminé, il restaure $@, $!, $? et $^E pour éviter les actions à distance.</dd>
+  </dl>
+</section>
+<section class="Sh">
+  <h1 class="Sh" id='WHAT_HAPPENS_WHEN_I_USE_&lt;b&gt;done_testing()&lt;/b&gt;?'><a class='permalink' href='#WHAT_HAPPENS_WHEN_I_USE_&lt;b&gt;done_testing()&lt;/b&gt;?'>QUE SE PASSE-T-IL QUAND J'UTILISE <b>done_testing()</b>?</a></h1>
+  <pre>done_testing();</pre>
+  <dl class="Bl-tag">
+    <dt id="Any~2"><a class="permalink" href="#Any~2">Tous les événements IPC en attente seront élagués.</a></dt>
+    <dd>Si l'IPC est activé, un élagage final aura lieu.</dd>
+    <dt id="Follow"><a class="permalink" href="#Follow">Les hooks de suivi sont exécutés</a></dt>
+    <dd>Les hooks de suivi sont un moyen d'exécuter des actions lorsqu'un hub est terminé. Ceci est utile pour ajouter des tâches de nettoyage ou des tests finaux à la fin d'un test.</dd>
+    <dt id="The~15"><a class="permalink" href="#The~15">L'événement de plan final est généré et traité.</a></dt>
+    <dd>L'événement de plan final sera produit en utilisant le nombre de tests actuel comme nombre de tests planifiés.</dd>
+    <dt id="The~16"><a class="permalink" href="#The~16">Le hub actuel est finalisé.</a></dt>
+    <dd>Cela marquera le hub comme terminé et n'autorisera pas le traitement de nouveaux événements.</dd>
+  </dl>
+</section>
+<section class="Sh">
+  <h1 class="Sh" id='WHAT_HAPPENS_WHEN_A_TEST_SCRIPT_IS_DONE?'><a class='permalink' href='#WHAT_HAPPENS_WHEN_A_TEST_SCRIPT_IS_DONE?'>QUE SE PASSE-T-IL QUAND UN SCRIPT DE TEST EST TERMINÉ?</a></h1>
+  <p class="Pp">Test2 a certains comportements qu'il exécute dans un bloc <span class="Li">&quot;END { ... }&quot;</span> après que les tests soient terminés. Ce bloc de fin effectue quelques vérifications finales pour vous avertir si quelque chose s'est mal passé. Ce bloc de fin définit également la valeur de sortie du script.</p>
+  <dl class="Bl-tag">
+    <dt id="API"><a class="permalink" href="#API">Les versions de l'API sont vérifiées.</a></dt>
+    <dd>Un avertissement sera produit si Test::Builder est chargé, mais a une version différente de Test2::API. Cette situation peut se produire si vous rétrogradez vers une distribution Test-Simple plus ancienne, et c'est une mauvaise situation.</dd>
+    <dt id="Any~3"><a class="permalink" href="#Any~3">Tous les objets de contexte restants sont nettoyés.</a></dt>
+    <dd>S'il reste des objets de contexte, ils devront être nettoyés. Un contexte restant n'est jamais une bonne chose et nécessite généralement un avertissement. Un contexte restant pourrait également résulter d'une exception lancée qui termine le script. Test2 est assez bon pour remarquer cela et ne pas avertir dans ces cas, car l'avertissement ne serait qu'un bruit.</dd>
+    <dt id="Child"><a class="permalink" href="#Child">Les processus enfants reçoivent un événement 'en attente'.</a></dt>
+    <dd>Si l'IPC est actif, un événement en attente est envoyé à tous les processus enfants.</dd>
+    <dt id="The~17"><a class="permalink" href="#The~17">Le script attendra que tous les processus et/ou threads enfants se terminent.</a></dt>
+    <dd>Cela se produit uniquement lorsque l'IPC est chargé, mais que Test::Builder ne l'est pas. Ce comportement est utile, mais briserait la compatibilité pour les tests hérités.</dd>
+    <dt id="The~18"><a class="permalink" href="#The~18">La pile des hubs est nettoyée.</a></dt>
+    <dd>Tous les hubs sont finalisés en partant du haut. Les hubs restants sont généralement une mauvaise chose, un avertissement est donc produit s'il en est trouvé.</dd>
+    <dt id="The~19"><a class="permalink" href="#The~19">Le hub racine est finalisé.</a></dt>
+    <dd>Cette étape est une opération nulle si <span class="Li">done_testing()</span> a été utilisé. Si nécessaire, cela marquera le hub racine comme terminé.</dd>
+    <dt id="Exit"><a class="permalink" href="#Exit">Les rappels de sortie sont appelés.</a></dt>
+    <dd>C'est une occasion pour les plugins de modifier la valeur de sortie finale du script.</dd>
+    <dt id="The~20"><a class="permalink" href="#The~20">La valeur de sortie du script ($?) est définie.</a></dt>
+    <dd>Si le test a rencontré des échecs, celle-ci sera définie sur une valeur non nulle. Si possible, elle sera définie sur le nombre d'échecs, ou 255 si le nombre est supérieur à 255 (la valeur maximale autorisée).</dd>
+    <dt id="Broken"><a class="permalink" href="#Broken">Diagnostics de modules cassés</a></dt>
+    <dd>Test2 est conscient de nombreux modules qui ont été cassés par la sortie de Test2. À ce stade, le script vérifiera si des modules connus comme cassés ont été chargés et vous avertira s'ils l'ont été.
+      <p class="Pp"><b>Remarque :</b> Cela ne se produit que s'il y a eu des échecs de test. Aucun avertissement de module cassé n'est produit en cas de succès.</p>
+    </dd>
+  </dl>
+</section>
+<section class="Sh">
+  <h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR AUSSI</a></h1>
+  <p class="Pp">Test2::Manual - Index principal du manuel.</p>
+</section>
+<section class="Sh">
+  <h1 class="Sh" id='SOURCE'><a class='permalink' href='#SOURCE'>SOURCE</a></h1>
+  <p class="Pp">Le dépôt de code source de Test2-Manual se trouve à l'adresse <a href='https://github.com/Test-More/test-more/'>https://github.com/Test-More/test-more/</a>.</p>
+</section>
+<section class="Sh">
+  <h1 class="Sh" id='MAINTAINERS'><a class='permalink' href='#MAINTAINERS'>MAINTENEURS</a></h1>
+  <dl class="Bl-tag">
+    <dt id="Chad"><a class="permalink" href="#Chad">Chad Granum &lt;exodist@cpan.org&gt;</a></dt>
+    <dd></dd>
+  </dl>
+</section>
+<section class="Sh">
+  <h1 class="Sh" id='AUTHORS'><a class='permalink' href='#AUTHORS'>AUTEURS</a></h1>
+  <dl class="Bl-tag">
+    <dt id="Chad~2"><a class="permalink" href="#Chad~2">Chad Granum &lt;exodist@cpan.org&gt;</a></dt>
+    <dd></dd>
+  </dl>
+</section>
+<section class="Sh">
+  <h1 class="Sh" id='COPYRIGHT'><a class='permalink' href='#COPYRIGHT'>DROITS D'AUTEUR</a></h1>
+  <p class="Pp">Copyright Chad Granum &lt;exodist@cpan.org&gt;</p>
+  <p class="Pp">Ce programme est un logiciel libre ; vous pouvez le redistribuer et/ou le modifier sous les mêmes termes que Perl lui-même.</p>
+  <p class="Pp">Voir <a href='http://dev.perl.org/licenses/'>http://dev.perl.org/licenses/</a></p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-13</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page man" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/core/x86_64/perl/">core/perl</a></dd>
+        <dt>Version :</dt>
+        <dd>5.42.0-1</dd>
+        <dt>En amont :</dt>
+        <dd><a href="https://www.perl.org">https://www.perl.org</a></dd>
+        <dt>Licences :</dt>
+        <dd>Artistic-1.0-Perl OU GPL-1.0-or-later</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/core/perl/">/listing/core/perl/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#WHAT_HAPPENS_WHEN_I_LOAD_THE_API?">QUE SE PASSE-T-IL QUAND JE CHARGE L'API ?</a></li>
+        
+            <li><a href="#WHAT_HAPPENS_WHEN_I_USE_A_TOOL?">QUE SE PASSE-T-IL QUAND J'UTILISE UN OUTIL ?</a></li>
+        
+            <li><a href="#WHAT_HAPPENS_WHEN_I_ACQUIRE_A_CONTEXT?">QUE SE PASSE-T-IL QUAND J'ACQUIERS UN CONTEXTE ?</a></li>
+        
+            <li><a href="#WHAT_HAPPENS_WHEN_I_SEND_AN_EVENT?">QUE SE PASSE-T-IL QUAND J'ENVOIE UN ÉVÉNEMENT ?</a></li>
+        
+            <li><a href="#WHAT_HAPPENS_WHEN_I_RELEASE_A_CONTEXT?">QUE SE PASSE-T-IL QUAND JE RELEASE UN CONTEXTE ?</a></li>
+        
+            <li><a href="#WHAT_HAPPENS_WHEN_I_USE_&lt;b&gt;done_testing()&lt;/b&gt;?">QUE SE PASSE-T-IL QUAND J'UTILISE <b>done_testing()</b>?</a></li>
+        
+            <li><a href="#WHAT_HAPPENS_WHEN_A_TEST_SCRIPT_IS_DONE?">QUE SE PASSE-T-IL QUAND UN SCRIPT DE TEST EST TERMINÉ?</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+            <li><a href="#SOURCE">SOURCE</a></li>
+        
+            <li><a href="#MAINTAINERS">MAINTENEURS</a></li>
+        
+            <li><a href="#AUTHORS">AUTEURS</a></li>
+        
+            <li><a href="#COPYRIGHT">DROITS D'AUTEUR</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Test2::Manual::Anatomy::EndToEnd.3perl.en.txt">txt</a>, 
+        
+            <a href="/man/Test2::Manual::Anatomy::EndToEnd.3perl.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>, à l'exception du contenu des pages man, qui ont leur propre licence spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

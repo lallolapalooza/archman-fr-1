@@ -1,0 +1,258 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>bpkg-repository-signing(1) — Pages manuelles </title>d'Arch
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">bpkg-repository-signing(1)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/build2/">build2</a></p>
+
+        nt
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">bpkg-repository-signin</td>g(1)
+    <td class="head-vol">Manuel des commandes </td>générales
+    <td class="head-rtitle">bpkg-repository-signin</td>g(</tr>1</table>)
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NO</a></h1>M
+<p class="Pp"><b>bpkg-reposit</b>ory-signing </p>- comment sig</section>ner un dépôt
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSI</a></h1>S
+<p class="Pp"><b>bpkg rep-create </b>--key .</p>.</section>.
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTIO</a></h1>N
+<p class="Pp">Le but de signer un dépôt est d'empêcher la falsification des
+    paquets, que ce soit pendant la transmission ou sur la machine <i>hôte
+    du dépôt.</i> Idéalement, vous devriez générer et signer les manifestes du dépôt
+    sur une machine de <i>compilation
+    distincte située derrière un pare-feu. De
+    cette façon, si (ou, en fait, lorsque) votre machine hôte est compromise, il sera
+    difficile pour un attaquant de compromettre les paquets du dépôt sans
+    être remarqué. Comme la clé du dépôt est conservée sur </i>la machine de compilation (ou,
+    mieux encore, sur un <i>appareil </i>PIV/PKCS#11 à sens unique ; voir ci-dessous), ils ne pourront
+    pas re-signer le dépôt modifié. <i>bpkg utilise </i>la cryptographie à clé publique X.509 pour la signature
+    des dépôts. Actuellement, seule l'authentification par </p>certificat
+<p class="Pp"><b>« </b>first use » explicite est implémentée. C'est-à-dire que, pour un certificat inconnu (de cette <i>configuration
+    bpkg), les informations du sujet </i>et
+    l'empreinte numérique sont présentées à l'utilisateur. Si l'utilisateur confirme l'authenticité
+    du certificat, alors celui-ci est ajouté à la configuration et tout dépôt
+    qui présentera ce certificat à l'avenir sera considéré comme digne de confiance sans autres
+    confirmations, à condition que son nom corresponde au sujet du certificat (voir
+    ci-dessous). À l'avenir, un modèle basé sur une autorité de certification (CA) pourrait être
+  ajouté. <b>Le </b>reste de ce guide montre comment créer une paire clé/certificat
+    </p>pour
+<p class="Pp">la signature de dépôts pkg et comment l'utiliser pour signer un dépôt. À la
+    fin, il explique également brièvement comment stocker la clé privée sur un appareil PIV/PKCS#11
+    en prenant Yubikey 4 comme exemple. <b>1.</b> Générer la clé </p>privée
+<dl class="Bl-tag">
+  <dt>La première étape consiste à générer la clé </dt>privée :
+  <dd>
+    <br/>
+    $ openssl genrsa -aes256 2048 &gt;key.pem
+        <pre>Si vous souhaitez générer une clé sans protection par mot de passe
+        (ce qui n'est pas une bonne idée, sauf pour les tests),</pre> laissez l'option
+    <p class="Pp">-aes256 de côté. Vous devrez peut-être aussi ajouter
+        <b>-nodes
+</b>        en fonction de votre <b>co</b>nfiguration <a href='/man/openssl.1.en'>ope</a>nss</p>l(</dd>1).
+  <dt>2. Générer le </dt>certificat
+  <dd>
+    <br/>
+    Créez ensuite le fichier de configuration du certificat en enregistrant ce qui suit dans
+      <b>cert.conf.</b> Vous voudrez peut-être le conserver au cas où vous auriez besoin de renouveler
+      un certificat expiré, etc.
+        <pre>name  = example.com
+org   = Example, Inc
+email = admin@example.com
+[req]
+distinguished_name = req_distinguished_name
+x509_extensions    = v3_req
+prompt             = no
+utf8               = yes
+[req_distinguished_name]
+O  = $org
+CN = name:$name
+[v3_req]
+keyUsage         = critical,digitalSignature
+extendedKeyUsage = critical,codeSigning
+subjectAltName   = email:</pre>$email
+    <p class="Pp">Ajustez les trois premières lignes pour qu'elles correspondent à vos informations. Si le
+        dépôt est hébergé par une organisation, utilisez le nom de l'organisation pour
+        <b>org.</b> Si vous l'hébergez en tant qu'individu, mettez votre nom complet et réel
+        là-bas. Utiliser un type d'alias ou de surnom est une mauvaise idée (sauf,
+        encore une fois, pour les tests). Rappelez-vous que les utilisateurs de votre dépôt seront
+        présentés avec ces informations et s'ils voient qu'il a été signé par quelqu'un
+        nommé SmellySnook, ils ne lui feront probablement pas confiance. Utilisez également une adresse e-mail fonctionnelle
+        au cas où les utilisateurs auraient besoin de vous contacter au sujet de problèmes avec votre
+        certificat. Notez que le <b>pr</b>éfixe <b>name:</b> dans la </p>valeur
+    <p class="Pp">CN n'est
+        pas une faute de frappe. <b>L</b>e <b>champ </b>name est un préfixe de nom de dépôt canonique
+        avec la partie de type <b>pkg: retirée. Tout dépôt dont le nom canonique
+</b>        commence par ce préfixe peut être authentifié par ce
+        certificat (voir la documentation sur les manifestes de dépôt pour plus
+        d'informations sur les noms canoniques). Par exemple, name
+        <b>example.com
+        correspondra à tout </b>dépôt hébergé sur <b>{,www.,pkg.,bpkg.}</b>example.com. Alors que name <b>example.com/math
+       </b> correspondra à
+        <b>{...}example.</b>com/pkg/1/ma</p>th mais pas à
+    <p class="Pp">{...}example.com/pkg/1/misc. <b>Un nom de certificat </b>peut également contenir un joker de sous-domaine. Un
+        nom joker sous la forme <b>*.example.com correspond à n'importe quel </b>sous-domaine de niveau unique,
+        par exemple
+        <b>foo.</b>example.com mais pas
+        <b>foo.</b>bar.example.com, tandis qu'un nom joker sous la forme<b>**.example.com correspond </b>à n'importe quel sous-domaine, y compris multi-niveaux.
+        Les deux formes ci-dessus ne correspondent pas au domaine lui-même ( <b>example.com
+        dans l'exemple </b>ci-dessus). Si c'est souhaité, les formes
+        <b>*example.</b>com et
+        <b>**example.com </b>devraient être utilisées à la place. Notez que ces formes
+        ne correspondent toujours qu'à des sous-domaines. En d'autres termes, elles ne correspondront </p>pas à
+    <p class="Pp">fooexample.com. Les noms jokers sont moins sécurisés et sont donc
+        normalement utilisés uniquement pour les tests et/ou les </p>dépôts internes.
+        <pre>Une fois le fichier de configuration prêt, générez le
+        certificat </pre>:
+    <p class="Pp">openssl req -x509 -new -sha256 -key key.pem \
+  -config cert.conf -days </p>730 &gt;cert.pem
+        <pre>Pour vérifier les i</pre>nformations du cer</dd>tificat, exécutez :
+  <dt>openssl x509 -noout -nameopt RFC2253,sep_multiline \
+  -subject -dates -email </dt>&lt;cert.pem
+  <dd>
+    <br/>
+    3. Ajouter le certificat au dépôt <b>Ajoutez </b>le champ<b>certificate: pour le </b>dépôt de base ( <b>role:
+      base)</b> dans le(s) fichier(s) manifeste
+        <pre>repositories </pre>:
+    <p class="Pp">certificate:
+\
+&lt;cert&gt;
+\ <i>R</i>emplacez
+        <b>cert </b>par l'intégralité du contenu </p>de
+        <pre>cert.pem (y compris les lignes BEGIN CERT</pre>IFICATE et END CERTIFICATE
+        ). Vo</dd>us aurez donc une entrée comme celle-ci :
+  <dt>certificate:
+\
+-----BEGIN CERTIFICATE-----
+MIIDQjCCAiqgAwIBAgIJAIUgsIqSnesGMA0GCSqGSIb3DQEBCwUAMDkxFzAVBgNV
+.
+.
+.
++NOVBamEvjn58ZcLfWh2oKee7ulIZg==
+</dt>-----END CERTIFICATE-----
+\
+  <dd>
+    <br/>
+    4. Signer le dépôt <a href='/man/bpkg-rep-create.1.en'>Lors de la génération </a>des manifestes de dépôt avec la commande <b>bpkg-rep-create(1)
+  </b>    , spécifiez le chemin vers <b>key.</b>pem avec l'option
+        <pre>--key : bpkg rep-create --key /path/to/key.pem </pre>/path/to/repository
+    <p class="Pp">On vous demandera un mot</p> de passe pour déverrouil</dd>ler la clé
+      privée.
+  <dt>5. Utiliser un appareil </dt>PIV/PKCS#11
+  <dd>
+    <br/>
+    Cette étape facultative montre comment charger la clé privée dans Yubikey 4 puis
+      l'utiliser à la place de la clé privée elle-même pour signer le dépôt. Notez
+      que vous aurez besoin d'OpenSSL 1.0.2 ou ultérieur pour que la partie signature fonctionne.
+    <p class="Pp">Modifiez d'abord la MKEY, la PUK et le PIN de la Yubikey si nécessaire. Vous
+        devriez absolument le faire si elle a encore les valeurs par défaut d'usine. Importez ensuite
+        la clé privée et le certificat dans la Yubikey (remplacez
+        <i>mkey </i>par la clé de </p>gestion) :
+        <pre>yubico-piv-tool --key=&lt;mkey&gt; -a import-key -s 9c &lt;key.pem
+yubico-piv-tool --key=&lt;mkey&gt; -a import-certificate -s 9c &lt;cert.</pre>pem
+    <p class="Pp">Après cela, vous enregistrerez normalement le certificat/la clé privée
+        sur un support de sauvegarde, le stockerez dans un endroit sécurisé et hors ligne, et retirerez
+        la clé de la machine de </p>compilation.
+    <p class="Pp">Pour signer le dépôt avec la Yubikey, spécifiez les options suivantes
+        au lieu de simplement <b>--key </b>comme à l'étape 4 (« SIGN key »
+        est l'étiquette de la clé privée du </p>slot 9c) :
+        <pre>bpkg rep-create                                                     \
+  --openssl-option pkeyutl:-engine --openssl-option pkeyutl:pkcs11  \
+  --openssl-option pkeyutl:-keyform --openssl-option pkeyutl:engine \
+  --key "pkcs11:object=SIGN%20key" </pre>/path/to/repository
+    <p class="Pp">Notez que pour les versions <b>openssl </b>antérieures à la <b>3.</b>0.0
+        <b>bpkg </b>utilise la commande <b>rsautl </b>au lieu de <b>pkeyutl po</b>ur
+      </p>  l'opérat</dd>ion de sig</dl>nature de</section>s données.
+<section class="Sh">
+<h1 class="Sh" id='BUGS'><a class='permalink' href='#BUGS'>ANOMALI</a></h1>ES
+<p class="Pp">Envoyez les rapports de </p>bogue à la liste de dif</section>fusion users@build2.org.
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT'><a class='permalink' href='#COPYRIGHT'>DROITS </a></h1>D'AUTEUR
+<p class="Pp">Copyright (c) 2014-2024 les auteurs de </p>build2.
+<p class="Pp">La permission est accordée de</p> copier, distribuer et/ou mod</section>ifier ce
+    document selon </div>les termes de la licence MIT.
+<table class="foot">
+  <tr>
+    <td class="foot-date">Juin </td>2024
+    <td class="foot-os">bp</td>kg</tr> 0</table>.</section>17</article>.0
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le </p>paquet :
+    <dl>
+        <dt>Nom du </dt>paquet :
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/build2/">extra/b</a></dd>uild2
+        <dt>Version </dt>:
+        <dd>0.17.</dd>0-1
+        <dt>Amont </dt>:
+        <dd><a href="https://build2.org/">https://build2.</a></dd>org/
+        <dt>Licences </dt>:
+        <dd>M</dd>IT
+        <dt>Manuels </dt>:
+        <dd><a href="/listing/extra/build2/">/listing/extra/b</a></dd>uild</dl>2</section>/
+
+<details>
+    <summary>Table des </summary>matières
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">N</a></li>OM
+        
+            <li><a href="#SYNOPSIS">SY</a></li>NOPSIS
+        
+            <li><a href="#DESCRIPTION">DESC</a></li>RIPTION
+        
+            <li><a href="#BUGS">B</a></li>OGUES
+        
+            <li><a href="#COPYRIGHT">DRO</a></li>ITS</ul> D'</nav>AUT</details>EUR
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/bpkg-repository-signing.1.en.txt">t</a>xt, 
+        
+            <a href="/man/bpkg-repository-signing.1.en.raw">b</a></p>r</nav>u</aside></main>t
+        <footer>
+            de manuel.
+            <p>Le site web est disponible selon les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0
+               , à </a>l'exception du contenu des p</p>ages de manuel, qui ont leu</footer>r propre licence
+          </body>     spécifiée dans le paque</html>t Arch Linux correspondant.

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>btool_faq(1) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">btool_faq(1)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/perl-text-bibtex/">perl-text-bibtex</a></p>
+<p class="lic">Licences: PerlArtistic, GPL</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">BTOOL_FAQ(1)</td>
+    <td class="head-vol">btparse</td>
+    <td class="head-rtitle">BTOOL_FAQ(1)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">btool_faq - Foire aux questions concernant btparse et Text::BibTeX</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Ce document tente de répondre aux questions qui m'ont été posées
+    plusieurs fois, et qui sont faciles à répondre, mais pas en consultant la
+    documentation. Pour diverses raisons, les réponses ont tendance à être
+    finement distribuées dans plusieurs pages de manuel, rendant difficile de
+    comprendre ce qui se passe. Par conséquent, cette page de manuel tentera de
+    lier divers fils de pensée, en fournissant des réponses rapides et ciblées,
+    du type « Comment faire X ? », par opposition à de longues descriptions des
+    capacités et conventions des bibliothèques bTOOL.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PERL_LIBRARY'><a class='permalink' href='#PERL_LIBRARY'>BIBLIOTHÈQUE PERL</a></h1>
+<p class="Pp">Cette section couvre les questions que se sont posées les utilisateurs
+    de <span class="Li">&quot;Text::BibTeX&quot;</span>, le composant Perl de
+    <b>btOOL</b>.</p>
+<section class="Ss">
+<h2 class="Ss" id='Why_aren&apos;t_the_BibTeX_&amp;quot;month&amp;quot;_macros_defined?'><a class='permalink' href='#Why_aren&apos;t_the_BibTeX_&amp;quot;month&amp;quot;_macros_defined?'>Pourquoi les macros « month » de BibTeX ne sont-elles pas définies ?</a></h2>
+<p class="Pp">Parce qu'elles sont spécifiques à la bibliographie, et que
+    <span class="Li">&quot;Text::BibTeX&quot;</span>, par défaut, n'impose aucune
+    hypothèse sur un type particulier de base de données ou de domaine de
+    traitement de données sur vos entrées. Le problème survient lorsque vous analysez
+    des entrées d'un fichier, disons <i>foo.bib</i>, qui utilisent très
+    judicieusement les macros de mois (<span class="Li">&quot;jan&quot;</span>,
+    <span class="Li">&quot;feb&quot;</span>, etc.) fournies par les fichiers de
+    style standard de BibTeX :</p>
+<pre>$bibfile = Text::BibTeX::File-&gt;new('foo.bib')    # ouvre le fichier
+   or die &quot;foo.bib: $!\n&quot;;
+$entry = Text::BibTeX::Entry-&gt;new($bibfile);     # analyse la première entrée</pre>
+<p class="Pp">En utilisant ce code, vous pourriez obtenir un avertissement « macro non définie »
+    pour chaque entrée analysée à partir de <i>foo.bib</i>. Outre la gêne
+    superficielle de tous ces messages d'avertissement, les macros non définies
+    sont développées comme des chaînes vides, ce qui signifie que vous perdez toute
+    information à leur sujet – ce qui n'est pas bon.</p>
+<p class="Pp">Vous pourriez toujours bidouiller et définir de force les macros de mois
+    vous-même. Avant la version 0.30, cela devait être fait en analysant un
+    ensemble de fausses entrées, mais maintenant <span class="Li">&quot;Text::BibTeX&quot;</span>
+    fournit une interface directe vers la table des macros sous-jacente. Vous
+    <i>pourriez</i> simplement faire ceci avant d'analyser des entrées :</p>
+<pre>use Text::BibTeX qw(:macrosubs);
+# ...
+my %month = (jan =&gt; 'January', feb =&gt; 'February', ... );
+add_macro_text ($macro, $value) 
+   while (($macro, $value) = each %month);</pre>
+<p class="Pp">Mais il existe une meilleure façon, plus conforme à la manière dont les choses
+    sont faites dans BibTeX (où les macros par défaut sont définies dans le fichier
+    de style) : utilisez l'analogue orienté objet de <span class="Li">&quot;Text::BibTeX&quot;</span>
+    pour les fichiers de style, appelé modules de structure. <span class="Li">&quot;Text::BibTeX&quot;</span>
+    fournit un module de structure, <span class="Li">&quot;Text::BibTeX::Bib&quot;</span>,
+    qui émule (partiellement) les fichiers de style standard de BibTeX 0.99, y
+    compris la définition des macros de mois. Les modules de structure sont spécifiés
+    par fichier en utilisant la méthode <span class="Li">&quot;set_structure&quot;</span>
+    sur un objet <span class="Li">&quot;Text::BibTeX::File&quot;</span>. Il est
+    assez simple de dire à <span class="Li">&quot;Text::BibTeX&quot;</span> que les
+    entrées de <span class="Li">$bibfile</span> sont censées se conformer à la
+    structure <span class="Li">&quot;Bib&quot;</span> (qui est implémentée par le
+    module <span class="Li">&quot;Text::BibTeX::Bib&quot;</span>, mais vous n'avez
+    pas vraiment besoin de le savoir) :</p>
+<pre>$bibfile = Text::BibTeX::File-&gt;new('foo.bib')
+   or die &quot;foo.bib: $!\n&quot;;
+$bibfile-&gt;set_structure ('Bib');</pre>
+<p class="Pp">Vous ne devriez probablement pas coder en dur le nom d'une structure
+    particulière dans vos programmes, car il y aura éventuellement une multitude
+    de modules de structure parmi lesquels choisir (tout comme il y a une
+    multitude de fichiers de style BibTeX parmi lesquels choisir). Mon approche
+    préférée est de faire de la structure une option en ligne de commande qui
+    par défaut est <span class="Li">&quot;Bib&quot;</span> (car c'est la seule
+    structure réellement implémentée au moment de la rédaction).</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='How_do_I_append_to_a_BibTeX_file?'><a class='permalink' href='#How_do_I_append_to_a_BibTeX_file?'>Comment ajouter des entrées à un fichier BibTeX ?</a></h2>
+<p class="Pp">Ouvrez-le simplement en mode ajout, et écrivez-y des entrées comme
+    d'habitude. Rappelez-vous, un objet <span class="Li">&quot;Text::BibTeX::File&quot;</span>
+    est principalement un wrapper autour d'un objet <span class="Li">&quot;IO::File&quot;</span>,
+    et la méthode <span class="Li">&quot;Text::BibTeX::File::open&quot;</span> (et
+    donc <span class="Li">&quot;new&quot;</span> aussi) n'est qu'une façade pour
+    <span class="Li">&quot;IO::File::open&quot;</span>. <span class="Li">&quot;IO::File::open&quot;</span>,
+    en retour, est une façade soit pour la fonction intégrée <span class="Li">&quot;open&quot;</span>
+    de Perl (si appelée avec un argument), soit pour <span class="Li">&quot;sysopen&quot;</span>
+    (deux ou trois arguments). Pour vous éviter la peine d'aller lire toutes ces
+    pages de manuel, voici l'astuce : si vous passez juste un nom de fichier à la
+    méthode <span class="Li">&quot;new&quot;</span> de <span class="Li">&quot;Text::BibTeX::File&quot;</span>,
+    alors il est traité comme un nom de fichier passé à la fonction intégrée
+    <span class="Li">&quot;open&quot;</span> de Perl :</p>
+<pre>my $append_file = Text::BibTeX::File-&gt;new(&quot;&gt;&gt;$filename&quot;)
+   or die &quot;impossible d'ouvrir $filename en mode ajout : $!\n&quot;;</pre>
+<p class="Pp">ouvre <span class="Li">$filename</span> en mode ajout. Si, plus tard, vous
+    avez une entrée d'un autre fichier (disons <span class="Li">$entry</span>), alors
+    vous pouvez l'ajouter à <span class="Li">$append_file</span> en l'écrivant
+    simplement comme d'habitude :</p>
+<pre>$entry-&gt;write ($append_file);</pre>
+<p class="Pp">Voir <span class="Li">&quot;append_entries&quot;</span> dans le sous-répertoire
+    <i>examples/</i> de la distribution <span class="Li">&quot;Text::BibTeX&quot;</span>
+    pour un exemple complet.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='C_LIBRARY'><a class='permalink' href='#C_LIBRARY'>BIBLIOTHÈQUE C</a></h1>
+<p class="Pp">Cette section couvre les questions fréquemment posées sur
+    <b>btparse</b>, le composant C de <b>btOOL</b>.</p>
+<section class="Ss">
+<h2 class="Ss" id='Is_there_a_Python_binding_for_&lt;b&gt;btparse&lt;/b&gt;_yet?'><a class='permalink' href='#Is_there_a_Python_binding_for_&lt;b&gt;btparse&lt;/b&gt;_yet?'>Existe-t-il déjà une liaison Python pour <b>btparse</b> ?</a></h2>
+<p class="Pp">Pas que je sache. Je n'en ai pas écrit. Si vous en écrivez une, s'il vous
+    plaît faites-le moi savoir.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR AUSSI</a></h1>
+<p class="Pp">btparse, Text::BibTeX</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTEUR</a></h1>
+<p class="Pp">Greg Ward &lt;gward@python.net&gt;</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT'><a class='permalink' href='#COPYRIGHT'>COPYRIGHT</a></h1>
+<p class="Pp">Copyright (c) 1997-2000 par Gregory P. Ward. Tous droits réservés.
+    Ce fichier fait partie de la bibliothèque Text::BibTeX. Cette bibliothèque est un
+    logiciel libre ; vous pouvez la redistribuer et/ou la modifier sous les mêmes
+    conditions que Perl lui-même.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">btparse, version 0.91</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher une page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/perl-text-bibtex/">extra/perl-text-bibtex</a></dd>
+        <dt>Version :</dt>
+        <dd>0.91-2</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://metacpan.org/release/Text-BibTeX">https://metacpan.org/release/Text-BibTeX</a></dd>
+        <dt>Licences :</dt>
+        <dd>PerlArtistic, GPL</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-text-bibtex/">/listing/extra/perl-text-bibtex/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#PERL_LIBRARY">BIBLIOTHÈQUE PERL</a></li>
+        
+            <li><a href="#C_LIBRARY">BIBLIOTHÈQUE C</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+            <li><a href="#AUTHOR">AUTEUR</a></li>
+        
+            <li><a href="#COPYRIGHT">COPYRIGHT</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/btool_faq.1.en.txt">txt</a>, 
+        
+            <a href="/man/bto
+ol_faq.1.en.raw"&gt;raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible selon les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               , à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>containers-storage-zstd-chunked(1) — Pages man Arch Linux</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">containers-storage-zstd-chunked(1)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/containers-common/">containers-common</a></p>
+<p class="lic">Licences: Apache-2.0</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">()</td>
+    <td class="head-vol"></td>
+    <td class="head-rtitle">()</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='containers-storage_1_August_2024'><a class='permalink' href='#containers-storage_1_August_2024'>containers-storage   1 août 2024</a></h1>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">containers-storage-zstd-chunked - Informations sur
+    zstd:chunked</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Le format traditionnel pour les couches d'images de conteneurs est
+    application/vnd.oci.image.layer.v1.tar+gzip
+    &#x27E8;<a href='https://github.com/opencontainers/image-spec/blob/main/layer.md#gzip-media-types'>https://github.com/opencontainers/image-spec/blob/main/layer.md#gzip-media-types</a>&#x27E9;.
+    Plus récemment, la norme a été complétée par zstd :
+    application/vnd.oci.image.layer.v1.tar+zstd
+    &#x27E8;<a href='https://github.com/opencontainers/image-spec/blob/main/layer.md#zstd-media-types'>https://github.com/opencontainers/image-spec/blob/main/layer.md#zstd-media-types</a>&#x27E9;
+    qui est un format de compression plus moderne et efficace.</p>
+<p class="Pp"><b>zstd:chunked</b> est une variante du type de média
+    <b>application/vnd.oci.image.layer.v1.tar+zstd</b> qui utilise des images
+    sautables zstd
+    &#x27E8;<a href='https://github.com/facebook/zstd/blob/dev/doc/zstd_compression_format.md#skippable-frames'>https://github.com/facebook/zstd/blob/dev/doc/zstd_compression_format.md#skippable-frames</a>&#x27E9;
+    pour inclure des métadonnées supplémentaires (en particulier une « table des
+    matières ») qui incluent le SHA-256 et les décalages de morceaux individuels
+    de fichiers. De plus, les morceaux sont compressés séparément. Cela permet à
+    un client de ne récupérer dynamiquement que le contenu qu'il ne possède pas
+    déjà en utilisant des requêtes de plage HTTP.</p>
+<p class="Pp">Au moment de la rédaction, la prise en charge de cela est activée par
+    défaut dans le code.</p>
+<p class="Pp">Vous pouvez activer ou désactiver explicitement zstd:chunked avec les
+    modifications suivantes dans <b>containers-storage.conf</b> :</p>
+<pre>[storage.options.pull_options]
+enable_partial_images = &quot;true&quot; | &quot;false&quot;</pre>
+<p class="Pp">Notez que la valeur de ce champ doit être une « chaîne booléenne »,
+    elle ne peut pas être un booléen TOML natif.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='IMPLEMENTATION'><a class='permalink' href='#IMPLEMENTATION'>IMPLÉMENTATION</a></h1>
+<p class="Pp">Chaque couche a une clé associée « big data » appelée
+    <b>chunked-manifest-cache</b> qui est un format binaire personnalisé adapté
+    à mmap() et qui contient des métadonnées d'index pour chaque couche avec le
+    digest sha256 complet de chaque fichier plus ses « morceaux » (tels que calculés
+    par <b>zstd:chunked</b>).</p>
+<p class="Pp">Lorsque toute image est récupérée, toutes les autres couches existantes
+    sont analysées à l'aide de <b>chunked-manifest-cache</b> pour voir si elles
+    contiennent un fichier avec un digest correspondant. Si un tel fichier est
+    trouvé, l'autre fichier est lié en dur si
+    <b>use_hardlinks = &quot;true</b>&quot;, sinon il est reflinké (si pris en charge
+    par le système de fichiers, ou une copie physique complète est effectuée). Une
+    tentative est faite pour activer fsverity sur le fichier s'il est configuré
+    (voir &#x27E8;<a href='https://github.com/containers/storage/issues/2017'>https://github.com/containers/storage/issues/2017</a>&#x27E9;).</p>
+<p class="Pp">Pour plus d'informations, au moment de la rédaction, le fichier contenant
+    le plus d'informations est pkg/chunked/internal/compression.go
+    &#x27E8;<a href='https://github.com/containers/storage/blob/39d469c34c96db67062e25954bc9d18f2bf6dae3/pkg/chunked/internal/compression.go'>https://github.com/containers/storage/blob/39d469c34c96db67062e25954bc9d18f2bf6dae3/pkg/chunked/internal/compression.go</a>&#x27E9;.
+    Ce qui précède est un lien permanent pour la stabilité, mais assurez-vous de
+    vérifier s'il y a également de nouveaux changements.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='STANDARDIZATION'><a class='permalink' href='#STANDARDIZATION'>STANDARDIZATION</a></h1>
+<p class="Pp">Au moment de la rédaction, le format n'est pas officiellement
+    standardisé ou documenté au-delà des commentaires et du code dans
+    l'implémentation de référence.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BUGS'><a class='permalink' href='#BUGS'>BOGUES</a></h1>
+<dl class="Bl-tag">
+  <dt>&#x2022;</dt>
+  <dd><a href='https://github.com/containers/storage/issues?q=is%3Aissue+label%3Aarea%2Fzstd%3Achunked+is%3Aopen'>https://github.com/containers/storage/issues?q=is%3Aissue+label%3Aarea%2Fzstd%3Achunked+is%3Aopen</a>
+      </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='FOOTNOTES'><a class='permalink' href='#FOOTNOTES'>NOTES</a></h1>
+<p class="Pp">Le projet Containers Storage s'engage à l'inclusivité, une valeur
+    fondamentale de l'open source. La terminologie <b>master</b> et <b>slave</b>
+    pour la propagation des montages est utilisée dans ce dépôt. Ce langage est
+    problématique et divise, et devrait être modifié. Cependant, ces termes sont
+    actuellement utilisés dans le noyau Linux et doivent être utilisés tels quels
+    à ce moment-là. Lorsque les mainteneurs du noyau rectifieront cette utilisation,
+    Containers Storage suivra immédiatement.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date"></td>
+    <td class="foot-os"></td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher une page man" name="q" value=""
+         />
+    <input type="submit" name="go" value="Valider" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/containers-common/">extra/containers-common</a></dd>
+        <dt>Version :</dt>
+        <dd>1:0.66.0-1</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://github.com/containers/container-libs">https://github.com/containers/container-libs</a></dd>
+        <dt>Licences :</dt>
+        <dd>Apache-2.0</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/containers-common/">/listing/extra/containers-common/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#containers-storage_1_August_2024">containers-storage 1 août 2024</a></li>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#IMPLEMENTATION">IMPLÉMENTATION</a></li>
+        
+            <li><a href="#STANDARDIZATION">STANDARDIZATION</a></li>
+        
+            <li><a href="#BUGS">BOGUES</a></li>
+        
+            <li><a href="#FOOTNOTES">NOTES</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/containers-storage-zstd-chunked.1.en.txt">txt</a>, 
+        
+            <a href="/man/containers-storage-zstd-chunked.1.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages man, qui ont leur propre licence spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

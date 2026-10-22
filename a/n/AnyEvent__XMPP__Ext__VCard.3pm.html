@@ -1,0 +1,329 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>AnyEvent::XMPP::Ext::VCard(3pm) — Pages manuelles d'Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">AnyEvent__XMPP__Ext__VCard(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-anyevent-xmpp/">perl-anyevent-xmpp</a></p>
+<p class="lic">Licences: GPL, PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">AnyEvent::XMPP::Ext::VCard(3)</td>
+    <td class="head-vol">Documentation Perl contribuée par les utilisateurs</td>
+    <td class="head-rtitle">AnyEvent::XMPP::Ext::VCard(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">AnyEvent::XMPP::Ext::VCard - VCards (XEP-0054 &amp; XEP-0084)</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>use AnyEvent::XMPP::Ext::VCard;
+my $vcard = AnyEvent::XMPP::Ext::VCard-&gt;new;
+$con-&gt;reg_cb (
+   stream_ready =&gt; sub { $vcard-&gt;hook_on ($con) }
+);
+$vcard-&gt;retrieve ($con, 'elmex@jabber.org', sub {
+   my ($jid, $vcard, $error) = @_;
+   if ($error) {
+      warn "couldn't get vcard for elmex@jabber.org: " . $error-&gt;string . "\n";
+   } else {
+      print "vCard nick for elmex@jabber.org: ".$vcard-&gt;{NICKNAME}."\n";
+      print "Avatar hash for elmex@jabber.org: ".$vcard-&gt;{_avatar_hash}."\n";
+   }
+});
+$vcard-&gt;store ($con, undef, { NICKNAME =&gt; 'net-xmpp2' }, sub {
+   my ($error) = @_;
+   if ($error) {
+      warn "upload failed: " . $error-&gt;string . "\n";
+   } else {
+      print "upload successful\n";
+   }
+});
+$disco-&gt;enable_feature ($vcard-&gt;disco_feature);</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Cette extension gère la définition et la récupération du VCard ainsi
+    que les avatars basés sur le VCard.</p>
+<p class="Pp">Par exemple, voir la suite de tests d'AnyEvent::XMPP.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='METHODS'><a class='permalink' href='#METHODS'>MÉTHODES</a></h1>
+<dl class="Bl-tag">
+  <dt id="new"><a class="permalink" href="#new"><b>new (%args)</b></a></dt>
+  <dd>Crée une nouvelle extension vcard. Elle peut prendre un
+      <span class="Li">"cache"</span> argument, qui doit être un
+      hash lié qui doit être capable de sauvegarder les vcards récupérés. Si aucun
+      <span class="Li">"cache"</span> n'est défini, un hash interne sera
+      utilisé et les vcards seront récupérés à chaque redémarrage du programme.
+      Les clés seront les JIDs nus (bare JIDs) stringprepped des personnes dont nous avons récupéré un vcard
+      et la valeur sera une structure de données hash/tableau non cyclique
+      représentant le vcard.
+    <p class="Pp">À propos de cette structure de données, voir ci-dessous à <b>STRUCTURE
+      VCARD</b>.</p>
+    <p class="Pp">Si vous voulez prendre en charge les avatars correctement, assurez-vous de connecter
+        la connexion via la <span class="Li">"hook_on"</span>
+        méthode.</p>
+  </dd>
+  <dt id="hook_on"><a class="permalink" href="#hook_on"><b>hook_on ($con,
+    </b><b>$dont_retrieve_vcard</b><b>)</b></a></dt>
+  <dd><span class="Li">$con</span> doit être un objet de la classe
+      AnyEvent::XMPP::Connection (ou dérivée). Une fois que l'extension vCard a été
+      connectée à une connexion, elle ajoutera les informations d'avatar à toutes
+      les stanzas de présence sortantes.
+    <p class="Pp">IMPORTANT : Vous devez vous connecter à la connexion <b>AVANT</b> qu'elle
+        ne soit connectée. La stanza de présence initiale doit contenir les
+        informations indiquant que nous prenons en charge les avatars. Le vcard sera automatiquement
+        récupéré si la session n'a pas encore été démarrée. Sinon, vous devrez
+        récupérer le vcard manuellement si vous le connectez après que l'événement
+        <span class="Li">"session_ready"</span> a été reçu.
+        Vous pouvez empêcher la récupération automatique en donnant une valeur vraie dans
+        <span class="Li">$dont_retrieve_vcard</span>. Cependant, assurez-vous simplement de
+        vous connecter à n'importe quelle connexion avant qu'elle ne soit connectée si vous voulez offrir
+        la prise en charge des avatars sur celle-ci.</p>
+    <p class="Pp">Le mieux est probablement de le faire comme ceci :</p>
+        <pre>my $vcard = AnyEvent::XMPP::Ext::VCard-&gt;new;
+$con-&gt;reg_cb (
+   stream_ready =&gt; sub { $vcard-&gt;hook_on ($con) }
+);
+</pre>
+  </dd>
+  <dt id="my_vcard"><a class="permalink" href="#my_vcard"><b>my_vcard
+    ($con)</b></a></dt>
+  <dd>Cette méthode retourne le vcard pour le compte connecté par
+      <span class="Li">$con</span>. Cela ne fonctionne que si le vcard a été (avec succès)
+      récupéré. Si la connexion a été connectée, le vcard a été automatiquement
+      récupéré.
+    <p class="Pp">Alternativement <span class="Li">$con</span> peut aussi être une
+        chaîne représentant le JID d'un compte.</p>
+  </dd>
+  <dt id="cache"><a class="permalink" href="#cache"><b>cache
+    ([$newcache])</b></a></dt>
+  <dd>Voir aussi <span class="Li">"new"</span> à propos du sens des
+      hashes de cache. Si aucun argument n'est donné, le cache actuel est retourné.</dd>
+  <dt id="store"><a class="permalink" href="#store"><b>store ($con,
+    </b><b>$vcard</b><b>, </b><b>$cb</b><b>)</b></a></dt>
+  <dd>Cette méthode stockera votre <span class="Li">$vcard</span> sur le
+      serveur connecté. <span class="Li">$cb</span> est appelé soit lorsqu'une
+      erreur s'est produite, soit lorsque le stockage a réussi. Si une erreur s'est produite, le premier
+      argument n'est pas indéfini et contient un objet AnyEvent::XMPP::Error::IQ
+      .
+    <p class="Pp"><span class="Li">$con</span> devrait être un
+        AnyEvent::XMPP::Connection ou un objet d'une classe dérivée.</p>
+    <p class="Pp"><span class="Li">$vcard</span> a une structure de données comme
+        décrit ci-dessous dans <b>STRUCTURE VCARD</b>.</p>
+  </dd>
+  <dt id="retrieve"><a class="permalink" href="#retrieve"><b>retrieve ($con,
+    </b><b>$jid</b><b>, </b><b>$cb</b><b>)</b></a></dt>
+  <dd>Cette méthode récupérera le vCard pour <span class="Li">$jid</span> via
+      la connexion <span class="Li">$con</span>. Si
+      <span class="Li">$jid</span> est indéfini, le vCard de vous-même est
+      récupéré. Le callback <span class="Li">$cb</span> est appelé lorsqu'une
+      erreur s'est produite ou lorsque le vcard a été récupéré. Le premier argument du
+      callback sera le JID auquel le vCard appartient, le deuxième argument
+      est le vCard lui-même (comme décrit dans <b>STRUCTURE VCARD</b> ci-dessous) et le
+      troisième argument est l'erreur, si une erreur s'est produite (undef sinon).</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VCARD_STRUCTURE'><a class='permalink' href='#VCARD_STRUCTURE'>STRUCTURE   VCARD</a></h1>
+<p class="Pp">Comme il n'y a actuellement pas de belles implémentations DOM en Perl et que je
+    n'aime pas du tout l'API DOM en général, ce module a une simple
+    structure de données Perl sans cycles pour représenter le vCard.</p>
+<p class="Pp">D'abord un exemple : Un hash vCard récupéré peut ressembler à ceci :</p>
+<pre>{
+  'URL' =&gt; ['http://www.ta-sa.org/'],
+  'ORG' =&gt; [{
+             'ORGNAME' =&gt; 'nethype GmbH'
+           }],
+  'N' =&gt; [{
+           'FAMILY' =&gt; 'Redeker'
+         }],
+  'EMAIL' =&gt; ['elmex@ta-sa.org'],
+  'BDAY' =&gt; ['1984-06-01'],
+  'FN' =&gt; ['Robin'],
+  'ADR' =&gt; [
+     {
+       HOME =&gt; undef,
+       'COUNTRY' =&gt; 'Germany'
+     },
+     {
+        WORK =&gt; undef,
+        COUNTRY =&gt; 'Germany',
+        LOCALITY =&gt; 'Karlsruhe'
+     }
+  ],
+  'NICKNAME' =&gt; ['elmex'],
+  'ROLE' =&gt; ['Programmer']
+}</pre>
+<p class="Pp">Les clés représentent l'élément de premier niveau d'un vCard, les valeurs sont
+    toujours des références de tableau contenant une ou plusieurs valeurs pour la clé. Si la
+    valeur est une référence de hash, sa valeur ne sera pas une
+    référence de tableau mais soit undef soit des valeurs simples.</p>
+<p class="Pp">Les valeurs des clés de premier niveau sont toutes des références de tableau car
+    des champs comme <span class="Li">"ADR"</span> peuvent apparaître plusieurs
+    fois.</p>
+<p class="Pp">Consultez XEP-0054 pour une explication de ce que ces champs signifient ou
+    contiennent.</p>
+<p class="Pp">Il y a des champs spéciaux dans cette structure pour gérer les avatars :
+    <span class="Li">"_avatar"</span> contient les données binaires pour
+    l'image de l'avatar. <span class="Li">"_avatar_hash"</span> contient le
+    hash sha1 hexadécimal des données binaires de l'image.
+    <span class="Li">"_avatar_type"</span> contient le type mime de
+    l'avatar.</p>
+<p class="Pp">Si vous voulez stocker le vcard, vous n'avez qu'à définir
+    <span class="Li">"_avatar"</span> et
+    <span class="Li">"_avatar_type"</span> si vous voulez stocker un
+    avatar.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EVENTS'><a class='permalink' href='#EVENTS'>ÉVÉNEMENTS</a></h1>
+<p class="Pp">L'extension vcard émettra ces événements :</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='TODO'><a class='permalink' href='#TODO'>TODO</a></h1>
+<p class="Pp">Implémenter la mise en cache, les trucs de cache ne sont qu'un hash de stockage pour le
+    moment. Ou peut-être l'abandonner complètement et laisser l'application gérer
+  la mise en cache.</p>
+<dl class="Bl-tag">
+  <dt id="retrieve_vcard_error"><a class="permalink" href="#retrieve_vcard_error">retrieve_vcard_error
+    =&gt; $iq_error</a></dt>
+  <dd>Lorsqu'une récupération de vCard n'a pas réussi, cet événement est émis. Cela est
+      nécessaire car certaines récupérations peuvent se produire automatiquement.</dd>
+  <dt id="vcard"><a class="permalink" href="#vcard">vcard =&gt; $jid,
+    $vcard</a></dt>
+  <dd>Chaque fois qu'un vCard est récupéré, soit automatiquement soit manuellement, cet
+      événement est émis avec le vCard récupéré.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTEUR</a></h1>
+<p class="Pp">Robin Redeker, <span class="Li">"&lt;elmex at
+    ta-sa.org&gt;"</span>, JID : <span class="Li">"&lt;elmex at
+    jabber.org&gt;"</span></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT_&amp;amp;_LICENSE'><a class='permalink' href='#COPYRIGHT_&amp;amp;_LICENSE'>DROITS D'AUTEUR   &amp; LICENCE</a></h1>
+<p class="Pp">Copyright 2007, 2008 Robin Redeker, tous droits réservés.</p>
+<p class="Pp">Ce programme est un logiciel libre ; vous pouvez le redistribuer et/ou
+    le modifier selon les mêmes termes que Perl lui-même.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2024-07-13</td>
+    <td class="foot-os">perl v5.38.2</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-anyevent-xmpp/">extra/perl-anyevent-xmpp</a></dd>
+        <dt>Version :</dt>
+        <dd>0.55-7</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://search.cpan.org/dist/AnyEvent-XMPP">https://search.cpan.org/dist/AnyEvent-XMPP</a></dd>
+        <dt>Licences :</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-anyevent-xmpp/">/listing/extra/perl-anyevent-xmpp/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">RÉSUMÉ</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#METHODS">MÉTHODES</a></li>
+        
+            <li><a href="#VCARD_STRUCTURE">STRUCTURE VCARD</a></li>
+        
+            <li><a href="#EVENTS">ÉVÉNEMENTS</a></li>
+        
+            <li><a href="#TODO">À FAIRE</a></li>
+        
+            <li><a href="#AUTHOR">AUTEUR</a></li>
+        
+            <li><a href="#COPYRIGHT_&amp;amp;_LICENSE">DROITS D'AUTEUR &amp; LICENCE</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/AnyEvent::XMPP::Ext::VCard.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/AnyEvent::XMPP::Ext::VCard.3pm.en.raw">brut</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible selon les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               , à l'exception du contenu des pages de manuel, qui possède sa propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

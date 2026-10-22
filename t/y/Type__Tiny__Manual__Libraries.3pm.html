@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Type::Tiny::Manual::Libraries(3pm) — Pages du manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Type__Tiny__Manual__Libraries(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-type-tiny/">perl-type-tiny</a></p>
+<p class="lic">Licences: PerlArtistic, GPL</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Type::Tiny::Manual::Libraries(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">Type::Tiny::Manual::Libraries(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Type::Tiny::Manual::Libraries - définir vos propres bibliothèques de types</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MANUEL'><a class='permalink' href='#MANUEL'>MANUEL</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='Définir_un_type'><a class='permalink' href='#Définir_un_type'>Définir   un type</a></h2>
+<p class="Pp">Un type est un objet et vous pouvez en créer un nouveau en utilisant le
+    constructeur :</p>
+<pre>use Type::Tiny;
+
+my $type = Type::Tiny-&gt;new(%args);</pre>
+<p class="Pp">Une liste complète des arguments disponibles se trouve dans la
+    documentation de Type::Tiny, mais les plus importants pour commencer sont :</p>
+<dl class="Bl-tag">
+  <dt>&quot;name&quot;</dt>
+  <dd>Le nom de votre nouveau type. Type::Tiny utilise une convention de noms
+      UpperCamelCase pour les contraintes de type. Le nom du type peut également
+      commencer par un ou deux tirets bas pour indiquer un type destiné à un usage
+      interne uniquement. Les types utilisant des caractères non-ASCII peuvent
+      poser des problèmes sur les anciennes versions de Perl (avant 5.8).
+    <p class="Pp">Bien que ce soit facultatif et que les types puissent être
+        anonymes, un nom est requis pour qu'une contrainte de type soit ajoutée
+        à une bibliothèque de types.</p>
+  </dd>
+  <dt>&quot;constraint&quot;</dt>
+  <dd>Une référence de code vérifiant <span class="Li">$_</span> et retournant un
+      booléen. Alternativement, une chaîne de code Perl peut être fournie.
+    <p class="Pp">Si vous avez bien suivi, vous pouvez probablement deviner que la
+        chaîne de code Perl peut entraîner des vérifications de type plus efficaces.</p>
+  </dd>
+  <dt>&quot;parent&quot;</dt>
+  <dd>Une contrainte de type existante dont hériter. Une valeur devra passer la
+      contrainte parente avant que sa propre contrainte ne soit appelée.
+        <pre>my $Even = Type::Tiny-&gt;new(
+  name       =&gt; 'EvenNumber',
+  parent     =&gt; Types::Standard::Int,
+  constraint =&gt; sub {
+    # dans ce sub, nous n'avons pas besoin de vérifier que $_ est un Int
+    # car le parent s'en chargera !
+
+    $_ % 2 == 0
+  },
+);
+</pre>
+    <p class="Pp">Bien que le <span class="Li">&quot;parent&quot;</span> soit
+        facultatif, il est judicieux, lorsque cela est possible, d'hériter d'une
+        contrainte de type existante pour bénéficier d'éventuelles optimisations
+        ou implémentations XS qu'elles pourraient fournir.</p>
+  </dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Définir_une_bibliothèque'><a class='permalink' href='#Définir_une_bibliothèque'>Définir   une bibliothèque</a></h2>
+<p class="Pp">Une bibliothèque est un module Perl qui exporte des contraintes de type
+    sous forme de subs. Types::Standard, Types::Common::Numeric, et
+    Types::Common::String sont des bibliothèques de types fournies avec Type::Tiny.</p>
+<p class="Pp">Pour créer une bibliothèque de types, créez un paquet qui hérite de
+    Type::Library.</p>
+<pre>package MyTypes {
+  use Type::Library -base;
+
+  ...; # vos définitions de types vont ici
+}</pre>
+<p class="Pp">Le drapeau <span class="Li">&quot;-base&quot;</span> est juste un
+    raccourci pour :</p>
+<pre>package MyTypes {
+  use Type::Library;
+  our @ISA = 'Type::Library';
+}</pre>
+<p class="Pp">Vous pouvez ajouter des types comme ceci :</p>
+<pre>package MyTypes {
+  use Type::Library -base;
+
+  my $Even = Type::Tiny-&gt;new(
+    name       =&gt; 'EvenNumber',
+    parent     =&gt; Types::Standard::Int,
+    constraint =&gt; sub {
+      # dans ce sub, nous n'avons pas besoin de vérifier que $_ est un Int
+      # car le parent s'en chargera !
+
+      $_ % 2 == 0
+    },
+  );
+
+  __PACKAGE__-&gt;add_type($Even);
+}</pre>
+<p class="Pp">Il existe un raccourci pour ajouter des types s'ils sont destinés à
+    être des objets Type::Tiny bénis et non, par exemple, une sous-classe de
+    Type::Tiny. Vous pouvez simplement passer <span class="Li">%args</span>
+    directement à <span class="Li">&quot;add_type&quot;</span>.</p>
+<pre>package MyTypes {
+  use Type::Library -base;
+
+  __PACKAGE__-&gt;add_type(
+    name       =&gt; 'EvenNumber',
+    parent     =&gt; Types::Standard::Int,
+    constraint =&gt; sub {
+      # dans ce sub, nous n'avons pas besoin de vérifier que $_ est un Int
+      # car le parent s'en chargera !
+
+      $_ % 2 == 0
+    },
+  );
+}</pre>
+<p class="Pp">La méthode <span class="Li">&quot;add_type&quot;</span> retourne le
+    type qu'elle vient d'ajouter, de sorte qu'il puisse être stocké dans une
+    variable.</p>
+<pre>my $Even = __PACKAGE__-&gt;add_type(...);</pre>
+<p class="Pp">Cela peut être utile si vous souhaitez utiliser
+    <span class="Li">$Even</span> comme type parent pour un autre type que vous
+    allez définir plus tard.</p>
+<p class="Pp">Voici un exemple plus large :</p>
+<pre>package Example::Types {
+  use Type::Library -base;
+  use Types::Standard -types;
+  use DateTime;
+
+  # Type::Tiny::Class est une sous-classe de Type::Tiny pour créer
+  # des types de type InstanceOf. C'est un peu mieux car
+  # il fait des choses cool comme passer $type-&gt;new(%args)
+  # au constructeur de la classe.
+  #
+  my $dt = __PACKAGE__-&gt;add_type(
+    Type::Tiny::Class-&gt;new(
+      name    =&gt; 'Datetime',
+      class   =&gt; 'DateTime',
+    )
+  );
+
+  my $dth = __PACKAGE__-&gt;add_type(
+    name    =&gt; 'DatetimeHash',
+    parent  =&gt; Dict[
+      year       =&gt; Int,
+      month      =&gt; Optional[ Int ],
+      day        =&gt; Optional[ Int ],
+      hour       =&gt; Optional[ Int ],
+      minute     =&gt; Optional[ Int ],
+      second     =&gt; Optional[ Int ],
+      nanosecond =&gt; Optional[ Int ],
+      time_zone  =&gt; Optional[ Str ],
+    ],
+  );
+
+  my $eph = __PACKAGE__-&gt;add_type(
+    name    =&gt; 'EpochHash',
+    parent  =&gt; Dict[ epoch =&gt; Int ],
+  );
+
+  # On ne peut pas juste utiliser la méthode "plus_coercions" car cela crée
+  # un nouveau type enfant anonyme pour y ajouter les coercitions. Nous voulons
+  # les ajouter au type qui existe dans cette bibliothèque.
+  #
+  $dt-&gt;coercion-&gt;add_type_coercions(
+    Int,    q{ DateTime-&gt;from_epoch(epoch =&gt; $_) },
+    Undef,  q{ DateTime-&gt;now() },
+    $dth,   q{ DateTime-&gt;new(%$_) },
+    $eph,   q{ DateTime-&gt;from_epoch(%$_) },
+  );
+
+  __PACKAGE__-&gt;make_immutable;
+}</pre>
+<p class="Pp"><span class="Li">&quot;make_immutable&quot;</span> gèle les
+    coercitions de tous les types du paquet, donc aucun code extérieur ne peut
+    altérer les coercitions, et cela permet à Type::Tiny de faire des optimisations
+    sur les coercitions, sachant qu'elles ne seront pas modifiées ultérieurement. Vous
+    devriez toujours faire cela à la fin.</p>
+<p class="Pp">La bibliothèque exportera les types <b>Datetime</b>,
+    <b>DatetimeHash</b> et <b>EpochHash</b>. Le type <b>Datetime</b> aura des
+    coercitions depuis <b>Int</b>, <b>Undef</b>, <b>DatetimeHash</b> et
+    <b>EpochHash</b>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Extension_des_bibliothèques'><a class='permalink' href='#Extension_des_bibliothèques'>Extension   des bibliothèques</a></h2>
+<p class="Pp">Type::Utils fournit une fonction utile
+    <span class="Li">&quot;extends&quot;</span>.</p>
+<pre>package My::Types {
+  use Type::Library -base;
+  use Type::Utils qw( extends );
+
+  BEGIN { extends(&quot;Types::Standard&quot;) };
+
+  # définissez vos propres types ici
+}</pre>
+<p class="Pp">La fonction <span class="Li">&quot;extends&quot;</span> (que vous
+    devriez généralement utiliser dans un bloc
+    <span class="Li">&quot;BEGIN { }&quot;</span>) charge non seulement une autre
+    bibliothèque de types, mais ajoute également tous les types qu'elle contient
+    à votre bibliothèque.</p>
+<p class="Pp">Cela signifie que le code utilisant My::Types ci-dessus n'a pas besoin
+    de faire :</p>
+<pre>use Types::Standard qw( Str );
+use My::Types qw( Something );</pre>
+<p class="Pp">Il peut simplement faire :</p>
+<pre>use My::Types qw( Str Something );</pre>
+<p class="Pp">Car tous les types de Types::Standard ont été copiés dans My::Types et
+    sont également disponibles là-bas.</p>
+<p class="Pp"><span class="Li">&quot;extends&quot;</span> peut recevoir une liste
+    de bibliothèques ; vous pouvez hériter de plusieurs bibliothèques existantes.
+    Elle peut également reconnaître et importer des types des bibliothèques
+    MooseX::Types, MouseX::Types et Specio::Exporter.</p>
+<p class="Pp">Depuis Type::Library 1.012, il existe un raccourci pour
+    <span class="Li">&quot;extends&quot;</span>.</p>
+<pre>package My::Types {
+  use Type::Library -extends =&gt; [ 'Types::Standard' ];
+
+  # définissez vos propres types ici
+}</pre>
+<p class="Pp">Le drapeau <span class="Li">&quot;-extends&quot;</span> prend un
+    tableau de bibliothèques de types à étendre. Il implique automatiquement
+    <span class="Li">&quot;-base&quot;</span>, vous n'avez donc pas besoin d'utiliser
+    les deux.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Messages_d_erreur_personnalisés'><a class='permalink' href='#Messages_d_erreur_personnalisés'>Messages   d'erreur personnalisés</a></h2>
+<p class="Pp">Une contrainte de type peut avoir des messages d'erreur personnalisés. C'est
+    assez simple :</p>
+<pre>Type::Tiny-&gt;new(
+  name       =&gt; 'EvenNumber',
+  parent     =&gt; Types::Standard::Int,
+  constraint =&gt; sub {
+    # dans ce sub, nous n'avons pas besoin de vérifier que $_ est un Int
+    # car le parent s'en chargera !
+
+    $_ % 2 == 0
+  },
+  message   =&gt; sub {
+    sprintf '%s n'est pas un nombre pair', Type::Tiny::_dd($_);
+  },
+);</pre>
+<p class="Pp">La référence de code du message prend simplement une valeur dans
+    <span class="Li">$_</span> et retourne une chaîne. Elle peut utiliser
+    <span class="Li">Type::Tiny::_dd()</span> comme moyen d'afficher joliment une
+    valeur. (Ne soyez pas rebuté par le trait de soulignement dans le nom de la
+    fonction. <span class="Li">_dd()</span> fait maintenant partie officiellement
+    prise en charge de l'API de Type::Tiny.)</p>
+<p class="Pp">Vous n'avez pas besoin de fournir une référence de code de message
+    d'erreur à moins que vous ne vouliez vraiment des messages d'erreur personnalisés.
+    Le</p>
+</section>
+</div>
+</section>
+            </article>
+            
+        </main>
+        <footer>
+            
+        </footer>
+    </body>
+</html>
+default sub devrait être raisonnable.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Inlining'><a class='permalink' href='#Inlining'>Inlining</a></h2>
+<p class="Pp">Dans Perl, les appels de sous-routines sont relativement coûteux en
+    termes d'utilisation de mémoire et de CPU. Le type <b>PositiveInt</b> hérite
+    de <b>Int</b> qui hérite de <b>Num</b> qui hérite de <b>Str</b> qui hérite de
+    <b>Defined</b> qui hérite de <b>Item</b> qui hérite de <b>Any</b>.</p>
+<p class="Pp">Vous pourriez donc penser que pour vérifier si <span class="Li">$value</span>
+    est un <b>PositiveInt</b>, il faut le vérifier tout le long de la chaîne
+    d'héritage. Mais c'est ici qu'intervient l'une des grandes optimisations de
+    Type::Tiny. Type::Tiny peut enchaîner un ensemble de vérifications avec un
+    eval sous forme de chaîne, et obtenir une seule référence de sous-routine qui
+    peut effectuer toutes les vérifications en une seule fois.</p>
+<p class="Pp">C'est pourquoi, lorsque Type::Tiny vous donne le choix entre utiliser
+    une référence de sous-routine ou une chaîne de code Perl, vous devriez
+    généralement choisir la chaîne de code Perl. Une seule référence de
+    sous-routine peut « casser la chaîne ».</p>
+<p class="Pp">Mais ces chaînes de code Perl générées automatiquement ne sont pas
+    toujours aussi efficaces qu'elles pourraient l'être. Par exemple, imaginez que
+    <b>HashRef</b> soit défini comme suit :</p>
+<pre>my $Defined = Type::Tiny-&gt;new(
+  name       =&gt; 'Defined',
+  constraint =&gt; 'defined($_)',
+);
+my $Ref = Type::Tiny-&gt;new(
+  name       =&gt; 'Ref',
+  parent     =&gt; $Defined,
+  constraint =&gt; 'ref($_)',
+);
+my $HashRef = Type::Tiny-&gt;new(
+  name       =&gt; 'HashRef',
+  parent     =&gt; $Ref,
+  constraint =&gt; 'ref($_) eq &quot;HASH&quot;',
+);</pre>
+<p class="Pp">Alors la vérification combinée est :</p>
+<pre>defined($_) and ref($_) and ref($_) eq &quot;HASH&quot;</pre>
+<p class="Pp">En pratique, c'est encore plus compliqué, car Type::Tiny doit localiser
+    et définir <span class="Li">$_</span> au préalable.</p>
+<p class="Pp">Mais en pratique, la vérification suivante devrait être suffisante :</p>
+<pre>ref($_) eq &quot;HASH&quot;</pre>
+<p class="Pp">Il est possible pour le type <b>HashRef</b> d'avoir plus de contrôle
+    sur la chaîne de code générée.</p>
+<pre>my $HashRef = Type::Tiny-&gt;new(
+  name       =&gt; 'HashRef',
+  parent     =&gt; $Ref,
+  constraint =&gt; 'ref($_) eq &quot;HASH&quot;',
+  inlined    =&gt; sub {
+    my $varname = pop;
+    sprintf 'ref(%s) eq &quot;HASH&quot;', $varname;
+  },
+);</pre>
+<p class="Pp">La référence de sous-routine inlinée reçoit le nom d'une variable à
+    vérifier. Cela peut être <span class="Li">'$_'</span> ou <span class="Li">'$var'</span>
+    ou <span class="Li">&quot;$some{deep}{thing}[0]&quot;</span>. Comme elle reçoit le
+    nom d'une variable à vérifier, au lieu de vérifier toujours <span class="Li">$_</span>,
+    cela permet une vérification très efficace pour les types paramétrés.</p>
+<p class="Pp">Bien que dans ce cas, la référence de sous-routine d'inlining renvoie
+    simplement une chaîne, techniquement elle renvoie une liste de chaînes. S'il
+    y a plusieurs chaînes, Type::Tiny les joindra dans une grande instruction
+    &quot;&amp;&amp;&quot;.</p>
+<p class="Pp">À titre spécial, si le premier élément de la liste de chaînes renvoyée est
+    `undef`, alors Type::Tiny substituera la chaîne d'inlining de la contrainte de
+    type parente à sa place. Ainsi, une référence de sous-routine d'inlining pour
+    les nombres pairs pourrait être :</p>
+<pre>Type::Tiny-&gt;new(
+  name       =&gt; 'EvenNumber',
+  parent     =&gt; Types::Standard::Int,
+  constraint =&gt; sub { $_ % 2 == 0 },
+  inlined    =&gt; sub {
+    my $varname = pop;
+    return (undef, &quot;$varname % 2 == 0&quot;);
+  },
+);</pre>
+<p class="Pp">Même si vous fournissez une référence de sous-routine sous forme de
+    chaîne, une référence de sous-routine d'inlining a le potentiel de générer un
+    code plus efficace, vous devriez donc envisager d'en fournir une.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Pre-Declaring_Types'><a class='permalink' href='#Pre-Declaring_Types'>Pré-déclaration   des types</a></h2>
+<pre>use Type::Library -base,
+  -declare =&gt; qw( Foo Bar Baz );</pre>
+<p class="Pp">Cela déclare les types <b>Foo</b>, <b>Bar</b> et <b>Baz</b> au moment de la
+    compilation afin qu'ils puissent être utilisés en toute sécurité comme des
+    mots nus dans votre bibliothèque de types.</p>
+<p class="Pp">Cela permet également aux types définis récursivement de fonctionner
+    (la plupart du temps !).</p>
+<pre>use Type::Library -base,
+  -declare =&gt; qw( NumericArrayRef );
+use Types::Standard qw( Num ArrayRef );
+
+__PACKAGE__-&gt;add_type(
+  name     =&gt; NumericArrayRef,
+  parent   =&gt; ArrayRef-&gt;of( Num | NumericArrayRef ),
+);</pre>
+<p class="Pp">(Prise en charge des définitions de types récursives ajoutée dans
+    Type::Library 1.009_000.)</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Parameterizable_Types'><a class='permalink' href='#Parameterizable_Types'>Types   paramétrables</a></h2>
+<p class="Pp">C'est probablement le concept le plus « méta » qui sera abordé. Construire
+    votre propre contrainte de type qui peut être paramétrée comme <b>ArrayRef</b>
+    ou <b>HasMethods</b>.</p>
+<p class="Pp">La contrainte de type que nous allons construire sera
+    <b>MultipleOf[$i]</b> qui vérifie qu'un entier est un multiple de
+  <span class="Li">$i</span>.</p>
+<pre>__PACKAGE__-&gt;add_type(
+  name       =&gt; 'MultipleOf',
+  parent     =&gt; Int,
+
+  # Cette référence de sous-routine reçoit le contenu des crochets.
+  constraint_generator =&gt; sub ( $i ) {
+    assert_Int $i;
+    # doit retourner une référence de sous-routine à utiliser comme contrainte pour le
+    # type paramétré
+    return sub { $_ % $i == 0 };
+  },
+
+  # optionnel mais recommandé
+  inline_generator =&gt; sub ( $i ) {
+    return sub {
+      my $varname = pop;
+      return (undef, &quot;$varname % $i == 0&quot;);
+    };
+  },
+
+  # probablement la partie la plus complexe
+  coercion_generator =&gt; sub ( $parent_type, $child_type, $i ) {
+    require Type::Coercion;
+    return Type::Coercion-&gt;new(
+      type_coercion_map =&gt; [
+        Num, qq{ int($i * int(\$_/$i)) }
+      ],
+    );
+  },
+);</pre>
+<p class="Pp">Nous pouvons maintenant définir un nombre pair comme ceci :</p>
+<pre>__PACKAGE__-&gt;add_type(
+  name     =&gt; 'EvenNumber',
+  parent   =&gt; __PACKAGE__-&gt;get_type('MultipleOf')-&gt;of(2),
+  coercion =&gt; 1,  # hériter du parent
+);</pre>
+<p class="Pp">Notez qu'il est possible pour une contrainte de type d'avoir une
+    <span class="Li">&quot;constraint&quot;</span> *et* un
+    <span class="Li">&quot;constraint_generator&quot;</span>.</p>
+<pre>BaseType          # utilise la contrainte
+BaseType[]        # constraint_generator sans arguments
+BaseType[$x]      # constraint_generator avec un argument</pre>
+<p class="Pp">Dans l'exemple <b>MultipleOf</b> ci-dessus, <b>MultipleOf[]</b> sans
+    nombre lèverait une erreur à cause de <span class="Li">assert_Int(shift)</span>
+    qui ne trouve pas d'entier.</p>
+<p class="Pp">Mais il est certainement possible que <b>BaseType[]</b> ait un sens et
+    soit distinct de <span class="Li">&quot;BaseType&quot;</span>.</p>
+<p class="Pp">Par exemple, <b>Tuple</b> est juste le même que <b>ArrayRef</b> et accepte
+    n'importe quel arrayref comme valide. Mais <b>Tuple[]</b> n'acceptera que des
+    arrayrefs avec zéro élément. (Tout comme <b>Tuple[Any,Any]</b> n'acceptera que
+    des arrayrefs avec deux éléments.)</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='NEXT_STEPS'><a class='permalink' href='#NEXT_STEPS'>PROCHAINES   ÉTAPE</a></h1>
+<p class="Pp">Après ce dernier exemple, reposez-vous un peu. Une fois que vous vous
+    serez remis, voici votre prochaine étape :</p>
+<dl class="Bl-tag">
+  <dt>&#x2022;</dt>
+  <dd>Type::Tiny::Manual::UsingWithMoose
+    <p class="Pp">Comment utiliser Type::Tiny avec Moose, y compris les avantages de
+        Type::Tiny par rapport aux contraintes de type intégrées, et les
+        fonctionnalités spécifiques à Moose.</p>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTEUR</a></h1>
+<p class="Pp">Toby Inkster &lt;tobyink@cpan.org&gt;.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT_AND_LICENCE'><a class='permalink' href='#COPYRIGHT_AND_LICENCE'>DROIT D'AUTEUR   ET LICENCE</a></h1>
+<p class="Pp">Ce logiciel est copyright (c) 2013-2014, 2017-2025 par Toby
+    Inkster.</p>
+<p class="Pp">C'est un logiciel libre ; vous pouvez le redistribuer et/ou le modifier
+    selon les mêmes termes que le système de langage de programmation Perl 5
+    lui-même.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DISCLAIMER_OF_WARRANTIES'><a class='permalink' href='#DISCLAIMER_OF_WARRANTIES'>EXCLUSION   DE GARANTIES</a></h1>
+<p class="Pp">CE PAQUET EST FOURNI « TEL QUEL » ET SANS AUCUNE GARANTIE EXPRESSE OU
+    IMPLICITE, Y COMPRIS, SANS LIMITATION, LES GARANTIES IMPLICITES DE
+    COMMERCIABILITÉ ET D'ADÉQUATION À UN USAGE PARTICULIER.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-11-02</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page man" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-type-tiny/">extra/perl-type-tiny</a></dd>
+        <dt>Version :</dt>
+        <dd>2.008004-1</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://metacpan.org/release/Type-Tiny">https://metacpan.org/release/Type-Tiny</a></dd>
+        <dt>Licences :</dt>
+        <dd>PerlArtistic, GPL</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-type-tiny/">/listing/extra/perl-type-tiny/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#MANUAL">MANUEL</a></li>
+        
+            <li><a href="#NEXT_STEPS">PROCHAINES ÉTAPE</a></li>
+        
+            <li><a href="#AUTHOR">AUTEUR</a></li>
+        
+            <li><a href="#COPYRIGHT_AND_LICENCE">DROIT D'AUTEUR ET LICENCE</a></li>
+        
+            <li><a href="#DISCLAIMER_OF_WARRANTIES">EXCLUSION DE GARANTIES</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Type::Tiny::Manual::Libraries.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/Type::Tiny::Manual::Libraries.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>, à l'exception du contenu des pages de manuel, qui ont leur propre licence spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

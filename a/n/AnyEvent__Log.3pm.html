@@ -1,0 +1,863 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>AnyEvent::Log(3pm) — Pages manuelles </title>d'Arch
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">AnyEvent__Log(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-anyevent/">perl-anyevent</a></p>
+
+        er
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">AnyEvent::</td>Log(3)
+    <td class="head-vol">Documentation Perl contribuée par les </td>utilisateurs
+    <td class="head-rtitle">AnyE</td>vent</tr>::Lo</table>g(3)
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NO</a></h1>M
+<p class="Pp">AnyEvent::Log - "</p>framework" de jour</section>nalisation simple
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSI</a></h1>S
+<p class="Pp">Utilisations simples </p>:
+<pre>use AnyEvent;
+AE::log fatal =&gt; "No config found, cannot continue!"; # never returns
+AE::log alert =&gt; "The battery died!";
+AE::log crit  =&gt; "The battery is too hot!";
+AE::log error =&gt; "Division by zero attempted.";
+AE::log warn  =&gt; "Couldn't delete the file.</pre>";
+<p class="Pp">Aperçu des niveaux de journalisation </p>:
+<pre>LVL NAME      SYSLOG   PERL  NOTE
+ 1  fatal     emerg    exit  system unusable, aborts program!
+ 2  alert                    failure in primary system
+ 3  critical  crit           failure in backup system
+ 4  error     err      die   non-urgent program errors, a bug
+ 5  warn      warning        possible problem, not necessarily error
+ 6  note      notice         unusual conditions
+ 7  info                     normal messages, no action required
+ 8  debug                    debugging messages for development
+ 9  trace                    copious tracing </pre>output
+<p class="Pp">Utilisations "complexes" (pour le code sensible à la vitesse, par ex.
+    messages trace/debug) </p>:
+<pre>use AnyEvent::Log;
+my $tracer = AnyEvent::Log::logger trace =&gt; \my $trace;
+$tracer-&gt;("i am here") if $trace;
+$tracer-&gt;(sub { "lots of data: " . Dumper $self }) if </pre>$trace;
+<p class="Pp">Configuration (voir aussi la section EXEMPLES) </p>:
+<pre># set default logging level to suppress anything below "notice"
+# i.e. enable logging at "notice" or above - the default is to
+# to not log anything at all.
+$AnyEvent::Log::FILTER-&gt;level ("notice");
+# set logging for the current package to errors and higher only
+AnyEvent::Log::ctx-&gt;level ("error");
+# enable logging for the current package, regardless of global logging level
+AnyEvent::Log::ctx-&gt;attach ($AnyEvent::Log::LOG);
+# enable debug logging for module some::mod and enable logging by default
+(AnyEvent::Log::ctx "some::mod")-&gt;level ("debug");
+(AnyEvent::Log::ctx "some::mod")-&gt;attach ($AnyEvent::Log::LOG);
+# send all critical and higher priority messages to syslog,
+# regardless of (most) other settings
+$AnyEvent::Log::COLLECT-&gt;attach (new AnyEvent::Log::Ctx
+   level         =&gt; "critical",
+   log_to_syslog =&gt; "user",
+</pre>)</section>;
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTIO</a></h1>N
+<p class="Pp">Ce module implémente un "framework" de journalisation relativement
+    simple. Il ne prétend pas être "la" solution de journalisation, ni même
+    "une" solution de journalisation pour AnyEvent - AnyEvent crée simplement
+    des messages de journalisation en interne, et ce module expose plus ou
+    moins ce mécanisme, avec quelques extras pour permettre de l'utiliser
+    depuis d'autres modules </p>également.
+<p class="Pp">Rappelez-vous que le niveau de verbosité par défaut est
+    <span class="Li">4 </span>(<span class="Li">"error"),</span> donc
+    seuls les erreurs et les messages plus importants seront journalisés, sauf
+    si vous définissez
+    <span class="Li">"PERL_ANYEVENT_VERBOSE" </span>à un nombre plus
+    élevé avant de lancer votre programme
+    (<span class="Li">"AE_VERBOSE=5" est </span>recommandé pendant
+    le développement), ou si vous changez le niveau de journalisation à
+    l'exécution avec quelque chose comme </p>:
+<pre>use AnyEvent::Log;
+$AnyEvent::Log::FILTER-&gt;level ("info")</pre>;
+<p class="Pp">L'objectif de conception derrière ce module était de le garder simple
+    (et petit), mais de le rendre assez puissant pour être potentiellement
+    utile pour n'importe quel module, et assez étendu pour les tâches les plus
+    courantes, comme la journalisation vers plusieurs cibles, ou la capacité à
+    journaliser dans une base de </p>données.
+<p class="Pp">Le module est également utilisable avant même l'initialisation
+    d'AnyEvent, auquel cas certaines fonctionnalités peuvent être </p>réduites.
+<p class="Pp">La quantité de documentation pourrait indiquer le co</p>ntraire, mais la
+    partie exécution du module est </section>toujours juste en dessous de 300 lignes de
+    code.
+<section class="Sh">
+<h1 class="Sh" id='LOGGING_LEVELS'><a class='permalink' href='#LOGGING_LEVELS'>NIVEAUX DE </a></h1>JOURNALISATION
+<p class="Pp">Les niveaux de journalisation dans ce module vont de <span class="Li">1
+</span>    (priorité la plus élevée) à <span class="Li">9 </span>(priorité la plus basse). Notez que
+    la valeur numérique la plus basse est la priorité la plus élevée, donc
+    quand ce document dit "priorité plus élevée", cela signifie "valeur
+    numérique plus </p>basse".
+<p class="Pp">Au lieu de spécifier les niveaux par nom, vous pouvez aussi les
+    spécifier par alias </p>:
+<pre>LVL NAME      SYSLOG   PERL  NOTE
+ 1  fatal     emerg    exit  system unusable, aborts program!
+ 2  alert                    failure in primary system
+ 3  critical  crit           failure in backup system
+ 4  error     err      die   non-urgent program errors, a bug
+ 5  warn      warning        possible problem, not necessarily error
+ 6  note      notice         unusual conditions
+ 7  info                     normal messages, no action required
+ 8  debug                    debugging messages for development
+ 9  trace                    copious tracing </pre>output
+<p class="Pp">Comme vous pouvez le voir, certains niveaux de journalisation ont
+    plusieurs alias - le premier est le nom "officiel", le deuxième le nom
+    "syslog" (s'il diffère) et le troisième le nom "perl", suggérant (seulement !)
+    que vous journalisiez les messages
+    <span class="Li">"die" </span>à la priorité
+    <span class="Li">"error".</span> La colonne NOTE tente de
+    fournir une justification sur la manière de choisir un niveau de
+    </p>journalisation.
+<p class="Pp">Comme ligne directrice approximative, les niveaux 1..3 sont
+    principalement destinés aux utilisateurs du programme (administrateurs,
+    personnel), et sont les seuls journalisés sur STDERR par défaut. Les
+    niveaux 4..6 sont destinés aux utilisateurs et aux développeurs, tandis
+    que les niveaux 7..9 sont généralement destinés aux </p>développeurs.
+<p class="Pp">Vous ne pouvez normalement journaliser un message qu'une seule fois au
+    niveau de priorité le plus élevé (<span class="Li">1</span>, <span class="Li">"fatal"),</span>
+    car la journalisation d'un message fatal quittera également le programme -
+    utilisez-le donc avec parcimonie :</p>)
+<p class="Pp">Par exemple, un programme qui trouve une option inconnue sur la ligne
+    de commande pourrait bien utiliser un niveau de journalisation fatal pour
+    en informer les utilisateurs - le "système" dans ce cas serait le
+    programme, ou le </p>module.
+<p class="Pp">Certaines méthodes offrent également quelques niveaux supplémentaires,
+    tels que
+    <span class="Li">0</span>, <span class="Li">"of</span>f",
+    <span class="Li">"none" </span>ou
+    <span class="Li">"all" - ceux-ci ne s</span>ont valides que
+   </p> pour les méthodes </section>qui les documentent.
+<section class="Sh">
+<h1 class="Sh" id='LOGGING_FUNCTIONS'><a class='permalink' href='#LOGGING_FUNCTIONS'>FONCTIONS DE </a></h1>JOURNALISATION
+<p class="Pp">Les fonctions suivantes vous permettent de journaliser des messages.
+    Elles utilisent toujours le package de l'appelant comme "contexte de
+    journalisation". De plus, la fonction principale de journalisation, <span class="Li">"log",</span> est un alias pour
+    <span class="Li">"AnyEvent::</span>log" et
+    <span class="Li">"AE::log" </span>lorsque le module
+    <span class="Li">"AnyEvent" </span>est </p>chargé.
+<dl class="Bl-tag">
+  <dt id="AnyEvent::Log::log"><a class="permalink" href="#AnyEvent::Log::log">AnyEvent::Log::log
+    $level, $msg[, </a></dt>@args]
+  <dd>Demande la journalisation du <span class="Li">$msg </span>donné avec le niveau de
+      journalisation donné, et renvoie vrai si le message a été journalisé <i>quelque </i>part.
+    <p class="Pp">Pour le niveau de journalisation <span class="Li">"fatal",</span> le
+        programme </p>s'arrêtera.
+    <p class="Pp">Si seul un <span class="Li">$msg </span>est donné, il est journalisé
+        tel quel. Avec des <span class="Li">@args </span>supplémentaires, le
+        <span class="Li">$msg </span>est interprété comme une chaîne de
+      format </p>sprintf.
+    <p class="Pp">Le <span class="Li">$msg </span>ne doit pas se terminer par
+        <span class="Li">"\n",</span> mais peut le faire si c'est
+        plus pratique pour vous. De plus, les messages multilignes sont gérés
+        </p>correctement.
+    <p class="Pp">Enfin, <span class="Li">$msg </span>peut être une référence de
+        code, auquel cas elle est censée renvoyer le message. Elle ne sera
+        appelée que lorsque le message est effectivement journalisé, ce qui est
+        utile si la création du message est coûteuse en premier </p>lieu.
+    <p class="Pp">Cette fonction prend soin de sauvegarder et de restaurer
+        <span class="Li">$!</span> et <span class="Li">$@,</span> vous n'avez donc pas
+        à le </p>faire.
+    <p class="Pp">Si le message donné sera journalisé dépend du niveau de journalisation
+    maximal et du package de l'appelant. La valeur de retour peut être utilisée
+    pour s'assurer que les messages ne sont pas "perdus" - par exemple, quand
+    AnyEvent::Debug détecte une erreur d'exécution, il essaie de la journaliser au
+        <span class="Li">niveau </span>"die", mais si ce message est
+        perdu, il utilise simplement </p>warn.
+    <p class="Pp">Notez que vous pouvez (et devriez) appeler cette fonction comme
+        <span class="Li">"AnyEvent:</span>:log" ou
+        <span class="Li">"AE::</span>log", sans
+        <span class="Li">"use"-er </span>ce module si possible
+        (c.-à-d. vous n'avez pas besoin de fonctions supplémentairesonalité), car ces fonctions
+        chargeront le module de logging à la demande uniquement. Elles sont aussi beaucoup plus courtes
+        à </p>écrire.
+    <p class="Pp">De plus, si vous générez éventuellement beaucoup de messages de débogage (par exemple
+        lors du traçage de certaines instructions), vous devriez envisager d'utiliser un rappel de logger
+        et un activateur booléen (voir <span class="Li">"logger",</span>
+        ci-dessous)</p>.
+    <p class="Pp">Exemple : journaliser quelque chose au niveau </p>erreur.
+        <pre>AE::log error =&gt; </pre>"something";
+    <p class="Pp">Exemple : utiliser le formatage </p>printf.
+        <pre>AE::log info =&gt; "%5d %-10.10s %s", $index, $category, </pre>$msg;
+    <p class="Pp">Exemple : ne générer un dump coûteux que lorsque le message est
+        effectivement </p>journalisé.
+        <pre>AE::log debug =&gt; sub { </pre>require Data::Dump; Data</dd>::Dump::dump \%cache };
+  <dt>$logger = AnyEvent::Log::logger $level[, </dt>\$enabled]
+  <dd>Crée une référence de code qui, lorsqu'elle est appelée, se comporte comme si la
+        fonction
+      <span class="Li">"AnyEvent::Log::log" </span>avait été appelée
+      à cet endroit avec le niveau donné. <span class="Li">$logger </span>reçoit
+      un <span class="Li">$msg </span>et des
+      <span class="Li">@args </span>optionnels, tout comme avec la fonction
+      <span class="Li">"AnyEvent::</span>Log::log" :
+        <pre>my $debug_log = AnyEvent::Log::logger "debug";
+$debug_log-&gt;("debug here");
+$debug_log-&gt;("%06d emails processed", 12345);
+$debug_log-&gt;(sub { $obj-&gt;as_string </pre>});
+    <p class="Pp">L'idée derrière cette fonction est de décider de journaliser
+        avant de journaliser réellement - lorsque la fonction
+        <span class="Li">"logger" </span>est appelée une fois, mais
+        le rappel de logger retourné souvent, cela peut être un gain de vitesse
+        </p>considérable.
+    <p class="Pp">Malgré cet avantage de vitesse, les changements dans la configuration du logging
+        seront toujours reflétés par le rappel de logger, même si la configuration change <i>après </i>sa </p>création.
+    <p class="Pp">Pour accélérer davantage le logging, vous pouvez lier une variable scalaire au
+        logger, qui contient vrai si le logger doit être appelé ou non -
+        s'il est faux, l'appel du logger peut être ignoré en toute sécurité. Cette variable
+        sera mise à jour tant que <span class="Li">$logger </span>est en </p>vie.
+    <p class="Pp">Exemple </p>complet :
+        <pre># near the init section
+use AnyEvent::Log;
+my $debug_log = AnyEvent:Log::logger debug =&gt; \my $debug;
+# and later in your program
+$debug_log-&gt;("yo, stuff here") if $debug;
+$debug and $debug_log-&gt;</pre>("123")</dd>;
+  <dt id="AnyEvent::Log::exact_time"><a class="permalink" href="#AnyEvent::Log::exact_time">AnyEvent::Log::exact_time
+    </a></dt>$on
+  <dd>Par défaut, <span class="Li">"AnyEvent::</span>Log" utilisera
+      <span class="Li">"AE::now", </span>c'est-à-dire le temps de boucle d'événements
+      en cache, pour les horodatages des journaux. Après avoir appelé cette fonction avec une valeur
+      vraie, il utilisera plutôt
+      <span class="Li">"AE::time", </span>c'est-à-dire récupérer l'heure actuelle
+      pour chaque message de journal. Cela ne fait une différence que pour les boucles d'événements qui
+      mettent réellement le temps en cache (comme EV ou AnyEvent::Loop).
+    <p class="Pp">Ce réglage peut être modifié à tout moment en appelant cette
+        </p>fonction.
+    <p class="Pp">Puisque <span class="Li">"AnyEvent::Log" </span>doit
+        fonctionner même avant l'initialisation d'AnyEvent, ce commutateur décidera
+        également d'utiliser
+        <span class="Li">"CORE::</span>time" ou
+        <span class="Li">"Time::HiRes::time" lors d</span>e la journalisation d'un
+ </p>       message avant qu'An</dd>yEvent ne soit disponible.
+  <dt id="AnyEvent::Log::format_time"><a class="permalink" href="#AnyEvent::Log::format_time">AnyEvent::Log::format_time
+    </a></dt>$timestamp
+  <dd>Formate un horodatage tel que retourné par
+      <span class="Li">"AnyEvent-&gt;</span>now" ou
+      <span class="Li">"AnyEvent-&gt;time" </span>ou de nombreuses autres
+      fonctions de la même manière que
+      <span class="Li">"AnyEvent:</span>:Log".
+    <p class="Pp">Dans votre programme principal (par opposition à votre module), vous pouvez
+        remplacer le format d'affichage de l'horodatage par défaut en chargeant ce module puis
+        en redéfinissant cette </p>fonction.
+    <p class="Pp">Le plus couramment, cette fo</p>nction peut être utilisée da</dd>ns les rappels de formatage.
+  <dt id="AnyEvent::Log::default_format"><a class="permalink" href="#AnyEvent::Log::default_format">AnyEvent::Log::default_format
+    $time, $ctx, $level, </a></dt>$msg
+  <dd>Formate un message de journal en utilisant l'horodatage, le contexte de logging, le niveau de journal
+      et le message de journal donnés.
+    <p class="Pp">C'est la fonction de formatage utilisée pour formater les messages lorsque
+        aucune fonction personnalisée n'est </p>fournie.
+    <p class="Pp">Dans votre programme principal (par opposition à votre module), v</p>ous pouvez
+        remplacer le format de message par défaut en </dd>chargeant ce module puis
+        en redéfinissant cette fonction.
+  <dt id="AnyEvent::Log::fatal_exit()"><a class="permalink" href="#AnyEvent::Log::fatal_exit()"><b>AnyEvent::Log::</b></a></dt>fatal_exit()
+  <dd>C'est la fonction qui est appelée après avoir journalisé un
+        message de journal
+      <span class="Li">"fatal".</span> Elle ne doit pas retourner.
+    <p class="Pp">L'implémentation par défaut appelle simplement
+        <span class="Li">"ex</span>it </p>1".
+    <p class="Pp">Dans votre programme principal (par oppositio</p>n à votre module), vous pouvez
+        rempla</dd>cer la fonction de sortie fatale en chargeant</dl> ce module puis
+        en redéfinissant cett</section>e fonction. Assurez-vous de ne pas retourner.
+<section class="Sh">
+<h1 class="Sh" id='LOGGING_CONTEXTS'><a class='permalink' href='#LOGGING_CONTEXTS'>CONTEXTES   DE   </a></h1>LOGGING
+<p class="Pp">Ce module associe chaque message de journal à un
+        contexte de
+    <i>loggin</i>g <i>dit, </i>basé sur le package de l'appelant. Chaque
+    package perl a son propre contexte de </p>logging.
+<p class="Pp">Un contexte de logging a trois responsabilités principales : filtrer,
+    journaliser et propager le </p>message.
+<p class="Pp">Pour le premier objectif, le filtrage, chaque contexte a un ensemble de
+    niveaux de logging, appelé le masque de niveau de journal. Les messages qui ne sont pas dans l'ensemble seront
+    ignorés par ce contexte (masqués)</p>.
+<p class="Pp">Pour le logging, le contexte stocke un rappel de formatage (qui prend
+    l'horodatage, le contexte, le niveau et le message de chaîne et le formate de la manière
+    dont il doit être journalisé) et un rappel de logging (qui est responsable de
+    journaliser réellement le message formaté et de dire à
+    <span class="Li">"AnyEvent::</span>Log" s'il a consommé
+    le message, ou s'il doit être propagé)</p>.
+<p class="Pp">Pour la propagation, un contexte peut avoir un nombre quelconque de
+    <i>contexte</i>s <i>esclaves </i>attachés. Tout message qui n'est ni masqué par le
+    masque de logging ni masqué par le rappel de logging retournant vrai sera
+    passé à tous les contextes </p>esclaves.
+<p class="Pp">Chaque appel à une fonction de logging journalisera le message au plus une fois
+    par contexte, donc cela n'a pas d'importance (beaucoup) s'il y a des cycles ou si le
+    message peut arriver au même contexte via plusieurs </p>chemins.
+<section class="Ss">
+<h2 class="Ss" id='DEFAULTS'><a class='permalink' href='#DEFAULTS'>DÉFAUT</a></h2>S
+<p class="Pp">Par défaut, tous les contextes de logging ont un ensemble complet de niveaux de journal
+    ("all"), un rappel de logging désactivé et le rappel de formatage
+    par </p>défaut.
+<p class="Pp">Les contextes de package ont le nom du package comme titre de logging
+    par </p>défaut.
+<p class="Pp">Ils ont exactement un esclave - le contexte du
+    package "parent". Le package parent est simplement défini comme le
+    nom du package sans le dernier composant, c'est-à-dire
+    <span class="Li">"AnyEvent::Debug::Wrapped" </span>devient
+    <span class="Li">"AnyEvent::</span>Debug", et
+    <span class="Li">"AnyEvent" </span>devient ...
+    <span class="Li">$AnyEvent::Log::COLLECT </span>qui est l'exception de
+    la règle - tout comme le "parent" de tout nom de package à composant unique
+    dans Perl est <span class="Li">"main",</span> l'esclave par défaut
+    de tout contexte de package de premier niveau est
+    <span class="Li">$AnyEven</span>t::Log::</p>COLLECT.
+<p class="Pp">Puisque les packages perl ne forment qu'une hiérarchie approximative, ce contexte
+    esclave peut bien sûr être </p>supprimé.
+<p class="Pp">Tous les autres contextes (anonymes) n'ont pas d'esclaves et un titre vide
+    par </p>défaut.
+<p class="Pp">Lorsque le module est chargé, il crée le
+    contexte de logging
+    <span class="Li">$AnyEvent::Log:</span>:LOG qui journalise simplement
+    tout via <span class="Li">"warn",</span> sans propager
+    quoi que ce soit nulle part par défaut. Le but de ce contexte est de fournir un
+    endroit pratique pour remplacer la cible de logging globale ou pour attacher
+    des cibles de journal supplémentaires. Il n'est pas destiné au </p>filtrage.
+<p class="Pp">Il crée ensuite le
+    contexte <span class="Li">$AnyEvent::Log::FILTER
+</span>    dont le but est de supprimer tous les messages avec une priorité plus élevée que
+    <span class="Li">$ENV{PERL_ANYEVENT_VERBOSE}. Il </span>attache ensuite le
+    contexte
+    <span class="Li">$AnyEvent::Log::LOG </span>à celui-ci. Le but du
+    contexte filtre est simplement de fournir un filtrage selon un certain niveau de
+    journal </p>global.
+<p class="Pp">Enfin, il crée le contexte de package de premier niveau
+    <span class="Li">$AnyEvent::Log::COLLECT et </span>attache le
+    contexte
+    <span class="Li">$AnyEvent::Log::FILTER à </span>celui-ci, mais laisse
+    par ailleurs la configuration par défaut. Son but est simplement de collecter tous les messages de
+    journal à l'échelle du </p>système.
+<p class="Pp">La hiérarchie est alors </p>:
+<pre>any package, eventually -&gt; $COLLECT -&gt; $FILTER -&gt; </pre>$LOG
+<p class="Pp">L'effet de tout cela est que les messages de journal, par défaut, remontent
+    jusqu'au
+    contexte <span class="Li">$AnyEvent::Log::COLLECT </span>où tous les
+    messages aboutissent normalement, de là au
+    <span class="Li">$AnyEvent::Log::FILTER où </span>les messages de journal avec une priorité plus basse que <span class="Li">$ENV{PERL_ANYEVENT_VERBOSE}</span> seront
+    filtrés, puis au
+    contexte <span class="Li">$AnyEvent::Log::</span>LOG
+    pour être passés à <span class="Li">"warn</span>"</p>.
+<p class="Pp">Cela facilite la définition d'un niveau de logging global (en modifiant
+    <span class="Li">$FILTER),</span> mais permet toujours à d'autres contextes d'envoyer,
+    par exemple, leurs messages de débogage et de traçage à la
+    cible
+    <span class="Li">$LOG </span>malgré le niveau de logging global, ou d'
+    attacher des cibles de journal supplémentaires qui journalisent les messages, quel que soit le niveau de
+    logging </p>global.
+<p class="Pp">Cela facilite également la modification du logger warn par défaut ($LOG) en
+    quelque chose qui journalise dans un fichier, ou l'attachement de cibles de logging supplémentaires (telles
+    que le logging dans un fichier) en l'attachant à
+  <span class="Li">$F</span>IL</p>TE</section>R.
+<section class="Ss">
+<h2 class="Ss" id='CREATING/FINDING/DESTROYING_CONTEXTS'><a class='permalink' href='#CREATING/FINDING/DESTROYING_CONTEXTS'>CRÉATION/TROUVE/DESTRUCTION   DES   </a></h2>CONTEXTES
+<dl class="Bl-tag">
+  <dt>$ctx = AnyEvent::Log::ctx </dt>[$pkg]
+  <dd>Cette fonction crée ou retourne un contexte de logging (qui est un objet).
+    <p class="Pp">Si un nom de package est donné, le contexte pour ce package
+        est retourné. Si elle est appelée sans aucun argument, le contexte pour le
+        package de l'appelant est retourné (c'est-à-dire le même contexte que celui
+        <span class="Li">utilisé par </span>un appel à
+        "AE:</p>:log").
+    <p class="Pp">Si <span class="Li">"undef" est donné, elle
+        crée </span>un nouveau contexte anonyme qui n'est</p> lié à aucun package et est
+        dé</dd>truit lorsqu'il n'est plus référencé.
+  <dt id="AnyEvent::Log::reset"><a class="permalink" href="#AnyEvent::Log::reset">AnyEvent::Log::</a></dt>reset
+  <dd>Réinitialise tous les contextes de package et recrée la hiérarchie par défaut.archy si
+      nécessaire, c'est-à-dire réinitialise le sous-système de journalisation aux valeurs par défaut, autant que
+      possible. Ce processus conserve intactes les références aux contextes détenues par d'autres parties du
+      programme.
+    <p class="Pp">Cela peut être utilisé pour implémenter le (re)chargemen</p>t d'un fichier de configuration : avant
+        de char</dd>ger une configuration, réinitialisez tous les contextes.
+  <dt>$ctx = new AnyEvent::Log::Ctx methodname =&gt; param.</dt>..
+  <dd>Il s'agit d'un constructeur de convenance qui simplifie la construction
+      de contextes de journalisation anonymes.
+    <p class="Pp">Chaque paire clé-valeur entraîne l'invocation de la méthode portant le
+        même nom que la clé, avec la valeur comme paramètre, sauf si la valeur
+        est une référence de tableau (arrayref), auquel cas la méthode est appelée avec le contenu du
+        tableau. Les méthodes sont appelées dans l'ordre </p>spécifié.
+    <p class="Pp">Exemple : créer un nouveau contexte de journalisation et définir à la fois le
+        niveau de journalisation par défaut, certains contextes esclaves et un rappel (callback) de </p>journalisation.
+        <pre>$ctx = new AnyEvent::Log::Ctx
+   title   =&gt; "dubious messages",
+   level   =&gt; "error",
+   log_cb  =&gt; sub { print STDOUT shift; 0 },
+   slaves  =&gt; [$ctx1, $ctx, </pre>$ctx2]</dd>,</dl>
+</section>;
+<section class="Ss">
+<h2 class="Ss" id='CONFIGURING_A_LOG_CONTEXT'><a class='permalink' href='#CONFIGURING_A_LOG_CONTEXT'>CONFIGURATION   D'UN CONTEXTE DE </a></h2>JOURNALISATION
+<p class="Pp">Les méthodes suivantes peuvent être utilisées pour configurer le
+    contexte de </p>journalisation.
+<dl class="Bl-tag">
+  <dt>$ctx-&gt;title ([$new_title]</dt>)
+  <dd>Renvoie le titre du contexte de journalisation - il s'agit du nom du
+      package pour les contextes de package, et d'une chaîne définie par l'utilisateur pour tous les autres.
+    <p class="Pp">Si <span class="Li">$new_title est f</span>ourni, alors il
+</p>        remplac</dd>e le nom du pack</dl>age ou le titre.
+<p class="Pp"><i>NIVEAUX DE </i></p>JOURNALISATION
+<p class="Pp">Les méthodes suivantes traitent du niveau de journalisation associé
+    au contexte de </p>journalisation.
+<p class="Pp">La méthode la plus courante à utiliser est probablement
+    <span class="Li">"$ctx-&gt;level ($level)", </span>qui
+    configure le niveau spécifié et tous les niveaux de priorité </p>supérieurs.
+<p class="Pp">Toutes les fonctions qui acceptent une liste de niveaux acceptent également la
+    chaîne spéciale <span class="Li">"all" </span>qui se développe en tous
+    les niveaux de </p>journalisation.
+<dl class="Bl-tag">
+  <dt>$ctx-&gt;levels ($level[, $level..</dt>.])
+  <dd>Active la journalisation pour les niveaux donnés et la désactive pour tous les </dd>autres.
+  <dt>$ctx-&gt;level </dt>($level)
+  <dd>Active la journalisation pour le niveau donné et tous les niveaux inférieurs (priorité
+      supérieure). En plus des niveaux de journalisation normaux, spécifier un niveau de
+      <span class="Li">0 </span>ou <span class="Li">"off"
+</span>      désactive toute journalisation pour ce niveau.
+    <p class="Pp">Exemple : journaliser les avertissements (warnings), les erreurs et les messages de priorité
+    </p>  supérieure.
+        <pre>$ctx-&gt;level ("warn");
+</pre>$ctx-&gt;level (5); # sa</dd>me thing, just numeric
+  <dt>$ctx-&gt;enable ($level[, $level..</dt>.])
+  <dd>Active la journalisation pour les niveaux donnés, laissant tous les autres </dd>inchangés.
+  <dt>$ctx-&gt;disable ($level[, $level..</dt>.])
+  <dd>Désactive la journalisation pour les niveaux donnés, laissant tous les autres </dd>inchangés.
+  <dt>$ctx-&gt;cap </dt>($level)
+  <dd>Limite la priorité maximale au niveau donné, pour tous les messages journalisés vers,
+      ou passant par, ce contexte. C'est-à-dire que, bien que cela n'affecte pas
+      si un message est journalisé ou transmis, la priorité maximale des messages
+      sera limitée au niveau spécifié - les messages ayant une priorité plus élevée
+      se verront attribuer la priorité spécifiée.
+    <p class="Pp">Une autre façon de voir cela est que
+        <span class="Li">"-&gt;level" </span>filtre les messages ayant
+        une priorité trop basse, tandis que <span class="Li">"-&gt;cap"
+</span>        modifie les messages ayant une priorité trop </p>élevée.
+    <p class="Pp">C'est utile lorsque différentes cibles de journalisation ont des interprétations
+        différentes de la priorité. Par exemple, pour un programme de ligne de commande
+        spécifique, un commutateur de ligne de commande erroné peut très bien entraîner un
+        <span class="Li">message de </span>journalisation "fatal", tandis que le même
+        message, journalisé vers syslog, est probablement <i>pas </i>fatal pour le système ou la
+        fonctionnalité syslog dans son ensemble, mais plutôt une simple
+        <span class="Li">"erreu</span>r" (e</p>rror).
+    <p class="Pp">Cela peut être modélisé en ayant un journaliseur stderr qui journalise
+        les messages "tels quels" et un journaliseur syslog qui journalise les messages avec une
+        limite de niveau de, disons, <span class="Li">"error",</span> ou, pour
+        les composants véritablement critiques pour le système, réellement
+        <span class="Li">"c</span>ri</p>tic</dd>al</dl>".
+<p class="Pp"><i>CONTEXTES </i></p>ESCLAVES
+<p class="Pp">Les méthodes suivantes attachent et détachent un autre contexte de journalisation à
+    un contexte de </p>journalisation.
+<p class="Pp">Les messages de journalisation sont propagés à tous les contextes esclaves, sauf si le
+    rappel de journalisation consomme le </p>message.
+<dl class="Bl-tag">
+  <dt>$ctx-&gt;attach ($ctx2[, $ctx3..</dt>.])
+  <dd>Attache les contextes donnés comme esclaves à ce contexte. Ce n'est pas une erreur
+      d'ajouter un contexte deux fois (la deuxième tentative sera ignorée).
+    <p class="Pp">Un contexte peut être spécifié </p>soit comme nom de package, soi</dd>t comme
+        objet contexte.
+  <dt>$ctx-&gt;detach ($ctx2[, $ctx3..</dt>.])
+  <dd>Retire les esclaves donnés de ce contexte - ce n'est pas une erreur d'essayer
+      de retirer un contexte qui n'a pas été ajouté.
+    <p class="Pp">Un contexte peut être spécifié </p>soit comme nom de package, soi</dd>t comme
+        objet contexte.
+  <dt>$ctx-&gt;slaves ($ctx2[, $ctx3..</dt>.])
+  <dd>Remplace tous les esclave</dd>s attachés à ce contexte </dl>par ceux qui sont donnés.
+<p class="Pp"><i>CIBLES DE </i></p>JOURNALISATION
+<p class="Pp">Les méthodes suivantes configurent la manière dont le contexte de journalisation effectue
+    réellement la journalisation (ce qui consiste à formater le message et à l'imprimer
+    ou à faire ce qu'il veut avec lui)</p>.
+<dl class="Bl-tag">
+  <dt>$ctx-&gt;log_cb ($cb-&gt;($str)</dt>)
+  <dd>Remplace le rappel de journalisation sur le contexte
+      (<span class="Li">"undef" </span>désactive le rappel de journalisation).
+    <p class="Pp">Le rappel de journalisation est responsable du traitement des messages de journalisation formatés (voir <span class="Li">"fmt_cb" </span>ci-dessous) -
+        normalement de simples chaînes de texte se terminant par un saut de ligne (et éventuellement
+        elles-mêmes multilignes)</p>.
+    <p class="Pp">Il doit également renvoyer vrai si et seulement s'il a consommé le message de
+        journalisation, et faux s'il ne l'a pas fait. Consommer un message signifie qu'il ne sera
+        envoyé à aucun contexte esclave. En cas de doute, renvoyez
+        <span class="Li">0 </span>depuis votre rappel de </p>journalisation.
+    <p class="Pp">Exemple : un rappel de journalisation très simple, simplement déverser le
+        message sur STDOUT et ne pas le </p>consommer.
+        <pre>$ctx-&gt;log_cb (sub { print STDERR shift; </pre>0 });
+    <p class="Pp">Vous pouvez filtrer les messages en ayant un rappel de journalisation qui renvoie simplement <span class="Li">1 </span>et ne fait rien avec le
+        message, mais cela compte comme "message étant journalisé" et pourrait
+        ne pas être très </p>efficace.
+    <p class="Pp">Exemple : propager tous les messages sauf les niveaux de journalisation
+        "debug" et "trace". Les messages seront tout de même
+        générés, ce qui peut ralentir votre </p>programme.
+        <pre>$ctx-&gt;levels ("debug", "trace");
+$c</pre>tx-&gt;log_cb (sub { 1 }); # do not lo</dd>g, but eat debug and trace messages
+  <dt>$ctx-&gt;fmt_cb ($fmt_cb-&gt;($timestamp, $orig_ctx, $level,
+    $message)</dt>)
+  <dd>Remplace le rappel de formatage sur le contexte
+      (<span class="Li">"undef" </span>restaure le formateur
+      par défaut).
+    <p class="Pp">Le rappel reçoit l'horodatage (éventuellement fractionnaire), le contexte de journalisation d'origine (objet, pas titre), le niveau de journalisation (numérique) et la chaîne de message brute, et doit renvoyer un message de journalisation formaté. Dans la plupart des cas, ce sera une chaîne, mais cela pourrait tout aussi bien être une référence de tableau stockant simplement les </p>valeurs.
+    <p class="Pp">Si, pour une raison quelconque, vous souhaitez utiliser
+        <span class="Li">"caller" </span>pour en savoir plus sur le
+        journaliseur, vous devriez remonter la pile d'appels jusqu'à ce que vous ne soyez plus à l'intérieur du <span class="Li">"AnyEvent::</span>Log"
+      </p>package.
+    <p class="Pp">Pour implémenter votre propre rappel de journalisation, vous pourriez trouver les
+        <span class="Li">"AnyEvent::Log::</span>format_time" et
+        <span class="Li">"AnyEvent::Log::default_format"
+</span>        fonctions </p>utiles.
+    <p class="Pp">Exemple : formater le message comme le ferait AnyEvent::Log, en
+        laissant AnyEvent::Log faire le travail. C'est une bonne base pour concevoir un
+        rappel de formatage qui ne change que des aspects mineurs de la
+      mise </p>en forme.
+        <pre>$ctx-&gt;fmt_cb (sub {
+   my ($time, $ctx, $lvl, $msg) = @_;
+   AnyEvent::Log::default_format $time, $ctx, $lvl, $msg
+</pre>});
+    <p class="Pp">Exemple : formater simplement le message brut, avec le niveau de journalisation numérique
+        entre </p>chevrons.
+        <pre>$ctx-&gt;fmt_cb (sub {
+   my ($time, $ctx, $lvl, $msg) = @_;
+   "&lt;$lvl&gt;$msg\n"
+</pre>});
+    <p class="Pp">Exemple : renvoyer une référence de tableau avec simplement les valeurs de journalisation, et utiliser <span class="Li">"PApp::SQL::sql_exec" </span>pour stocker
+        le message dans une base </p>de données.
+        <pre>$ctx-&gt;fmt_cb (sub { \@_ });
+$ctx-&gt;log_cb (sub {
+   my ($msg) = @_;
+   sql_exec "insert into log (when, subsys, prio, msg) values (?, ?, ?, ?)",
+            $msg-&gt;[0] + 0,
+            "$msg-&gt;[1]",
+            $msg-&gt;[2] + 0,
+            "$msg-&gt;[3]";
+  </pre> 0
+</dd>});
+  <dt>$ctx-&gt;</dt>log_to_warn
+  <dd>Définit <span class="Li">"log_cb" </span>pour simplement utiliser
+      <span class="Li">"CORE::warn" pour </span>signaler tous les messages
+      (habituellement, cela journalise vers STDERR)</dd>.
+  <dt>$ctx-&gt;log_to_file </dt>($path)
+  <dd>Définit <span class="Li">"log_cb" </span>pour journaliser vers un fichier (par
+      ajout), non tamponné. La fonction peut renvoyer avant que le fichier de journalisation ait
+      été ouvert ou </dd>créé.
+  <dt>$ctx-&gt;log_to_path </dt>($path)
+  <dd>Identique à <span class="Li">"-&gt;log_to_file", </span>mais ouvre
+      le fichier pour chaque message. C'est beaucoup plus lent, mais cela vous permet de
+      changer/déplacer/renommer/supprimer le fichier à peu près à tout moment.
+    <p class="Pp">Inutile(?) de dire que, si vous ne voulez pas être mordu par une
+        personne malveillante appelant <span class="Li">"chdir",</span> le chemin
+        devrait être absolu. Cela n'aide pas avec
+        <span class="Li">"chroot",</span> mais </p>bon.</dd>..
+  <dt>$ctx-&gt;log_to_syslog ([$facility]</dt>)
+  <dd>Journalise tous les messages via Sys::Syslog, en faisant correspondre
+      <span class="Li">"trace" </span>à
+      <span class="Li">"debug" </span>et tous les autres de manière évidente. Si spécifié, alors <span class="Li">$facility est
+</span>      utilisé comme la fonctionnalité (facility) (<span class="Li">"us</span>er",
+      <span class="Li">"au</span>th",
+      <span class="Li">"local0" </span>et ainsi de suite). La fonctionnalité par défaut est <span class="Li">"use</span>r".
+    <p class="Pp">Notez que cette fonction définit également un
+        <span class="Li">"fmt_cb" </span>- la partie journalisation requiert
+        une référence de tableau avec [$level, <span class="Li">$str]</span> comm</p>e
+   </dd>   en</dl>trée.
+<p class="Pp"><i>JOURNALISATION DES </i></p>MESSAGES
+<p class="Pp">Ces méthodes vous permettent de journaliser des messages directement vers un contexte,
+    sans passer par votre contexte de </p>package.
+<dl class="Bl-tag">
+  <dt>$ctx-&gt;log ($level, $msg[, @params]</dt>)
+  <dd>Identique à <span class="Li">"AnyEvent::Log::log", mais </span>utilise
+      le contexte donné comme contexte de journalisation.
+    <p class="Pp">Exemple : enregistrer un message dans le contexte d'un autre </p>paquet.
+        <pre>(AnyEvent::Log::ctx "</pre>Other::Package")-&gt;log </dd>(warn =&gt; "heely bo");
+  <dt>$logger = $ctx-&gt;logger ($level[, \$enabled]</dt>)
+  <dd>Identique à <span class="Li">"AnyEvent::Log::</span>logger", mais
+  </dd>    utilise le c</dl>ontexte donné c</section>omme contexte de</section> journalisation.
+<section class="Sh">
+<h1 class="Sh" id='CONFIGURATION_VIA_$ENV{PERL_ANYEVENT_LOG}'><a class='permalink' href='#CONFIGURATION_VIA_$ENV{PERL_ANYEVENT_LOG}'>CONFIGURATION   VIA $ENV{PERL_ANYEVENT_LOG</a></h1>}
+<p class="Pp">La journalisation peut également être configurée en définissant la variable d'environnement
+    <span class="Li">"PERL_ANYEVENT_LOG" </span>(ou
+    <span class="Li">"AE</span>_LOG</p>").
+<p class="Pp">La valeur se compose d'une ou plusieurs spécifications de contexte de journalisation
+    séparées par <span class="Li">":</span>" ou des espaces. Chaque
+    spécification de journalisation commence par un nom de contexte, suivi de
+    <span class="Li">"=",</span> suivi de zéro ou plusieurs
+    directives de configuration séparées par des virgules. Voici quelques exemples </p>:
+<pre># définir le niveau de journalisation par défaut
+filter=warn
+# journaliser dans un fichier au lieu de stderr
+log=file=/tmp/mylog
+# journaliser dans un fichier en plus de stderr
+log=+%file:%file=file=/tmp/mylog
+# activer les messages de journalisation de débogage, journaliser les avertissements et plus vers syslog
+filter=debug:log=+%warnings:%warnings=warn,syslog=LOG_LOCAL0
+# journaliser les messages de traçage (uniquement) de AnyEvent::Debug vers un fichier
+AnyEvent::Debug=+%trace:%trace=only,trace,file=/tmp/tracelo</pre>g
+<p class="Pp">Un nom de contexte dans la spécification de journalisation peut être l'un des
+    suivants </p>:
+<dl class="Bl-tag">
+  <dt>"collect", "filter", </dt>"log"
+  <dd>Correspondent aux trois contextes prédéfinis
+      <span class="Li">$AnyEvent::Log::</span>COLLECT,
+      <span class="Li">"AnyEvent::Log::</span>FILTER" et
+      <span class="Li">$AnyEvent::</span>Log::</dd>LOG.
+  <dt>%na</dt>me
+  <dd>Les noms de contexte commençant par un <span class="Li">"%" </span>sont
+      des contextes anonymes créés lorsque le nom est mentionné pour la première fois.
+      La différence avec les contextes de paquets est qu'ils n'ont par défaut aucun esclave attaché.
+    <p class="Pp">Cela permet de créer de nouveaux contextes de journalisation</p> auxquels on peut
+        faire référence plusieurs fois par </dd>leur nom au sein de la même spécification de journalisation.
+  <dt id="a"><a class="permalink" href="#a">un nom de paquet </a></dt>perl
+  <dd>Toute autre chaîne fait référence au contexte de journalisation associé au
+      "package" Perl <span class="Li">donné. Dans </span>le cas peu probable où vous souhaitez spécifier un contexte de paquet
+      correspondant à l'une des autres formes de nom de contexte, vous pouvez ajouter un <span class="Li">"::"
+      au nom d</span>u paquet pour forse</dd>r son interprétati</dl>on comme un paquet.
+<p class="Pp">Les spécifications de configuration peuvent être un nombre quelconque des
+    éléments suivants </p>:
+<dl class="Bl-tag">
+  <dt>"stder</dt>r"
+  <dd>Configure le contexte pour utiliser la fonction
+      "warn" de Perl (qui journalise généralement vers
+      <span class="Li">"STDERR")</span>. Fonctionne comme
+      <span class="Li">"log</span>_to_warn".
+      <span class="Li">"log_to_war</span>n</dd>".
+  <dt>"file="<i>che</i></dt>min
+  <dd>Configure le contexte pour journaliser dans un fichier avec le chemin donné. Fonctionne comme
+      <span class="Li">"log_to_fil</span>e</dd>".
+  <dt>"path="<i>che</i></dt>min
+  <dd>Configure le contexte pour journaliser dans un fichier avec le chemin donné. Fonctionne comme
+      <span class="Li">"log_to_pat</span>h</dd>".
+  <dt>"syslog" ou "syslog="<i>ex</i></dt>pr
+  <dd>Configure le contexte pour journaliser vers syslog. Si <i>expr </i>est donné, il est
+      évalué dans le paquet Sys::Syslog, vous pourriez donc utiliser :
+        <pre>log=syslog=LOG_L</pre>OCA</dd>L0
+  <dt>"nolo</dt>g"
+  <dd>Configure le contexte pour ne journaliser rien par lui-même, ce qui est
+      le comportement par défaut. Identique à <span class="Li">"$ctx-&gt;log</span>_cb
+     </dd> (undef)".
+  <dt>"cap="<i>nive</i></dt>au
+  <dd>Limite les messages de journalisation entrant dans ce contexte au niveau donné, c'est-à-dire
+      réduit la priorité des messages ayant une priorité plus élevée que ce niveau. La valeur par défaut est <span class="Li">0 </span>(ou
+      <span class="Li">"off")</span>, ce qui signifie que la priorité ne sera pas
+      </dd>modifiée.
+  <dt>0 ou </dt>"off"
+  <dd>Définit le niveau de journalisation du contexte à <span class="Li">0,</span> c'est-à-dire
+      que tous les messages seront </dd>filtrés.
+  <dt>"al</dt>l"
+  <dd>Active tous les niveaux de journalisation, c'est-à-dire que le filtrage sera
+      effectivement désactivé (comportement par défaut)</dd>.
+  <dt>"onl</dt>y"
+  <dd>Désactive tous les niveaux de journalisation et change l'interprétation des
+      spécifications de niveau suivantes pour n'activer que le niveau spécifié.
+    <p class="Pp">Exemple : n'activer que les messages de débogage pour un </p>contexte.
+        <pre>contex</pre>t=only</dd>,debug
+  <dt>"excep</dt>t"
+  <dd>Active tous les niveaux de journalisation et change l'interprétation des
+      spécifications de niveau suivantes pour désactiver ce niveau. Rarement utilisé.
+    <p class="Pp">Exemple : activer tous les niveaux de journalisation sauf fatal et trace
+        (ce qui est plutôt </p>absurde).
+        <pre>filter=e</pre>xept,fat</dd>al,trace
+  <dt>"leve</dt>l"
+  <dd>Active tous les niveaux de journalisation et change l'interprétation des
+      spécifications de niveau suivantes pour signifier "ce niveau ou tout message de priorité
+      supérieure". C'est le comportement par défaut.
+    <p class="Pp">Exemple : journaliser tout ce qui est au niveau warn ou </p>au-dessus.
+        <pre>filter=warn
+# ou, </pre>plus verbeux
+filt</dd>er=only,level,warn
+  <dt>1..9 ou un nom de niveau de journalisation ("error", "debug"
+    </dt>etc.)
+  <dd>Un niveau de journalisation numérique ou le nom d'un niveau sera interprété selon
+      la directive <span class="Li">"on</span>ly",
+      <span class="Li">"except" </span>ou
+      <span class="Li">"level" </span>la plus récente. Par défaut,
+      spécifier un niveau de journalisation active ce niveau et tout message de priorité
+    </dd>supérieure.
+  <dt>"+"<i>contex</i></dt>te
+  <dd>Attache le contexte nommé comme esclave au </dd>contexte.
+  <dt>"+</dt>"
+  <dd>Un <span class="Li">"+" </span>isolé
+      détache tous les contextes, c'est-à-dire
+      efface la liste des esclaves du contexte. Les contextes anonymes (<span class="Li">%name)</span> n'ont aucun esclave attaché par
+      défaut, mais les contextes de paquets ont le contexte parent comme esclave par défaut.
+    <p class="Pp">Exemple : journaliser les messages de My::Module dans un fichier, ne pas les envoyer
+        au collecteur de journalisation </p>par défaut.
+        <pre>My::Module=+,file=/tmp/mymodul</pre>el</dd>o</dl>g
+<p class="Pp">N'importe quel caractère peut être échappé en le faisant précéder d'un
+    <span class="Li">"\" </span>(antislash), comme d'habitude. Ainsi, pour journaliser dans un
+    fichier contenant une virgule, deux-points, un antislash et quelques espaces dans le nom de fichier,
+    vous feriez ceci </p>:
+<pre>PERL_ANYEVENT_LOG='log=file=/some\ \:file\ with\,\ </pre>\\-escapes'
+<p class="Pp">Comme les espaces (qui incluent les sauts de ligne) sont autorisés, il est possible
+    de spécifier plusieurs lignes dans
+    <span class="Li">"PERL_ANYEVENT_LOG", par </span>exemple </p>:
+<pre>PERL_ANYEVENT_LOG="
+   filter=warn
+   AnyEvent::Debug=+%trace
+   %trace=only,trace,+log
+" </pre>myprog
+<p class="Pp">De plus, dans le cas peu probable où vous souhaitez concaténer des
+    spécifications, utilisez les espaces comme séparateur, car
+    <span class="Li">"::" </span>sera interprété comme faisant partie d'un
+    nom de module, une spécification vide avec deux séparateurs </p>:
+<pre>PERL_ANYEVENT_LOG</pre>="$PERL_ANYEVENT</section>_LOG MyMod=debug"
+<section class="Sh">
+<h1 class="Sh" id='EXAMPLES'><a class='permalink' href='#EXAMPLES'>EXEMPLE</a></h1>S
+<p class="Pp">Cette section montre quelques configurations courantes, à la fois en code et
+    en <span class="Li">chaîne </span>"PERL_ANYEVENT_LOG"</p>.
+<dl class="Bl-tag">
+  <dt id="Setting"><a class="permalink" href="#Setting">Définir le niveau de
+    journalisation </a></dt>global.
+  <dd>Soit placez
+      <span class="Li">"PERL_ANYEVENT_VERBOSE="&lt;nombre&gt;</span>
+      dans votre environnement avant de lancer votre programme, utilisez
+      <span class="Li">"PERL_ANYEVENT_LOG" </span>ou modifiez le niveau de
+      journalisation du contexte racine à l'exécution :
+        <pre>PERL_ANYEVENT_VERBOSE=5 ./myprog
+PERL_ANYEVENT_LOG=log=warn
+$AnyEvent::Log::FILTER-&gt;level </pre>("warn")</dd>;
+  <dt id="Append"><a class="permalink" href="#Append">Ajouter tous les messages à un
+    fichier au lieu de les envoyer vers </a></dt>STDERR.
+  <dd>Cela est affecté par le niveau de journalisation global.
+        <pre>$AnyEvent::Log::LOG-&gt;log_to_file ($path);
+PERL_ANYEVENT_LOG=log=file=/som</pre>e/p</dd>ath
+  <dt id="Write"><a class="permalink" href="#Write">Écrire tous les messages avec une priorité
+    "error" et supérieure dans un </a></dt>fichier.
+  <dd>Cela ne les écrit que lorsque le niveau de journalisation global le permet, car il
+      est attaché au contexte par défaut qui est invoqué <i>après </i>le filtrage
+      global.
+        <pre>$AnyEvent::Log::FILTER-&gt;attach (
+   new AnyEvent::Log::Ctx log_to_file =&gt; $path);
+PERL_ANYEVENT_LOG=filter=+%filelogger:%filelogger=file=/some</pre>/path
+    <p class="Pp">Cela les écrit quel que soit le niveau de journalisation global,
+        car il est attaché au contexte de premier niveau, qui reçoit tous les
+        messages <i>avant </i>le filtrage </p>global.
+        <pre>$AnyEvent::Log::COLLECT-&gt;attach (
+   new AnyEvent::Log::Ctx log_to_file =&gt; $path);
+PERL_ANYEVENT_LOG=%filelogger=file=/some/path:collect=+%filel</pre>ogger
+    <p class="Pp">Dans les deux cas, le</p>s messages sont toujou</dd>rs écrits sur STDERR.
+  <dt id="Additionally"><a class="permalink" href="#Additionally">De plus, journaliser tous les messages avec une priorité "warn" et supérieure vers
+    "syslog", mais limiter à </a></dt>"error".
+  <dd>Cela journalise tous les messages vers la cible de journalisation par défaut, mais journalise également les messages
+      avec une priorité <span class="Li">"warn" </span>ou supérieure (et non
+      filtrés autrement) vers la facilité syslog
+      <span class="Li">"user".</span> Les messages avec une priorité supérieure
+      à <span class="Li">"error" </span>seront journalisés avec le niveau
+      <span class="Li">"er</span>ror".
+        <pre>$AnyEvent::Log::LOG-&gt;attach (
+   new AnyEvent::Log::Ctx
+      le</pre>vel  =&gt; "warn",
+      cap    =&gt; "error",
+      syslog =&gt; "user",</dd>
+);
+PERL_ANYEVENT_LOG=log=+%syslog:%syslog=warn,cap=error,syslog
+  <dt id="Write~2"><a class="permalink" href="#Write~2">Écrire les messages de traçage
+    (uniquement) de AnyEvent::Debug vers la ou les cibles de journalisation par </a></dt>défaut.
+  <dd>Attacher le contexte <span class="Li">$AnyEvent::Log:</span>:LOG au contexte
+      <span class="Li">"AnyEvent::Debug" </span>- cela contourne simplement
+      le filtrage global pour les messages de traçage.
+        <pre>my $debug = AnyEvent::Debug-&gt;AnyEvent::Log::ctx;
+$debug-&gt;attach ($AnyEvent::Log::LOG);
+PERL_ANYEVENT_LOG=AnyEvent::</pre>Debug=+log
+    <p class="Pp">Cela fonctionne bien sûr pour n'importe quel</p> paquet, pas seulement
+        AnyEvent::Deb</dd>ug, mais suppose que le niveau de journalisat</dl>ion pour AnyEvent::Debug n'a pas
+        été</section> modifié par rapport à la valeur par défaut.
+<section class="Sh">
+<h1 class="Sh" id='ASYNCHRONOUS_DISK_I/O'><a class='permalink' href='#ASYNCHRONOUS_DISK_I/O'>E/S DISQUE </a></h1>ASYNCHRONE
+<p class="Pp">Ce module utilise AnyEvent::IO pour écrire réellement les messages de journalisation (dans
+    <span class="Li">"log_to_file" </span>et
+    <span class="Li">"log_to_path"), il ne bloque donc pas</span> votre
+    programme lorsque le disqu</p>e est occupé et qu'un backend AnyEvent</section>::IO non bloquant est
+    disponible.
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTEU</a></h1>R
+<pre>Marc Lehmann &lt;schmorp@schmorp.de&gt;
+http://anyevent.schmorp.</pre>de
+ection</div>&gt;
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07</td>-13
+    <td class="foot-os">pe</td>rl</tr> v</table>5.</section>42</article>.0
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le </p>paquet :
+    <dl>
+        <dt>Nom du </dt>paquet :
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-anyevent/">extra/perl-an</a></dd>yevent
+        <dt>Version </dt>:
+        <dd>4:7.</dd>17-9
+        <dt>Amont </dt>:
+        <dd><a href="https://metacpan.org/release/AnyEvent">https://metacpan.</a></dd>org/release/AnyEvent
+        <dt>Licences </dt>:
+        <dd>PerlArtistic,</dd> GPL
+        <dt>Manuels </dt>:
+        <dd><a href="/listing/extra/perl-anyevent/">/listin</a></dd>g/extra</dl>/perl-an</section>yevent/
+
+<details>
+    <summary>Table des </summary>matières
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">N</a></li>OM
+        
+            <li><a href="#SYNOPSIS">SY</a></li>NOPSIS
+        
+            <li><a href="#DESCRIPTION">DESC</a></li>RIPTION
+        
+            <li><a href="#LOGGING_LEVELS">NIVEAUX DE </a></li>JOURNALISATION
+        
+            <li><a href="#LOGGING_FUNCTIONS">FONCTIONS DE </a></li>JOURNALISATION
+        
+            <li><a href="#LOGGING_CONTEXTS">CONTEXTES </a></li>DE JOURNALISATION
+        
+            <li><a href="#CONFIGURATION_VIA_$ENV{PERL_ANYEVENT_LOG}">CONFIGURATION VIA </a></li>$ENV{PERL_ANYEVENT_LOG}
+        
+            <li><a href="#EXAMPLES">EX</a></li>EMPLES
+        
+            <li><a href="#ASYNCHRONOUS_DISK_I/O">E/S DISQUE </a></li>ASYNCHRONE
+        
+            <li><a href="#AUTHOR">A</a></li>U</ul>TE</nav>U</details>R
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/AnyEvent::Log.3pm.en.txt">t</a>xt, 
+        
+            <a href="/man/AnyEvent::Log.3pm.en.raw">b</a></p>r</nav>u</aside></main>t
+        <footer>
+            de manuel.
+            <p>Le site est disponible selon les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0
+               , à l</a>'exception du contenu des p</p>ages de manuel, qui possède </footer>sa propre licence
+          </body>     spécifiée dans le paqu</html>et Arch Linux correspondant.

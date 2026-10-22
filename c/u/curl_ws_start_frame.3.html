@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>curl_ws_start_frame(3) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">curl_ws_start_frame(3)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/core/x86_64/curl/">curl</a></p>
+<p class="lic">Licences: MIT</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">curl_ws_start_frame(3)</td>
+    <td class="head-vol">Manuel des fonctions de bibliothèque</td>
+    <td class="head-rtitle">curl_ws_start_frame(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">curl_ws_start_frame - démarrer une nouvelle trame WebSocket</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<pre>#include &lt;curl/curl.h&gt;
+CURLcode curl_ws_start_frame(CURL *curl,
+                             unsigned int flags,
+                             curl_off_t frame_len);</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Ajoute l'en-tête de trame WebSocket pour les drapeaux et la longueur
+    donnés au tampon d'envoi du transfert pour les données encodées en WebSocket.
+    Prévu pour une utilisation dans une fonction de rappel
+    <a href='/man/CURLOPT_READFUNCTION.3.fr'>CURLOPT_READFUNCTION(3)</a>.</p>
+<p class="Pp">Lors de l'utilisation d'un
+    <a href='/man/CURLOPT_READFUNCTION.3.fr'>CURLOPT_READFUNCTION(3)</a> dans un transfert WebSocket, toute donnée
+    retournée par cette fonction est envoyée sous forme de trame
+    <i>CURLWS_BINARY</i> dont la longueur correspond à la quantité de données
+    lues.</p>
+<p class="Pp">Pour envoyer des trames plus grandes ou des trames d'un type différent,
+    appelez curl_ws_start_frame() depuis la fonction de lecture, puis retournez
+    les données appartenant à la trame.</p>
+<p class="Pp">La fonction échoue si une trame précédente n'a pas encore été complètement
+    lue. Elle échoue également en mode <i>CURLWS_RAW_MODE</i>.</p>
+<p class="Pp">La fonction de lecture dans libcurl traite généralement une valeur de retour
+    de 0 comme une indication de fin de fichier et arrête toute lecture
+    ultérieure. Cela empêcherait l'envoi de trames WebSocket de longueur 0.</p>
+<p class="Pp">Si la fonction de lecture appelle cependant <i>curl_ws_start_frame()</i>,
+    une valeur de retour de 0 n'est pas traitée comme une fin de fichier et
+    libcurl appelle à nouveau la fonction de lecture.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='FLAGS'><a class='permalink' href='#FLAGS'>FLAGS</a></h1>
+<p class="Pp">Prend en charge tous les drapeaux documentés dans
+    <a href='/man/curl_ws_meta.3.fr'>curl_ws_meta(3)</a>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PROTOCOLES'><a class='permalink' href='#PROTOCOLES'>PROTOCOLES</a></h1>
+<p class="Pp">Cette fonctionnalité affecte uniquement ws</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXEMPLE'><a class='permalink' href='#EXEMPLE'>EXEMPLE</a></h1>
+<pre>#include &lt;string.h&gt; /* pour strlen */
+struct read_ctx {
+  CURL *easy;
+  char *message;
+  size_t msg_len;
+  size_t nsent;
+};
+static size_t readcb(char *buf, size_t nitems, size_t buflen, void *p)
+{
+  struct read_ctx *ctx = p;
+  size_t len = nitems * buflen;
+  size_t left = ctx-&gt;msg_len - ctx-&gt;nsent;
+  CURLcode result;
+  if(!ctx-&gt;nsent) {
+    /* Vouloir envoyer une trame TEXTE. */
+    result = curl_ws_start_frame(ctx-&gt;easy, CURLWS_TEXT,
+                                 (curl_off_t)ctx-&gt;msg_len);
+    if(result) {
+      fprintf(stderr, &quot;erreur de démarrage de la trame : %d\n&quot;, result);
+      return CURL_READFUNC_ABORT;
+    }
+  }
+  if(left) {
+    if(left &lt; len)
+      len = left;
+    memcpy(buf, ctx-&gt;message + ctx-&gt;nsent, len);
+    ctx-&gt;nsent += len;
+    return len;
+  }
+  return 0;
+}
+int main(void)
+{
+  CURL *easy;
+  struct read_ctx rctx;
+  CURLcode res;
+  easy = curl_easy_init();
+  if(!easy)
+    return 1;
+  curl_easy_setopt(easy, CURLOPT_URL, &quot;wss://example.com&quot;);
+  curl_easy_setopt(easy, CURLOPT_READFUNCTION, readcb);
+  /* dire à curl que nous voulons envoyer la charge utile */
+  memset(&amp;rctx, 0, sizeof(rctx));
+  rctx.easy = easy;
+  rctx.message = &quot;Bonjour, ami !&quot;;
+  rctx.msg_len = strlen(rctx.message);
+  curl_easy_setopt(easy, CURLOPT_READDATA, &amp;rctx);
+  curl_easy_setopt(easy, CURLOPT_UPLOAD, 1L);
+  /* Effectuer la requête, res obtient le code de retour */
+  res = curl_easy_perform(easy);
+  /* Vérifier les erreurs */
+  if(res != CURLE_OK)
+    fprintf(stderr, &quot;curl_easy_perform() a échoué : %s\n&quot;,
+            curl_easy_strerror(res));
+  /* toujours nettoyer */
+  curl_easy_cleanup(easy);
+  return 0;
+}</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DISPONIBILITE'><a class='permalink' href='#DISPONIBILITE'>DISPONIBILITE</a></h1>
+<p class="Pp">Ajouté dans curl 8.16.0</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VALEUR_DE_RETOUR'><a class='permalink' href='#VALEUR_DE_RETOUR'>VALEUR DE RETOUR</a></h1>
+<p class="Pp">Cette fonction retourne un code CURLcode indiquant succès ou erreur.</p>
+<p class="Pp">CURLE_OK (0) signifie que tout s'est bien passé, une valeur non nulle indique une
+    erreur. Voir <a href='/man/libcurl-errors.3.fr'>libcurl-errors(3)</a>. Si <a href='/man/CURLOPT_ERRORBUFFER.3.fr'>CURLOPT_ERRORBUFFER(3)</a>
+    a été configuré avec <a href='/man/curl_easy_setopt.3.fr'>curl_easy_setopt(3)</a>, un message d'erreur peut être
+    stocké dans le tampon d'erreur lorsque la valeur retournée est non nulle.</p>
+<p class="Pp">Au lieu de bloquer, la fonction retourne <b>CURLE_AGAIN</b>. Le comportement
+    correct consiste alors à attendre que le socket signale sa lisibilité avant
+    d'appeler à nouveau cette fonction.</p>
+<p class="Pp">Toute autre valeur de retour non nulle indique une erreur. Voir la page de
+    manuel <a href='/man/libcurl-errors.3.fr'>libcurl-errors(3)</a> pour la liste complète avec les
+    descriptions.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR AUSSI</a></h1>
+<p class="Pp"><a href='/man/curl_easy_getinfo.3.fr'>curl_easy_getinfo(3)</a>, <a href='/man/curl_easy_perform.3.fr'>curl_easy_perform(3)</a>,
+    <a href='/man/curl_easy_setopt.3.fr'>curl_easy_setopt(3)</a>, <a href='/man/curl_ws_recv.3.fr'>curl_ws_recv(3)</a>, <a href='/man/libcurl-ws.3.fr'>libcurl-ws(3)</a></p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-11-13</td>
+    <td class="foot-os">libcurl</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Aller" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/core/x86_64/curl/">core/curl</a></dd>
+        <dt>Version :</dt>
+        <dd>8.17.0-2</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://curl.se/">https://curl.se/</a></dd>
+        <dt>Licences :</dt>
+        <dd>MIT</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/core/curl/">/listing/core/curl/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#SYNTAXE">SYNTAXE</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#FLAGS">FLAGS</a></li>
+        
+            <li><a href="#PROTOCOLES">PROTOCOLES</a></li>
+        
+            <li><a href="#EXEMPLE">EXEMPLE</a></li>
+        
+            <li><a href="#DISPONIBILITE">DISPONIBILITE</a></li>
+        
+            <li><a href="#VALEUR_DE_RETOUR">VALEUR DE RETOUR</a></li>
+        
+            <li><a href="#VOIR_AUSSI">VOIR AUSSI</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/curl_ws_start_frame.3.fr.txt">txt</a>, 
+        
+            <a href="/man/curl_ws_start_frame.3.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

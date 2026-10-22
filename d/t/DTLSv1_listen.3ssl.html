@@ -1,0 +1,166 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>DTLSv1_listen(3ssl) — Pages manuelles </title>d'Arch
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">DTLSv1_listen(3ssl)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/core/x86_64/openssl/">openssl</a></p>
+
+        nt
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">DTLSV1_LISTEN(3</td>ssl)
+    <td class="head-vol">Open</td>SSL
+    <td class="head-rtitle">DTLSV1_LISTEN(3</td>ss</tr>l</table>)
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NO</a></h1>M
+<p class="Pp">SSL_stateless, DTLSv1_li</p>sten - Écouter sans état </section>les connexions entrantes
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSI</a></h1>S
+<pre>#include &lt;openssl/ssl.h&gt;
+int SSL</pre>_stateless(SSL *s);
+int DTLSv1_l</section>isten(SSL *ssl, BIO_ADDR *peer);
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTIO</a></h1>N
+<p class="Pp"><b>SSL_stateless()</b> écoute sans état les nouvelles connexions TLSv1.3 entrantes. <b>DTLSv1_listen()</b> écoute sans état les nouvelles connexions DTLS entrantes. Si un ClientHello est reçu qui ne contient pas de cookie, alors il répond par une demande de nouveau ClientHello contenant un cookie. Si un ClientHello est reçu avec un cookie qui est vérifié, alors la fonction retourne afin de permettre la complétion de la négociation (par exemple en utilisant <b>SSL_</b>acc</p>ept</section>()).
+<section class="Sh">
+<h1 class="Sh" id='NOTES'><a class='permalink' href='#NOTES'>NOTE</a></h1>S
+<p class="Pp">Certains protocoles de transport (comme UDP) peuvent être vulnérables aux attaques par amplification. Contrairement à TCP, il n'y a pas de mise en place initiale de connexion dans UDP qui valide que le client peut réellement recevoir des messages sur son adresse source annoncée. Un attaquant pourrait forger son adresse IP source et ensuite envoyer des messages d'initiation de négociation au serveur. Le serveur enverrait alors sa réponse à l'adresse IP source forgée. Si les messages de réponse sont plus grands que le message original, alors l'attaque par amplification a </p>réussi.
+<p class="Pp">Si DTLS est utilisé sur UDP (ou tout protocole basé sur des datagrammes qui ne valide pas l'adresse IP source), alors il est vulnérable à ce type d'attaque. TLSv1.3 est conçu pour fonctionner sur un protocole de transport basé sur un flux (comme TCP). Si TCP est utilisé, il n'est pas nécessaire d'utiliser
+    <b>SSL_stateless().</b> Cependant, certains protocoles de transport basés sur un flux (par exemple QUIC) peuvent ne pas valider l'adresse source. Dans ce cas, une application TLSv1.3 serait vulnérable à cette </p>attaque.
+<p class="Pp">En guise de contre-mesure à ce problème, TLSv1.3 et DTLS incluent un mécanisme de cookie sans état. L'idée est que lorsqu'un client tente de se connecter à un serveur, il envoie un message ClientHello. Le serveur répond avec un HelloRetryRequest (dans TLSv1.3) ou un HelloVerifyRequest (dans DTLS) qui contient un cookie unique. Le client renvoie ensuite le ClientHello, mais cette fois-ci il inclut le cookie dans le message, prouvant ainsi que le client est capable de recevoir les messages envoyés à cette adresse. Tout cela peut être fait par le serveur sans allouer d'état, et donc sans consommer de ressources </p>coûteuses.
+<p class="Pp">OpenSSL implémente cette capacité via les fonctions <b>SSL_stateless()</b>
+    et <b>DTLSv1_listen()</b>. Le paramètre <b>ssl </b>doit être un objet SSL nouvellement alloué avec ses BIOs de lecture et d'écriture configurés, de la même manière que pour un appel à <b>SSL_accept().</b> Typiquement, pour DTLS, le BIO de lecture sera dans un état « non connecté » et donc capable de recevoir des messages de n'importe quel </p>pair.
+<p class="Pp">Lorsqu'un ClientHello est reçu contenant un cookie qui a été vérifié, alors ces fonctions retourneront avec le paramètre <b>ssl
+</b>    mis à jour dans un état où la négociation peut être continuée par un appel à (par exemple) <b>SSL_accept()</b>. De plus, pour
+    <b>DTLSv1_listen()</b>, le <b>BIO_ADDR </b>pointé par <b>peer </b>sera rempli avec les détails du pair qui a envoyé le ClientHello. Si le BIO sous-jacent est incapable d'obtenir le <b>BIO_ADDR </b>du pair (par exemple parce que le BIO ne le supporte pas), alors <b>*peer </b>sera effacé et la famille définie à AF_UNSPEC. Typiquement, le code utilisateur est censé « connecter » le socket sous-jacent au pair et continuer la négociation dans un état </p>connecté.
+<p class="Pp">Avertissement : Il est essentiel que le code appelant connecte le socket sous-jacent au pair après avoir utilisé <b>DTLSv1_listen()</b>. Dans le cas typique où <a href='/man/BIO_s_datagram.3.en'>BIO_s_datagram(3) </a>est utilisé, l'adresse du pair est mise à jour lors de la réception d'un datagramme sur un socket non connecté. Si le socket n'est pas connecté, il peut recevoir des datagrammes de n'importe quel hôte sur le réseau, ce qui fera que les datagrammes sortants transmis ultérieurement par DTLS seront transmis à cet hôte. En d'autres termes, ne pas appeler
+    <b>BIO_connect() </b>ou une fonction similaire spécifique à l'OS sur un socket signifie que n'importe quel hôte sur le réseau peut faire rediriger le trafic DTLS sortant vers lui en envoyant un datagramme au socket en question. Cela ne rompt pas les protections cryptographiques de DTLS mais peut faciliter une attaque par déni de service ou permettre à un attaquant d'apprendre des informations non chiffrées dans la négociation DTLS. Cela est dû à la conception historique de <a href='/man/BIO_s_datagram.3.en'>BIO_s_datagram(3) </a>; voir <a href='/man/BIO_s_datagram.3.en'>BIO_s_datagram(3) </a>pour plus de détails sur ce </p>problème.
+<p class="Pp">Une fois qu'un socket a été connecté, <a href='/man/BIO_ctrl_set_connected.3.en'>BIO_ctrl_set_connected(3)
+</a>    devrait être utilisé pour informer le BIO que le socket doit être utilisé en mode </p>connecté.
+<p class="Pp">Avant d'appeler <b>DTLSv1_listen(), </b>le code utilisateur doit s'assurer que les rappels de génération et de vérification de cookie ont été configurés en utilisant
+    <a href='/man/SSL_CTX_set_cookie_generate_cb.3.en'>SSL_CTX_set_cookie_generate_cb(3)</a> et
+    <a href='/man/SSL_CTX_set_cookie_verify_cb.3.en'>SSL_CTX_set_cookie_verify_cb(3)</a> respectivement. Pour
+    <b>SSL_stateless()</b>, <a href='/man/SSL_CTX_set_stateless_cookie_generate_cb.3.en'>SSL_CTX_set_stateless_cookie_generate_cb(3)</a>
+    et <a href='/man/SSL_CTX_set_stateless_cookie_verify_cb.3.en'>SSL_CTX_set_stateless_cookie_verify_cb(3) doivent </a>être utilisés à la </p>place.
+<p class="Pp">Étant donné que <b>DTLSv1_listen()</b> opère entièrement sans état lors du traitement des ClientHellos entrants, il est incapable de traiter les messages fragmentés (puisque cela nécessiterait l'allocation d'état). Une implication de cela est que <b>DTLSv1_listen(</b>) <b>ne </b>supporte que les ClientHellos qui tiennent dans un seul </p>datagramme.
+<p class="Pp">Pour <b>SSL_stateless(), </b>si un message ClientHello entier ne peut pas être lu sans que le BIO de « lecture » ne devienne vide, alors l'appel à
+    <b>SSL_stateless()</b> échouera. C'est à l'application de s'assurer que les données lues depuis le BIO de « lecture » lors d'un seul appel à <b>SSL_stateless()</b> proviennent toutes du même </p>pair.
+<p class="Pp"><b>SSL_stateless() </b>échouera (avec une valeur de retour 0) si une version de TLS inférieure à TLSv1.3 est </p>utilisée.
+<p class="Pp">À la fois <b>SSL_stateless()</b> et <b>DTLSv1_listen()</b> effaceront la file d'erreurs lorsqu'ils </p>démarrent.
+<p class="Pp"><b>SSL_stateless() ne peut pas êt</b>re utilisé avec des objets SSL </p>QUIC et retourne une erreur s'i</section>l est appelé sur un tel objet.
+<section class="Sh">
+<h1 class="Sh" id='RETURN_VALUES'><a class='permalink' href='#RETURN_VALUES'>VALEURS   </a></h1>RETOURNÉES
+<p class="Pp">Pour <b>SSL_stateless(),</b> une valeur de retour de 1 indique le succès et l'objet <b>ssl </b>sera configuré prêt à continuer la négociation. Une valeur de retour de 0 ou -1 indique un échec. Si la valeur est 0, alors un HelloRetryRequest a été envoyé. Une valeur de -1 indique toute autre erreur. Le code utilisateur peut réessayer l'appel à <b>SSL_s</b>tatele</p>ss().
+<p class="Pp">Pour <b>DTLSv1_listen(),</b> une valeur de retour &gt;= 1 indique le succès. L'objet <b>ssl </b>sera configuré prêt à continuer la négociation. La valeur <b>peer </b>sera également </p>remplie.
+<p class="Pp">Une valeur de retour de 0 indique une erreur non fatale. Cela pourrait (par exemple) être dû à une E/S non bloquante, ou à la réception d'un message invalide d'un pair. Des erreurs peuvent être placées sur la file d'erreurs OpenSSL avec des informations supplémentaires si approprié. Typiquement, le code utilisateur est censé réessayer l'appel à <b>DTLSv1_listen()</b> en cas d'erreur non </p>fatale.
+<p class="Pp">Une valeur de retour &lt; 0 indique une erreur fatale. Cela pourrait (par exemple) être dû à un échec d'allocation de mémoire suffisante pour </p>l'opération.
+<p class="Pp">Pour <b>DTLSv1_listen(), avant OpenSSL 1.1.0, les erreurs fatales et non fatal</b>es produisaient toutes deux des codes de retour &lt;= 0 (dans les implémen</p>tations typiques, le code utilisateur traite toutes les erreurs comme n</section>on fatales), tandis que les codes de retour &gt; 0 indiquaient le succès.
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR   </a></h1>AUSSI
+<p class="Pp"><a href='/man/SSL_CTX_set_cookie_generate_cb.3.en'>SSL_CTX_set_cookie_generate_cb(3)</a>,
+    <a href='/man/SSL_CTX_set_cookie_verify_cb.3.en'>SSL_CTX_set_cookie_verify_cb(3)</a>,
+    <a href='/man/SSL_CTX_set_stateless_cookie_generate_cb.3.en'>SSL_CTX_set_stateless_cookie_generate_cb(3)</a>,
+    <a href='/man/SSL_CTX_set_stateless_cookie_verify_cb.3.en'>SSL_CTX_set_stateless_cookie_verify_cb(3)</a>, <a href='/man/SSL_get_error.3.en'>SSL_get_error(3)</a>,
+    <a href='/man/SSL_accept.3.en'>SSL_accept(3)</a>, <a href='/man/ssl.7.en'>ssl(7)</a>, <a href='/man/bio.7.en'>bio(</a></p>7</section>)
+<section class="Sh">
+<h1 class="Sh" id='HISTORY'><a class='permalink' href='#HISTORY'>HISTORIQU</a></h1>E
+<p class="Pp">La fonction <b>SSL_stateless()</b> a été ajoutée dans OpenSSL 1.1.</p>1.
+<p class="Pp">Les codes de retour de <b>DTLSv1_listen() ont été clar</b>ifiés dans OpenSSL 1.1.0. Le</p> type de « peer » a égalemen</section>t changé dans OpenSSL 1.1.0.
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT'><a class='permalink' href='#COPYRIGHT'>DROITS </a></h1>D'AUTEUR
+<p class="Pp">Copyright 2015-2023 The OpenSSL Project Authors. Tous droits
+    </p>réservés.
+<p class="Pp">Sous licence Apache License 2.0 (la « Licence »).
+    Vous ne pouvez pas utiliser ce fichier sauf en conformité avec la Licence. Vous pouvez
+    obtenir une copie du fichier LICENSE dans la distribution source ou à l'adresse
+    <a href='https://www.openssl.org/source/license.html'>https://w</a>ww.openss</p>l.org/so</section>urce/lice</div>nse.html.
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-10</td>-01
+    <td class="foot-os">3</td>.</tr></table>6</section>.</article>0
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le </p>paquet :
+    <dl>
+        <dt>Nom du </dt>paquet :
+        <dd><a href="https://www.archlinux.org/packages/core/x86_64/openssl/">core/op</a></dd>enssl
+        <dt>Version </dt>:
+        <dd>3.</dd>6.0-1
+        <dt>Amont </dt>:
+        <dd><a href="https://www.openssl.org">https://www.openssl.</a></dd>org
+        <dt>Licences </dt>:
+        <dd>Apache-2.</dd>0
+        <dt>Manuels </dt>:
+        <dd><a href="/listing/core/openssl/">/listing/core/op</a></dd>enss</dl>l</section>/
+
+<details>
+    <summary>Table des </summary>matières
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">N</a></li>OM
+        
+            <li><a href="#SYNOPSIS">RÉ</a></li>SUMÉ
+        
+            <li><a href="#DESCRIPTION">DESC</a></li>RIPTION
+        
+            <li><a href="#NOTES">N</a></li>OTES
+        
+            <li><a href="#RETURN_VALUES">VALEURS </a></li>DE RETOUR
+        
+            <li><a href="#SEE_ALSO">VOIR </a></li>AUSSI
+        
+            <li><a href="#HISTORY">HI</a></li>STORIQUE
+        
+            <li><a href="#COPYRIGHT">DRO</a></li>ITS</ul> D'</nav>AUT</details>EUR
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/DTLSv1_listen.3ssl.en.txt">t</a>xt, 
+        
+            <a href="/man/DTLSv1_listen.3ssl.en.raw"></a>r</p>a</nav></aside></main>w
+        <footer>
+            de manuel.
+            <p>Le site web est disponible selon les termes de la <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0
+               licen</a>ce, à l'exception du contenu </p>des pages de manuel, qui ont </footer>leur propre licence
+        </body>       spécifiée dans le paq</html>uet Arch Linux correspondant.

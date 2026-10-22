@@ -1,0 +1,1742 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>DBD::ODBC(3pm) — Pages manuelles </title>d'Arch
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">DBD__ODBC(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/perl-dbd-odbc/">perl-dbd-odbc</a></p>
+
+        er
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">ODBC</td>(3)
+    <td class="head-vol">Documentation Perl contribuée par les </td>utilisateurs
+    <td class="head-rtitle">OD</td>BC</tr>(</table>3)
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NO</a></h1>M
+<p class="Pp">DBD::ODBC -</p> Pilote OD</section>BC pour DBI
+<section class="Sh">
+<h1 class="Sh" id='VERSION'><a class='permalink' href='#VERSION'>VERSIO</a></h1>N
+<p class="Pp">Cette documentation</p> concerne la version</section> 1.61 de DBD::ODBC.
+<section class="Sh">
+<h1 class="Sh" id='WARNING'><a class='permalink' href='#WARNING'>AVERTISSEME</a></h1>NT
+<p class="Pp">Cette version de DBD::ODBC contient une correction significative pour l'unicode lors de l'insertion dans des colonnes CHAR/VARCHAR et il s'agit d'un changement de comportement par rapport à la version 1.45. Le changement <b>ne </b>s'applique qu'aux compilations unicode de DBD::ODBC (par défaut sous Windows mais vous pouvez aussi le compiler pour l'unicode sous unix) et aux colonnes char/varchar et non aux colonnes </p>nchar/nvarchar.
+<p class="Pp">Avant cette version de DBD::ODBC, lorsque vous utilisiez la compilation unicode de DBD::ODBC et insériez des données dans des colonnes CHAR/VARCHAR à l'aide de paramètres, DBD::ODBC faisait ceci </p>:
+<p class="Pp">1 si vous définissiez odbc_describe_parameters à 0, (empêchant ainsi
+    DBD::ODBC
+  <br/>
+   d'appeler SQLDescribeParam) les paramètres pour les colonnes CHAR/VARCHAR
+  <br/>
+   étaient liés comme SQL_WVARCHAR ou SQL_WLONGVARCHAR (selon la
+  <br/>
+   longueur du paramètre)</p>.
+<p class="Pp">2 si vous définissiez odbc_force_bind_type alors tous les paramètres étaient liés comme
+    vous
+  <br/>
+   l'aviez </p>spécifié.
+<p class="Pp">3 si vous surchargez le type de paramètre dans la méthode bind_param, le
+  <br/>
+   type que vous aviez spécifié était </p>utilisé.
+<p class="Pp">4 si le pilote ne prenait pas en charge SQLDescribeParam ou si SQLDescribeParam
+  <br/>
+   était appelé et échouait, le type de liaison revenait au comportement par défaut comme en </p>1.
+<p class="Pp">5 si rien de ce qui précède (et je suppose que c'est le cas normal pour la plupart
+  <br/>
+   des gens) alors DBD::ODBC appelait SQLDescribeParam pour trouver le type du
+  <br/>
+   paramètre. Cela renvoyait généralement SQL_CHAR ou SQL_VARCHAR pour les colonnes CHAR/VARCHAR,
+  <br/>
+   ce qui n'est pas surprenant. Le paramètre était alors lié comme </p>SQL_VARCHAR.
+<p class="Pp">Les points 1 à 4 s'appliquent toujours. Le point 5 a maintenant un comportement différent. Dans cette
+    version, DBD::ODBC examine d'abord vos données liées avant d'utiliser le type
+    renvoyé par SQLDescribeParam. Si vos données ressemblent à de l'unicode (c'est-à-dire si
+    <b>SvUTF8() </b>est vrai), le paramètre est maintenant lié comme </p>SQL_WVARCHAR.
+<p class="Pp">Que pourrait cela signifier pour vous </p>?
+<p class="Pp">Si vous aviez des scalaires Perl liés à des colonnes CHAR/VARCHAR dans
+    une insertion/mise à jour/suppression et que ces scalaires contenaient de l'unicode, DBD::ODBC
+    passait en réalité les octets individuels de votre scalaire et non les caractères. Par
+    exemple, si vous aviez le scalaire Perl "\x{20ac}" (le caractère unicode
+    Euro) et que vous le liiez à un CHAR/VARCHAR, DBD::ODBC passerait 0xe2,
+    0x82, 0xc2 comme caractères séparés car ces octets étaient l'encodage UTF-8
+    de Perl pour un euro. Votre moteur de base de données les interpréterait probablement comme 3 caractères dans sa page de code actuelle. Si vous interrogiez votre base de données
+    pour trouver la longueur des données insérées, vous obtiendriez probablement 3, et non
+  </p>1.
+<p class="Pp">Cependant, lorsque DBD::ODBC lisait cette colonne dans une instruction select,
+    il liait la colonne comme SQL_WCHAR et vous obteniez 3
+    caractères avec l'octet utf8 activé (quels étaient ces caractères dépendait de la façon dont
+    votre base de données ou votre pilote traduisait les caractères de la page de code en caractères larges)</p>.
+<p class="Pp">Ce qui devrait se produire maintenant est que si vos paramètres liés sont
+    unicode, DBD::ODBC les liera comme des caractères larges (unico</p>de) et votre
+    pilote ou votre base de données tentera de les convertir dans la page de code qu'il
+    utilise. Cela signifie que tant que</section> votre base de données peut stocker les données que vous
+    insérez, lorsque vous les relisez, vous devriez obtenir ce que vous avez inséré.
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>RÉSUM</a></h1>É
+<pre>use DBI;
+$dbh = DBI-&gt;connect('dbi:ODBC:DSN=mydsn', 'user', 'password')</pre>;
+<p class="Pp">Voir DBI po</p>ur plus d'in</section>formations.
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTIO</a></h1>N
+<section class="Ss">
+<h2 class="Ss" id='Change_log_and_FAQs'><a class='permalink' href='#Change_log_and_FAQs'>Journal des modifications et </a></h2>FAQ
+<p class="Pp">Veuillez noter que le journal des modifications a été déplacé vers
+    DBD::ODBC::Changes. Pour accéder à cette documentation, utilisez
+    <span class="Li">"perldoc D</span>BD::ODBC:</p>:Changes".
+<p class="Pp">Les FAQ ont également été déplacées vers DBD::ODBC::FAQ.pm. Pour accéder aux FAQ
+    utilisez <span class="Li">"perld</span>oc DBD</p>::ODBC:</section>:FAQ".
+<section class="Ss">
+<h2 class="Ss" id='Important_note_about_the_tests'><a class='permalink' href='#Important_note_about_the_tests'>Note importante sur les </a></h2>tests
+<p class="Pp">DBD::ODBC est différent de la plupart des autres DBD en ce sens qu'il se connecte à
+    littéralement des dizaines de pilotes ODBC possibles. Il est pratiqu</p>ement impossible pour
+    moi de les tester tous et certains tests peuvent donc échouer avec certains pilotes ODBC. Cela
+    ne signifie pas que DBD::ODBC ne</section> fonctionnera pas avec votre pilote ODBC, mais il vaut la peine de
+    signaler tout échec de test sur rt.cpan.org ou sur la liste de diffusion
+  dbi-users.
+<section class="Ss">
+<h2 class="Ss" id='DBI_attribute_handling'><a class='permalink' href='#DBI_attribute_handling'>Gestion des attributs </a></h2>DBI
+<p class="Pp">Si un attribut défini par DBI n'est pas mentionné ici, il se comporte conformément à la spécification </p>DBI.
+<p class="Pp"><i>ReadOnly </i></p>(booléen)
+<p class="Pp">DBI documente l'attribut <span class="Li">"ReadOnly"
+</span>    comme pouvant être défini et récupéré sur les descripteurs de connexion et d'instruction. Dans ODBC, définir ReadOnly à vrai provoque la définition de l'attribut de connexion
+    <span class="Li">"SQL_ATTR_ACCESS_MODE" </span>à
+    <span class="Li">"SQL_MODE_READ_ONLY" </span>et le définir à
+    faux définira le mode d'accès à
+    <span class="Li">"SQL_MODE_READ_WRITE" </span>(qui est la
+    valeur par défaut dans ODBC)</p>.
+<p class="Pp"><b>Remarque </b>: Il n'existe pas d'équivalent pour définir ReadOnly sur un
+    descripteur d'instruction dans </p>ODBC.
+<p class="Pp"><b>Remarque </b>: Voir la documentation ODBC sur
+    <span class="Li">"SQL_ATTR_ACCESS_MODE" </span>car le définir à
+    <span class="Li">"SQL_MODE_READ_ONLY" </span>ne <b>empêche
+</b>    pas votre script d'exécuter des mises à jour ou des suppressions ; c'est simplement un indice pour
+    le pilote/la base de données que vous ne ferez pas de mises à </p>jour.
+<p class="Pp"><b>Remarque </b>: Depuis DBD::ODCB 1.44_3, si le pilote ne prend pas en charge la définition de <span class="Li">"SQL_ATTR_ACCESS_MODE" </span>et renvoie SQL_SUCCESS_WITH_INFO et "option value changed", un avertissement
+    est émis (que vous ne verrez que si vous avez DBI &gt; 1.628). De plus,
+    toute tentative ultérieure de récupérer l'attribut ReadOnly renverra la
+    valeur définie en </p>dernier.
+<p class="Pp">Cet attribut nécessi</p>te la version 1.55 o</section>u supérieure de DBI.
+<section class="Ss">
+<h2 class="Ss" id='Private_attributes_common_to_connection_and_statement_handles'><a class='permalink' href='#Private_attributes_common_to_connection_and_statement_handles'>Attributs privés communs aux descripteurs de connexion et </a></h2>d'instruction
+<p class="Pp"><i>odbc_ignore_named_placeholder</i></p>s
+<p class="Pp">Utilisez ceci si vous avez des besoins particuliers (comme des déclencheurs Oracle, etc.)
+    où :new ou :name signifient quelque chose de spécial et ne sont pas juste des noms de paramètres. Vous <b>devez </b>alors utiliser ? pour lier les paramètres. Exemple </p>:
+<pre>$dbh-&gt;{odbc_ignore_named_placeholders} = 1;
+$dbh-&gt;do("create trigger foo as if :new.x &lt;&gt; :old.x then ... etc")</pre>;
+<p class="Pp">Sans cela, DBD::ODBC pensera que :new et :old sont des paramètres
+    pour la liaison et sera </p>confus.
+<p class="Pp"><i>odbc_default_bind_typ</i></p>e
+<p class="Pp">Cette valeur vaut 0 par </p>défaut.
+<p class="Pp">Les anciennes versions de DBD::ODBC supposaient que le type de liaison de paramètre était 12 (<span class="Li">"SQL_VARCHAR")</span>. Les nouvelles
+    versions tentent toujours d'appeler
+    <span class="Li">"SQLDescribeParam" </span>pour trouver les types des paramètres mais si <span class="Li">"SQLDescribeParam" </span>est
+    indisponible, DBD::ODBC revient à un type de liaison par défaut. Le type de liaison interne par défaut est <span class="Li">"SQL_VARCHAR" </span>(pour une compilation
+    non-unicode) et <span class="Li">"SQL_WVARCHAR" </span>ou
+    <span class="Li">"SQL_VARCHAR" </span>(pour une compilation unicode
+    selon que le paramètre est unicode ou non). Si vous définissez
+    <span class="Li">"odbc_default_bind_type" à </span>une valeur autre
+    que 0, vous surchargez la valeur interne par </p>défaut.
+<p class="Pp"><b>N.</b>B. Si vous appelez la
+    <span class="Li">méthode </span>"bind_param" avec un type SQL, cela surcharge tout ce qui </p>précède.
+<p class="Pp"><i>odbc_force_bind_typ</i></p>e
+<p class="Pp">Cette valeur vaut 0 par </p>défaut.
+<p class="Pp">Si définie à une valeur autre que 0, cela forcera les paramètres liés
+    à être liés comme ce type et
+    <span class="Li">"SQLDescribeParam" </span>ne sera pas utilisé ; en
+    d'autres termes, cela implique que "odbc_describe_parameters" est aussi défini à </p>faux.
+<p class="Pp">Les anciennes versions de DBD::ODBC supposaient que le type de liaison de paramètre était
+    12 (<span class="Li">"SQL_VARCHAR") </span>et les nouvelles versions
+    tentent toujours d'appeler <span class="Li">"SQLDescribeParam"
+  </span>  pour trouver les types des paramètres. Si votre pilote prend en charge
+    <span class="Li">"SQLDescribeParam" </span>et que cela réussit, il peut quand même échouer à décrire les paramètres avec précision (MS SQL Server le fait parfois avec certaines requêtes SQL comme <i>select myfunc(?) where 1 </i>= 1). Définir
+    <span class="Li">"odbc_force_bind_type" </span>à
+    <span class="Li">"SQL_VARCHAR" </span>forcera DBD::ODBC à lier
+    tous les paramètres en tant que <span class="Li">"SQL_VARCHAR" </span>et
+    ignorera SQLDescribeParam</p>.
+<p class="Pp">Gardez à l'esprit que si vous insérez des données unicode, vous voudrez probablement utiliser
+    <span class="Li">"SQL_WVARCHAR"</span>/<span class="Li">"SQL_WCHAR"</span>/<span class="Li">"SQL_WLONGVARCHAR"
+</span>    et non <span class="Li">"SQL_VARCHAR</span>"</p>.
+<p class="Pp">Comme cet attribut a été créé pour contourner les pilotes ODBC bogués
+    qui prennent en charge SQLDescribeParam mais décrivent incorrectement les paramètres, vous
+    ferez probablement mieux de spécifier le type de liaison dans l'appel à
+    <span class="Li">"bind_param" </span>au niveau de chaque instruction plutôt que de définir aveuglément
+    <span class="Li">"odbc_force_bind_type" </span>pour toute une
+    </p>connexion.
+<p class="Pp"><b>N.B.</b> Si vous appelez la méthode
+    <span class="Li">"bind_param" </span>avec un type SQL, cela
+    annule tout ce qui </p>précède.
+<p class="Pp"><i>odbc_force_rebin</i></p>d
+<p class="Pp">Cela permet de gérer des cas particuliers, notamment lors de l'utilisation de plusieurs
+    ensembles de résultats. Définissez-le avant execute pour "forcer" DBD::ODBC à
+    réobtenir le nombre de colonnes et les types de colonnes de l'ensemble de résultats pour chaque
+    execute. Particulièrement utile pour appeler des procédures stockées qui peuvent retourner
+    différents ensembles de résultats à chaque exécution. La seule pénalité de performance est lors de
+    <b>execute(),</b> mais je ne voulais pas supporter cette pénalité dans toutes les
+    circonstances. C'est probablement assez rare. Cet attribut
+    sera automatiquement défini lorsque plusieurs ensembles de résultats sont déclenchés. La plupart
+    des gens ne devraient pas avoir à s'en </p>soucier.
+<p class="Pp"><i>odbc_async_exe</i></p>c
+<p class="Pp">Permet l'exécution asynchrone des requêtes. Cela provoque une boucle d'attente active
+    (avec un petit "sleep") jusqu'à ce que l'API ODBC appelée soit terminée
+    (c'est-à-dire tant que l'API ODBC retourne
+    <span class="Li">"SQL_STILL_EXECUTING")</span>. C'est utile
+    cependant, si vous voulez la gestion des erreurs et les messages asynchrones (voir
+    "odbc_err_handler" et <i>t/20SQLServer.</i>t pour un exemple de
+    cela)</p>.
+<p class="Pp"><i>odbc_query_timeou</i></p>t
+<p class="Pp">Cela vous permet de modifier le délai d'attente de requête ODBC (l'attribut d'instruction ODBC
+    <span class="Li">"SQL_ATTR_QUERY_TIMEOUT"). </span>ODBC définit
+    le délai d'attente de requête comme le nombre de secondes à attendre pour qu'une instruction SQL
+    s'exécute avant de retourner à l'application. Une valeur de 0 (par défaut)
+    signifie qu'il n'y a pas de délai d'attente. Ne confondez pas cela avec les attributs ODBC
+    <span class="Li">"SQL_ATTR_LOGIN_TIMEOUT" </span>et
+    <span class="Li">"SQL_ATTR_CON</span>NECTION_TIME</p>OUT". Ajoutez
+<pre>{ odbc_query_timeout =&gt; 30 </pre>}
+<p class="Pp">à votre connexion, définissez-le sur le
+    <span class="Li">"dbh" </span>avant de créer une instruction ou
+    définissez-le explicitement sur votre gestionnaire d'instruction. Le odbc_query_timeout sur une
+    instruction est hérité de la connexion </p>parente.
+<p class="Pp">Notez qu'en interne, DBD::ODBC ne définit le délai d'attente de requête que si vous
+    le définissez explicitement et que la valeur par défaut de 0 (pas de délai d'attente) est implémentée par le
+    pilote ODBC et non par DBD::</p>ODBC.
+<p class="Pp">Notez que certains pilotes ODBC implémentent une valeur maximale de délai d'attente de requête
+    et limiteront les délais d'attente définis au-dessus de leur maximum. Vous pourriez voir un avertissement
+    si votre délai d'attente est plafonné par le pilote, mais il n'y a actuellement aucun moyen de
+    récupérer la valeur plafonnée depuis le </p>pilote.
+<p class="Pp">Notez que certains pilotes peuvent ne pas prendre en charge cet </p>attribut.
+<p class="Pp">Voir <i>t/20SqlServer.</i>t pour un </p>exemple.
+<p class="Pp"><i>odbc_putdata_star</i></p>t
+<p class="Pp"><span class="Li">"odbc_putdata_start" </span>définit la
+    taille à laquelle DBD::ODBC utilise <span class="Li">"SQLPutData"
+</span>    et <span class="Li">"SQLParamData" </span>pour envoyer de plus gros objets
+    à la base de données au lieu de simplement les lier normalement avec
+    <span class="Li">"SQLBindParameter". </span>C'est principalement un
+    espace réservé pour de futurs changements permettant d'envoyer des morceaux de données à la
+    base de données et il y a peu de raison pour qu'un quelconque utilisateur le modifie </p>actuellement.
+<p class="Pp">La valeur par défaut pour odbc_putdata_start est 32768 car cette valeur était
+    codée en dur dans DBD::ODBC jusqu'à la version 1.</p>16_1.
+<p class="Pp"><i>odbc_column_display_siz</i></p>e
+<p class="Pp">Si votre pilote ODBC ne prend pas en charge les attributs SQL_COLUMN_DISPLAY_SIZE
+    et SQL_COLUMN_LENGTH pour SQLColAtrributes, alors DBD::ODBC ne
+    sait pas de quelle taille la colonne peut être. odbc_column_display_size définit la valeur
+    par défaut pour la taille de la colonne lors de la récupération des données de colonne lorsque la taille ne peut pas
+    être </p>déterminée.
+<p class="Pp">La valeur par défaut pour odbc_column_display_size est 2001 car cette
+    valeur était codée en dur dans DBD::ODBC jusqu'à la version 1.</p>17_3.
+<p class="Pp"><i>odbc_utf8_o</i></p>n
+<p class="Pp">Définissez ce drapeau pour traiter toutes les chaînes retournées par le pilote ODBC
+    (sauf les colonnes décrites comme SQL_BINARY ou SQL_TIMESTAMP et ses variations)
+    comme encodées en UTF-8. Certains pilotes ODBC (comme Aster et peut-être PostgreSQL) retournent
+    des données encodées en UTF-8 mais ne prennent pas en charge l'API unicode SQLxxxW. Activer ce
+    drapeau fera que DBD::ODBC traitera les données retournées par le pilote comme encodées en UTF-8 et
+    elles seront marquées comme telles dans </p>Perl.
+<p class="Pp">Ne confondez pas cela avec le support unicode de DBD::ODBC. L'attribut
+    <span class="Li">"odbc_utf8_on" </span>ne s'applique qu'aux
+    compilations de DBD::ODBC non activées pour </p>unicode.
+<p class="Pp"><i>odbc_describe_parameter</i></p>s
+<p class="Pp">Activé par défaut. Lorsqu'il est défini, cela permet à DBD::ODBC d'appeler
+    SQLDescribeParam (si le pilote le prend en charge) pour récupérer des informations sur
+    les </p>paramètres.
+<p class="Pp">Lorsqu'il est désactivé/faux, DBD::ODBC n'appellera pas SQLDescribeParam et
+    utilisera par défaut la liaison des paramètres en SQL_CHAR/SQL_WCHAR en fonction du type de
+    compilation et du fait que vos données soient unicode ou </p>non.
+<p class="Pp">Vous n'avez pas à désactiver odbc_describe_parameters juste parce que
+    votre pilote ne prend pas en charge SQLDescribeParam, car DBD::ODBC le
+    déterminera au démarrage via SQLGetFunctions</p>.
+<p class="Pp"><b>Notez </b>: désactiver odbc_describe_parameters lorsque votre pilote
+    prend en charge SQLDescribeParam peut empêcher DBD::ODBC de lier correctement les paramètres pour
+    certains types de </p>colonnes.
+<p class="Pp">Vous pouvez également définir cet attribut dans les attributs passés à la
+    méthode </p>prepare.
+<p class="Pp">Cet attribut a été ajouté pour qu'une personne passant de freeTDS (un pilote
+    qui ne prend pas en charge SQLDescribeParam) à un pilote qui prend en cha</p>rge SQLDescribeParam puisse le faire sans changer quoi que ce soit en Perl. La situation était
+    très spécifique car les dates étaient liées en tant que </section>dates lorsque SQLDescribeParam
+    était appelé et en tant que caractères sinon, et le format de données n'était pas un format de date
+    pris en charge.
+<section class="Ss">
+<h2 class="Ss" id='Private_methods_common_to_connection_and_statement_handles'><a class='permalink' href='#Private_methods_common_to_connection_and_statement_handles'>Méthodes privées communes aux gestionnaires de connexion et </a></h2>d'instruction
+<p class="Pp"><i>odbc_getdiagre</i></p>c
+<pre>@diags = $handle-&gt;odbc_getdiagrec($record_number)</pre>;
+<p class="Pp">Introduit en 1.</p>34_3.
+<p class="Pp">C'est juste un enveloppement autour de l'API ODBC SQLGetDiagRec. Lorsqu'une
+    méthode sur un gestionnaire de connexion ou d'instruction échoue, s'il y a des diagnostics ODBC
+    vous pouvez utiliser cette méthode pour les récupérer. Les enregistrements commencent à 1 et
+    il peut y en avoir plus d'un. Elle retourne un tableau contenant l'état, le code
+    natif et le texte du message d'erreur, ou un tableau vide si l'enregistrement de diagnostic
+    demandé n'existe pas. Pour obtenir tous les diagnostics disponibles, continuez d'incrémenter
+    <span class="Li">$record_number </span>jusqu'à ce qu'odbc_getdiagrec retourne un
+    tableau </p>vide.
+<p class="Pp">Tous les états, codes natifs et textes de messages sont déjà passés à
+    DBI via sa méthode set_err, donc cette méthode ne vous dit vraiment rien
+    que vous ne puissiez déjà obtenir de DBI, sauf lorsqu'il y a plus d'un
+    </p>diagnostic.
+<p class="Pp">Vous pourriez trouver cela utile dans un gestionnaire d'erreurs car vous pouvez obtenir les
+    diagnostics ODBC tels quels et non comment DBD::ODBC a été forcé de les ajuster
+    au système de </p>DBI.
+<p class="Pp">NOTE : appeler cette méthode n'efface pas les valeurs d'erreur de DBI comme
+    cela arrive </p>habituellement.
+<p class="Pp"><i>odbc_getdiagfiel</i></p>d
+<pre>$diag = $handle-&gt;odbc_getdiagfield($record, $identifier)</pre>;
+<p class="Pp">C'est juste un enveloppement autour de l'API ODBC SQLGetDiagField. Lorsqu'une
+    méthode sur un gestionnaire de connexion ou d'instruction échoue, s'il y a des diagnostics ODBC
+    vous pouvez utiliser cette méthode pour récupérer les champs de diagnostic individuels. Comme pour
+    "odbc_getdiagrec", les enregistrements commencent à 1. L'
+    identifiant est l'un des suivants </p>:
+<pre>SQL_DIAG_CURSOR_ROW_COUNT
+SQL_DIAG_DYNAMIC_FUNCTION
+SQL_DIAG_DYNAMIC_FUNCTION_CODE
+SQL_DIAG_NUMBER
+SQL_DIAG_RETURNCODE
+SQL_DIAG_ROW_COUNT
+SQL_DIAG_CLASS_ORIGIN
+SQL_DIAG_COLUMN_NUMBER
+SQL_DIAG_CONNECTION_NAME
+SQL_DIAG_MESSAGE_TEXT
+SQL_DIAG_NATIVE
+SQL_DIAG_ROW_NUMBER
+SQL_DIAG_SERVER_NAME
+SQL_DIAG_SQLSTATE
+SQL_DIAG_SUBCLASS_ORIGI</pre>N
+<p class="Pp">DBD::ODBC exporte ces constantes sous le nom de 'diags', par ex.</p>,
+<pre>use DBD::ODBC qw(:diags)</pre>;
+<p class="Pp">SQL_DIAG_COLUMN_NUMBER est d'un intérêt particulier car il vous indiquera
+    quelle colonne ou quel paramètre lié est en erreur (en supposant que votre pilote
+    le prenne en charge). Voir params_in_error dans le répertoire </p>examples.
+<p class="Pp">NOTE : appeler cette méthode n'effac</p>e pas les valeurs d'erreur de DBI c</section>omme
+    cela arrive habituellement.
+<section class="Ss">
+<h2 class="Ss" id='Private_connection_attributes'><a class='permalink' href='#Private_connection_attributes'>Attributs privés de </a></h2>connexion
+<p class="Pp"><i>odbc_err_handle</i></p>r
+<p class="Pp"><b>NOTE :</b> Vous voudrez peut-être examiner le gestionnaire d'erreurs de DBI avant
+    d'utiliser celui de DBD::ODBC, cependant, il y a des différences subtiles.
+    Le odbc_err_handler de DBD::ODBC est appelé pour les erreurs <b>et </b>les diagnostics informatifs, c'est-à-dire qu'il est appelé lorsqu'un appel ODBC échoue à la macro
+    SQL_SUCCEEDED, ce qui signifie que l'appel ODBC a retourné SQL_ERROR (-1) ou
+    SQL_SUCCESS_WITH_INFO (1)</p>.
+<p class="Pp">Permet aux erreurs et aux diagnostics informatifs d'être gérés par
+    l'application. Une fonction de rappel fournie par l'application pour gérer ou
+    ignorer les </p>messages.
+<p class="Pp">La fonction de rappel reçoit quatre paramètres : l'état (chaîne),
+    l'erreur (chaîne), le code d'erreur natif (nombre) et le statut retourné par le
+    dernier appel API ODBC. Le quatrième argument a été ajouté en 1.</p>30_7.
+<p class="Pp">Si le gestionnaire d'erreurs retourne 0, l'erreur est ignorée, sinon
+    l'erreur est transmise à la gestion d'erreurs normale de DBI. Notez que si le
+    statut est SQL_SUCCESS_WITH_INFO, cela <b>n'atteindra </b>pas le gestionnaire d'erreurs de
+    DBI car ce n'est pas une </p>erreur.
+<p class="Pp">Cela peut aussi être utilisé pour des procédures sous MS SQL Server (et probablement
+    Sybase) pour obtenir des messages de procédures système telles que DBCC. Vérifiez
+    <i>t/20SQLServer.</i>t et <i>t/10h</i>andl</p>er.t.
+<pre>$dbh-&gt;{RaiseError} = 1;
+sub err_handler {
+   ($state, $msg, $native, $rc, $status) = @_;
+   if ($state = '12345')
+       return 0; # ignorer cette erreur
+   else
+       return 1; # propager l'erreur
+}
+$dbh-&gt;{odbc_err_handler} = \&
+# faire quelque chose pour provoquer une erreur
+$dbh-&gt;{odbc_err_handler} = undef; # annuler le </pre>gestionnaire
+<p class="Pp"><i>odbc_SQL_ROWSET_SIZ</i></p>E
+<p class="Pp">Définir odbc_SQL_ROWSET_SIZE entraîne un appel à
+    SQLSetConnectAttr pour définir l'attribut ODBC SQL_ROWSET_SIZE (9) à la valeur
+    que vous définissez pour odbc_SQL_ROWSET_SIZE</p>.
+<p class="Pp">La valeur par défaut ODBC pour SQL_ROWSET_SIZE est </p>1.
+<p class="Pp">Habituellement, MS SQL Server ne prend pas en charge les instructions actives multiples
+    (MAS), c'est-à-dire que vous ne pouvez pas avoir 2 ou plus de sélections en attente. Vous pouvez définir
+    odbc_SQL_ROWSET_SIZE à 2 pour persuader MS SQL Server de prendre en charge plusieurs
+    </p>instructions
+<p class="Pp">actives.
+Définir SQL_ROWSET_SIZE n'affecte généralement que les appels à
+    SQLExtendedFetch mais permet le MAS et comme DBD::ODBC n'utilise pas
+    SQLExtendedFetch, il ne devrait pas y avoir d'effets néfastes </p>pour
+<p class="Pp">DBD::ODBC.
+Soyez prudent avec cet attribut car une fois défini à une valeur supérieure à
+    1 (la valeur par défaut), vous devez récupérer tous les ensembles de résultats avant que le gestionnaire
+    d'instruction ne sorte de la portée, sinon vous pouvez perturber le protocole TDS et cela peut
+    entraîner un blocage. Avec DBI, cela est peu probable car DBI émet un </p>avertissement
+<p class="Pp">lorsqu'une instruction
+    sort de la portée avec des résultats en attente.
+REMARQUE : si vous obtenez une erreur disant "[Microsoft][ODBC SQL Server
+    Driver]Invalid attribute/option identifier (SQL-HY092)" lorsque vous définissez
+    odbc_SQL_ROWSET_SIZE dans la méthode connect, vous devez soit a) passer à
+    DBI </p>1.
+<p class="Pp">616 ou supérieur, soit b) définir odbc_SQL_ROWSET_SIZE après la connexion.
+Dans les versions de SQL Server 2005 et ultérieures, consultez "Multiple </p>Active
+<p class="Pp">Statements (MAS)" dans le DBD::ODBC::FAQ au lieu </p>d'utiliser
+<p class="Pp">cet
+    attribut.
+Merci à Andrew Brown pour le patch original.
+Note pour le développeur de DBD : Voici un sac de problèmes. Premièrement,
+    SQL_ROWSET_SIZE est un attribut ODBC 2 et est généralement un attribut
+    d'instruction, pas un attribut de connexion. Cependant, dans ODBC 2.0, vous pouviez définir des attributs
+    d'instruction sur un gestionnaire de connexion et il agissait comme une valeur par défaut pour tous
+    les gestionnaires d'instructions ultérieurs créés sous ce gestionnaire de connexion. Si
+    vous utilisez ODBC 3, le gestionnaire de pilotes continue de faire correspondre cet appel mais le pilote
+    ODBC doit agir en conséquence (le pilote MS SQL Server semble toujours le faire mais
+    certains autres pilotes ODBC pour MS SQL Server ne le font pas). Deuxièmement, quelque part
+    sur la ligne, MS a décidé qu'il n'était plus valide de récupérer
+    l'attribut SQL_ROWSET_SIZE depuis un gestionnaire de connexion dans une application
+    ODBC 3 (ce que DBD::ODBC est maintenant). En soi, cela ne serait pas un problème sauf pour
+    un bug mineur dans DBI qui, jusqu'à la version 1.616, émettait par erreur un FETCH sur
+    tout attribut mentionné dans l'appel de méthode connect. Par conséquent, si vous utilisez
+    une version de DBI antérieure à 1.616 et tentez de définir odbc_SQL_ROWSET_SIZE dans l'appel
+    de méthode connect, DBI émet un FETCH sur odbc_SQL_ROWSET_SIZE et le gestionnaire
+    de pilotes le rejette comme attribut invalide, entraînant ainsi une erreur.
+    La seule façon de contourner cela (autre que de mettre à jour DBI) est de définir
+    odbc_SQL_ROWSET_SIZE APRÈS l'appel à connect. Troisièmement, MS a retiré la
+    macro SQLROWSETSIZE des fichiers d'en-tête sql dans MDAC 2.7 pour les plateformes
+    <a href='http://msdn.microsoft.com/en-us/library/ms716287%28v=vs.85%29.aspx'>64 bits, c'est-à-dire que SQLROWSETSIZE n'est pas défini sur les plateformes </a>64 bits à partir de MDAC
+    2.7 car il se trouve dans un "#ifdef win32" (voir
+http://msdn.microsoft.com/en-us/library/ms716287%28v=vs.85%29.aspx). Définir
+    SQL_ROWSET_SIZE semble toujours avoir un effet sur les </p>plateformes
+<p class="Pp"><i>64 bits mais </i></p>vous
+<p class="Pp">ne pouvez
+    plus récupérer
+    <span class="Li">sa valeur depuis </span>un gestionnaire de
+    <span class="Li">connexion </span>(d'où<span class="Li">le p</span>rob</p>lème
+<p class="Pp">ci-dessus
+    avec le FETCH redondant de DBI).
+    <span class="Li">odbc_exec_direct
+</span>Forcer DBD::ODBC à utiliser
+    <b>"SQLExecDirect" </b>au lieu de
+"SQLPrepare"/
+"SQLExecute".
+Il existe des pilotes qui ne prennent en charge que
+"SQLExecDirect" et la surcharge
+    </p>do()
+<p class="Pp">de DBD::ODBC ne permet pas de retourner d'ensembles de résultats. Par conséquent, la
+    façon de faire cela maintenant est de définir l'attribut odbc_exec_direct.
+REMARQUE : Vous <span class="Li">pouvez </span>également vouloir
+    <a href='http://technet.microsoft.com/en-US/library/ms131667.aspx'>utiliser cette option si vous créez
+    des objets temporaires </a>(par exemple,
+    <i>des tables) dans MS SQL Server et que pour une raison quelconque vous ne </i>pouvez
+    <i>pas
+    utiliser la
+méthode </i>"do". Voir
+http://technet.microsoft.com/en-US/library/ms131667.aspx qui dit
+Les instructions préparées </p>ne
+<p class="Pp">peuvent pas être utilisées pour créer des </p>objets
+<pre>temporaires sur
+SQL Server 2000 ou ultérieur.... </pre>Sans
+<p class="Pp"></p>o
+<pre>dbc_exec_direct, l'objet
+    </pre>temporaire
+<p class="Pp"><b>disparaîtra </b>avant que vous puissiez l'utiliser.
+Il y a actuellement deux façons d'obtenir ceci :
+$dbh-&gt;prepare($sql, { odbc_exec_direct =&gt; 1});
+et
+$dbh-&gt;{odbc_exec_direct} = 1;
+REMARQUE : Même si vous compilez DBD::ODBC avec la prise en charge </p>unicode,
+<p class="Pp"><i>vous
+    ne pouvez </i></p>toujours
+<p class="Pp">pas passer de chaînes unicode <b>à la méthode </b>prepare si vous définissez également
+    odbc_exec_direct. C'est une restriction de cet </p>attribut
+<p class="Pp"><i>qui est
+    </i></p>inévitable.
+<p class="Pp">odbc_SQL_DRIVER_ODBC_VER
+Ceci, bien que disponible via
+get_info(), est capturé ici. </p>Je
+<pre>pourrais me débarrasser </pre>de
+<p class="Pp">cela car je ne l'utilisais qu'à des fins de débogage.
+</p>odbc_cursortype
+<pre>Cela permet plusieurs instructions concurrentes </pre>sur
+<p class="Pp">SQL*Server. Dans </p>votre
+<pre>connect, ajoutez
+{ odbc_cursortype =&gt; 2 }.
+Si vous utilisez DBI &gt; 1.41, vous devriez également pouvoir utiliser
+{ odbc_cursortype =&gt; DBI::SQL_CURSOR_DYNAMIC }
+à la place. Par exemple :
+my $dbh = DBI-&gt;connect("dbi:ODBC:$DSN", $user, $pass,
+              { RaiseError =&gt; 1, odbc_cursortype =&gt; 2});
+my $sth = $dbh-&gt;</pre>prepare("one
+<p class="Pp">s <i>tatement");
+my $sth2 </i>= $dbh-&gt;</p>prepare("two
+<p class="Pp">statement");
+$sth-&gt;execute;
+my @row;
+while (@row = $sth-&gt;fetchrow_array) {
+   $sth2-&gt;execute($row[0]);
+}
+Voir
+t/20SqlServer.t pour un exemple.
+Dans les </p>versions
+<p class="Pp"><i>de SQL Server </i></p>2005
+<p class="Pp">et ultérieures, consultez "Multiple Active
+    Statements (MAS)" dans le DBD::ODBC::FAQ au lieu d'utiliser cet
+    attribut.
+odbc_has_unicode
+Un attribut en lecture seule indiquant si DBD::ODBC a été compilé avec
+    la </p>macro
+<p class="Pp">C WITH_UNICODE ou non. Une valeur de 1 indique que DBD::ODBC a été compilé
+    avec WITH_UNICODE, sinon la valeur retournée est 0.
+La compilation avec WITH_UNICODE affecte les colonnes et les paramètres qui </p>sont
+<p class="Pp">SQL_C_WCHAR, SQL_WCHAR, SQL_WVARCHAR </p>et
+<dl class="Bl-tag">
+  <dt id="bind"><a class="permalink" href="#bind">SQL_WLONGVARCHAR, SQL, la méthode
+    connect et bien plus encore. </a></dt>Voir
+  <dd>"Unicode".
+Quand odbc_has_unicode vaut 1, DBD::ODBC fera :
+lier toutes les colonnes de chaînes en
+    caractères larges (SQL_Wxxx)
+Cela signifie que les données UNICODE stockées </dd>dans
+  <dt id="bind~2"><a class="permalink" href="#bind~2">ces colonnes seront retournées à
+      Perl correctement en unicode (c'est-à-dire encodées en UTF-8 et avec </a></dt>le
+  <dd>drapeau
+    UTF-8 activé).
+lier les paramètres que la
+    base de données déclare comme caractères larges ou paramètres unicode en
+    SQL_Wxxx
+Les paramètres liés là où la base de données déclare le paramètre comme étant un
+      caractère large, ou là où les données du paramètre sont unicode, ou là où le
+      type de paramètre est explicitement défini sur un type large (par exemple, SQL_Wxxx) sont liés </dd>en
+  <dt id="SQL"><a class="permalink" href="#SQL">SQL</a></dt>
+  <dd>caractères larges dans <span class="Li">l'API ODBC </span>et DBD::ODBC
+      <span class="Li">encode </span>les paramètres perl en
+      UTF-16 avant de les passer au pilote.
+SQL
+Le SQL passé aux
+méthodes "prepare" ou
+"do" qui a le
+      <span class="Li">drapeau
+      </span>UTF-8 activé
+      <span class="Li">sera con</span>verti e</dd>n UTF-16
+  <dt id="connection"><a class="permalink" href="#connection">avant d'être passé aux </a></dt>API
+  <dd>ODBC
+"SQLPrepare" ou
+"SQLExecDirect".
+chaînes
+      <span class="Li">de
+    </span>connexion
+Les chaînes de connexion passées à la
+méthode "connect" seront converties en
+      <span class="Li">UTF-16 avant d'être passées à l'API ODBC
+"SQLDriverConnectW". Cela se </span>produit
+      indépendamment du fait que le drapeau UTF-8 soit activé </dd>sur les chaînes de connexion perl
+      car unixODBC exige qu'une appli</dl>cation appelle SQLDriverConnectW pour
+      indiquer qu'elle appellera
+<p class="Pp">les API ODBC larges.
+REMARQUE : Vous aurez besoin d'au moins Perl 5.8.1 pour </p>utiliser
+<p class="Pp">UNICODE avec
+    DBD::ODBC.
+REMARQUE : La liaison des paramètres de </p>sortie
+<p class="Pp">unicode est codée mais
+  non testée.
+REMARQUE : Lors de la compilation de DBD::ODBC sur Windows ($^O eq 'MSWin32') la
+    macro WITH_UNICODE est automatiquement ajoutée. Pour la désactiver, spécifiez <span class="Li">-nou comme
+    argument à Makefile.</span>PL (par exemple
+"perl Makefile.PL
+    -nou"). Sur les plateformes
+    <b>non-Windows,</b> la macro WITH_UNICODE n'est
+pas activée par défaut et pour l'activer, vous devez spécifier l'argument -u
+    à Makefile.PL. Veuillez garder à l'esprit que certains pilotes ODBC ne
+    </p>prennent
+<p class="Pp">pas en charge les colonnes ou paramètres SQL_Wxxx.
+Vous pouvez également spécifier
+    <span class="Li">que vous voulez la </span>prise en charge UNICODE en définissant la
+</p>variable
+<pre>d'environnement "DBD_ODBC_UNICODE"
+    </pre>avant
+<p class="Pp">l'installation :
+export DBD_ODBC_UNICODE=1
+cpanm DBD::ODBC
+La prise en charge UNICODE dans les pilotes ODBC diffère considérablement</p>.
+<p class="Pp"><i>Veuillez lire
+    le </i></p>fichier
+<p class="Pp">README.unicode pour plus de détails.
+odbc_out_connect_string
+Après l'appel de la méthode connect, ceci sera la chaîne de connexion de </p>sortie
+<p class="Pp"><b>du </b>pilote ODBC - voir la documentation sur SQLDriverConnect.
+REMARQUE : cette valeur n'est définie que si DBD::ODBC appelle
+    l'API ODBC SQLDriverConnect (et non SQLConnect) ce qui ne se produit que si a) DSN
+    ou DRIVER est </p>spécifié
+<p class="Pp">dans la chaîne de connexion ou b) SQLConnect échoue.
+Typiquement, les applications (comme MS Access et beaucoup d'autres) qui
+    construisent une chaîne de connexion via des dialogues et éventuellement SQLBrowseConnect
+    finissent par établir une connexion ODBC réussie avec le pilote ODBC et la
+    base de données. Le odbc_out_connect_string fournit une chaîne que vous pouvez passer
+    à SQLDriverConnect (le connect de DBI préfixé par dbi:ODBC:") qui vous
+    connectera à la même source de données à une date ultérieure. Vous </p>pouvez
+<p class="Pp"><i>égalemen</i></p>t
+<p class="Pp">consulter
+    "odbc_driver_complete".
+odbc_version
+Ceci a été ajouté avant le passage à ODBC 3.x pour permettre à l'appelant
+    de "forcer" la compatibilité ODBC 3.0. C'est probablement moins utile
+    maintenant, mais cela permettait à get_info et get_type_info de retourner des informations correctes/mises à jour
+    qu'ODBC 2.x ne permettait/fournissait pas. Depuis que DBD::ODBC est maintenant 3.</p>x,
+<pre>cela peut être utilisé pour forcer le comportement 2.x via quelque chose comme : my
+$dbh = DBI-&gt;</pre>connect("dbi:
+<p class="Pp"><i>ODBC:$DSN", </i></p>$user,
+<p class="Pp">$pass,
+                    { odbc_version =&gt;2})</p>;
+<p class="Pp">odbc_driver_complete
+Cet attribut a été ajouté à DBD::ODBC dans 1.32_2.
+odbc_driver_complete n'est pertinent que pour le système d'exploitation Windows et </p>sera
+<p class="Pp">ignoré sur d'autres plateformes. Il est désactivé par défaut.
+Lorsqu'il est défini à une valeur vraie, DBD::ODBC tente d'obtenir un handle de fenêtre et appelle SQLDriverConnect avec l'attribut SQL_DRIVER_COMPLETE au lieu de l'option normale SQL_DRIVER_NOPROMPT. Cela signifie que si la chaîne de connexion ne décrit pas suffisamment d'attributs pour permettre au gestionnaire de pilotes ODBC de se connecter à une source de données, il affichera un dialogue vous permettant de saisir les attributs restants. Une fois que vous validez ce dialogue, le gestionnaire de pilotes ODBC continuera comme si vous aviez spécifié ces attributs dans la chaîne de connexion. Une fois la connexion établie, vous pouvez consulter l'attribut odbc_out_connect_string pour obtenir une chaîne de connexion que vous pourrez utiliser ultérieurement en la passant à la méthode connect sans invite.
+Comme </p>un
+<p class="Pp">handle de fenêtre est passé à SQLDriverConnect, cela signifie également que le pilote ODBC peut afficher un dialogue, par exemple, si votre mot de passe a expiré, le pilote MS SQL Server vous demandera souvent d'en saisir </p>un
+<p class="Pp">nouveau.
+Un </p>exemple
+<pre>est :
+my $h = DBI-&gt;connect('dbi:ODBC:DRIVER={SQL Server}', "username", "password",
+                     {odbc_driver_complete =&gt; 1})</pre>;
+<p class="Pp">Comme cela ne fournit que le pilote et que d'autres attributs sont
+    requis, un dialogue sera affiché vous permettant de spécifier le serveur SQL
+    auquel se connecter et éventuellement d'autres </p>attributs.
+<p class="Pp"><i>odbc_batch_siz</i></p>e
+<p class="Pp">Définit la taille du lot pour execute_for_fetch, qui vaut 10 par défaut.
+    Gardez à l'esprit que plus vous la définissez grand, plus DBD::ODBC devra
+    allouer de mémoire lors de l'exécution de execute_for_fetch et que la mémoire
+    requise est max_length_of_pn * odbc_batch_size * </p>n_parameters.
+<p class="Pp"><i>odbc_array_operation</i></p>s
+<p class="Pp">NOTE : cela s'appelait brièvement odbc_disable_array_operations dans les
+    versions 1.35 et 1.36_1. J'avais prévenu que c'était expérimental et il s'est
+    avéré que la valeur par défaut était trop ambitieuse et que c'était de toute
+    façon un mauvais nom. De plus, la valeur par défaut était d'utiliser les
+    opérations de tableau et maintenant c'est </p>l'inverse.
+<p class="Pp">Si défini à true, DBD::ODBC utilise sa propre implémentation interne de
+    execute_for_fetch au lieu de celle par défaut de DBI. La valeur par défaut est
+    false. L'utilisation de execute_for_fetch interne devrait être nettement plus
+    rapide lorsque vous utilisez des tableaux de paramètres pour les opérations
+    d'insertion/mise à jour/suppression, car des lots de paramètres sont envoyés à
+    la base de données en une seule fois. Cependant, la prise en charge requise
+    dans certains pilotes ODBC est un peu approximative et DBD::ODBC n'a aucun
+    moyen de s'en assurer avant qu'il ne soit trop </p>tard.
+<p class="Pp">Veuillez lire la documentation sur execute_array et
+    execute_for_fetch, qui détaille les différences subtiles entre
+    l'implémentation de DBD::ODBC et l'utilisation de l'implémentation par défaut
+    de DBI. Si ces différences vous posent problème, vous pouvez définir
+    odbc_array_operations à false et DBD::ODBC reviendra aux implémentations de
+    DBI pour les méthodes de </p>tableau.
+<p class="Pp">Vous pouvez utiliser la variable d'environnement
+    ODBC_DISABLE_ARRAY_OPERATIONS pour activer/désactiver également les opérations
+    de tableau. Lorsqu'elle est définie à 1, les opérations de tableau sont
+    désactivées. Lorsqu'elle n'est pas définie, la valeur par défaut est utilisée
+    (qui est actuellement désactivée). Lorsqu'elle est définie à 0, les opérations
+    de tableau sont utilisées quoi qu'il arrive. Je sais que c'est légèrement
+    contre-intuitif, mais j'ai eu du mal à changer le nom (il a été adopté et
+    utilisé dans quelques endroits très rapidement)</p>.
+<p class="Pp"><i>odbc_taf_callbac</i></p>k
+<p class="Pp">NOTE : ceci est expérimental jusqu'à ce que je voie au moins plus d'un
+    pilote ODBC qui prenne en charge </p>TAF.
+<p class="Pp">Le Transparent Application Failover (TAF) est une fonctionnalité d'OCI qui
+    permet aux clients de se reconnecter automatiquement à une instance en cas de
+    défaillance de celle-ci. La reconnexion se fait automatiquement à partir de la
+    bibliothèque OCI (Oracle Call Interface)</p>.
+<p class="Pp">TAF prend en charge une fonction de rappel (callback) qui, une fois
+    enregistrée, est appelée par le pilote pour vous informer de ce qui se passe
+    et qui vous permet, dans une certaine mesure, de contrôler la gestion du
+    </p>basculement.
+<p class="Pp">Vous devez d'abord configurer TAF sur votre instance et ce processus est
+    hors du cadre de ce document. Une fois TAF activé, vous définissez simplement
+    <span class="Li">"odbc_taf_callback" </span>sur une référence de code
+    qui devrait ressembler à ceci </p>:
+<pre>sub taf_handler {
+ my ($dbh, $event, $type) = @_;
+ # faire quelque chose ici
+</pre>}
+<p class="Pp">DBD::ODBC transmettra le handle de connexion ($dbh), le type d'événement
+    Oracle (OCI_FO_END, OCI_FO_ABORT, OCI_FO_REAUTH, OCI_FO_BEGIN, OCI_FO_ERROR)
+    et le type Oracle (OCI_FO_NONE, OCI_FO_SESSION, OCI_FO_SELECT, OCI_FO_TXNAL).
+    Consultez la documentation Oracle pour savoir ce que sont ces constantes. Vous
+    pouvez importer ces constantes à l'aide du tag d'exportation :taf. Si votre
+    instance n'a pas TAF activé, il est probable qu'une tentative d'enregistrement
+    d'un callback échouera, mais cela dépend du pilote (tout ce que fait DBD::ODBC
+    est d'effectuer un appel SQLSetConnectAttr et de fournir un wrapper C qui
+    appelle votre sous-programme Perl)</p>.
+<p class="Pp">Voici un exemple commenté </p>:
+<pre>my $h = DBI-&gt;connect('dbi:ODBC:oracle','xxx','yyy',
+                     {RaiseError =&gt; 1,
+                      odbc_taf_callback =&gt; \&amp;taf_handler}) or die "connect";
+while (1) {
+    my $s = $h-&gt;selectall_arrayref(q/select 1 from dual/);
+    sleep 5;
+}
+sub taf_handler {
+   my ($dbh, $event, $type) = @_;
+   #print "taf_handler $dbh, $event, $type\n";
+   if ($event == OCI_FO_BEGIN) {
+       print "Instance unavailable, stand by\n";
+       print "Your TAF type is : ",
+           ($type == OCI_FO_NONE ? "NONE" :
+                ($type == OCI_FO_SESSION ? "SESSION" :
+                     ($type == OCI_FO_SELECT ? "SELECT" : "?"))) , "\n";
+       # start a counter and each time OCI_FO_ERROR is passed in we will
+       # count down and abort the failover when we hit 0.
+       $count = 10;
+       return 0;
+   } elsif ($event == OCI_FO_ERROR) {
+       # We get an OCI_FO_ERROR each time the failover fails
+       # sleep a while until the count hits 0
+       if (--$count &lt; 1) {
+           print "Giving up\n";
+           return 0;            # give up
+       } else {
+           print "Retrying...\n";
+           sleep 1;
+           return OCI_FO_RETRY; # tell Oracle to retry
+       }
+   } elsif ($event == OCI_FO_REAUTH) {
+       print "Failed over user. Resuming Services\n";
+   } elsif ($event == OCI_FO_END) {
+       print "Failover ended - resuming\n";
+   }
+   return 0;
+</pre>}
+<p class="Pp">NOTE : L'exemple ci-dessus est destiné à être utilisé avec le pilote ODBC
+    Oracle Easysoft. ODBC ne définit aucun moyen standard de prendre en charge TAF
+    et donc différents pilotes peuvent utiliser différents attributs de connexion
+    pour le configurer ou peuvent même passer des arguments différents au callback.
+    Malheureusement, je n'ai accès à aucun autre pilote ODBC qui prenne en charge
+    TAF. Tant que je n'en vois pas d'autres, je ne peux pas créer d'interface
+    générique. J'accepterai volontiers des correctifs pour tout autre pilote ou si
+    vous m'envoyez une copie fonctionnelle du pilote et la documentation, j'ajouterai la prise en </p>charge.
+<p class="Pp"><i>odbc_trace_fil</i></p>e
+<p class="Pp">Spécifie le nom et le chemin d'accès d'un fichier dans lequel vous souhaitez
+    que les informations de traçage de l'API ODBC soient écrites. Voir
+    </p>"odbc_trace".
+<p class="Pp"><i>odbc_trac</i></p>e
+<p class="Pp">Active ou désactive le traçage de l'API ODBC. Défini à 1 pour activer et à 0
+    pour </p>désactiver.
+<p class="Pp">Cela appelle SQLSetConnectAttr pour SQL_ATTR_TRACE et définit soit
+    SQL_OPT_TRACE_ON soit SQL_OPT_TRACE_OFF. L'activation du traçage indiquera au
+    gestionnaire de pilotes ODBC d'écrire une trace de l'API ODBC dans le fichier
+    nommé par "odbc_trace_file"</p>.
+<p class="Pp">NOTE : Si vous ne définissez pas odbc_trace_file, la plupart des
+    gestionnaires de pilotes ODBC écrivent dans un fichier appelé SQL.LOG dans le
+    répertoire racine (mais cela dépend du gestionnaire de pilotes utilisé)</p>.
+<p class="Pp">NOTE : Ce traçage est produit par le gestionnaire de pilotes ODBC et n'a
+    rien à voir avec DBD::ODBC, si ce n'est qu'il devrait tracer les appels ODBC
+    effectués par DBD::ODBC, c'est-à-dire que DBD::ODBC n'est pas responsable du
+    mécanisme de traçage </p>lui-même.
+<p class="Pp">NOTE : L'activation du traçage ralentira probablement beaucoup votre
+    application. J'y réfléchirais</p> à deux fois dans un environnement de production
+    à moins que vous ne soyez désespéré, car cela a t</section>endance à produire des
+    fichiers de trace très volumineux pour de courtes périodes d'activité ODBC.
+<section class="Ss">
+<h2 class="Ss" id='Private_statement_attributes'><a class='permalink' href='#Private_statement_attributes'>Attributs privés de </a></h2>statement
+<p class="Pp"><i>odbc_more_result</i></p>s
+<p class="Pp">Utilisez cet attribut pour déterminer s'il y a d'autres jeux de résultats
+    </p>disponibles.
+<p class="Pp">Tout pilote ODBC qui met en lot les résultats ou les compteurs
+    d'insertions/mises à jour aura besoin que vous boucliez sur odbc_more_results
+    jusqu'à ce qu'il n'y ait plus de résultats. Par exemple, si vous effectuez
+    plusieurs selects dans une procédure ou plusieurs
+    insertions/mises à jour/suppressions, vous devrez probablement boucler sur
+    odbc_more_results</p>.
+<p class="Pp">Utilisez odbc_more_results comme suit </p>:
+<pre>do {
+   my @row;
+   while (@row = $sth-&gt;fetchrow_array()) {
+      # faire des choses ici
+   }
+} while ($sth-&gt;{odbc_more_results})</pre>;
+<p class="Pp">Notez qu'avec plusieurs jeux de résultats et des paramètres de sortie
+    (c'est-à-dire en utilisant bind_param_inout), n'attendez-vous pas à ce que les
+    paramètres de sortie soient écrits avant que TOUS les jeux de résultats aient
+    été </p>récupérés.
+<p class="Pp">Sous le capot, cet attribut provoque un appel à l'API ODBC
+    SQLMoreResults, puis tou</p>t jeu de résultat, insertion/mise à jour/suppression ou
+    paramètre de sortie est décr</section>it par DBD::ODBC et le handle de statement sera
+    prêt à traiter le nouveau résultat.
+<section class="Ss">
+<h2 class="Ss" id='Private_statement_methods'><a class='permalink' href='#Private_statement_methods'>Méthodes privées de </a></h2>statement
+<p class="Pp"><i>odbc_row</i></p>s
+<p class="Pp">Cette méthode a été ajoutée dans la version 1.</p>42_1.
+<p class="Pp">En ODBC 64 bits, SQLRowCount peut renvoyer une valeur 64 bits pour le
+    nombre de lignes affectées. Malheureusement, l'interface DBI DBD définit
+    actuellement (au moins jusqu'à la version 1.622) execute comme renvoyant un int,
+    donc les valeurs qui ne peuvent pas tenir dans un int sont tronquées. Voir RT
+    </p>81911.
+<p class="Pp">À partir de DBD::ODBC 1.42_1, DBD::</p>ODBC
+<p class="Pp">o définit cette méthode qui renverra les lignes affectées dans un IV
+    (et les IV sont garantis de pouvoir contenir un pointeur) afin que vous puissiez
+    obtenir les lignes réellement affectées sans </p>troncature.
+<p class="Pp">o s'il détecte un débordement dans la méthode execute, il émettra un
+    avertissement (si Warn est activé, ce qui est le cas par défaut) et renverra
+    </p>INT_MAX.
+<p class="Pp">À un certain stade, DBI pourrait changer pour corriger le problème que cela
+  </p>contourne.
+<p class="Pp">NOTE : la valeur renvoyée par odbc_rows n'est pas la valeur brute renvoyée
+    par SQLRowCount. C'est la même que celle que execute renvoie normalement, par
+    exemple 0E0 (pour 0), -1 pour inconnu et N pour N lignes affectées où N &gt; </p>0.
+<p class="Pp"><i>odbc_lob_rea</i></p>d
+<pre>$chrs_or_bytes_read = $sth-&gt;odbc_lob_read($column_no, \$lob, $length, \%attr)</pre>;
+<p class="Pp">Lit <span class="Li">$length </span>octets du lob à la colonne
+    <span class="Li">$column_no </span>en renvoyant le lob dans
+    <span class="Li">$lob </span>et le nombre d'octets ou de caractères lus dans
+    <span class="Li">$chrs_or_bytes_read.</span> Si une erreur se produit, undef sera
+    renvoyé. Lorsqu'il n'y a plus de données à lire, 0 est </p>renvoyé.
+<p class="Pp">NOTE : C'est actuellement une méthode expérimentale et pourrait changer à
+    l'avenir, par exemple elle pourrait prendre en charge la concaténation
+    automatique des parties du lob à la fin de <span class="Li">$lob </span>avec l'ajout d'un
+    drapeau supplémentaire ou d'un décalage de destination comme dans le blob_read
+    non documenté de </p>DBI.
+<p class="Pp">Le type dans lequel le lob est récupéré peut être remplacé dans
+    <span class="Li">%attr en </span>utilisant <span class="Li">"TYPE =&gt;
+    </span>sql_type". <span class="Li">%attr </span>est facultatif et si
+    omis, vaut par défaut SQL_C_BINARY pour les colonnes binaires et
+    SQL_C_CHAR/SQL_C_WCHAR pour les autres types de colonnes selon que DBD::ODBC
+    est compilé avec la prise en charge d'unicode. <span class="Li">$chrs_or_bytes_read
+ </span>   sera les octets lus lorsque les types de colonne SQL_C_CHAR ou SQL_C_BINARY
+    sont utilisés et les caractères lus si le type de colonne est </p>SQL_C_WCHAR.
+<p class="Pp">Lorsqu'il est compilé avec la prise en charge d'unicode <span class="Li">$length
+ </span>   spécifie la quantité d'espace tampon à utiliser lors de la récupération des
+    données du lob, mais comme elles sont renvoyées en tant que caractères SQLWCHAR,
+    cela signifie que vous récupérez au plus
+    <span class="Li">"$length/2" </span>caractères. Lorsque ces
+    caractères récupérés sont encodés en UTF-8 pour Perl, le
+    <span class="Li">scalaire </span>$lob peut avoir besoin d'être plus grand que
+    <span class="Li">$length, </span>donc DBD::ODBC l'agrandit de manière </p>appropriée.
+<p class="Pp">Vous pouvez récupérer un lob par morceaux comme ceci </p>:
+<pre>$sth-&gt;bind_col($column, undef, {TreatAsLOB=&gt;1});
+while(my $retrieved = $sth-&gt;odbc_lob_read($column, \my $data, $length)) {
+    print "retrieved=$retrieved lob_data=$data\n";
+</pre>}
+<p class="Pp">REMARQUE : pour récupérer un lob de cette manière, vous devez <b>d'abord </b>lier la colonne
+    lob en spécifiant BindAsLOB, sinon DBD::ODBC 1) liera la colonne
+    normalement et elle sera soumise à LongReadLen et b) échouera dans </p>odbc_lob_read.
+<p class="Pp">REMARQUE : Certains moteurs de base de données et pilotes ODBC ne vous
+    permettent pas de récupérer des colonnes hors de l'ordre (par exemple, MS SQL Server sauf si vous utilisez
+    des curseurs). Dans ces cas, vous devez vous assurer que le lob récupéré est la dernière (ou
+    l'unique) colonne de votre liste de </p>sélection.
+<p class="Pp">REMARQUE : Vous ne pouvez récupérer qu'une partie d'un lob, mais vous devrez probablement
+    appeler finish sur le gestionnaire de requête avant de faire quoi que ce soit d'autre avec
+    cette requête. Lorsque vous ne récupérez qu'une partie d'un grand lob, vous pourriez voir
+    un léger délai lorsque vous appelez finish, car certains protocoles utilisés par les pilotes ODBC envoient
+    le lob sur le socket de manière synchrone et il n'y a aucun moyen de l'arrêter (cela
+    signifie que le pilote ODBC doit lire tout le lob depuis le socket même si
+    vous ne l'avez jamais entièrement récupéré vous-même)</p>.
+<p class="Pp">REMARQUE : Si votre sélection contient plusieurs lobs, vous ne pouvez pas lire une
+    partie du pr</p>emier lob, puis le second lob, puis revenir au premier lob. Vous devez lire
+    tous les lobs dans </section>l'ordre et complètement, ou lire une partie d'un lob et ne plus faire
+    d'appels à odbc_lob_read.
+<section class="Ss">
+<h2 class="Ss" id='Private_DBD::ODBC_Functions'><a class='permalink' href='#Private_DBD::ODBC_Functions'>Fonctions privées de DBD::</a></h2>ODBC
+<p class="Pp">Vous utilisez les fonctions privées de DBD::ODBC de cette manière </p>:
+<pre>$dbh-&gt;func(arg, private_function_name, @args)</pre>;
+<p class="Pp"><i>GetInf</i></p>o
+<p class="Pp"><b>Cette fonction privée est désormais remplacée par la méthode get_info
+    de </b></p>DBI.
+<p class="Pp">Cette fonction correspond à l'appel ODBC SQLGetInfo et l'argument
+    doit être un type d'information ODBC valide (voir la spécification ODBC). Par exemple </p>:
+<pre>$value = $dbh-&gt;func(6, 'GetInfo')</pre>;
+<p class="Pp">qui retourne le
+    <span class="Li">"SQL_DRIVER_NAME</span>"</p>.
+<p class="Pp">Cette fonction retourne une valeur scalaire, qui peut être numérique ou
+    une chaîne de caractères selon la valeur d'information </p>demandée.
+<p class="Pp"><i>GetTypeInf</i></p>o
+<p class="Pp"><b>Cette fonction privée est désormais remplacée par les méthodes type_info
+    </b>et <b>type_info_all de DBI, cependant, comme elle est utilisée par ces </b>méthodes, <b>elle existe </b></p>toujours.
+<p class="Pp">Cette fonction correspond à l'API ODBC SQLGetTypeInfo et l'argument
+    doit être un numéro de type SQL (par exemple SQL_VARCHAR) ou SQL_ALL_TYPES.
+    SQLGetTypeInfo retourne des informations sur un type de données pris en charge par la source
+    de </p>données.
+<p class="Pp">Par exemple </p>:
+<pre>use DBI qw(:sql_types);
+$sth = $dbh-&gt;func(SQL_ALL_TYPES, GetTypeInfo);
+DBI::dump_results($sth)</pre>;
+<p class="Pp">Cette fonction retourne un gestionnaire de requête DBI pour le
+    jeu de résultats SQLGetTypeInfo contenant de nombreuses colonnes d'attributs de type (voir la
+    spécification ODBC)</p>.
+<p class="Pp">REMARQUE : Il est TRÈS important que le <span class="Li">"use
+    </span>DBI" inclue le <span class="Li">qw(:sql_types) </span>afin que des
+    valeurs comme SQL_VARCHAR soient correctement interprétées. Cela "importe"
+    les noms de types SQL dans l'espace de noms du programme. Une erreur très courante est
+    d'oublier le <span class="Li">qw(:sql_types) </span>et d'obtenir des
+    résultats </p>étranges.
+<p class="Pp"><i>GetFunction</i></p>s
+<p class="Pp">Cette fonction correspond à l'API ODBC SQLGetFunctions qui retourne
+    des informations sur le fait qu'une fonction est prise en charge par le pilote </p>ODBC.
+<p class="Pp">L'argument doit être
+    <span class="Li">"SQL_API_ALL_FUNCTIONS" (0)</span> pour toutes
+    les fonctions ou un numéro de fonction ODBC valide (par exemple
+    <span class="Li">"SQL_API_SQLDESCRIBEPARAM" </span>qui est 58).
+    Voir la spécification ODBC ou examiner vos fichiers d'en-tête sqlext.h et sql.h pour
+    toutes les macros </p>SQL_API_XXX.
+<p class="Pp">Si appelé avec
+    <span class="Li">"SQL_API_ALL_FUNCTIONS" </span>(0), un tableau de 100
+    éléments est retourné où chaque élément contiendra un '1' si la fonction
+    ODBC avec cet index SQL_API_XXX est prise en charge ou '' si elle ne l'est </p>pas.
+<p class="Pp">Si appelé avec une valeur SQL_API_XXX spécifique pour une seule fonction,
+    elle retournera vrai si le pilote ODBC prend en charge cette fonction, sinon
+    </p>faux.
+<p class="Pp">Par exemple </p>:
+<pre>my @x = $dbh-&gt;func(0,"GetFunctions");
+print "SQLDescribeParam is supported\n" if ($x[58])</pre>;
+<p class="Pp">o</p>u
+<pre>print "SQLDescribeParam is supported\n"
+    if $dbh-&gt;func(58, "GetFunctions")</pre>;
+<p class="Pp"><i>GetStatistic</i></p>s
+<p class="Pp"><b>Cette fonction privée est désormais remplacée par la méthode
+    </b>statistics_info <b>de </b></p>DBI.
+<p class="Pp">Voir la spécification ODBC pour l'API SQLStatistics. Vous appelez
+    SQLStatistics de cette manière </p>:
+<pre>$dbh-&gt;func($catalog, $schema, $table, $unique, 'GetStatistics')</pre>;
+<p class="Pp">Avant DBD::ODBC 1.16 <span class="Li">$unique </span>n'était pas
+    défini comme étant vrai/faux ou SQL_INDEX_UNIQUE/SQL_INDEX_ALL. En fait,
+    quelle que soit la valeur que vous fournissiez pour <span class="Li">$unique,</span> elle était transmise
+    inchangée à l'appel API ODBC SQLStatistics. Cela a changé en 1.16,
+    où <span class="Li">$unique </span>est devenu une valeur vrai/faux qui est
+    interprétée en SQL_INDEX_UNIQUE pour vrai et SQL_INDEX_ALL pour </p>faux.
+<p class="Pp"><i>GetForeignKey</i></p>s
+<p class="Pp"><b>Cette fonction privée est désormais remplacée par la méthode
+    foreign_key_inf</b>o <b>de </b></p>DBI.
+<p class="Pp">Voir la spécification ODBC pour l'API SQLForeignKeys. Vous appelez
+    SQLForeignKeys de cette manière </p>:
+<pre>$dbh-&gt;func($pcatalog, $pschema, $ptable,
+           $fcatalog, $fschema, $ftable,
+           "GetForeignKeys")</pre>;
+<p class="Pp"><i>GetPrimaryKey</i></p>s
+<p class="Pp"><b>Cette fonction privée est désormais remplacée par la méthode
+    primary_key_inf</b>o <b>de </b></p>DBI.
+<p class="Pp">Voir la spécification ODBC pour l'API SQLPrimaryKeys. Vous appelez
+    SQLPrimaryKeys de cette manière </p>:
+<pre>$dbh-&gt;func($catalog, $schema, $table, "GetPrimaryKeys")</pre>;
+<p class="Pp"><i>data_source</i></p>s
+<p class="Pp"><b>Cette fonction privée est désormais remplacée par la méthode
+    </b>data_sources <b>de DBI et a finalement été supprimée en 1.</b></p>49_1
+<p class="Pp"><i>GetSpecialColumn</i></p>s
+<p class="Pp">Voir la spécification ODBC pour l'API SQLSpecialColumns. Vous appelez
+    SQLSpecialColumns de cette manière </p>:
+<pre>$dbh-&gt;func($identifier, $catalog, $schema, $table, $scope,
+           $nullable, 'GetSpecialColumns')</pre>;
+<p class="Pp">Géré depuis la version 0.</p>28
+<p class="Pp"><i>ColAttribute</i></p>s
+<p class="Pp"><b>Cette fonction privée est désormais remplacée par les attributs de requête
+    de </b>DBI <b>NAME, TYPE, PRECISION, SCALE, NULLABLE etc)</b></p>.
+<p class="Pp">Voir la spécification ODBC pour l'API SQLColAttributes. Vous appelez
+    SQLColAttributes de cette manière </p>:
+<pre>$sth-&gt;func($column, $ftype, "ColAttributes");
+SQL_COLUMN_COUNT = 0
+SQL_COLUMN_NAME = 1
+SQL_COLUMN_TYPE = 2
+SQL_COLUMN_LENGTH = 3
+SQL_COLUMN_PRECISION = 4
+SQL_COLUMN_SCALE = 5
+SQL_COLUMN_DISPLAY_SIZE = 6
+SQL_COLUMN_NULLABLE = 7
+SQL_COLUMN_UNSIGNED = 8
+SQL_COLUMN_MONEY = 9
+SQL_COLUMN_UPDATABLE = 10
+SQL_COLUMN_AUTO_INCREMENT = 11
+SQL_COLUMN_CASE_SENSITIVE = 12
+SQL_COLUMN_SEARCHABLE = 13
+SQL_COLUMN_TYPE_NAME = 14
+SQL_COLUMN_TABLE_NAME = 15
+SQL_COLUMN_OWNER_NAME = 16
+SQL_COLUMN_QUALIFIER_NAME = 17
+SQL_COLUMN_LABEL = </pre>18
+<p class="Pp"><b>Remarque </b>: le pilote ODBC d'Oracle pour Linux dans le client instantané 11r1
+    retourne souvent des valeurs étranges pour le nom de colonne, par exemple '20291'. Il est plus judicieux
+    d'utiliser les attributs NAME et NAME_xx de DBI pour la </p>portabilité.
+<p class="Pp"><i>DescribeCo</i></p>l
+<p class="Pp">Supprimé dans DBD::ODBC 1.</p>40_3
+<p class="Pp">Utilisez à la place les attributs</p> de requête de DBI NAME, TYPE, PR</section>ECISION, SCALE,
+    NULLABLE etc.
+<section class="Ss">
+<h2 class="Ss" id='Additional_bind_col_attributes'><a class='permalink' href='#Additional_bind_col_attributes'>Attributs supplémentaires de </a></h2>bind_col
+<p class="Pp">DBD::ODBC prend en charge quelques attributs supplémentaires qui peuvent être passés
+    à la méthode bind_col dans les </p>attributs.
+<p class="Pp"><i>DiscardStrin</i></p>g
+<p class="Pp">Voir la fonction utilitaire sql_type_cast de </p>DBI.
+<p class="Pp">Si vous liez une colonne à un type spécifique (SQL_INTEGER, SQL_DOUBLE
+    et SQL_NUMERIC sont les seuls pris en charge actuellement) et que vous ajoutez
+    DiscardString aux attributs de prepare, alors si les données liées retournées
+    peuvent être converties en ce type, le pv du scalaire (la partie chaîne
+    d'un scalaire) est </p>effacé.
+<p class="Pp">REMARQUE : après DBD::ODBC 1.37, DBD::ODBC lie toutes les colonnes SQL_INTEGER
+    en SQL_C_LONG et DiscardString est sans </p>objet.
+<p class="Pp">C'est particulièrement utile si vous utilisez un module qui utilise
+    les drapeaux et/ou le pv d'un scalaire pour déterminer si un scalaire est un nombre. JSON::XS fait
+    cela et sans ce drapeau, vous devez ajouter 0 à toutes les données de colonnes liées
+    retournant des nombres pour que JSON::XS les encode en N au lieu de
+    </p>"N".
+<p class="Pp">REMARQUE : pour DiscardString, vous avez besoin d'au moins DBI 1.</p>611.
+<p class="Pp"><i>StrictlyType</i></p>d
+<p class="Pp">Voir la fonction utilitaire sql_type_cast de </p>DBI.
+<p class="Pp">Voir "DiscardString" </p>ci-dessus.
+<p class="Pp">Spécifie que lorsque la fonction sql_type_cast de DBI est appelée sur
+    des données retournées où un type de liaison est spécifié, si la conversion ne peut pas
+    être effectuée, une erreur sera </p>levée.
+<p class="Pp">C'est probablement peu utile avec DBD::ODBC car si vous demandez
+    par exemple un SQL_INTEGER et que les données ne peuvent pas être converties en un entier,
+    le pilote ODBC retournera probablement "Invalid character value for cast
+    specification (SQL-22018)</p>".
+<p class="Pp">REMARQUE : pour StrictlyTyped, vous avez besoin d'au moins DBI 1.</p>611.
+<p class="Pp"><i>TreatAsLO</i></p>B
+<p class="Pp">Voir </p>"odbc_lob_read"</section>.
+<section class="Ss">
+<h2 class="Ss" id='Tracing'><a class='permalink' href='#Tracing'>Traçag</a></h2>e
+<p class="Pp">DBD::ODBC prend désormais en charge les méthodes parse_trace_flag et parse_trace_flags
+    introduites dans DBI 1.42 (voir DBI pour une description complète). Depuis DBI
+    1.604, le seul drapeau de traçage défini qui est pertinent pour DBD::ODBC est 'SQL'
+    que DBD::ODBC prend en charge en affichant les chaînes SQL (après modification)
+    passées aux méthodes prepare et </p>do.
+<p class="Pp">Depuis DBI 1.617, DBI définit également les drapeaux de traçage ENC (encodage), CON (connexion),
+    TXN (transaction) et DBD (DBD uniquement). Les drapeaux de traçage ENC et CON de DBI
+    sont synonymes des drapeaux de traçage odbcunicode et odbcconnection de DBD::ODBC
+    bien que je puisse supprimer ceux de DBD::ODBC à l'avenir. Le drapeau de traçage DBD de DBI
+    permet de n'afficher que les messages de traçage de DBD::ODBC sans les messages de traçage de </p>DBI.
+<p class="Pp">Actuellement, DBD::ODBC prend en charge deux drapeaux de traçage privés. Le
+    drapeau 'odbcunicode' trace certaines opérations unicode et odbcconnection
+    trace le processus de </p>connexion.
+<p class="Pp">Pour activer le traçage de drapeaux particuliers, vous utilisez </p>:
+<pre>$h-&gt;trace($h-&gt;parse_trace_flags('SQL|odbcconnection'));
+$h-&gt;trace($h-&gt;parse_trace_flags('1|odbcunicode'))</pre>;
+<p class="Pp">Dans le premier cas, le traçage 'SQL' et 'odbcconnection' est activé sur
+    <span class="Li">$h.</span> Dans le second cas, le niveau de traçage 1 est défini et
+    le traçage 'odbcunicode' est </p>activé.
+<p class="Pp">Si vous voulez activer un drapeau de traçage privé de DBD::ODBC avant
+    la connexion, vous devez faire quelque chose comme </p>:
+<pre>use DBD::ODBC;
+DBI-&gt;trace(DBD::ODBC-&gt;parse_trace_flag('odbcconnection'))</pre>;
+<p class="Pp">o</p>u
+<pre>use DBD::ODBC;
+DBI-&gt;trace(DBD::ODBC-&gt;parse_trace_flags('odbcconnection|odbcunicode'))</pre>;
+<p class="Pp">o</p>u
+<pre>DBI_TRACE=odbcconnection|odbcunicode perl myscript.</pre>pl
+<p class="Pp">Depuis DBI 1.617, vous pouvez n'afficher que la trace de DBD::ODBC messages
+  </p>utilisant
+<pre>DBI_TRACE=DBD perl myscript.</pre>pl
+<p class="Pp">DBD::ODBC produit une trace au niveau 3 et au-dessus (car les niveaux 1
+    et 2 sont réservés au DBI)</p>.
+<p class="Pp">Pour une trace complète des appels de </p>méthodes DBI sans tous les
+    détails</section> internes du DBI, voir DBIx::Log4perl.
+<section class="Ss">
+<h2 class="Ss" id='Deviations_from_the_DBI_specification'><a class='permalink' href='#Deviations_from_the_DBI_specification'>Déviations par rapport à la spécification </a></h2>DBI
+<p class="Pp"><i>last_insert_i</i></p>d
+<p class="Pp">DBD::ODBC ne supporte pas la méthode last_insert_id de DBI. Il n'existe
+    pas de moyen défini par ODBC pour obtenir cette information. Généralement,
+    le mécanisme (et il diffère considérablement entre les bases de données et
+    les pilotes ODBC) consiste à émettre un select d'une certaine forme (par
+    ex., select @@identity ou select sequence.currval from dual, etc)</p>.
+<p class="Pp">Il existe littéralement des dizaines de bases de données et de pilotes
+    ODBC supportés par DBD::ODBC et je ne peux pas tous les avoir. Si vous
+    savez comment récupérer l'information pour last_insert_id et que vous
+    m'envoyez par courriel le nom/la version du pilote ODBC et le nom/la
+    version de la base de données avec un petit exemple fonctionnel, je
+    collecterai les exemples et les documenterai </p>ici.
+<p class="Pp"><b>Microsoft Access.</b> Les versions récentes de MS Access supportent
+    <i>selec</i>t <i>@@identity </i>pour récupérer le dernier ID inséré. Voir
+    <a href='http://support.microsoft.com/kb/815629'>http://support.microsoft.com/kb/815629.</a> Information fournie par Robert
+    </p>Freimuth.
+<p class="Pp"><i>Commentaires en </i></p>SQL
+<p class="Pp">DBI ne dit rien de particulier sur les commentaires en SQL.
+    DBD::ODBC cherche les placeholders dans la chaîne SQL et jusqu'à la version
+    1.24_2, il ne reconnaissait pas les commentaires dans les chaînes SQL, il
+    pouvait donc trouver ce qu'il croit être un placeholder dans un
+    commentaire, par ex.</p>,
+<pre>select '1' /* placeholder ? in comment */
+select -- named placeholder :named in comment
+  </pre>'1'
+<p class="Pp">Je ne peux pas être exact sur le support de l'ignorance des
+    placeholders dans les littéraux, mais cela existe depuis longtemps dans
+    DBD::ODBC. Le support pour ignorer les placeholders dans les commentaires a
+    été ajouté en 1.24_2. Si vous trouvez un cas où un placeholder nommé
+    n'est pas ignoré alors qu'il devrait l'être, voir
+    "odbc_ignore_named_placeholders" pour une solution de contournement et
+    envoyez-moi un exemple avec le nom de votre pilote </p>ODBC.
+<p class="Pp"><i>d</i></p>o
+<p class="Pp">Ceci n'est pas vraiment une déviation par rapport à la spécification
+    DBI puisque DBI permet à un pilote d'éviter la surcharge de création d'un
+    handle de statement DBI pour <b>do</b>(</p>).
+<p class="Pp">DBD::ODBC implémente <span class="Li">"do" </span>en
+    appelant SQLExecDirect dans ODBC et non SQLPrepare suivi de SQLExecute, donc
+    <span class="Li">"do" </span>n'est pas équivalent à </p>:
+<pre>$dbh-&gt;prepare($sql)-&gt;</pre>execute()
+<p class="Pp">Cela est fait pour éviter un aller-retour vers le serveur, ce qui est
+    plus rapide. Normalement c'est bien, mais certaines personnes rencontrent
+    des problèmes avec MS SQL Server si elles appellent une procédure qui
+    produit des sorties print (par ex., backup) car la procédure peut ne pas se
+    terminer. Voir la FAQ de DBD::ODBC et en général il est préférable
+    d'utiliser prepare/execute lors de l'appel de </p>procédures.
+<p class="Pp">De plus, vous devez réaliser que puisque DBD::ODBC ne crée pas un
+    statement DBI pour les appels do, si vous configurez un gestionnaire
+    d'erreurs, le handle passé lorsque un do échoue sera le handle de base de
+    données et non un handle de </p>statement.
+<p class="Pp"><i>Types de placeholders </i></p>mixtes
+<p class="Pp">Il existe 3 conventions pour les placeholders en DBI. Ce sont '?',
+    ':N' et ':name' (où 'N' est un nombre et 'name' est une chaîne
+    alphanumérique ne commençant pas par un chiffre). DBD::ODBC supporte toutes
+    ces méthodes pour nommer les placeholders, mais vous devez n'utiliser
+    qu'une seule méthode pour une chaîne SQL particulière. Si vous mélangez
+    les méthodes de placeholder, vous obtiendrez une erreur comme </p>:
+<pre>Can't mix placeholder styles </pre>(1/2)
+<p class="Pp"><i>Utiliser le même placeholder plus d'une </i></p>fois
+<p class="Pp">DBD::ODBC ne supporte pas (actuellement) l'utilisation d'un placeholder
+    nommé plus d'une fois dans une seule chaîne SQL. c.-à-d.</p>,
+<pre>insert into foo values (:bar, :p1, :p2, :bar)</pre>;
+<p class="Pp">n'est pas supporté car 'bar' est utilisé plus d'une fois, mais </p>:
+<pre>insert into foo values(:bar, :p1, :</pre>p2)
+<p class="Pp">est correct. Si vous faites le premier, vous obtiendrez une erreur
+    comme </p>:
+<pre>DBD::ODBC does not yet support binding a named parameter more than </pre>once
+<p class="Pp"><i>Liaison des placeholders </i></p>nommés
+<p class="Pp">Bien que la documentation DBI (en tant que version 1.604) ne dise pas
+    comment les paramètres nommés sont liés, Tim Bunce a dit que dans Oracle
+    ils sont liés avec le ':' initial faisant partie du nom et que cela a
+    toujours été le cas. c.-à-d.</p>,
+<pre>prepare("insert into mytable values (:fred)");
+bind_param(":foo", 1)</pre>;
+<p class="Pp">DBD::ODBC ne supporte pas la liaison des paramètres nommés avec
+    l'introducer ':'. Dans l'exemple ci-dessus, vous devez utiliser </p>:
+<pre>bind_param("foo", 1)</pre>;
+<p class="Pp">Dans une discussion sur la liste dbi-dev, il a été suggéré que le ':'
+    pourrait être rendu optionnel et il n'y avait pas d'objections de fond,
+    mais cela n'a pas encore trouvé sa place dans le </p>pod.
+<p class="Pp"><i>Types de paramètres </i></p>persistants
+<p class="Pp">La spécification DBI postérieure à 1.608 dit dans bind_param </p>:
+<pre>Le type de données est 'collant' (sticky) en ce sens que les valeurs
+liées passées à execute() sont liées avec le type de données spécifié par les
+appels précédents à bind_param(), le cas échéant. Les applications portables
+ne doivent pas compter sur la possibilité de changer le type de données après
+le premier appel à </pre>bind_param.
+<p class="Pp">DBD::ODBC permet à un paramètre d'être relié avec un autre type de
+    données car ODBC le permet intrinsèquement. Vous pouvez donc faire </p>:
+<pre># parameter 1 set as a SQL_LONGVARCHAR
+$sth-&gt;bind_param(1, $data, DBI::SQL_LONGVARCHAR);
+# without the bind above the $data parameter would be either a DBD::ODBC
+# internal default or whatever the ODBC driver said it was but because
+# parameter types are sticky, the type is still SQL_LONGVARCHAR.
+$sth-&gt;execute($data);
+# change the bound type to SQL_VARCHAR
+# some DBDs will ignore the type in the following, DBD::ODBC does not
+$sth-&gt;bind_param(1, $data, DBI::SQL_VARCHAR)</pre>;
+<p class="Pp"><i>disconnect et </i></p>transactions
+<p class="Pp">DBI ne définit pas si un pilote valide (commit) ou annule (rollback)
+    une transaction en attente lorsque disconnect est appelé. En tant que tel,
+    DBD::ODBC ne peut pas dévier de la spécification, mais vous devriez savoir
+    qu'il annule une transaction non validée lorsque disconnect est appelé si
+    SQLDisconnect retourne l'état 25000 (transaction en cours)</p>.
+<p class="Pp"><i>execute_for_fetch et </i></p>execute_array
+<p class="Pp">À partir de la version 1.34_1, DBD::ODBC implémente son propre
+    execute_for_fetch qui lie des tableaux de paramètres et peut envoyer
+    plusieurs lignes ("odbc_batch_size") de paramètres via le pilote ODBC en
+    une seule fois (cela remplace le execute_for_fetch par défaut du DBI). C'est
+    beaucoup plus rapide pour insérer, mettre à jour ou supprimer plusieurs
+    lignes en une seule fois. Notez qu'execute_array utilise execute_for_fetch
+    lorsque les paramètres sont passés pour une liaison par </p>colonne.
+<p class="Pp">NOTE : DBD::ODBC 1.34_1 à DBD::ODBC 1.36_1 définissaient par défaut
+    l'utilisation du execute_for_fetch propre à DBD::ODBC, mais assez de
+    pilotes ODBC ne peuvent tout simplement pas le gérer. En tant que tel, à
+    partir de DBD::ODBC 1.36_2, la valeur par défaut a été changée pour ne pas
+    utiliser le execute_for_fetch de DBD::ODBC (c.-à-d., vous devez l'activer
+    avec "odbc_array_operations")</p>.
+<p class="Pp">NOTE : Certains pilotes ODBC ne supportent pas la définition de
+    SQL_ATTR_PARAMSET_SIZE &gt; 1, et par conséquent ne peuvent pas supporter la
+    liaison de tableaux de paramètres. La seule façon de détecter cela est
+    d'essayer de définir SQL_ATTR_PARAMSET_SIZE à une valeur supérieure à 1 et
+    il est trop tard une fois que quelqu'un a appelé execute_for_fetch. Je ne
+    veux pas ajouter du code de test à chaque connexion pour tester cela car
+    cela affectera tout le monde, même ceux qui n'utilisent pas le
+    execute_for_fetch natif, donc pour l'instant c'est à essayer et voir. Pour
+    votre information, MS Access qui ne supporte pas les tableaux de paramètres
+    produit une erreur HY092, "Invalid attribute/option </p>identifier".
+<p class="Pp">Cependant, il existe un petit nombre de différences entre
+    l'utilisation du execute_for_fetch de DBD::ODBC et l'utilisation de
+    l'implémentation par défaut du DBI (qui appelle simplement execute
+    plusieurs fois, une fois par ligne). Les différences que vous pourriez
+    voir sont </p>:
+<p class="Pp">o comme le execute_for_fetch du DBI fait une ligne à la fois, le
+    résultat de execute est pour une ligne et presque tous les pilotes ODBC
+    peuvent rapporter le nombre de lignes affectées lorsque SQLRowCount est
+    appelé par execute. Lorsque des lots de paramètres sont envoyés, le pilote
+    peut toujours retourner le nombre de lignes affectées mais c'est
+    généralement par lot plutôt que par ligne. Par conséquent, le tableau
+    tuple_status que vous pourriez passer à execute_for_fetch (ou
+    execute_array) montre généralement -1 (inconnu) pour chaque ligne bien que
+    le total affecté retourné en contexte de tableau soit un total affecté
+    </p>correct.
+<p class="Pp">o tous les pilotes ODBC n'ont pas un support ODBC suffisant (on peut
+    argumenter que c'est un bug) pour un support correct des diagnostics lors
+    de l'utilisation de tableaux. DBI dicte que si une ligne dans le lot est en
+    erreur, tuple_status contiendra l'état, le natif et le message d'erreur.
+    Cependant, le lot peut générer plusieurs erreurs par ligne (ce dont DBI ne
+    dit rien) et plus d'une ligne peut être en erreur. Dans ODBC, nous obtenons
+    une liste d'erreurs mais pour associer chacune à une ligne particulière,
+    nous devons appeler SQLGetDiagField pour SQL_DIAG_ROW_NUMBER et il devrait
+    dire à quelle ligne du lot le diagnostic est associé. Certains pilotes ODBC
+    ne supportent pas correctement SQL_DIAG_ROW_NUMBER et alors DBD::ODBC ne
+    peut pas savoir à quelle ligne du lot une erreur se réfère. Dans ce cas,
+    DBD::ODBC rapportera une erreur disant "failed to retrieve diags", avec un
+    état de HY000 et un code natif de 1, donc vous verrez toujours une erreur
+    mais pas nécessairement exactement celle-ci. De plus, lorsque plus d'un
+    diagnostic est trouvé pour une ligne, DBD::ODBC choisit le premier (qui est
+    généralement le plus pertinent) car il n'y a aucun moyen de rapporter plus
+    d'un diagnostic par ligne dans le tuple_status. Si le premier problème de
+    SQL_DIAG_ROW_NUMBER s'avère être un problème pour vous, la trace de
+    DBD::ODBC montrera toutes les erreurs et vous pouvez aussi utiliser
+    "odbc_getdiagrec" </p>vous-même.
+<p class="Pp">o Lier des paramètres avec execute_array et execute_for_fetch ne
+    permet pas de définir les types de paramètres. Cependant, comme les types
+    de paramètres sont persistants, vous pouvez appeler
+    bind_param(param_num, undef, {TYPE =&gt; sql_type}) avant d'appeler
+    execute_for_fetch/execute_array et le TYPE devrait être persistant lorsque
+    le lot de paramètres est </p>lié.
+<p class="Pp">o Bien que vous puissiez insérer de très grandes colonnes,
+    execute_for_fetch aura besoin de "odbc_batch_size" * longueur max du
+    paramètre par paramètre, donc vous pourriez atteindre les limites de
+    mémoire. Si vous utilisez le execute_for_fetch du DBI, DBD::ODBC utilise
+    l'API ODBC SQLPutData (voir "odbc_putdata_start") qui ne nécessite pas de
+    grandes quantités de mémoire car les grandes colonnes sont envoyées par
+    </p>morceaux.
+<p class="Pp">o Beaucoup de pilotes ont des bugs avec les tableaux de paramètres
+    (voir la FAQ ODBC). Par ex., au 18-MAR-2012, j'ai vu le plus récent pilote
+    ODBC de SQLite produire un seg fault et freeTDS 8/0.91 retourner le mauvais
+    compte de lignes pour les </p>lots.
+<p class="Pp">o <b>N'ESSAYEZ </b>PAS de faire un insert/update/delete et un select
+    dans le même SQL avec execute_array, par ex.</p>,
+<pre>SET IDENTITY_INSERT mytable ON
+insert into mytable (id, name) values (?,?)
+SET IDENTITY_INSERT mytable OFF
+SELECT SCOPE_IDENTITY(</pre>)
+<p class="Pp">Cela ne fonctionnera pas/cannot fonctionner, bien que vous n'ayez peut-
+    être pas remarqué cela en utilisant les méthodes execute_* intégrées du DBI.
+    Voir rt </p>75687.
+<p class="Pp"><i>type_info_al</i></p>l
+<p class="Pp">Beaucoup de pilotes ODBC retournent maintenant 20 colonnes dans
+    type_info_all plutôt que les 19 documentées par DBI. La 20ème colonne est
+    généralement appelée "USERTYPE". Les pilotes ODBC récents de MS SQL Server font cela. Heureusement, cela ne devrait pas vous nuire tant que vous utilisez les clés fournies au début de </p>type_info_all.
+<p class="Pp"><i>Liaison des </i></p>colonnes
+<p class="Pp">La spécification DBI permet de remplacer un type de colonne dans l'appel à la méthode bind_col. Pour l'essentiel, DBD::ODBC ignore ce type car il lie les entiers (SQL_INTEGER) en tant que SQL_C_LONG (depuis DBD::ODBC 1.38_1) et toutes les autres colonnes en tant que SQL_C_CHAR ou SQL_C_WCHAR, et il est de toute façon trop tard pour changer le type de liaison une fois que l'ensemble de résultats a été décrit. Le seul cas où le TYPE passé à bind_col est utilisé dans DBD::ODBC est lorsqu'il s'agit de SQL_NUMERIC ou SQL_DOUBLE, auquel cas DBD::ODBC appellera la méthode sql_type_cast de </p>DBI.
+<p class="Pp">Depuis DBD::ODBC 1.38_1, si vous tentez de changer le type de liaison après que la colonne a déjà été liée, DBD::ODBC émettra un avertissement et ignorera votre changement de type de colonne, par ex.</p>,
+<pre>my $s = $h-&gt;prepare(q/select a from mytable);
+$s-&gt;execute;  # Le type de colonne a été déterminé ici
+my $r;
+$s-&gt;bind_col(1, \$r); # et lié avec le bon type ici
+$s-&gt;execute;
+$s-&gt;bind_col(1, \$r, {TYPE =&gt; SQL_XXX}); # avertissement, type </pre>changé
+<p class="Pp">Fondamentalement, si vous passez un TYPE à bind_col avec DBD::ODBC (autre que SQL_NUMERIC ou SQL_DOUBLE), votre code est probablement </p>incorrect.
+<p class="Pp">Des changements significatifs sont survenus dans DBD::ODBC à la version 1.38_1 pour la liaison des colonnes. Veuillez consulter le fichier </p>Changes.
+<p class="Pp"><i>bind_para</i></p>m
+<p class="Pp">DBD::ODBC suit la spécification DBI pour bind_param, cependant le troisième argument (un type ou une référence à un hash contenant un type) est vaguement défini par DBI. Depuis le pod de DBI </p>:
+<p class="Pp"><i>Le paramètre \%attr peut être utilisé pour suggérer le type de données que le paramètre devrait avoir. C'est rarement </i></p>nécessaire.
+<p class="Pp">En règle générale, ne spécifiez pas de type lors de l'appel à bind_param. Si vous vous contentez d'insérer des données appropriées dans la colonne appropriée, DBD::ODBC fera généralement la bonne chose, surtout si le pilote ODBC prend en charge SQLDescribeParam</p>.
+<p class="Pp">En particulier, n'ajoutez pas simplement un type SQL_DATE parce que vous insérez une date (cela ne fonctionnera pas). La syntaxe correcte en ODBC pour insérer des dates, des heures et des horodatages est </p>:
+<p class="Pp">insert into mytable (mydate, mttime, mytimestamp) values(?,?,?);
+    bind_param(1, "{d 'YYYY-MM-DD'}"); bind_param(2, "{t
+    'HH:MM:SS.MM'}"); # :MM peut être omis et certaines bases de données supportent :MMM
+    bind_param(3, "{ts 'YYYY-MM-DD HH:MM:SS'}")</p>;
+<p class="Pp">Voir
+    <a href='http://technet.microsoft.com/en-US/library/ms190234%28v=SQL.90%29.aspx'>http://technet.microsoft.com/en-US/library/ms190234%28v=SQL.90%29.</a></p>aspx
+<p class="Pp">Les seuls cas où vous pourriez vouloir ajouter un type sont </p>:
+<p class="Pp">1. Si votre pilote ODBC ne prend pas en charge SQLDescribeParam (ou si vous avez dit à DBD::ODBC de ne pas l'utiliser), alors DBD::ODBC insérera chaque paramètre par défaut en tant que chaîne (ce qui est généralement la bonne chose de toute façon). C'est acceptable la plupart du temps, mais ce n'est probablement pas ce que vous voulez lorsque vous insérez des données binaires (utilisez TYPE =&gt; SQL_BINARY)</p>.
+<p class="Pp">2. Si pour une raison quelconque votre pilote décrit le paramètre incorrectement. Il est difficile de décrire un exemple de </p>cela.
+<p class="Pp">3. Si SQLDescribeParam est pris en charge mais échoue, par ex., MS SQL Server a des problèmes avec du SQL comme "select myfunc(?) where 1 = </p>1".
+<p class="Pp">De plus, DBI exporte certains types qui ne sont pas disponibles en ODBC, par ex., SQL_BLOB. Si vous n'êtes pas sûr des types ODBC, regardez vos fichiers d'en-tête ODBC ou cherchez les types valides dans la spécification </p>ODBC.
+<p class="Pp"><i>tables et </i></p>table_info
+<p class="Pp">Ce ne sont pas vraiment des écarts par rapport à la spécification DBI, mais une clarification d'une fonctionnalité facultative de </p>DBI.
+<p class="Pp">DBD::ODBC prend en charge les caractères génériques (% et _) dans les arguments catalog, schema et type. Cependant, vous devez être conscient que si l'attribut d'instruction SQL_ATTR_METADATA_ID est SQL_TRUE, les valeurs sont interprétées comme des identifiants et la casse est ignorée. SQL_ATTR_METADATA_ID a SQL_FALSE par défaut, donc normalement les valeurs sont traitées comme des motifs et la casse est </p>significative.
+<p class="Pp">SQLGetInfo pour SQL_ACCESSIBLE_TABLES peut affecter les tables que vous pouvez </p>lister.
+<p class="Pp">Tous les cas spéciaux listés par DBI (chaînes vides pour tous les arguments sauf un qui est '%') pour catalog, schema et table type sont pris en charge par DBD::ODBC. Cependant, l'utilisation de '%' pour table type dans un appel à la méthode tables ne fonctionne actuellement pas avec DBI jusqu'à 1.631 en raison d'un problème dans </p>DBI.
+<p class="Pp">Bien que DBD::ODBC prenne en charge tous </p>les cas d'utilisation listés par DBI, vo</section>tre pilote ODBC pourrait ne pas le faire.
+<section class="Ss">
+<h2 class="Ss" id='Unicode'><a class='permalink' href='#Unicode'>Unicod</a></h2>e
+<p class="Pp">La spécification ODBC prend en charge les versions en caractères larges (un postfixe 'W') de certaines des API ODBC normales, par ex., SQLDriverConnectW est une version en caractères larges de SQLDriverConnect</p>.
+<p class="Pp">En ODBC sur Windows, les caractères larges sont définis comme des SQLWCHAR (2 octets) et sont en UCS-2 (mais UTF-16 est accepté par certains pilotes maintenant, par ex., MS SQL Server 2012 et le nouveau suffixe de collation _SC qui signifie Supplementary Character Support). Sur non-Windows, les principaux gestionnaires de pilotes que je connaisse ont implémenté les API en caractères larges différemment </p>:
+<dl class="Bl-tag">
+  <dt id="unixODBC"><a class="permalink" href="#unixODBC">unixOD</a></dt>BC
+  <dd>unixODBC imite précisément l'API ODBC de Windows, ce qui signifie que les versions en caractères larges attendent et retournent des caracteurs de 2 octets en UCS-2 ou UTF-16.
+    <p class="Pp">unixODBC reconnaîtra sans problème les pilotes ODBC qui n'ont que les versions ANSI de l'API ODBC et ceux qui ont aussi les versions </p>larges.
+    <p class="Pp">unixODBC permettra à une application ANSI de fonctionner avec un pilote ODBC unicode et vice versa (bien que dans ce dernier cas, vous ne puissiez évidemment pas réellement utiliser </p>unicode).
+    <p class="Pp">unixODBC ne vous empêche pas d'envoyer UTF-8 dans les versions ANSI des API ODBC, mais que cela soit compris par votre pilote ODBC est une autre </p>affaire.
+    <p class="Pp">unixODBC diffère du pilote ODBC Microsoft d'une seule manière en termes de support unicode : il évite les traductions inutiles entre caractères d'un seul et de deux octets lorsqu'une application ANSI utilise un pilote ODBC prenant e</p>n charge unicode, en exigeant que les applications unicode signalent leur intention en appelant d'abord SQLDriverConnectW. Sur Windows, le gestionnaire de pilotes ODBC utilise toujours les versions larges de l'API ODBC dans les pilo</dd>tes ODBC qui fournissent les versions larges, quelles que soient les besoins réels de l'application, et cela résulte en beaucoup de traductions de caractères inutiles lorsque vous avez une application ANSI et un pilote ODBC unicode.
+  <dt id="iODBC"><a class="permalink" href="#iODBC">iOD</a></dt>BC
+  <dd>Les versions en caractère</dd>s larges attendent et reto</dl>urnent des types wchar_t.
+<p class="Pp">DBD::ODBC est parti avec unixODBC, vous ne pouvez donc pas utiliser iODBC avec une version unicode de DBD::ODBC. Cependant, certains pilotes ODBC prennent en charge UTF-8 (bien que je ne sache pas comment ils font cela avec SQLGetData de manière fiable), et vous devriez donc pouvoir utiliser ceux-ci avec DBD::ODBC non construit pour </p>unicode.
+<p class="Pp"><i>Activer et désactiver le support </i></p>Unicode
+<p class="Pp">Sur Windows, le support Unicode est activé par défaut et pour le désactiver vous devrez spécifier <span class="Li">"-nou" </span>à
+    <i>Makefile.PL </i>pour revenir au comportement original de DBD::ODBC avant que tout support Unicode ne soit </p>ajouté.
+<p class="Pp">par ex.</p>,
+<pre>perl Makfile.PL </pre>-nou
+<p class="Pp">Sur les plateformes non-Windows, le support Unicode est désactivé par défaut. Pour l'activer, spécifiez <span class="Li">"-u" </span>à
+    <i>Makefile.PL </i>lorsque vous configurez DBD::</p>ODBC.
+<p class="Pp">par ex.</p>,
+<pre>perl Makefile.PL </pre>-u
+<p class="Pp"><i>Unicode - Qu'est-ce qui est pris en charge </i></p>?
+<p class="Pp">Depuis la version 1.17, DBD::ODBC a le support unicode suivant </p>:
+<dl class="Bl-tag">
+  <dt>SQL (introduit dans 1.</dt>16_2)
+  <dd>Les chaînes unicode dans les appels aux méthodes
+      <span class="Li">"prepare" </span>et
+      <span class="Li">"do" </span>sont prises en charge tant que
+      l' <span class="Li">attribut </span>"odbc_execdirect" n'est pas
+      </dd>utilisé.
+  <dt id="unicode"><a class="permalink" href="#unicode">chaînes de connexion
+    unicode (introduites dans 1.</a></dt>16_2)
+  <dd>Les chaînes de connexion unicode sont prises en charge mais vous aurez besoin d'un DBI postérieur à 1.607 pour </dd>cela.
+  <dt id="column"><a class="permalink" href="#column">noms de </a></dt>colonnes
+  <dd>Les noms de colonnes unicode sont </dd>retournés.
+  <dt id="bound"><a class="permalink" href="#bound">colonnes liées (introduites dans
+    1.</a></dt>15)
+  <dd>Si le SGBD rapporte que la colonne est un caractère large (SQL_Wxxx), elle sera liée en tant que caractère large et toutes les données retournées seront converties de UTF-16 en UTF-8 et le drapeau UTF-8 sera alors défini sur les </dd>données.
+  <dt id="bound~2"><a class="permalink" href="#bound~2">paramètres
+    </a></dt>liés
+  <dd>Si les scalaires perl que vous liez aux paramètres sont marqués UTF-8 et que le SGBD rapporte le type comme étant un type large ou que vous liez le paramètre en tant que type large, ils seront convertis en caractères larges et liés en tant que </dd>tels.
+  <dt id="metadata"><a class="permalink" href="#metadata">appels de métadonnées comme
+    table_info, </a></dt>column_info
+  <dd>Depuis DBD::ODBC 1.32_3, le</dd>s appels de métadonnées acc</dl>eptent les chaînes unicode.
+<p class="Pp">Depuis la version 1.16_4, le type de liaison de paramètre par défaut est SQL_WVARCHAR pour les versions unicode de DBD::ODBC. Cela n'affecte que les pilotes ODBC qui ne prennent pas en charge SQLDescribeParam et seulement si vous ne définissez pas spécifiquement un type SQL sur l'appel de méthode </p>bind_param.
+<p class="Pp">Le support Unicode ci-dessus a été testé avec les pilotes SQL Server, Oracle 9.2+ et Postgres sur Windows et divers pilotes ODBC Easysoft sur </p>UNIX.
+<p class="Pp"><i>Unicode - Qu'est-ce qui n'est pas pris en charge </i></p>?
+<p class="Pp">Vous ne pouvez pas utiliser de noms de paramètres unicode, par ex.</p>,
+<pre>select * from table where column = :unicode_param_nam</pre>e
+<p class="Pp">Vous ne pouvez pas utiliser de chaînes unicode dans les appels à prepare si vous définissez l'attribut odbc_execdirect</p>.
+<p class="Pp">Vous ne pouvez pas utiliser le gestionnaire de pilotes iODBC avec DBD::ODBC construit pour </p>unicode.
+<p class="Pp"><i>Unicode - Mises en </i></p>garde
+<p class="Pp">Pour le support Unicode sur n'importe quelle plateforme en Perl, vous aurez besoin d'au moins Perl 5.8.1 - désolé mais c'est ainsi que les choses sont avec </p>Perl.
+<p class="Pp">Le support Unicode dans DBD::ODBC attend qu'un WCHAR fasse 2 octets (comme c'est le cas sur Windows et comme la spécification ODBC le suggère). Tant qu'ODBC ne spécifie pas un autre support Unicode, il n'est pas prévu que cela change. Sur UNIX, il y a quelques gestionnaires de pilotes ODBC différents. Je n'ai testé que le gestionnaire de pilotes unixODBC (<a href='http://www.unixodbc.org'>http://www.unixodbc.org) avec </a>le support Unicode et il a été construit avec des valeurs par défaut qui définissent WCHAR comme faisant 2 </p>octets.
+<p class="Pp">Je crois que le gestionnaire de pilotes iODBC attend que les caractères larges soient des types wchar_t (qui font généralement 4 octets) et par conséquent DBD::ODBC ne fonctionnera pas avec iODBC lorsqu'il est construit pour </p>unicode.
+<p class="Pp">Le pilote ODBC doit attendre que les données unicode spécifiées dans SQLBindParameter et SQLBindCol soient en UTF-16 avec l'endianness locale. De même, dans les appels à SQLPrepareW, SQLDescribeColW et SQLDriverConnectW</p>.
+<p class="Pp">Vous devez être conscient qu'une fois le support Unicode activé, il affecte un certain nombre de méthodes DBI (certaines auxquelles vous ne vous attendriez peut-être pas). Par exemple, lors de l'énumération des tables, colonnes etc., certains pilotes (p. ex. Microsoft SQL
+    Server) signaleront les types de colonnes comme des types larges même si les chaînes
+    correspondent en réalité à l'ASCII 7 bits. Par conséquent, il y a un surcoût pour
+    récupérer les données de cette colonne car 2 octets par caractère seront transmis
+    (contre 1 lorsque le support Unicode n'est pas activé) et ces chaînes seront
+    converties en UTF-8 mais finiront par correspondre (dans la plupart des cas) à l'ASCII
+    7 bits, de sorte qu'une grande partie du travail de conversion a été effectué pour
+    rien. Si vous n'avez pas de noms de tables et de colonnes Unicode ou de données de
+    colonnes Unicode dans vos tables, il est préférable de désactiver le support </p>Unicode.
+<p class="Pp">Je ne suis actuellement pas sûr que le traitement ChopBlanks sur les chaînes Unicode
+    fonctionne correctement sur UNIX. À défaut, la construction L' ' dans dbdimp.c
+    pourrait ne pas fonctionner avec tous les compilateurs UNIX. Les rapports de problèmes
+    et les correctifs sont les </p>bienvenus.
+<p class="Pp"><i>Implémentation Unicode dans DBD::</i></p>ODBC
+<p class="Pp">DBD::ODBC utilise les versions à caractères larges de l'API ODBC et le
+    type ODBC SQL_WCHAR pour prendre en charge Unicode dans </p>Perl.
+<p class="Pp">Les caractères larges renvoyés par le pilote ODBC seront convertis en
+    UTF-8 et les scalaires perl auront le drapeau utf8 défini (en utilisant
+    sv_utf8_decode)</p>.
+<p class="Pp"><b>IMPORTAN</b></p>T
+<p class="Pp">Les scalaires Perl qui sont en UTF-8 et qui sont envoyés via l'API ODBC
+    seront convertis en UTF-16 et transmis aux API larges ODBC ou signalés comme
+    SQL_WCHAR (p. ex., dans le cas des colonnes liées). Les données récupérées qui sont
+    des caractères larges sont converties de UTF-16 en UTF-8. Cependant, vous devez
+    réaliser que la plupart des pilotes ODBC ne prennent pas en charge UTF-16, ODBC parle
+    seulement de caractères larges de 2 octets et UCS-2 et UTF-16 ne sont pas identiques.
+    UCS-2 ne prend en charge que les caractères Unicode du premier plan (le plan multilingue
+    de base ou BMP) (points de code U+0000 à U+FFFF), les caractères les plus fréquemment
+    utilisés. Alors pourquoi DBD::ODBC encode-t-il actuellement en UTF-16 ? Pour environ
+    97% des caractères Unicode dans la plage 0-0xFFFF, UCS-2 et UTF-16 sont exactement les
+    mêmes (et là où ils diffèrent, il n'y a pas de caractère Unicode valide car la plage
+    U+D800 à U+DFFF est réservée à une utilisation uniquement en tant que paires de
+    substituants). Comme l'API ODBC utilise actuellement UCS-2, elle ne prend pas en charge
+    les caractères Unicode avec des points de code supérieurs à 0xFFFF (si vous en savez
+    plus, j'aimerais avoir de vos nouvelles). Cependant, parce que DBD::ODBC utilise
+    l'encodage UTF-16, vous pouvez toujours insérer des caractères Unicode supérieurs à
+    0xFFFF dans votre base de données et les récupérer correctement, mais ils peuvent ne pas
+    être traités comme un seul caractère Unicode dans votre base de données, p. ex., un
+    "select length(a_column) from table" avec un seul caractère Unicode supérieur à 0xFFFF
+    peut renvoyer 2 et non 1, vous ne pouvez donc pas utiliser les fonctions de base de
+    données sur ces données comme upper/lower/length etc. mais vous pouvez au moins sauver
+    les données dans votre base de données et les </p>récupérer.
+<p class="Pp">Lorsqu'il est compilé pour Unicode, DBD::ODBC appellera toujours
+    SQLDriverConnectW (et non SQLDriverConnect) même si a) votre chaîne de connexion
+    n'est pas Unicode b) vous n'avez pas un DBI postérieur à 1.607, car
+    unixODBC nécessite que SQLDriverConnectW soit appelé si vous voulez appeler d'autres
+    API ODBC Unicode plus tard. Par conséquent, si vous compilez pour Unicode et passez
+    des chaînes ASCII à la méthode connect, elles seront converties en UTF-16 et
+    transmises à SQLDriverConnectW. Cela ne devrait faire aucune différence réelle pour
+    Perl n'utilisant pas de chaînes de connexion </p>Unicode.
+<p class="Pp">Vous aurez besoin d'un DBI postérieur à 1.607 pour prendre en charge les chaînes de
+    connexion Unicode car jusqu'à après 1.607, il n'y avait aucun moyen pour DBI de passer
+    des chaînes Unicode au </p>DBD.
+<p class="Pp"><i>Unicode et </i></p>Oracle
+<p class="Pp">Vous devez définir les variables d'environnement
+    <span class="Li">"NLS_NCHAR=AL32UTF8" </span>et
+    <span class="Li">"NLS_LANG=AMERICAN_AMERICA.AL32UTF8" </span>(ou
+    tout autre paramètre de langue se terminant par
+    <span class="Li">".AL32UTF8") </span>avant de charger DBD::ODBC pour
+    faire en sorte qu'Oracle renvoie des données Unicode. (Voir aussi "Oracle and Unicode"
+    dans le POD de DBD::Oracle.</p>)
+<p class="Pp">Sur Windows, en utilisant le pilote ODBC Oracle, vous devez activer le
+    <b>contourneme</b>nt <b>Force SQL_WCHAR </b>support dans la configuration de la source de données
+    pour faire en sorte qu'Oracle renvoie Unicode à une application non Unicode.
+    Alternativement, vous pouvez inclure <span class="Li">"FWC=T" </span>dans
+    votre chaîne de </p>connexion.
+<p class="Pp">Sauf si vous devez utiliser ODBC, si vous voulez la prise en charge Unicode avec
+    Oracle, il est préférable d'utiliser DBD::</p>Oracle.
+<p class="Pp"><i>Unicode et </i></p>PostgreSQL
+<p class="Pp">Voir le paramètre odbc_utf8_on pour traiter toutes les chaînes comme </p>utf8.
+<p class="Pp">Certains tests de la version originale de DBD::ODBC 1.13 échouent avec PostgreSQL
+    8.0.3, vous ne voudrez donc peut-être pas utiliser DBD::ODBC pour vous connecter à
+    PostgreSQL 8.0.</p>3.
+<p class="Pp">Les tests Unicode échouent car PostgreSQL ne semble donner aucun indice
+    sur Unicode, toutes les données sont donc traitées comme non </p>Unicode.
+<p class="Pp">Sauf si vous devez utiliser ODBC, si vous voulez la prise en charge Unicode avec
+    Postgres, il est préférable d'utiliser DBD::Pg car il a un attribut spécifique nommé <span class="Li">"pg_enable_utf8" pour </span>activer la prise en
+    charge </p>Unicode.
+<p class="Pp"><i>Unicode et pilotes ODBC </i></p>Easysoft
+<p class="Pp">Nous avons testé les pilotes Easysoft SQL Server, Oracle et ODBC Bridge
+    avec DBD::ODBC compilé pour Unicode. Tous fonctionnent comme décrit sans
+    modification sauf pour le pilote Oracle, vous devrez définir votre NLS_LANG
+    comme mentionné </p>ci-dessus.
+<p class="Pp"><i>Unicode et autres pilotes </i></p>ODBC
+<p class="Pp">Si vous avez un pilote ODBC prenant en charge</p> Unicode et qu'il fonctionne avec
+    DBD::ODB</section>C, faites-le moi savoir et je l'inclurai ici.
+<section class="Ss">
+<h2 class="Ss" id='ODBC_Support_in_ODBC_Drivers'><a class='permalink' href='#ODBC_Support_in_ODBC_Drivers'>ODBC   Support dans les pilotes </a></h2>ODBC
+<p class="Pp"><i>Pilotes sans SQLDescribePara</i></p>m
+<p class="Pp">Certains pilotes ne prennent pas en charge l'API
+    <span class="Li">"SQLDescribeParam" </span>ODBC (p. ex.,
+    Microsoft Access, FreeTDS)</p>.
+<p class="Pp">DBD::ODBC utilise l'API
+    <span class="Li">"SQLDescribeParam" </span>lorsque des paramètres sont
+    liés à votre SQL pour trouver les types des paramètres. Si le pilote ODBC
+    ne prend pas en charge <span class="Li">"SQLDescribeParam",
+</span>    DBD::ODBC suppose que les paramètres sont de type
+    <span class="Li">"SQL_VARCHAR" </span>ou
+    <span class="Li">"SQL_WVARCHAR" </span>(selon que
+    DBD::ODBC est compilé pour Unicode ou non et si votre paramètre est des données
+    Unicode). Dans tous les cas, si vous liez un paramètre et spécifiez un type SQL, cela
+    remplace tout type que DBD::ODBC aurait </p>choisi.
+<p class="Pp">Pour les pilotes ODBC qui ne prennent pas en charge
+    <span class="Li">"SQLDescribeParam", </span>le comportement par défaut dans
+    DBD::ODBC peut ne pas être celui que vous voulez. Pour changer le type de liaison de
+    paramètre par défaut, définissez "odbc_default_bind_type". Si, après cela, vous avez
+    du SQL où vous devez varier les types de paramètres utilisés, ajoutez le type SQL à la
+    fin de la <span class="Li">méthode</span> "bind_</p>param".
+<pre>use DBI qw(:sql_types);
+$h = DBI-&gt;connect;
+# définir le type de paramètre lié par défaut
+$h</pre>-&gt;{odbc_default_bind_type} = SQL_VARCHAR;
+# lier un paramètre avec un type spécifique
+$s = </section>$h-&gt;prepare(q/insert into mytable values(?)/);
+$s-&gt;bind_param(1, "\x{263a}", SQL_WVARCHAR);
+<section class="Ss">
+<h2 class="Ss" id='MS_SQL_Server_Query_Notification'><a class='permalink' href='#MS_SQL_Server_Query_Notification'>MS   SQL Server Query </a></h2>Notification
+<p class="Pp">Les notifications de requête ont été introduites dans SQL Server 2005 et
+    SQL Server Native Client. Les notifications de requête permettent aux applications d'être
+    notifiées lorsque les données ont </p>changé.
+<p class="Pp">DBD::ODBC prend en charge les notifications de requête avec MS SQL Server en utilisant les
+    attributs de préparation supplémentaires odbc_qn_msgtxt, odbc_qn_options et
+    odbc_qn_timeout. Lorsque vous passez des valeurs appropriées pour ces attributs à la
+    méthode prepare, DBD::ODBC fera les appels SQLSetStmtAttr appropriés
+    après que l'instruction a été </p>allouée.
+<p class="Pp">C'est au-delà de la portée de ce document de fournir un tutoriel sur
+    la façon de faire cela, mais voici quelques notes qui pourraient vous aider à </p>démarrer.
+<p class="Pp">Sur SQL </p>Server
+<pre>create database MyDatabase
+ALTER DATABASE MyDatabase SET ENABLE_BROKER
+use MyDatabase
+CREATE TABLE QNtest (a int NOT NULL PRIMARY KEY,
+                     b nchar(5) NOT NULL,
+                     c datetime NOT NULL)
+INSERT QNtest (a, b, c) SELECT 1, 'ALFKI', '19991212'
+CREATE QUEUE myQueue
+CREATE SERVICE myService ON QUEUE myQueue
+Voir L&lt;http://technet.microsoft.com/en-us/library/ms175110%28v=SQL.105%29.</pre>aspx&gt;
+<p class="Pp">Vous devez définir ces permissions SQL Server sauf si l'abonné
+    est un sysadmin </p>:
+<pre>GRANT RECEIVE ON QueryNotificationErrorsQueue TO "&lt;login-for-subscriber&gt;"
+GRANT SUBSCRIBE QUERY NOTIFICATIONS TO "&lt;login-for-subscriber&gt;</pre>"
+<p class="Pp">Pour vous abonner à la notification de requête pour cet exemple </p>:
+<pre># Préparer l'instruction.
+# C'est le SQL dont vous voulez savoir si le résultat change plus tard
+my $sth = $dbh-&gt;prepare(q/SELECT a, b, c FROM dbo.QNtest WHERE a = 1/,
+                        {odbc_qn_msgtxt =&gt; 'Message text',
+                         odbc_qn_options =&gt; 'service=myService',
+                         odbc_qn_timeout=&gt; 430000});
+# Récupérer et afficher la valeur du jeu de résultats.
+while ( my @row = $sth-&gt;fetchrow_array ) {
+   print "@row\n";
+}
+# select * from sys.dm_qn_subscriptions renverra un enregistrement maintenant que vous êtes </pre>abonné
+<p class="Pp">Pour attendre la notification </p>:
+<pre># Éviter l'erreur "String data, right truncation" lors de la récupération
+# du message.
+$dbh-&gt;{LongReadLen} = 800;
+# Cette requête génère un résultat vous indiquant quelle requête a changé
+# Elle se bloquera ju</pre>squ'au délai d'attente ou que la requête change
+my $sth = $dbh-&gt;prepare(q/WAITFOR (RECEIVE * FROM MyQueue)/);
+$sth-&gt;execute();
+# entre-temps quelqu'un fait UPDATE dbo.QNtest SET c = '19981212' WHERE a = 1
+# Ré</section>cupérer et afficher la valeur du jeu de résultats.
+while ( my @row = $sth-&gt;fetchrow_array ) {
+   print "@row\n";
+}
+# Vous devez maintenant comprendre le résultat et regarder pour décider quelle requête a changé
+<section class="Ss">
+<h2 class="Ss" id='Version_Control'><a class='permalink' href='#Version_Control'>Contrôle   de </a></h2>version
+<p class="Pp">Le code source de DBD::ODBC était sous contrôle de version sur svn.perl.org
+    jusqu'en avril 2013 lorsque svn.perl.org a été fermé et il est maintenant sur github
+    à <a href='https://github.com/perl5-dbi/DBD-ODBC.git'>https://gi</a>thub.com/pe</p>rl5-dbi/DBD</section>-ODBC.git.
+<section class="Ss">
+<h2 class="Ss" id='Contributing'><a class='permalink' href='#Contributing'>Contribue</a></h2>r
+<p class="Pp">Il existe plusieurs façons dont vous pouvez aider au développement et à la
+    maintenance de ce module </p>:
+<dl class="Bl-tag">
+  <dt id="Submitting"><a class="permalink" href="#Submitting">Soumettre
+    des </a></dt>correctifs
+  <dd>Veuillez m'envoyer une demande de pull git ou un diff unifié par email.
+    <p class="Pp">Veuillez essayer d'inclure un te</p>st qui démontre que le
+        </dd>correctif/changement fonctionne.
+  <dt id="Reporting"><a class="permalink" href="#Reporting">Signaler
+    les </a></dt>installations
+  <dd>Installez CPAN::Reporter et signalez vos installations. C'est facile à faire -
+      voir "CPAN Testers </dd>Reporting".
+  <dt id="Report"><a class="permalink" href="#Report">Signaler des </a></dt>bugs
+  <dd>Si vous trouvez ce que vous pensez être un bug, entrez-le dans le
+      <a href='http://rt.cpan.org/Dist/Display.html?Name=DBD-ODBC'>système http://rt.cpan.org/Dist/Display.html?</a>Name=DBD-ODBC. Si
+      possible, incluez du code qui reproduit le problème, y compris tout schéma
+      requis et les versions des logiciels que vouse utilisant.
+    <p class="Pp">Si vous n'êtes pas sûr d'avoir trouvé un b</p>ug, signalez-le
+        quand même ou post</dd>ez-le sur la liste de diffusion dbi-users.
+  <dt id="pod"><a class="permalink" href="#pod">commentaires et
+    corrections </a></dt>pod
+  <dd>Si vous trouvez des inexactitudes dans le pod de DBD::ODBC ou si vous avez un commentaire que vous
+      pensez devoir être ajouté, rendez-vous sur <a href='http://annocpan.org'>http://annocpan.org et </a>soumettez-les
+      là-bas. Je reçois un e-mail pour chaque commentaire ajouté et je passerai chacun
+      d'entre eux en revue et appliquerai les modifications correspondantes à la </dd>documentation.
+  <dt id="Review"><a class="permalink" href="#Review">Évaluer DBD::</a></dt>ODBC
+  <dd>Ajoutez votre évaluation de DBD::ODBC sur <a href='http://cpanratings.perl.org'>http://cpanratings.perl.</a>org.
+    <p class="Pp">Si vous êtes membre sur ohloh, ajoutez votre évaluation ou enregistrez
+        votre utilisation de DBD::ODBC sur
+        <a href='http://www.ohloh.net/projects/perl_dbd_odbc'>http://www.ohloh.net/projects/perl_dbd</a>_</p>od</dd>bc.
+  <dt id="submit"><a class="permalink" href="#submit">soumettre des cas de </a></dt>test
+  <dd>La plupart des DBD sont construits contre une seule bibliothèque client pour la base de données.
+    <p class="Pp">Contrairement aux autres DBD, DBD::ODBC fonctionne avec de nombreux pilotes ODBC
+        différents. Bien qu'ils devraient tous être écrits en tenant compte de la spécification ODBC,
+        les pilotes ont des bugs et à certains endroits la spécification est
+        ouverte à interprétation. En conséquence, lorsque des modifications sont appliquées à
+        DBD::ODBC, il est très facile de casser quelque chose dans un pilote </p>ODBC.
+    <p class="Pp">Ce qui aide énormément à identifier les problèmes dans les nombreuses
+        combinaisons de DBD::ODB</p>C et de pilotes ODBC est une grande suite de tests. J'apprécierais
+        grandement tout cas de test </dd>et en particulier tout nouveau cas
+        de test pour des bases de données autres que MS SQL Server.
+  <dt id="Test"><a class="permalink" href="#Test">Tester DBD::</a></dt>ODBC
+  <dd>J'ai beaucoup de mal à décider quand passer une version de développement à une
+      version officielle car je reçois peu de rapports de test pour les versions de développement.
+      Ce qui arrive souvent, c'est que j'appelle des testeurs sur diverses listes, j'en obtiens quelques-uns et
+      ensuite je suis submergé de demandes pour faire une version officielle. Puis je fais
+      une version officielle et plein de rt apparaissent d'un coup et le cycle
+      recommence.
+    <p class="Pp">DBD::ODBC, par sa nature même, fonctionne avec de nombreux pilotes ODBC et
+        il m'est impossible</p> de tous les avoir et de les tester tous (ce qui diffère des
+        autres DBD). Si vous dépendez de </dd>DBD::ODBC, vous devriez être intéressé par les nouvelles
+        versions et si vous m'envoyez votre a</dl>dresse e-mail en suggérant que vous êtes
+        prêt à faire partie du réseau de test de DBD::ODBC, j</section>e vous créditerai
+        dans le fichier Changes et peut-être dans le fichier principal de DBD::ODBC.
+<section class="Ss">
+<h2 class="Ss" id='CPAN_Testers_Reporting'><a class='permalink' href='#CPAN_Testers_Reporting'>Rapports des
+        CPAN   </a></h2>Testers
+<p class="Pp">S'il vous plaît, s'il vous plaît, s'il vous plaît (est-ce assez), envisagez d'installer
+    CPAN::Reporter afin que lorsque vous installez des modules perl, un rapport de
+    succès ou d'échec de l'installation puisse être envoyé aux cpan testers. De cette façon,
+    les auteurs de modules 1) reçoivent un retour sur le fait qu'un module est en cours d'installation
+    2) peuvent savoir s'il y a des problèmes d'installation. De plus, d'autres personnes
+    comme vous peuvent consulter les rapports de test pour voir à quel point ils sont couronnés de succès avant
+    de choisir la version d'un module à </p>installer.
+<p class="Pp">Consultez ce guide pour savoir comment commencer à envoyer des rapports de test :
+    <a href='http://wiki.cpantesters.org/wiki/QuickStart'>http://wiki.cpantesters.org/wiki/QuickSta</a>r</p>t</section>.
+<section class="Ss">
+<h2 class="Ss" id='Others/todo?'><a class='permalink' href='#Others/todo?'>Autres/todo </a></h2>?
+<p class="Pp">Niveau </p>2
+<pre>SQLColumnPrivileges
+SQLProcedure</pre>Columns
+SQLProcedures
+SQLTablePr</section>ivileges
+SQLDrivers
+SQLNativeSql
+<section class="Ss">
+<h2 class="Ss" id='Random_Links'><a class='permalink' href='#Random_Links'>Liens
+    </a></h2>aléatoires
+<p class="Pp">Ceux-ci ont besoin d'être triés et annotés. Certains ne sont pertinents
+    que pour les développeurs </p>ODBC.
+<p class="Pp">Vous pouvez trouver DBD::ODBC sur ohloh maintenant à </p>:
+<p class="Pp"><a href='http://www.ohloh.net/projects/perl_dbd_odbc'>http://www.ohloh.net/projects/perl_dbd_odb</a></p>c
+<p class="Pp">Si vous utilisez ohloh et DBD::ODBC, dites que vous l'utilisez et </p>notez-le.
+<p class="Pp">Il existe un bon moteur de recherche pour les différentes listes de diffusion Perl DBI aux
+    URL suivantes </p>:
+<p class="Pp"><a href='http://perl.markmail.org/search/list:org.perl.dbi-users'>http://perl.markmail.org/search/list:org.perl.</a></p>dbi-users
+<p class="Pp"><a href='http://perl.markmail.org/search/list:org.perl.dbi-dev'>http://perl.markmail.org/search/list:org.perl.</a></p>dbi-dev
+<p class="Pp"><a href='http://perl.markmail.org/search/list:org.perl.dbi-announce'>http://perl.markmail.org/search/list:org.perl.</a></p>dbi-announce
+<p class="Pp"><a href='http://www.syware.com'>http://www.syware.</a></p>com
+<p class="Pp"><a href='http://www.microsoft.com/odbc'>http://www.microsoft.</a></p>com/odbc
+<p class="Pp">Pour les utilisateurs de Linux/Unix, des gestionnaires de pilotes ODBC compatibles peuvent être trouvés
+    à </p>:
+<p class="Pp"><a href='http://www.unixodbc.org'>http://www.unixodbc.org </a>(sources et rpms de </p>unixODBC)
+<p class="Pp"><a href='http://www.iodbc.org'>http://www.iodbc.org </a>(sources du gestionnaire de pilotes </p>iODBC)
+<p class="Pp">Pour les utilisateurs de Linux/Unix, vous pouvez consulter les sites suivants pour des pilotes ODBC
+    et des ponts </p>:
+<p class="Pp"><a href='http://www.easysoft.com'>http://www.easysoft.</a></p>com
+<p class="Pp"><a href='http://www.openlinksw.com'>http://www.openlinksw.</a></p>com
+<p class="Pp"><a href='http://www.datadirect.com'>http://www.datadirect.</a></p>com
+<p class="Pp"><a href='http://www.atinet.com'>http://</a></p>www.ati</section>net.com
+<section class="Ss">
+<h2 class="Ss" id='Some_useful_tutorials:'><a class='permalink' href='#Some_useful_tutorials:'>Quelques tutoriels utiles </a></h2>:
+<p class="Pp">Déboguer Perl DBI </p>:
+<p class="Pp"><a href='http://www.easysoft.com/developer/languages/perl/dbi-debugging.html'>http://www.easysoft.com/developer/languages/perl/dbi-debugging.</a></p>html
+<p class="Pp">Activer le support ODBC en Perl avec Perl DBI et DBD::ODBC </p>:
+<p class="Pp"><a href='http://www.easysoft.com/developer/languages/perl/dbi_dbd_odbc.html'>http://www.easysoft.com/developer/languages/perl/dbi_dbd_odbc.</a></p>html
+<p class="Pp">Tutoriel Perl DBI/DBD::ODBC Partie 1 - Pilotes, sources de données et
+    connexion </p>:
+<p class="Pp"><a href='http://www.easysoft.com/developer/languages/perl/dbd_odbc_tutorial_part_1.html'>http://www.easysoft.com/developer/languages/perl/dbd_odbc_tutorial_part_1.</a></p>html
+<p class="Pp">Tutoriel Perl DBI/DBD::ODBC Partie 2 - Introduction à la récupération
+    de données depuis votre base de données </p>:
+<p class="Pp"><a href='http://www.easysoft.com/developer/languages/perl/dbd_odbc_tutorial_part_2.html'>http://www.easysoft.com/developer/languages/perl/dbd_odbc_tutorial_part_2.</a></p>html
+<p class="Pp">Tutoriel Perl DBI/DBD::ODBC Partie 3 - Connecter Perl sur UNIX ou
+    Linux à Microsoft SQL Server </p>:
+<p class="Pp"><a href='http://www.easysoft.com/developer/languages/perl/sql_server_unix_tutorial.html'>http://www.easysoft.com/developer/languages/perl/sql_server_unix_tutorial.</a></p>html
+<p class="Pp">Perl DBI - Mettez vos données sur le Web </p>:
+<p class="Pp"><a href='http://www.easysoft.com/developer/languages/perl/tutorial_data_web.html'>http://www.easysoft.com/developer/languages/perl/tutorial_data_web.</a></p>html
+<p class="Pp">Instructions actives multiples (MAS) et DBD::</p>ODBC
+<p class="Pp"><a href='http://www.easysoft.com/developer/languages/perl/multiple-active-statements.html'>http://www.easysoft.com/developer/languages/perl/multiple-active-statements.</a></p>html
+<p class="Pp">ODBC 64 </p>bits
+<p class="Pp"><a href='http://www.easysoft.com/developer/interfaces/odbc/64-bit.html'>http://www.easysoft.com/developer/interfaces/odbc/64-bit.</a></p>html
+<p class="Pp">Comment insérer des caractères Unicode supplémentaires dans SQL Server
+    depuis Perl </p>?
+<p class="Pp"><a href='http://www.easysoft.com/support/kb/kb01043.html'>http://www.easysoft.com/support/kb/kb01043.</a></p>html
+<p class="Pp">Quelques problèmes Unicode courants et leurs solutions avec Perl DBD::ODBC
+    et MS SQL </p>Server
+<p class="Pp"><a href='http://www.easysoft.com/developer/languages/perl/sql-server-unicode.html'>http://www.easysoft.com/developer/languages/perl/sql-server-unicode.</a></p>html
+<p class="Pp">et une version peut-être maintenue plus à jour </p>:
+<p class="Pp"><a href='https://github.com/mjegh/dbd_odbc_sql_server_unicode/blob/master/common_problems.pod'>https://github.com/mjegh/dbd_odbc_sql_server_unicode/blob/master/common_problems.</a></p>pod
+<p class="Pp">Comment utiliser les notifications de requête SQL Server depuis Linux et
+  UNIX </p>?
+<p class="Pp"><a href='http://www.easysoft.com/support/kb/kb01069.html'>http://www.easys</a></p>oft.com/support</section>/kb/kb01069.html
+<section class="Ss">
+<h2 class="Ss" id='Frequently_Asked_Questions'><a class='permalink' href='#Frequently_Asked_Questions'>Questions
+    </a></h2>fréquentes
+<p class="Pp">Les questions fréquentes se trouvent désormais dans DBD::ODBC::FAQ. Lancez
+    <span class="Li">"perldoc </span>DBD::ODB</p>C::FAQ" p</section>our les </section>afficher.
+<section class="Sh">
+<h1 class="Sh" id='CONFIGURATION_AND_ENVIRONMENT'><a class='permalink' href='#CONFIGURATION_AND_ENVIRONMENT'>CONFIGURATION   ET </a></h1>ENVIRONNEMENT
+<p class="Pp">Vous devriez consulter la docum</p>entation du gestionnaire de pilo</section>tes ODBC
+    que vous utilisez.
+<section class="Sh">
+<h1 class="Sh" id='DEPENDENCIES'><a class='permalink' href='#DEPENDENCIES'>DÉPENDANCE</a></h1>S
+<p class="Pp">DB</p>I
+<p class="Pp">Test</p>::Si</section>mple
+<section class="Sh">
+<h1 class="Sh" id='INCOMPATIBILITIES'><a class='permalink' href='#INCOMPATIBILITIES'>INCOMPATIBILITÉ</a></h1>S
+<p class="Pp">Aucun</p>e co</section>nnue.
+<section class="Sh">
+<h1 class="Sh" id='BUGS_AND_LIMITATIONS'><a class='permalink' href='#BUGS_AND_LIMITATIONS'>BUGS   ET </a></h1>LIMITATIONS
+<p class="Pp">Aucun connu autres que les écarts par rapport à la spécification DBI
+    mentionnés ci-dessus dans « Écarts par rapport à la spécification DBI »</p>.
+<p class="Pp">Veuillez me les signaler via le système CPAN RT. Voir
+    <a href='http://rt.cpan.org/'>http://rt.</a>cpan.org/ </p>pour plus d</section>e détails.
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTEU</a></h1>R
+<p class="Pp">Tim </p>Bunce
+<p class="Pp">Jeff </p>Urlwin
+<p class="Pp">Thomas K. </p>Wenrich
+<p class="Pp">Marti</p>n J. </section>Evans
+<section class="Sh">
+<h1 class="Sh" id='LICENSE_AND_COPYRIGHT'><a class='permalink' href='#LICENSE_AND_COPYRIGHT'>LICENCE   ET DROITS </a></h1>D'AUTEUR
+<p class="Pp">Ce programme est un logiciel libre ; vous pouvez le redistribuer et/ou
+    le modifier selon les mêmes termes que Perl lui-même. Voir perlartistic. Ce
+    programme est distribué dans l'espoir qu'il sera utile, mais SANS AUCUNE
+    GARANTIE ; sans même la garantie implicite de COMMERCIALISATION ou de CONFORMITÉ À
+    UNE UTILISATION </p>PARTICULIÈRE.
+<p class="Pp">Des parties de ce logiciel sont Copyright T</p>im Bunce, Thomas K.
+    Wenrich, Jeff Urlwi</section>n et Martin J. Evans - voir le code source.
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR   </a></h1>AUSSI
+<p class="Pp">DB</p>I
+<p class="Pp">DBD::ODBC peut être utilisé avec de nombreux pilotes ODBC pour de nombreuses bases de données
+    différentes. Si vous voulez un DBD générique pour plusieurs bases de données, DBD::ODBC est
+    probablement fait pour vous. Si vous n'accédez qu'à une seule base de données, vous pourriez
+    vouloir chercher DBD::ma_base_de_données (par exemple DBD::Oracle) car les DBD spécifiques à une base de données
+    ont souvent plus de fonctionnalités</p>.
+<p class="Pp">DBIx::LogAny ou DBIx::Log4perl</p> pour journaliser les appels d</section>e méthodes DBI, le SQL,
+    le</div>s paramètres et les résultats.
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07</td>-14
+    <td class="foot-os">per</td>l v</tr>5.4</table>2.0secti</article>on&gt;
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le </p>paquet :
+    <dl>
+        <dt>Nom du </dt>paquet :
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/perl-dbd-odbc/">extra/perl-db</a></dd>d-odbc
+        <dt>Version </dt>:
+        <dd>1.</dd>61-6
+        <dt>Amont </dt>:
+        <dd><a href="https://search.cpan.org/dist/DBD-ODBC/">https://search.cpan.</a></dd>org/dist/DBD-ODBC/
+        <dt>Licences </dt>:
+        <dd>GPL, </dd>PerlArtistic
+        <dt>Manuels </dt>:
+        <dd><a href="/listing/extra/perl-dbd-odbc/">/listin</a></dd>g/extra</dl>/perl-db</section>d-odbc/
+
+<details>
+    <summary>Table des </summary>matières
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">N</a></li>OM
+        
+            <li><a href="#VERSION">VE</a></li>RSION
+        
+            <li><a href="#WARNING">AVE</a></li>RTISSEMENT
+        
+            <li><a href="#SYNOPSIS">RÉ</a></li>SUMÉ
+        
+            <li><a href="#DESCRIPTION">DESC</a></li>RIPTION
+        
+            <li><a href="#CONFIGURATION_AND_ENVIRONMENT">CONFIGURATION ET </a></li>ENVIRONNEMENT
+        
+            <li><a href="#DEPENDENCIES">DÉPE</a></li>NDANCES
+        
+            <li><a href="#INCOMPATIBILITIES">INCOMPA</a></li>TIBILITÉS
+        
+            <li><a href="#BUGS_AND_LIMITATIONS">BUGS ET </a></li>LIMITATIONS
+        
+            <li><a href="#AUTHOR">A</a></li>UTEUR
+        
+            <li><a href="#LICENSE_AND_COPYRIGHT">LICENCE ET </a></li>DROITS D'AUTEUR
+        
+            <li><a href="#SEE_ALSO">VO</a></li>IR</ul> A</nav>US</details>SI
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/DBD::ODBC.3pm.en.txt">t</a>xt, 
+        
+            <a href="/man/DBD::ODBC.3pm.en.raw">b</a></p>r</nav>u</aside></main>t
+        <footer>
+            de manuel.
+            <p>Le site web est disponible selon les termes de la <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0
+               licenc</a>e, à l'exception du contenu d</p>es pages de manuel, qui poss</footer>ède sa propre licence
+       </body>        spécifiée dans le paq</html>uet Arch Linux correspondant.

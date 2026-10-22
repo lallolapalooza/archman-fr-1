@@ -1,0 +1,347 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>File::FcntlLock(3pm) — Pages manuelles d'Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">File__FcntlLock(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/perl-file-fcntllock/">perl-file-fcntllock</a></p>
+<p class="lic">Licences: GPL, PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">File::FcntlLock(3)</td>
+    <td class="head-vol">Documentation Perl contribuée par les utilisateurs</td>
+    <td class="head-rtitle">File::FcntlLock(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">File::FcntlLock - Verrouillage de fichiers avec <a href='/man/fcntl.2.en'>fcntl(2)</a></p>
+<p class="Pp">Ce texte documente également les sous-paquets suivants :</p>
+<dl class="Bl-tag">
+  <dt id="File::FcntlLock::XS"><a class="permalink" href="#File::FcntlLock::XS">File::FcntlLock::XS</a></dt>
+  <dd></dd>
+  <dt id="File::FcntlLock::Pure"><a class="permalink" href="#File::FcntlLock::Pure">File::FcntlLock::Pure</a></dt>
+  <dd></dd>
+  <dt id="File::FcntlLock::Inline"><a class="permalink" href="#File::FcntlLock::Inline">File::FcntlLock::Inline</a></dt>
+  <dd></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>RÉSUMÉ</a></h1>
+<pre>use File::FcntlLock;
+my $fs = new File::FcntlLock;
+$fs-&gt;l_type( F_RDLCK );
+$fs-&gt;l_whence( SEEK_CUR );
+$fs-&gt;l_start( 100 );
+$fs-&gt;l_len( 123 );
+open my $fh, '&lt;', 'file_name' or die "Can't open file: $!\n";
+$fs-&gt;lock( $fh, F_SETLK )
+    or print "Locking failed: " . $fs-&gt;error . "\n";
+$fs-&gt;l_type( F_UNLCK );
+$fs-&gt;lock( $fh, F_SETLK )
+    or print "Unlocking failed: " . $fs-&gt;error . "\n";</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Le verrouillage de fichiers en Perl se fait généralement à l'aide de la fonction
+    <span class="Li">"flock"</span> . Malheureusement, celle-ci ne permet de verrouiller que des fichiers entiers et est souvent implémentée en termes de
+    <a href='/man/flock.2.en'>flock(2)</a> , une fonction système qui présente certaines insuffisances (notamment concernant les verrous sur les systèmes de fichiers montés à distance) et un comportement légèrement différent de <a href='/man/fcntl.2.en'>fcntl(2)</a>.</p>
+<p class="Pp">À l'aide de ce module, le verrouillage de fichiers via <a href='/man/fcntl.2.en'>fcntl(2)</a> peut être effectué (ce qui restreint évidemment l'utilisation du module aux systèmes disposant de l'appel système
+    <a href='/man/fcntl.2.en'>fcntl(2)</a> ). Avant de pouvoir verrouiller un fichier (ou des parties d'un fichier), un objet simulant une structure flock, contenant les informations au format binaire à transmettre à <a href='/man/fcntl.2.en'>fcntl(2)</a> pour les requêtes de verrouillage, doit être créé et ses propriétés définies. Ensuite, en appelant la méthode <b>lock()</b>
+    , un verrou peut être posé et retiré, ou il peut être déterminé si et quel processus détient actuellement le verrou.</p>
+<p class="Pp">File::FcntlLock (ou son alias File::FcntlLock::XS) utilise une bibliothèque partagée, construite lors de l'installation, pour appeler directement la fonction système <a href='/man/fcntl.2.en'>fcntl(2)</a> . Si cela convient mal, il existe deux alternatives : File::FcntlLock::Pure et File::FcntlLock::Inline. Toutes deux appellent la fonction Perl
+    <span class="Li">"fcntl"</span> et utilisent du code Perl pour assembler et désassembler la structure. Pour cela, la disposition binaire (dépendante du système) de la structure flock a dû être déterminée à un moment donné à l'aide d'un programme écrit en C. La différence entre File::FcntlLock::Pure et File::FcntlLock::Inline est que pour le premier, cela se produit lors de l'installation du paquet, tandis que pour le second, cela se fait à chaque chargement du paquet (par exemple avec
+    <span class="Li">"use"</span>). Ainsi, pour que File::FcntlLock::Inline fonctionne, un compilateur C doit être disponible. Il existe quelques différences mineures dans la fonctionnalité et le comportement lors du passage d'arguments invalides à la méthode de verrouillage, qui seront décrites ci-dessous.</p>
+<section class="Ss">
+<h2 class="Ss" id='Creating_objects'><a class='permalink' href='#Creating_objects'>Création   d'objets</a></h2>
+<dl class="Bl-tag">
+  <dt id="new()"><a class="permalink" href="#new()">new()</a></dt>
+  <dd>Pour créer un nouvel objet représentant une structure flock, appelez <b>new()</b>:
+        <pre>$fs = new File::FcntlLock;
+</pre>
+    <p class="Pp">L'objet possède un certain nombre de propriétés, reflétant les membres de la structure flock à transmettre à <a href='/man/fcntl.2.en'>fcntl(2)</a> (voir ci-dessous). Par défaut, lors de la création de l'objet, la propriété l_type est définie à
+        <span class="Li">"F_RDLCK"</span>, l_whence à
+        <span class="Li">"SEEK_SET"</span>, et l_start et l_len à 0, c'est-à-dire les paramètres pour un verrou de lecture sur le fichier entier.</p>
+    <p class="Pp">Ces valeurs par défaut peuvent être remplacées en passant à la méthode <b>new()</b>
+        un ensemble de paires clé-valeur pour initialiser les propriétés de l'objet, par exemple en utilisant</p>
+        <pre>$fs = new File::FcntlLock( l_type   =&gt; F_WRLCK,
+                           l_whence =&gt; SEEK_SET,
+                           l_start  =&gt; 0,
+                           l_len    =&gt; 100 );
+</pre>
+    <p class="Pp">si vous avez l'intention d'obtenir un verrou d'écriture pour les 100 premiers octets d'un fichier.</p>
+  </dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Object_properties'><a class='permalink' href='#Object_properties'>Propriétés   de l'objet</a></h2>
+<p class="Pp">Une fois l'objet simulant la structure flock créé, les méthodes suivantes permettent d'interroger et, dans la plupart des cas, de modifier ses propriétés.</p>
+<dl class="Bl-tag">
+  <dt id="l_type()"><a class="permalink" href="#l_type()">l_type()</a></dt>
+  <dd>Si elle est appelée sans argument, la méthode renvoie le paramètre actuel du type de verrou ; sinon, le type de verrou est défini à la valeur de l'argument, qui doit être soit <span class="Li">"F_RDLCK"</span>,
+      <span class="Li">"F_WRLCK"</span> ou
+      <span class="Li">"F_UNLCK"</span> (pour un verrou de lecture, un verrou d'écriture ou un déverrouillage).</dd>
+  <dt id="l_whence()"><a class="permalink" href="#l_whence()">l_whence()</a></dt>
+  <dd>Cette méthode définit, lorsqu'elle est appelée avec un argument, la propriété l_whence de l'objet flock, déterminant si la valeur l_start est relative au début du fichier, à la position courante dans le fichier ou à la fin du fichier. Ces valeurs sont <span class="Li">"SEEK_SET"</span>,
+      <span class="Li">"SEEK_CUR"</span> et
+      <span class="Li">"SEEK_END"</span> (voir aussi la page de manuel pour
+      <a href='/man/lseek.2.en'>lseek(2)</a>). Si elle est appelée sans argument, la valeur courante de la propriété est renvoyée.</dd>
+  <dt id="l_start()"><a class="permalink" href="#l_start()">l_start()</a></dt>
+  <dd>Interroge ou définit la position de départ (décalage) du verrou dans le fichier selon le mode sélectionné par le membre l_whence. Voir aussi la page de manuel pour <a href='/man/lseek.2.en'>lseek(2)</a>.</dd>
+  <dt id="l_len()"><a class="permalink" href="#l_len()">l_len()</a></dt>
+  <dd>Interroge ou définit la longueur de la région (en octets) du fichier à verrouiller. Une valeur de 0 est interprétée comme signifiant un verrou, commençant à
+      <span class="Li">"l_start"</span>, jusqu'à la fin du fichier. Par exemple, un verrou obtenu avec l_whence défini à
+      <span class="Li">"SEEK_SET"</span> et l_start et l_len définis à 0 verrouille le fichier complet.
+    <p class="Pp">Conformément à SUSv3, la prise en charge des valeurs négatives pour l_len est autorisée, ce qui donne un verrou s'étendant de
+        <span class="Li">"l_start+l_len"</span> jusqu'à et y compris
+        <span class="Li">"l_start-1"</span>. Mais tous les systèmes ne prennent pas en charge les valeurs négatives pour l_len et renverront une erreur lorsque vous essayerez d'obtenir un tel verrou, alors veuillez lire attentivement la page de manuel <a href='/man/fcntl.2.en'>fcntl(2)</a> du système pour plus de détails.</p>
+  </dd>
+  <dt id="l_pid()"><a class="permalink" href="#l_pid()">l_pid()</a></dt>
+  <dd>Si un appel à la méthode <b>lock()</b> avec
+      <span class="Li">"F_GETLK"</span> indique qu'un autre processus détient le verrou (auquel cas la propriété l_type sera soit
+      <span class="Li">"F_WRLCK"</span> soit
+      <span class="Li">"F_RDLCK"</span>), un appel à la méthode <b>l_pid()</b>
+      renvoie le PID du processus détenant le verrou. Cette méthode n'accepte aucun argument.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Locking'><a class='permalink' href='#Locking'>Verrouillage</a></h2>
+<p class="Pp">Après avoir configuré l'objet représentant une structure flock, on peut alors essayer d'obtenir un verrou, le libérer ou déterminer le détenteur actuel du verrou en invoquant la méthode <b>lock()</b> :</p>
+<dl class="Bl-tag">
+  <dt id="lock()"><a class="permalink" href="#lock()">lock()</a></dt>
+  <dd>Cette méthode attend deux arguments. Le premier est un descripteur de fichier (ou typeglob). File::FcntlLock, et donc File::FcntlLock::XS (<b>mais</b>
+      <b>ni</b> File::FcntlLock::Pure <b>ni</b> File::FcntlLock::Inline), accepte également un descripteur de fichier entier « brut ». Le second argument est un indicateur (flag) indiquant l'action à entreprendre. Appelez-la donc comme ceci :
+        <pre>$fs-&gt;lock( $fh, F_SETLK );
+</pre>
+    <p class="Pp">Il existe trois valeurs pouvant être utilisées comme second argument :</p>
+  </dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt>"F_SETLK"</dt>
+  <dd>Avec <span class="Li">"F_SETLK"</span> , la méthode <b>lock()</b> essaie d'obtenir un verrou (lorsque l_type est défini à
+      <span class="Li">"F_WRLCK"</span> ou
+      <span class="Li">"F_RDLCK"</span>) ou le libère (si l_type est défini à <span class="Li">"F_UNLCK"</span>). Si une tentative est faite pour obtenir un verrou mais qu'un verrou est déjà détenu par un autre processus, la méthode renvoie <span class="Li">"undef"</span> et
+      <span class="Li">"errno"</span> est défini à
+      <span class="Li">"EACCESS"</span> ou
+      "&gt;"EAGAIN"</span> (veuillez consulter la page de man
+      pour <a href='/man/fcntl.2.en'>fcntl(2)</a> pour plus de détails).</dd>
+  <dt>"F_SETLKW"</dt>
+  <dd>est similaire à <span class="Li">"F_SETLK"</span>, mais au lieu de
+      renvoyer une erreur si le verrou ne peut pas être obtenu immédiatement, il met
+      le processus appelant en sommeil, c'est-à-dire qu'il se bloque, jusqu'à ce que le verrou soit obtenu à
+      un moment ultérieur. Si un signal est reçu pendant l'attente du verrou, la
+      méthode renvoie <span class="Li">"undef"</span> et
+      <span class="Li">"errno"</span> est défini à
+      <span class="Li">"EINTR"</span>.</dd>
+  <dt>"F_GETLK"</dt>
+  <dd>Avec <span class="Li">"F_GETLK"</span> , la <b>lock()</b> méthode
+      détermine si et quel processus détient actuellement le verrou. S'il n'y a
+      pas d'autre verrou, la propriété l_type sera définie à
+      <span class="Li">"F_UNLCK"</span>. Sinon, l'objet de structure flock est défini avec les valeurs qui nous empêcheraient d'obtenir un verrou. Il peut y avoir plusieurs processus qui nous empêchent d'obtenir un verrou, y compris
+      certains qui sont eux-mêmes bloqués en attendant d'obtenir un verrou.
+      <span class="Li">"F_GETLK"</span> ne rendra visible que les détails de l'un
+      de ces processus, et on n'a aucun contrôle sur lequel de ces processus il s'agit.</dd>
+</dl>
+</div>
+<div class="Bd-indent">
+<p class="Pp">En cas de succès, la <b>lock()</b> méthode renvoie la chaîne "0 but
+    true", c'est-à-dire une valeur qui est vraie en booléen mais 0 en contexte numérique.
+    Si la méthode échoue (comme indiqué par une
+    <span class="Li">"undef"</span> valeur de retour), vous pouvez soit
+    évaluer immédiatement le numéro d'erreur (en utilisant $!,
+    <span class="Li">$ERRNO</span> ou <span class="Li">$OS_ERROR</span>), soit
+    vérifier celui-ci via les méthodes discutées ci-dessous à un moment ultérieur.</p>
+</div>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Error_handling'><a class='permalink' href='#Error_handling'>Gestion   des erreurs</a></h2>
+<p class="Pp">Il existe des différences mineures entre File::FcntlLock d'une part et File::FcntlLock::Pure et File::FcntlLock::Inline d'autre part, dues au fait que le premier appelle la fonction système <a href='/man/fcntl.2.en'>fcntl(2)</a> directement alors que
+    les deux derniers invoquent la fonction Perl <span class="Li">"fcntl"</span>
+    . La fonction Perl <span class="Li">"fcntl"</span> renvoie déjà
+    une erreur Perl pour certains types d'arguments invalides. En revanche,
+    File::FcntlLock les transmet à l'appel système <a href='/man/fcntl.2.en'>fcntl(2)</a> et renvoie ensuite la réponse du système à l'appelant.</p>
+<p class="Pp">Il existe trois méthodes pour obtenir des informations sur la raison
+    pour laquelle un appel de la <b>lock()</b> méthode a échoué :</p>
+<dl class="Bl-tag">
+  <dt id="lock_errno()"><a class="permalink" href="#lock_errno()">lock_errno()</a></dt>
+  <dd>Renvoie le numéro d'erreur <span class="Li">"errno"</span> du dernier appel de <b>lock()</b>. Si le dernier appel n'a pas entraîné d'erreur, <span class="Li">"undef"</span> est renvoyé.</dd>
+  <dt id="error()"><a class="permalink" href="#error()">error()</a></dt>
+  <dd>Renvoie une brève description de l'erreur survenue lors du dernier
+      appel de <b>lock()</b>. Veuillez prendre les messages avec un grain de sel, ils
+      représentent ce que SUSv3 (IEEE 1003.1-2001) et les pages de manuel de Linux, TRUE64, OpenBSD3
+      et Solaris8 indiquent comme signification des numéros d'erreur. Il pourrait y avoir
+      des différences (et des numéros d'erreur supplémentaires) sur d'autres systèmes. S'il n'y avait
+      pas d'erreur, la méthode renvoie
+    <span class="Li">"undef"</span>.</dd>
+  <dt id="system_error()"><a class="permalink" href="#system_error()">system_error()</a></dt>
+  <dd>Alors que la <b>error()</b> méthode essaie de renvoyer une chaîne avec une certaine pertinence
+      directe pour l'opération de verrouillage (c'est-à-dire "File or segment already
+      locked by other process(es)" au lieu de "Permission
+      denied"), cette méthode renvoie le message d'erreur système "normal" associé à <span class="Li">"errno"</span>. La
+      méthode renvoie <span class="Li">"undef"</span> s'il n'y avait pas
+      d'erreur.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='EXPORT'><a class='permalink' href='#EXPORT'>EXPORT</a></h2>
+<p class="Pp">Le paquet exporte les constantes suivantes :</p>
+<dl class="Bl-tag">
+  <dt id="F_GETLK"><a class="permalink" href="#F_GETLK">F_GETLK F_SETLK
+    F_SETLKW</a></dt>
+  <dd></dd>
+  <dt id="F_RDLCK"><a class="permalink" href="#F_RDLCK">F_RDLCK F_WRLCK
+    F_UNLCK</a></dt>
+  <dd></dd>
+  <dt id="SEEK_SET"><a class="permalink" href="#SEEK_SET">SEEK_SET SEEK_CUR
+    SEEK_END</a></dt>
+  <dd></dd>
+</dl>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INCOMPATIBILITIES'><a class='permalink' href='#INCOMPATIBILITIES'>INCOMPATIBILITÉS</a></h1>
+<p class="Pp">Évidemment, ce module nécessite qu'il existe un <a href='/man/fcntl.2.en'>fcntl(2)</a>
+    appel système. Notez également que dans certaines circonstances, les
+    modules File::FcntlLock::Pure et File::FcntlLock::Inline peuvent ne pas avoir été
+    installés. Cela se produit sur les systèmes 32 bits qui utilisent des entiers 64 bits dans leur
+    structure flock mais où la version de Perl installée ne supporte pas le format 'q' pour ses <span class="Li">"pack"</span> et
+    <span class="Li">"unpack"</span> fonctions.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CREDITS'><a class='permalink' href='#CREDITS'>REMERCIEMENTS</a></h1>
+<p class="Pp">Merci à Mark Jason Dominus et Benjamin Goldberg pour leurs discussions utiles, exemples de code et encouragements. Glenn Herteg a souligné
+    plusieurs problèmes et a également aidé à améliorer la documentation. Julian Moreno
+    Patino a aidé à corriger la documentation et a souligné des problèmes survenant
+    sur GNU Hurd qui semble n'avoir qu'un support très rudimentaire pour le verrouillage avec <a href='/man/fcntl.2.en'>fcntl(2)</a>. Niko Tyni et Guillem Jover ont encouragé et aidé à
+    mettre en œuvre des alternatives à une approche uniquement XS qui, on l'espère, rendra
+    le module plus utile dans certaines circonstances.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTEUR</a></h1>
+<p class="Pp">Jens Thoms Toerring &lt;jt@toerring.de&gt;</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR   AUSSI</a></h1>
+<p class="Pp"><a href='/man/perl.1.en'>perl(1)</a>, <a href='/man/fcntl.2.en'>fcntl(2)</a>, <a href='/man/lseek.2.en'>lseek(2)</a>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='LICENSE'><a class='permalink' href='#LICENSE'>LICENCE</a></h1>
+<p class="Pp">Cette bibliothèque est un logiciel libre. Vous pouvez la redistribuer et/ou
+    la modifier selon les mêmes termes que Perl lui-même.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-13</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/perl-file-fcntllock/">extra/perl-file-fcntllock</a></dd>
+        <dt>Version :</dt>
+        <dd>0.22-3</dd>
+        <dt>Amont :</dt>
+        <dd><a href="http://search.cpan.org/dist/$_perlmod/">http://search.cpan.org/dist/$_perlmod/</a></dd>
+        <dt>Licences :</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-file-fcntllock/">/listing/extra/perl-file-fcntllock/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#INCOMPATIBILITIES">INCOMPATIBILITÉS</a></li>
+        
+            <li><a href="#CREDITS">REMERCIEMENTS</a></li>
+        
+            <li><a href="#AUTHOR">AUTEUR</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+            <li><a href="#LICENSE">LICENCE</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/File::FcntlLock.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/File::FcntlLock.3pm.en.raw">brut</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible selon les termes de la <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               licence, à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

@@ -1,0 +1,877 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>DBI::DBD::SqlEngine::Developers(3pm) — Pages de manuel </title>d'Arch
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">DBI__DBD__SqlEngine__Developers(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/perl-dbi/">perl-dbi</a></p>
+
+        nt
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">DBI::DBD::SqlEngine::</td>Developers(3)
+    <td class="head-vol">Documentation Perl contribuée par les </td>utilisateurs
+    <td class="head-rtitle">DBI::DBD</td>::SqlEngi</tr>ne::Devel</table>opers(3)
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NO</a></h1>M
+<p class="Pp">DBI::DBD::SqlEngine::Developers </p>- Documentation pour les dévelop</section>peurs de
+    DBI::DBD::SqlEngine
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>RÉSUM</a></h1>É
+<pre>package DBD::myDriver;
+use base qw(DBI::DBD::SqlEngine);
+sub driver
+{
+    ...
+    my $drh = $proto-&gt;SUPER::driver($attr);
+    ...
+    return $drh-&gt;{class};
+}
+sub CLONE { ... }
+package DBD::myDriver::dr;
+@ISA = qw(DBI::DBD::SqlEngine::dr);
+sub data_sources { ... }
+...
+package DBD::myDriver::db;
+@ISA = qw(DBI::DBD::SqlEngine::db);
+sub init_valid_attributes { ... }
+sub init_default_attributes { ... }
+sub set_versions { ... }
+sub validate_STORE_attr { my ($dbh, $attrib, $value) = @_; ... }
+sub validate_FETCH_attr { my ($dbh, $attrib) = @_; ... }
+sub get_myd_versions { ... }
+sub get_avail_tables { ... }
+package DBD::myDriver::st;
+@ISA = qw(DBI::DBD::SqlEngine::st);
+sub FETCH { ... }
+sub STORE { ... }
+package DBD::myDriver::Statement;
+@ISA = qw(DBI::DBD::SqlEngine::Statement);
+sub open_table { ... }
+package DBD::myDriver::Table;
+@ISA = qw(DBI::DBD::SqlEngine::Table);
+my %reset_on_modify = (
+                        myd_abc =&gt; "myd_foo",
+                        myd_mno =&gt; "myd_bar",
+                      );
+__PACKAGE__-&gt;register_reset_on_modify( \%reset_on_modify );
+my %compat_map = (
+                   abc =&gt; 'foo_abc',
+                   xyz =&gt; 'foo_xyz',
+                 );
+__PACKAGE__-&gt;register_compat_map( \%compat_map );
+sub bootstrap_table_meta { ... }
+sub init_table_meta { ... }
+sub table_meta_attr_changed { ... }
+sub open_data { ... }
+sub new { ... }
+sub fetch_row { ... }
+sub push_row { ... }
+sub push_names { ... }
+sub seek { ... }
+sub truncate { ... }
+sub drop { ... }
+# optimize the SQL engine by add one or more of
+sub update_current_row { ... }
+# or
+sub update_specific_row { ... }
+# or
+sub update_one_row { ... }
+# or
+sub insert_new_row { ... }
+# or
+sub delete_current_row { ... }
+# or
+sub delete_one_row { ...</pre> </section>}
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTIO</a></h1>N
+<p class="Pp">Ce document décrit l'interface de DBI::DBD::SqlEngine pour les
+    développeurs </p>de DBD qui écrivent des pilotes DBI basés sur
+    DBI::DBD::SqlEngine. Il complè</section>te DBI::DBD et DBI::DBD::SqlEngine::HowTo,
+    que vous devriez lire en premier.
+<section class="Sh">
+<h1 class="Sh" id='CLASSES'><a class='permalink' href='#CLASSES'>CLASSE</a></h1>S
+<p class="Pp">Chaque pilote DBI doit fournir une méthode globale au paquet
+    <span class="Li">"driver" </span>et trois classes liées à
+    DBI </p>:
+<dl class="Bl-tag">
+  <dt id="DBI::DBD::SqlEngine::dr"><a class="permalink" href="#DBI::DBD::SqlEngine::dr">DBI::DBD::SqlEngine:</a></dt>:dr
+  <dd>Paquet du pilote, contient les méthodes que DBI appelle indirectement via
+      l'interface DBI :
+        <pre>DBI-&gt;connect ('DBI:DBM:', undef, undef, {})
+# invokes
+package DBD::DBM::dr;
+our @ISA = qw(DBI::DBD::SqlEngine::dr);
+sub connect ($$;$$$)
+{
+    </pre>...
+}
+    <p class="Pp">De même pour <span class="Li">"data_sources
+        </span>()" et <span class="Li">discon</span>nect_</p>all().
+    <p class="Pp">Les pilotes DBI en Perl pur dérivés de DBI::DBD::SqlEngine n'ont
+        généralement pas besoin de redéfinir l'une des méthodes fournies via le
+        paquet DBD::XXX::dr. Cependant, si vous avez besoin d'une initialisation
+        supplémentaire qui ne convient pas à <span class="Li">init_valid_attributes()</span> et
+        <span class="Li">init_default_attributes() de v</span>otre classe ::db,
+        la m</p>éthode connect pourrait être </dd>le dernier endroit à modifier.
+  <dt id="DBI::DBD::SqlEngine::db"><a class="permalink" href="#DBI::DBD::SqlEngine::db">DBI::DBD::SqlEngine:</a></dt>:db
+  <dd>Contient les méthodes qui sont appelées via les handles de base de données
+      DBI (<span class="Li">$dbh)</span>. par exemple,
+        <pre>$sth = $dbh-&gt;prepare ("select * from foo");
+# returns the f_encoding setting for table foo
+$dbh-&gt;csv_get_meta ("foo", "f_encoding")</pre>;
+    <p class="Pp">DBI::DBD::SqlEngine fournit les méthodes typiques requises
+        ici. Les développeurs qui écrivent des pilotes DBI basés sur
+        DBI::DBD::SqlEngine doivent redéfinir les méthodes <span class="Li">"set_versions"
+</span>        et <span class="Li">"init_valid_attrib</span>u</p>tes</dd>".
+  <dt id="DBI::DBD::SqlEngine::TieMeta;"><a class="permalink" href="#DBI::DBD::SqlEngine::TieMeta;">DBI::DBD::SqlEngine::</a></dt>TieMeta;
+  <dd>Fournit la magie de tie pour <span class="Li">"$dbh-&gt;{$drv_pfx .
+      "_meta"}</span>". Achemine
+      <span class="Li">"STORE" </span>via
+      <span class="Li">"$drv-&gt;set_sql_engine_meta()</span>" et
+      <span class="Li">"FETCH" </span>via
+      <span class="Li">"$drv-&gt;get_sql_engine_meta()</span>".
+      <span class="Li">"DELETE" </span>n'est pas pris en charge, vous devez
+      exécuter une instruction <span class="Li">"DROP </span>TABLE", le cas </dd>échéant.
+  <dt id="DBI::DBD::SqlEngine::TieTables;"><a class="permalink" href="#DBI::DBD::SqlEngine::TieTables;">DBI::DBD::SqlEngine::</a></dt>TieTables;
+  <dd>Fournit la magie de tie pour les tables dans
+      <span class="Li">"$dbh-&gt;{$drv_pfx .
+      "_meta"}</span>". Achemine
+      <span class="Li">"STORE" </span>via
+      <span class="Li">"$tblClass-&gt;set_table_meta_attr()</span>"
+      et <span class="Li">"FETCH" </span>via
+      <span class="Li">"$tblClass-&gt;get_table_meta_attr()</span>".
+      <span class="Li">"DELETE" </span>supprime un attribut de
+      <i>l'objet </i>meta récupéré par
+      <span class="Li">"$tblClass</span>-&gt;get_tabl</dd>e_meta()".
+  <dt id="DBI::DBD::SqlEngine::st"><a class="permalink" href="#DBI::DBD::SqlEngine::st">DBI::DBD::SqlEngine:</a></dt>:st
+  <dd>Contient les méthodes pour gérer les handles de requêtes préparées. par exemple,
+        <pre>$sth-&gt;execut</pre>e () or die $</dd>sth-&gt;errstr;
+  <dt id="DBI::DBD::SqlEngine::TableSource;"><a class="permalink" href="#DBI::DBD::SqlEngine::TableSource;">DBI::DBD::SqlEngine::</a></dt>TableSource;
+  <dd>Classe de base pour les sources de tables tierces :
+        <pre>$dbh-&gt;{sql_table_</pre>source} = "DBD::F</dd>oo::TableSource";
+  <dt id="DBI::DBD::SqlEngine::DataSource;"><a class="permalink" href="#DBI::DBD::SqlEngine::DataSource;">DBI::DBD::SqlEngine::</a></dt>DataSource;
+  <dd>Classe de base pour les sources de données tierces :
+        <pre>$dbh-&gt;{sql_data_</pre>source} = "DBD::F</dd>oo::DataSource";
+  <dt id="DBI::DBD::SqlEngine::Statement;"><a class="permalink" href="#DBI::DBD::SqlEngine::Statement;">DBI::DBD::SqlEngine::</a></dt>Statement;
+  <dd>Classe de base pour le moteur de requêtes des pilotes dérivés. Implémente
+      <span class="Li">"open_tabl</span>e</dd>".
+  <dt id="DBI::DBD::SqlEngine::Table;"><a class="permalink" href="#DBI::DBD::SqlEngine::Table;">DBI::DBD::SqlEngine::</a></dt>Table;
+  <dd>Contient l'adaptation entre les exigences du moteur SQL et la
+      <span class="Li">magie de "DBI::DBD::</span>SqlEngine" pour trouver
+      les bonnes tables et le stockage. Construit des ponts entre le
+      <span class="Li">traitement </span>de "sql_meta" de
+      <span class="Li">"DBI::DBD::SqlEngine::db", </span>l'initialisation des tables pour les moteurs SQL et la <i>gestion des attr</i>ibuts de l'objet</dd> meta pour les </dl>pilotes dérivés.
+<section class="Ss">
+<h2 class="Ss" id='DBI::DBD::SqlEngine'><a class='permalink' href='#DBI::DBD::SqlEngine'>DBI::DBD::</a></h2>SqlEngine
+<p class="Pp">C'est le paquet principal contenant les routines pour initialiser
+    les pilotes DBI basés sur DBI::DBD::SqlEngine. Principalement la
+    <span class="Li">méthode "DBI::DBD::SqlEngine:</span>:driver" est
+    invoquée, soit directement par DBI lorsque le pilote est initialisé, soit par la classe </p>dérivée.
+<pre>package DBD::DBM;
+use base qw( DBI::DBD::SqlEngine );
+sub driver
+{
+    my ( $class, $attr ) = @_;
+    ...
+    my $drh = $class-&gt;SUPER::driver( $attr );
+    ...
+    return $drh;
+</pre>}
+<p class="Pp">Il n'est pas nécessaire d'implémenter votre propre méthode driver tant que
+    l'initialisation supplémentaire (par exemple l'installation de plus de méthodes de pilote privées) n'est pas requise. Vous n'avez pas besoin d'appeler
+    <span class="Li">"setup_driver"</span> car DBI::DBD:</p>:SqlEngine
+  </section>  s'en charge.
+<section class="Ss">
+<h2 class="Ss" id='DBI::DBD::SqlEngine::dr'><a class='permalink' href='#DBI::DBD::SqlEngine::dr'>DBI::DBD::SqlEngine::</a></h2>dr
+<p class="Pp">Le paquet pilote contient les méthodes que DBI appelle indirectement via
+    l'interface DBI (voir « DBI Class Methods » dans DBI)</p>.
+<p class="Pp">Les pilotes DBI basés sur DBI::DBD::SqlEngine n'ont généralement pas besoin de
+    implémenter quoi que ce soit ici, il suffit de faire l'initialisation de base </p>:
+<pre>package DBD:XXX::dr;
+our @ISA = qw (DBI::DBD::SqlEngine::dr);
+our $imp_data_size     = 0;
+our $data_sources_attr = undef;
+$DBD::XXX::ATTRIBUTION = "DBD::XXX $DBD::XXX::VERSION by Hans </pre>Mustermann";
+<p class="Pp"><i>Méthodes fournies par</i>
+    <span class="Li"><i>"DBI::DBD::SqlEngine::dr"</i></span><i></i></p>:
+<dl class="Bl-tag">
+  <dt id="connect"><a class="permalink" href="#connect">conne</a></dt>ct
+  <dd>Supervise le démarrage du pilote lors de l'appel de
+        <pre>DBI-&gt;connect( "dbi:Foo", , , { ... </pre>} );
+    <p class="Pp">D'abord, il instancie un nouveau pilote en utilisant
+        <span class="Li">"DBI::_new_dbh".</span> Après cela, initial
+        bootstrap of the newly instantiated driver is </p>done by
+        <pre>$dbh-&gt;func( 0, "init_default_attributes" </pre>);
+    <p class="Pp">The first argument (<span class="Li">0)</span> signals that
+        this is the very first call to
+        <span class="Li">"init_default_attributes".</span> Modern
+        drivers understand that and do early stage setup here after </p>calling
+        <pre>package DBD::Foo::db;
+our @ISA = qw(DBI::DBD::SqlEngine::db);
+
+sub init_default_attributes
+{
+  my ($dbh, $phase) = @_;
+  $dbh-&gt;SUPER::init_default_attributes($phase);
+  ...; # own setup code, maybe separated by </pre>phases
+}
+    <p class="Pp">When the <span class="Li">$phase </span>argument is passed
+        down until
+        <span class="Li">"DBI::DBD::SqlEngine::db::init_default_att</span>ributes",
+        <span class="Li">connect()</span> recognizes a <i>modern </i>driver and
+        initializes the attributes from <i>DSN </i>and
+        <span class="Li"><i>$attr</i></span><i></i> arguments passed via
+        <span class="Li">"DBI-&gt;connect( $ds</span>n, $user, $pass, </p>\%attr
+        )".
+    <p class="Pp">At the end of the attribute initialization after <i>phase
+        </i>0, <span class="Li">connect()</span> invoked
+        <span class="Li">"init_default_attributes" </span>again for
+        <i>pha</i>se</p> 1:
+        <pre>$dbh-&gt;func( 1,</pre> "init_default_</dd>attributes" );
+  <dt id="data_sources"><a class="permalink" href="#data_sources">data_sourc</a></dt>es
+  <dd>Returns a list of <i>DSN's </i>using the
+      <span class="Li">"data_sources" </span>method of the class
+      specified in
+      <span class="Li">"$dbh-&gt;{sql_table_source}</span>" or via
+      <span class="Li">"\%a</span>ttr":
+        <pre>@ary = DBI-&gt;data_sources($driver);
+@ary = DBI-&gt;data_sources($driver, </pre>\%attr)</dd>;
+  <dt id="disconnect_all"><a class="permalink" href="#disconnect_all">disconnect_a</a></dt>ll
+  <dd><span class="Li">"DBI::DBD::SqlEngin</span>e" doesn't have an
+ </dd>     overall driver</dl> cache, so nothing h</section>appens here at all.
+<section class="Ss">
+<h2 class="Ss" id='DBI::DBD::SqlEngine::db'><a class='permalink' href='#DBI::DBD::SqlEngine::db'>DBI::DBD::SqlEngine::</a></h2>db
+<p class="Pp">This package defines the database methods, which are called via
+    the DBI database handle <span class="Li">$db</span>h</p>.
+<p class="Pp"><i>Methods provided by</i>
+    <span class="Li"><i>"DBI::DBD::SqlEngine::db"</i></span><i></i></p>:
+<dl class="Bl-tag">
+  <dt id="ping"><a class="permalink" href="#ping">pi</a></dt>ng
+  <dd>Simply returns the content of the
+      <span class="Li">"Active" </span>attribute. Override when your
+      driver needs more complicated actions </dd>here.
+  <dt id="prepare"><a class="permalink" href="#prepare">prepa</a></dt>re
+  <dd>Prepares a new SQL statement to execute. Returns a statement handle,
+      <span class="Li">$sth </span>- instance of the DBD:XXX::st. It is neither
+      required nor recommended to override this </dd>method.
+  <dt id="validate_FETCH_attr"><a class="permalink" href="#validate_FETCH_attr">validate_FETCH_a</a></dt>ttr
+  <dd>Called by <span class="Li">"FETCH" </span>to allow inherited
+      drivers do their own attribute name validation. Calling convention is
+      similar to <span class="Li">"FETCH" </span>and the return value
+      is the approved attribute name.
+        <pre>return $validated_attribute_n</pre>ame;
+    <p class="Pp">In case of validation fails (e.g. accessing private attribute
+        or similar), <span class="Li">"validate_FETCH_</span>attr" is
+       </p> permitted to thr</dd>ow an exception.
+  <dt id="FETCH"><a class="permalink" href="#FETCH">FET</a></dt>CH
+  <dd>Fetches an attribute of a DBI database object. Private handle attributes
+      must have a prefix (this is mandatory). If a requested attribute is
+      detected as a private attribute without a valid prefix, the driver prefix
+      (written as <span class="Li">$drv_prefix)</span> is added.
+    <p class="Pp">The driver prefix is extracted from the attribute name and
+        verified against <span class="Li">"$dbh-&gt;{ $drv_prefix .
+        "valid_attrs" </span>}" (when it exists). If the
+        requested attribute value is not listed as a valid attribute, this
+        method croaks. If the attribute is valid and readonly (listed in
+        <span class="Li">"$dbh-&gt;</span>{ <span class="Li">$drv_prefix .
+        "readonly_attrs" </span>}" when it exists), a real copy
+        of the attribute value is returned. So it's not possible to modify
+        <span class="Li">"f_valid_attrs" from </span>outside of
+        DB</p>I::DBD::SqlEngine::d</dd>b or a derived class.
+  <dt id="validate_STORE_attr"><a class="permalink" href="#validate_STORE_attr">validate_STORE_a</a></dt>ttr
+  <dd>Called by <span class="Li">"STORE" </span>to allow inherited
+      drivers do their own attribute name validation. Calling convention is
+      similar to <span class="Li">"STORE" </span>and the return value
+      is the approved attribute name followed by the approved new value.
+        <pre>return ($validated_attribute_name, $validated_attribute_value)</pre>;
+    <p class="Pp">In case of validation fails (e.g. accessing private attribute
+        or similar), <span class="Li">"validate_STORE_attr" </span>is
+        permitted to throw an exception
+        (<span class="Li">"DBI::DBD::SqlEngine::db::validate_STORE_attr"
+</span>        throws an exception when someone tries to assign value other than
+        <span class="Li">"SQL_IC_UPPER .. </span>SQL_IC_MIXED" to
+        <span class="Li">"$dbh-&gt;{sql_identifier_case}</span>" or
+        <span class="Li">"$dbh-&gt;{sq</span>l_quoted_</p>identifie</dd>r_case}").
+  <dt id="STORE"><a class="permalink" href="#STORE">STO</a></dt>RE
+  <dd>Stores a database private attribute. Private handle attributes must have a
+      prefix (this is mandatory). If a requested attribute is detected as a
+      private attribute without a valid prefix, the driver prefix (written as
+      <span class="Li">$drv_prefix)</span> is added. If the database handle has
+      an attribute <span class="Li">"${drv_prefix}_valid_attrs"
+</span>      - for attribute names which are not listed in that hash, this method
+      croaks. If the database handle has an attribute
+      <span class="Li">"${drv_prefix}_readonly_attrs",</span> only
+      attributes which are not listed there can be stored (once they are
+      initialized). Trying to overwrite such an immutable attribute forces this
+      method to croak.
+    <p class="Pp">An example of a valid attributes list can be found in
+        <span class="Li">"DBI::DBD::SqlEngine::db::init_valid_attrib</span>u</p>te</dd>s".
+  <dt id="set_versions"><a class="permalink" href="#set_versions">set_versio</a></dt>ns
+  <dd>This method sets the attributes
+      <span class="Li">"f_vers</span>ion",
+      <span class="Li">"sql_nano_ver</span>sion",
+      <span class="Li">"sql_statement_version" </span>and (if not
+      prohibited by a restrictive
+      <span class="Li">"${prefix}</span>_valid_attrs")
+      <span class="Li">"${prefix}</span>_version".
+    <p class="Pp">This method is called at the end of the
+        <span class="Li">"connect </span>()" </p>phase.
+    <p class="Pp">When overriding this metho</p>d, do not forget to invoke</dd> the
+        superior one.
+  <dt id="init_valid_attributes"><a class="permalink" href="#init_valid_attributes">init_valid_attribu</a></dt>tes
+  <dd>This method is called after the database handle is instantiated as the
+      first attribute initialization.
+    <p class="Pp"><span class="Li">"DBI::DBD::SqlEngine::db::init_valid_attributes"
+</span>        initializes the attributes
+        <span class="Li">"sql_valid_attrs" </span>and
+        <span class="Li">"sql_readonly_at</span>t</p>rs".
+    <p class="Pp">When overriding this method, do not for</p>get to invoke the
+        superior one,</dd> preferably before doing anything else.
+  <dt id="init_default_attributes"><a class="permalink" href="#init_default_attributes">init_default_attribu</a></dt>tes
+  <dd>This method is called after the database handle is instantiated to
+      initialize the default attributes. It expects one argument:
+      <span class="Li">$phase.</span> If <span class="Li">$phase </span>is not
+      given, <span class="Li">"connect" </span>of
+      <span class="Li">"DBI::DBD::SqlEngine::</span>dr" expects this
+      is an old-fashioned driver which isn't capable of multi-phased
+      initialization.
+    <p class="Pp"><span class="Li">"DBI::DBD::SqlEngine::db::init_default_attributes"
+</span>        initializes the attributes
+        <span class="Li">"sql_identifier</span>_case",
+        <span class="Li">"sql_quoted_identifie</span>r_case",
+        <span class="Li">"sql_han</span>dler",
+        <span class="Li">"sql_init_</span>order",
+        <span class="Li">"sql_m</span>eta",
+        <span class="Li">"sql_engine_ve</span>rsion",
+        <span class="Li">"sql_nano_version" </span>and
+        <span class="Li">"sql_statement_version" </span>when
+        SQL::Statement is </p>available.
+    <p class="Pp">It sets <span class="Li">"sql_init_order" </span>to
+        the given <span class="Li">$p</span>has</p>e.
+    <p class="Pp">When the derived implementor class provides the attribute to
+        validate attributes (e.g.
+        <span class="Li">"$dbh-&gt;{dbm_valid_attrs} = {...</span>};")
+        or the attribute containing the immutable attributes (e.g.
+        <span class="Li">"$dbh-&gt;</span>{dbm_readonly_attrs}
+        <span class="Li">= {...}</span>;"), the attributes
+        <span class="Li">"drv_valid_</span>attrs",
+        <span class="Li">"drv_readonly_attrs" </span>and
+        <span class="Li">"drv_version" </span>are added (when
+        available) to the list of valid and immutable attributes (where
+        <span class="Li">"drv_" </span>is interpreted as the driver
+        </p>prefix)</dd>.
+  <dt id="get_versions"><a class="permalink" href="#get_versions">get_versio</a></dt>ns
+  <dd>This method is called by the code injected into the instantiated driver to
+      provide the user callable driver method
+      <span class="Li">"${prefix}</span>versions" (e.g.
+      <span class="Li">"dbm_versi</span>ons",
+      <span class="Li">"csv_versions",</span> ...).
+    <p class="Pp">The DBI::DBD::SqlEngine implementation returns all version
+        information known by DBI::DBD::SqlEngine (e.g. DBI version, Perl
+        version, DBI::DBD::SqlEngine version and the SQL handler </p>version).
+    <p class="Pp"><span class="Li">"get_versions" </span>takes the
+        <span class="Li">$dbh </span>as the first argument and optionally a
+        second argument containing a table name. The second argument is not
+        evaluated in
+        <span class="Li">"DBI::DBD::SqlEngine::db::get_versions"
+</span>        itself - but might be in the </p>future.
+    <p class="Pp">If the derived implementor class provides a method named
+        <span class="Li">"get_${drv_prefix}versions",</span> this is
+        invoked and the return value of it is associated to the derived driver
+     </p>   name:
+        <pre>if (my $dgv = $dbh-&gt;{ImplementorClass}-&gt;can ("get_" . $drv_prefix . "versions") {
+    (my $derived_driver = $dbh-&gt;{ImplementorClass}) =~ s/::db$//;
+    $versions{$derived_driver} = &amp;$dgv ($dbh, $table);</pre>
+}
+    <p class="Pp">Surchagez-la pour ajouter plus d'informations de version sur votre module,
+     </p>   (par ex. une sorte de version de parseur dans le cas de DBD::CSV, ...), si
+ </dd>       une ligne ne suffit pas pour fournir toutes les informations pertinentes.
+  <dt id="sql_parser_object"><a class="permalink" href="#sql_parser_object">sql_parser_obj</a></dt>ect
+  <dd>Renvoie une instance de SQL::Parser, quand
+      <span class="Li">"sql_handler" </span>est défini à
+      "SQL::Statement". L'instance du parseur est stockée dans
+      <span class="Li">"sql_parser_obj</span>ect".
+    <p class="Pp">Il n'est pas reco</p>mmandé de surcharg</dd>er cette méthode.
+  <dt id="disconnect"><a class="permalink" href="#disconnect">disconne</a></dt>ct
+  <dd>Se déconnecte d'une base de données. Toutes les informations locales de table sont
+      jetées et l'attribut <span class="Li">"Active" </span>est défini à </dd>0.
+  <dt id="type_info_all"><a class="permalink" href="#type_info_all">type_info_a</a></dt>ll
+  <dd>Renvoie des informations sur tous les types pris en charge par
+    DBI::DBD::</dd>SqlEngine.
+  <dt id="table_info"><a class="permalink" href="#table_info">table_in</a></dt>fo
+  <dd>Renvoie un gestionnaire de requête préparé pour fournir des informations sur
+      toutes les tables </dd>connues.
+  <dt id="list_tables"><a class="permalink" href="#list_tables">list_tabl</a></dt>es
+  <dd>Renvoie une liste de tous les noms de tables </dd>connues.
+  <dt id="quote"><a class="permalink" href="#quote">quo</a></dt>te
+  <dd>Protège une chaîne pour une utilisation dans des instructions </dd>SQL.
+  <dt id="commit"><a class="permalink" href="#commit">comm</a></dt>it
+  <dd>Émet un avertissement sur un appel inutile (si les avertissements sont activés) et
+      renvoie. DBI::DBD::SqlEngine est typiquement un pilote qui valide chaque action
+      instantanément lors de son </dd>exécution.
+  <dt id="rollback"><a class="permalink" href="#rollback">rollba</a></dt>ck
+  <dd>Émet un avertissement sur un appel inutile (si les avertissements sont </dd>activés) et
+      renvoie. DBI::DBD::SqlEngine est typiquement un pilo</dl>te qui valide chaque action
+      instantanément lors de son exécution.
+<p class="Pp"><i>Attributs utilisés par</i>
+    <span class="Li"><i>"DBI::DBD::SqlEngine::db"</i></span><i></i></p>:
+<p class="Pp">Cette section décrit des attributs qui sont importants pour les
+    développeurs de pilotes de base de données DBI dérivés de
+    <span class="Li">"DBI::D</span>BD::SqlE</p>ngine".
+<dl class="Bl-tag">
+  <dt id="sql_init_order"><a class="permalink" href="#sql_init_order">sql_init_ord</a></dt>er
+  <dd>Cet attribut contient un hachage avec des priorités comme clés et un tableau
+      contenant les <span class="Li">attributs </span>$dbh à initialiser
+      pendant avant/après d'autres attributs.
+    <p class="Pp"><span class="Li">"DBI::DBD::SqlEngine"
+</span>        initialise les attributs </p>suivants :
+        <pre>$dbh-&gt;{sql_init_order} = {
+     0 =&gt; [qw( Profile RaiseError PrintError AutoCommit )],
+    90 =&gt; [ "sql_meta", $dbh-&gt;{$drv_pfx_meta} ? $dbh-&gt;{$drv_pfx_meta} : </pre>() ]
+}
+    <p class="Pp">La priorité par défaut des clés d'attributs non listées est
+        <span class="Li">50.</span> Il est bien connu qu'un grand nombre d'attributs
+        doivent être définis avant que certains paramètres de table soient initialisés. Par
+        exemple, pour DBD::DBM, lors de </p>l'utilisation de
+        <pre>my $dbh = DBI-&gt;connect( "dbi:DBM:", undef, undef, {
+    f_dir =&gt; "/path/to/dbm/databases",
+    dbm_type =&gt; "BerkeleyDB",
+    dbm_mldbm =&gt; "JSON", # use MLDBM::Serializer::JSON
+    dbm_tables =&gt; {
+        quick =&gt; {
+            dbm_type =&gt; "GDBM_File",
+            dbm_MLDBM =&gt; "FreezeThaw"
+        }
+    </pre>}
+});
+    <p class="Pp">Ceci définit une table connue
+        <span class="Li">"quick" </span>qui utilise le backend GDBM_File
+        et FreezeThaw comme sérialiseur au lieu du BerkeleyDB et JSON par défaut. <b>Mais </b>tous les fichiers contenant les données de la table doivent
+        être recherchés dans <span class="Li">"$dbh-&gt;{f_dir}",
+</span>        ce qui nécessite que <span class="Li">"$dbh-&gt;{f_dir}</span>" soit
+        initialisé avant que
+        <span class="Li">"$dbh-&gt;{sql_meta}-&gt;{quick}" </span>soit
+        initialisé par la <span class="Li">méthode "bootstrap_table_meta"
+</span>        de "DBI::DBD::SqlEngine::Table" pour que
+        <span class="Li">"$dbh-&gt;{sql_meta}-</span>&gt;{quick}-&gt;{f_dir}"
+</p>        soit correc</dd>tement initialisé.
+  <dt id="sql_init_phase"><a class="permalink" href="#sql_init_phase">sql_init_pha</a></dt>se
+  <dd>Cet attribut n'est défini que pendant les étapes d'initialisation du pilote de
+      base de données DBI. Il contient la valeur de la phase d'initialisation en cours
+      d'exécution. Les phases actuellement prises en charge sont <i>phase </i>0 et <i>phase </i>1.
+      Cet attribut est défini dans
+      <span class="Li">"init_default_attributes" </span>et supprimé dans
+      <span class="Li">"init_don</span>e</dd>".
+  <dt id="sql_engine_in_gofer"><a class="permalink" href="#sql_engine_in_gofer">sql_engine_in_go</a></dt>fer
+  <dd>Cette valeur est vraie dans le cas où ce pilote est opéré via
+      DBD::Gofer. L'impact d'être opéré via Gofer est un pilote en lecture seule
+      (pas des bases de données en lecture seule !), donc vous ne pouvez modifier aucun
+      attribut plus tard - ni aucun paramètre de table. <b>Mais </b>vous n'obtiendrez pas d'erreur dans les cas où vous
+        modifiez des attributs de table, alors veuillez surveiller attentivement
+      <span class="Li">"sql_engine_in_gof</span>e</dd>r".
+  <dt id="sql_table_source"><a class="permalink" href="#sql_table_source">sql_table_sou</a></dt>rce
+  <dd>Nomme une classe qui est responsable de fournir les <i>sources de </i>données et les
+      <i>tables disponibles </i>(liées au pilote de base de données). <i>Les sources de </i>données
+      ici font référence à "data_sources" dans DBI, pas à
+      <span class="Li">"sql_data_sou</span>rce".
+    <p class="Pp">Voir "DBI::DBD::SqlEn</p>gine::TableSource" po</dd>ur
+      les détails.
+  <dt id="sql_data_source"><a class="permalink" href="#sql_data_source">sql_data_sou</a></dt>rce
+  <dd>Nomme une classe qui est responsable de la gestion de l'ouverture des ressources de
+      table et de la complétion des noms de tables demandés via des instructions SQL.
+    <p class="Pp">Voir "DBI::DBD::SqlEn</p>gine::DataSource" po</dd>ur
+      les détails.
+  <dt id="sql_dialect"><a class="permalink" href="#sql_dialect">sql_diale</a></dt>ct
+  <dd>Contrôle le dialecte compris par SQL::Parser. Valeurs possibles (état de
+      livraison de SQL::Statement) :
+        <pre>* ANSI
+* CSV
+* </pre>AnyData
+    <p class="Pp">Par défaut à "CSV". Parce qu'un SQL::Parser est
+        instancié u</p>ne seule fois et que SQL::Parser ne permet pas de modifier le
+    </dd>    dialecte une fois instancié, il est fortement recommandé de déf</dl>inir ce drapeau
+        avant l'exécution de toute instruction (le</section> meilleur endroit est le hachage
+        d'attributs de connexion).
+<section class="Ss">
+<h2 class="Ss" id='DBI::DBD::SqlEngine::st'><a class='permalink' href='#DBI::DBD::SqlEngine::st'>DBI::DBD::SqlEngine::</a></h2>st
+<p class="Pp">Contient les méthodes pour gérer les gestionnaires de requêtes préparées </p>:
+<dl class="Bl-tag">
+  <dt id="bind_param"><a class="permalink" href="#bind_param">bind_par</a></dt>am
+  <dd>Routine commune pour lier des paramètres de substitution à une instruction pour
+      exécution. Il est dangereux de surcharger cette méthode sans connaissances
+      détaillées sur la structure de stockage interne de
+      DBI::DBD::</dd>SqlEngine.
+  <dt id="execute"><a class="permalink" href="#execute">execu</a></dt>te
+  <dd>Exécute une instruction préparée (avec des paramètres de substitution, le cas
+      échéant)</dd>.
+  <dt id="finish"><a class="permalink" href="#finish">fini</a></dt>sh
+  <dd>Termine un gestionnaire de requête, jette tous les résultats tamponnés. L'instruction
+      préparée n'est pas jetée afin que l'instruction puisse être exécutée à </dd>nouveau.
+  <dt id="fetch"><a class="permalink" href="#fetch">fet</a></dt>ch
+  <dd>Récupère la ligne suivante de l'ensemble de résultats. Cette méthode peut être
+      réécrite dans une version ultérieure et si elle est surchargée dans une classe
+      dérivée, l'implémentation dérivée ne doit pas s'appuyer sur les détails de
+      </dd>stockage.
+  <dt id="fetchrow_arrayref"><a class="permalink" href="#fetchrow_arrayref">fetchrow_array</a></dt>ref
+  <dd>Alias pour <span class="Li">"fetc</span>h</dd>".
+  <dt id="FETCH~2"><a class="permalink" href="#FETCH~2">FET</a></dt>CH
+  <dd>Récupère les attributs du gestionnaire de requête. Les attributs pris en charge (pour
+      un aperçu complet voir "Statement Handle Attributes" dans DBI) sont
+      <span class="Li">"NA</span>ME",
+      <span class="Li">"TY</span>PE",
+      <span class="Li">"PRECISION" </span>et
+      <span class="Li">"NULLABLE".</span> Chaque colonne est renvoyée comme
+      <span class="Li">"NULLABLE" </span>ce qui peut être incorrect
+      en fonction du stockage du backend dérivé. Si le gestionnaire de requête a des
+      attributs privés, ils peuvent aussi être récupérés en utilisant cette méthode.
+      <b>Notez </b>que les attributs de requête ne sont associés à aucune table
+      utilisée dans cette instruction.
+    <p class="Pp">Cette méthode nécessite généralement d'être é</p>tendue dans une
+        implémentation dérivé</dd>e. Voir DBD::CSV ou DBD::DBM pour un exemple.
+  <dt id="STORE~2"><a class="permalink" href="#STORE~2">STO</a></dt>RE
+  <dd>Permet le stockage d'attributs privés de requête. Aucun traitement spécial n'est
+      actuellement implémenté </dd>ici.
+  <dt id="rows"><a class="permalink" href="#rows">ro</a></dt>ws
+  <dd>Renvoie le nombre de lignes affectées par la dernière exécution. Cette méthode peut
+      renvoyer <span class="Li">"u</span>n</dd>de</dl>f</section>".
+<section class="Ss">
+<h2 class="Ss" id='DBI::DBD::SqlEngine::TableSource'><a class='permalink' href='#DBI::DBD::SqlEngine::TableSource'>DBI::DBD::SqlEngine::</a></h2>TableSource
+<p class="Pp">Fournit des sources de données et des informations de table au niveau du pilote de
+    base de données et du gestionnaire de base de </p>données.
+<pre>package DBI::DBD::SqlEngine::TableSource;
+sub data_sources ($;$)
+{
+  my ( $class, $drh, $attrs ) = @_;
+  ...
+}
+sub avail_tables
+{
+  my ( $class, $drh ) = @_;
+  ...
+</pre>}
+<p class="Pp">La <span class="Li">méthode "data_sources" </span>est
+    appelée quand l'utilisateur invoce l'une des commandes suivantes </p>:
+<pre>@ary = DBI-&gt;data_sources($driver);
+@ary = DBI-&gt;data_sources($driver, \%attr);
+
+@ary = $dbh-&gt;data_sources();
+@ary = $dbh-&gt;data_sources(\%attr)</pre>;
+<p class="Pp">La <span class="Li">méthode "avail_tables" </span>est
+    appelée quand l'utilisateur invoce l'une des commandes suivantes </p>:
+<pre>@names = $dbh-&gt;tables( $catalog, $schema, $table, $type );
+
+$sth = $dbh-&gt;table_info( $catalog, $schema, $table, $type );
+$sth = $dbh-&gt;table_info( $catalog, $schema, $table, $type, \%attr );
+$dbh-&gt;func( "list_tables" )</pre>;
+<p class="Pp">Chaque fois qu'un argument <span class="Li">"\%attr"
+</span>    peut être spécifié, l'attribut <span class="Li">"sql_table_source"
+</span>    de cet objet <span class="Li">"\%attr"
+   </span> est préféré à l'attribut <span class="Li">$dbh ou à l</span>a valeur pa</p>r défaut du
+</section>    pilote.
+<section class="Ss">
+<h2 class="Ss" id='DBI::DBD::SqlEngine::DataSource'><a class='permalink' href='#DBI::DBD::SqlEngine::DataSource'>DBI::DBD::SqlEngine::</a></h2>DataSource
+<p class="Pp">Fournit la fonctionnalité de base pour gérer les tables. Elle est
+    principalement conçue pour permettre un accès transparent aux fichiers sur disque ou
+    aux flux (fichier-) déjà ouverts (par ex. pour DBD::CSV)</p>.
+<p class="Pp">Les classes dérivées doivent également être restreintes à des fonctionnalités
+    similaires (par ex. ouvrir des flux depuis une archive, compresser/décompresser
+    transparentement des fichiers journal avant de les </p>analyser,
+<pre>package DBI::DBD::SqlEngine::DataSource;
+sub complete_table_name ($$;$)
+{
+  my ( $self, $meta, $table, $respect_case ) = @_;
+  ...
+</pre>}
+<p class="Pp">La méthode <span class="Li">"complete_table_name"
+   </span> est appelée lors de la première configuration des <i>méta-informations </i>pour une table </p>:
+<pre>"SELECT user.id, user.name, user.shell FROM user WHERE ...</pre>"
+<p class="Pp">résultats dans l'ouverture de la
+    <span class="Li">table
+</span>"user". Première étape du processus d'ouverture de la table
+    est la complétion du nom. Imaginons que vous ayez un handle DBD::CSV
+    avec </p>les
+<pre>paramètres suivants :
+$dbh-&gt;{sql_identifier_case} = SQL_IC_LOWER;
+$dbh-&gt;{f_ext} = '.lst';
+$dbh-&gt;{f_dir} </pre>=
+<p class="Pp">'/data/web/adrmgr';
+Ces paramètres entraîneront la recherche
+    <span class="Li">de fichiers correspondant à
+</span>"[Uu][Ss]
+    <span class="Li">[Ee][Rr](\.lst)?$" </span>dans
+"/data/web/adrmgr/". Le balayage <span class="Li">du
+    répertoire
+</span>"/data/web/adrmgr/" et la
+    vérification de correspondance
+    <span class="Li">du motif seront effectués </span>dans
+"DBD:
+    <span class="Li">:File::DataSource::</span>File" </p>par
+<p class="Pp">la
+méthode "complete_table_name".
+Si vous prévoyez de fournir d'autres sources de flux de données que des fichiers,
+    <span class="Li">en plus de fournir </span>une méthode
+"complete_table_name" appropriée, une </p>méthode
+<pre>pour
+    ouvrir la ressource est requise :
+package DBI::DBD::SqlEngine::DataSource;
+sub open_data ($)
+{
+  my </pre>(
+<p class="Pp">$self, $meta, $attrs, <span class="Li">$flags ) = @_;
+  ...
+}
+Après que la méthode
+"open_data" a
+    été exécutée avec</span> succès, les méta-informations de la table sont dans un état qui
+    permet aux</p> méthodes d'accès aux données de la table de pouvoir récupérer/enregistrer les</section>
+    informations de ligne. Les détails d'implémentation dépendent fortement de
+<section class="Ss">
+<h2 class="Ss" id='DBI::DBD::SqlEngine::Statement'><a class='permalink' href='#DBI::DBD::SqlEngine::Statement'>l'implémentation
+    de la </a></h2>table,
+<p class="Pp">dont la plus connue est sans doute DBD::Fil</p>e::Table.
+DBI::DBD::SqlEngine::Statement
+D</section>érive de DBI::SQL::Nano::Statement pour une
+<section class="Ss">
+<h2 class="Ss" id='DBI::DBD::SqlEngine::Table'><a class='permalink' href='#DBI::DBD::SqlEngine::Table'>nomenclature unifiée lors de </a></h2>la
+<p class="Pp">dérivation de nouveaux pilotes. Aucune fonctionnalité supplémentaire n'est </p>fournie
+<p class="Pp">d'ici.
+DBI::DBD::SqlEngine::Table
+Dérive de
+    <span class="Li">DBI::SQL::Nano::</span>Table pour une nomenclature unifiée lors de la
+    dérivation de nouveaux pilotes.
+Vous devriez consulter la documentation de
+"SQL::Eval::Table" (voir SQL::Eval) pour obtenir
+    plus d'informations sur les </p>méthodes
+<dl class="Bl-tag">
+  <dt id="bootstrap_table_meta"><a class="permalink" href="#bootstrap_table_meta">abstraites de </a></dt>la
+  <dd>classe de base de la table que
+    vous devez redéfinir et une description des méta-informations de la <span class="Li">table </span>attendues par
+    les moteurs SQL.
+bootstrap_table_meta
+Initialise une
+    <p class="Pp">structure de méta-données de table. Peut être redéfinie en toute sécurité dans une classe <span class="Li">dérivée, </span>tant que la <span class="Li">méthode
+"SUPER" est
+  </span>    appelée
+        <span class="Li">à la fin de la méthode </span>redéfinie.
+        <span class="Li">Elle copie les </span>attributs suivants de la base de données vers </p>les
+    <p class="Pp">méta-données de la table
+"$dbh-&gt;{ReadOnly}"
+        vers
+"$meta-&gt;{readonly}",
+"sql_identifier_case" et
+"sql_data_source" et les rend
+        persistants </p>pour </dd>la
+  <dt id="init_table_meta"><a class="permalink" href="#init_table_meta">table.
+Cette </a></dt>méthode
+  <dd>devrait être appelée avant que vous n'essayez d'établir une correspondance entre le
+        nom de fichier et le nom de table pour vous assurer que le bon répertoire, la bonne extension, </dd>etc.
+  <dt id="get_table_meta"><a class="permalink" href="#get_table_meta">sont </a></dt>utilisés.
+  <dd>init_table_meta
+Initialise plus d'attributs des méta-données de la table - généralement des attributs plus
+      coûteux (par exemple ceux <i>qui </i>nécessitent l'instanciation de classes) - lorsque le
+      nom de fichier et le nom de table ont pu <i>être mappés.</i>
+get_table_meta
+Retourne les méta-données de la table. S'il n'y en a pas pour la table requise, une
+      nouvelle est initialisée. Lorsque, après le bootstrap d'un nouveau
+table_meta
+      <span class="Li">et la complétion du </span>nom de table, une correspondance peut être établie entre un
+      table_meta existant et le nouvel table_meta bootstrapé,</dd> le
+  <dt id="get_table_meta_attr"><a class="permalink" href="#get_table_meta_attr">table_meta </a></dt>déjà
+  <dd>existant est utilisé et un raccourci de correspondance entre le nom de table
+      récemment <span class="Li">utilisé et </span>le nom de table déjà connu est conservé dans
+</dd>"$dbh-&gt;
+  <dt id="set_table_meta_attr"><a class="permalink" href="#set_table_meta_attr">{sql_meta_map}". Si </a></dt>cela
+  <dd>échoue, rien n'est retourné. En cas de succès, le nom de la table et la structure <span class="Li">de
+      </span>méta-données sont retournés.
+get_table_meta_attr
+</dd>Retourne
+  <dt id="table_meta_attr_changed"><a class="permalink" href="#table_meta_attr_changed">un attribut unique </a></dt>des
+  <dd>méta-données de la table. Si le nom de l'attribut
+      apparaît
+    <p class="Pp">dans
+%compat_map, le nom de l'attribut est
+      mis à jour à partir de celui-ci.
+set_table_meta_attr
+Définit un attribut unique dans les méta-données de la <i>table. Si </i>le nom de l'attribut
+      apparaît dans
+%compat_map, le nom de <span class="Li">l'attribut est
+      mis </span>à </p>jour </dd>à
+  <dt id="register_reset_on_modify"><a class="permalink" href="#register_reset_on_modify">partir de </a></dt>celui-ci.
+  <dd>table_meta_attr_changed <span class="Li">Appelée lorsqu'un </span>attribut des méta-données est modifié.
+Si l'attribut modifié nécessite de réinitialiser un attribut <span class="Li">calc</span>ulé,
+      <span class="Li">l'attribut </span>calculé
+      <span class="Li">est </span>réinitialisé
+      <span class="Li">(supprimé </span>de la structure de
+      <span class="Li">méta-données)</span>
+        et le
+drapeau initialized
+      <span class="Li">est également </span>supprimé.
+      <span class="Li">La décision
+</span>        est basée sur
+      <span class="Li">%register_reset_on</span>_modify.
+    <p class="Pp">register_reset_on_modify
+Permet à
+"set_table_meta_attr" de réinitialiser <span class="Li">les méta-a</span>ttributs l</p>orsque des
+        <pre>attributs spécifiques sont modifiés. Pour DBD::File,
+      la modification de l'un de
+"f_file",
+"f_dir",
+</pre>"f_ext" </dd>ou
+  <dt id="register_compat_map"><a class="permalink" href="#register_compat_map">"f_lockfile" </a></dt>réinitialisera
+  <dd>"f_fqfn". <span class="Li">DBD::DBM étend la </span>liste pour
+      <span class="Li">"dbm_type" et
+"dbm_mldbm" </span>afin de réinitialiser la valeur de
+"dbm_tietype".
+Si votre DBD a des
+        <pre>valeurs calculées dans la zone des méta-</pre>données, alors
+        appelez
+"registe</dd>r_reset_on_modify" :
+my %reset_on_modify
+  <dt id="open_data"><a class="permalink" href="#open_data">= </a></dt>(
+  <dd>"xxx_foo" =&gt; "xxx_bar" );
+__PACKAGE__-&gt;register_reset_on_modify( \%reset_on_modify
+      <span class="Li">);
+register_compat_map
+Permet à
+</span>"get_table_meta_attr"
+    <p class="Pp">et
+"set_table_meta_attr" de mettre à jour le
+      nom de l'attribut vers <span class="Li">celui </span>actuell</p>ement p</dd>référé
+  <dt id="new"><a class="permalink" href="#new">:
+</a></dt>#
+  <dd>from DBD::DBM
+my %compat_map = ( "dbm_ext" =&gt; "f_ext" );
+        <pre>__PACKAGE__-&gt;register_compat_map( \%compat_map );
+open_data
+Appelée pour ouvrir le stockage de données de la table. Cela </pre>est
+    <p class="Pp">transmis silencieusement à
+"$</p>meta-&gt;{sql_data_source}-&gt;ope</dd>n_data()".
+Une fois cela fait</dl>, une classe dérivée peut ajo</section>uter d'autres étapes dans un</section>e méthode
+        "open_file"
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>redéfinie</a></h1>.
+<p class="Pp">new
+Instancie la table. Cela se fait en 3 étapes :
+</p>1.
+<p class="Pp">obtenir les méta-données de la tab</p>le
+2. ouvrir le fichier de donnée</section>s
+3. bénir la structure de données
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT_AND_LICENSE'><a class='permalink' href='#COPYRIGHT_AND_LICENSE'>de la table en </a></h1>utilisant
+<p class="Pp">le constructeur hérité new
+Il n'est pas </p>recommandé
+<p class="Pp">de redéfinir </p>le
+<p class="Pp">constructeur de la classe
+        table. Trouvez </p>un endroit raisonnable pour ajouter vos extension</section>s dans l'une des quatre méthodes ci-dessus.
+AUTE</div>UR
+Le module DBI::DBD::SqlEngine est actuellement
+<table class="foot">
+  <tr>
+    <td class="foot-date">maintenu </td>par
+H.
+    <td class="foot-os">Merijn Brand </td>&lt; </tr>h.</table>m.</section>brand at xs4all.</article>nl &gt; et Jens
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Rehsack
+    &lt; rehsack </p>at
+    <dl>
+        <dt>googlemail.com </dt>&gt;
+DROITS
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/perl-dbi/">D'AUTEUR   ET </a></dd>LICENCE
+        <dt>Copyright </dt>(C)
+        <dd>2010 by </dd>H.Merijn
+        <dt>Brand &amp; </dt>Jens Rehsack
+        <dd><a href="http://search.cpan.org/dist/DBI/">Tous droits réservés.
+Vous pouvez </a></dd>librement
+        <dt>distribuer </dt>et/ou
+        <dd>modifier ce module </dd>selon
+        <dt>les
+    </dt>termes de
+        <dd><a href="/listing/extra/perl-dbi/">la GNU </a></dd>General</dl> Public </section>License
+
+<details>
+    <summary>(GPL) ou de </summary>l'Artistic
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">License,</a></li> comme spécifié
+        
+            <li><a href="#SYNOPSIS">dans le </a></li>fichier README de Perl.
+        
+            <li><a href="#DESCRIPTION">2025-07-13
+</a></li>perl v5.42.0
+Informations
+        
+            <li><a href="#CLASSES">sur </a></li>le paquet :
+Nom du
+        
+            <li><a href="#AUTHOR">paquet </a></li>:
+extra/perl-dbi
+Version
+        
+            <li><a href="#COPYRIGHT_AND_LICENSE">:
+1.647-2
+</a></li>Amont :
+ht</ul>tp://searc</nav>h.cpan.org</details>/dist/DBI/
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Licences :
+GPL, PerlArtistic
+Manuels
+        
+            <a href="/man/DBI::DBD::SqlEngine::Developers.3pm.en.txt">:
+</a>/listing/extra/perl-dbi/ 
+        
+            <a href="/man/DBI::DBD::SqlEngine::Developers.3pm.en.raw">Table des m</a>atières
+NOM</p>
+SYNOPSIS
+</nav>DESCRIPTION</aside>
+CLASSES
+AU</main>TEUR
+DROITS
+        <footer>
+            mandoc pour la
+            <p>conversion des pages de manuel.
+Le site web est <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">disponible selon les termes de la
+</a>licence GPL-3.0
+               , à </p>l'exception du contenu des pages d</footer>e manuel, qui ont leur propre lice</body>nce
+               spécifiée dans l</html>e paquet Arch Linux correspondant.

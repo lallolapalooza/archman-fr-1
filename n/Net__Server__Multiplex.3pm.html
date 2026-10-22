@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Net::Server::Multiplex(3pm) — Pages du manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Net__Server__Multiplex(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-net-server/">perl-net-server</a></p>
+<p class="lic">Licences: PerlArtistic, GPL</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Net::Server::Multiplex(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">Net::Server::Multiplex(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Net::Server::Multiplex - Multiplexe plusieurs connexions au sein d'un même processus</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<pre>package MyPlexer;
+use base qw(Net::Server::Multiplex);
+sub mux_input {
+    #...code...
+}
+__PACKAGE__-&gt;run();</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Cette personnalité est conçue pour gérer plusieurs connexions au sein d'un même processus. Elle ne doit être utilisée qu'avec des protocoles garantis de pouvoir répondre rapidement paquet par paquet. Si la détermination d'une réponse peut prendre du temps ou une durée inconnue, toutes les autres connexions établies seront bloquées jusqu'à ce que la réponse soit terminée. Si cette condition risque de se produire, cette personnalité ne devrait probablement pas être utilisée.</p>
+<p class="Pp">Elle combine des fonctionnalités intéressantes de Net::Server (comme la configuration du socket d'écoute du serveur, le traitement des fichiers de configuration, la gestion sécurisée des signaux, la gestion pratique de l'E/S standard de style inet, les fonctions de journalisation, la désactivation et le suivi des PID, et la redémarrabilité -SIGHUP) et des fonctionnalités intéressantes de IO::Multiplex (E/S tamponnées automatiques et objets par descripteur de fichier) pour une interface facile à utiliser.</p>
+<p class="Pp">Consultez examples/samplechat.pl distribué avec Net::Server pour un exemple simple de serveur de chat utilisant plusieurs de ces fonctionnalités.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='FLUX_DE_TRAITEMENT'><a class='permalink' href='#FLUX_DE_TRAITEMENT'>FLUX DE TRAITEMENT</a></h1>
+<p class="Pp">Le flux de traitement est écrit de manière ouverte, facile à remplacer et facile à accrocher. Le flux de base est illustré ci-dessous.</p>
+<pre>  $self-&gt;configure_hook;
+  $self-&gt;configure(@_);
+  $self-&gt;post_configure;
+  $self-&gt;post_configure_hook;
+  $self-&gt;pre_bind;
+  $self-&gt;bind;
+  if (redémarrage du serveur) {
+      $self-&gt;restart_open_hook();
+  }
+  $self-&gt;post_bind_hook;
+  $self-&gt;post_bind;
+  $self-&gt;pre_loop_hook;
+  $self-&gt;loop; # Ceci exécute essentiellement IO::Multiplex::loop
+  # Pour les routines à l'intérieur d'un $self-&gt;loop
+  # Voir TRAITEMENT CLIENT ci-dessous
+  $self-&gt;pre_server_close_hook;
+  $self-&gt;post_child_cleanup_hook;
+  $self-&gt;server_close;
+  if (redémarrage du serveur) {
+      $self-&gt;restart_close_hook();
+      $self-&gt;hup_server;
+      # Recommencer le processus en commençant par configure_hook
+}</pre>
+<p class="Pp">Le serveur se termine ensuite.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='TRAITEMENT_CLIENT'><a class='permalink' href='#TRAITEMENT_CLIENT'>TRAITEMENT CLIENT</a></h1>
+<p class="Pp">Ce qui suit représente le flux du programme de traitement des clients :</p>
+<pre>$self-&gt;{server}-&gt;{client} = Net::Server::Proto::TCP-&gt;accept();  # NOTE : Multiplexé avec mux_input() ci-dessous
+if (check_for_dequeue secondes écoulées) {
+    $self-&gt;run_dequeue();
+}
+$self-&gt;get_client_info;
+$self-&gt;post_accept_hook; # Style Net::Server
+if ($self-&gt;allow_deny
+    &amp;&amp; $self-&gt;allow_deny_hook) {
+  # (Le $self-&gt;process_request() de style Net::Server n'est jamais appelé.)
+  # Un objet unique spécifique au client est créé
+  # pour toutes les méthodes mux_* à partir de ce moment.
+  $self = __PACKAGE__-&gt;new($self, client);
+  $self-&gt;mux_connection; # Style IO::Multiplex
+  for (chaque paquet reçu) {
+    $self-&gt;mux_input;  # NOTE : Multiplexé avec accept() ci-dessus
+  }
+} else {
+  $self-&gt;request_denied_hook;
+  # Notez que si allow_deny ou allow_deny_hook échoue,
+  # new(), mux_connection(), et mux_input() ne seront jamais appelés.
+  # mux_eof() et mux_close() seront toujours appelés, mais en utilisant un
+  # objet de rappel de socket d'écoute commun au lieu d'un objet unique spécifique au client.
+}
+$self-&gt;mux_eof;
+$self-&gt;post_process_request_hook;
+$self-&gt;mux_close;</pre>
+<p class="Pp">Ce processus boucle ensuite en multiplexant entre le <b>accept()</b> pour la prochaine connexion et <b>mux_input()</b> lorsqu'une entrée arrive afin d'éviter de bloquer l'un ou l'autre.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='HOOKS'><a class='permalink' href='#HOOKS'>HOOKS</a></h1>
+<p class="Pp">Les méthodes *_hook mentionnées ci-dessus sont destinées à être remplacées par vos propres sous-routines si vous souhaitez fournir des fonctionnalités supplémentaires.</p>
+<p class="Pp">La méthode <b>loop()</b> de Net::Server a été remplacée pour exécuter la routine de boucle de IO::Multiplex à la place. Les méthodes Net::Server peuvent accéder à l'objet IO::Multiplex à
+    l'<span class="Li">&quot;$self-&gt;{mux}&quot;</span> si désiré. Les méthodes IO::Multiplex peuvent accéder à l'objet Net::Server à
+    l'<span class="Li">&quot;$self-&gt;{net_server}&quot;</span> si désiré.</p>
+<p class="Pp">La méthode <b>process_request()</b> n'est jamais utilisée avec cette personnalité.</p>
+<p class="Pp">Les autres hooks et méthodes Net::Server devraient fonctionner de la même manière.</p>
+<dl class="Bl-tag">
+  <dt>&quot;$self-&gt;run_dequeue()&quot;</dt>
+  <dd>Ce hook n'est appelé qu'en conjonction avec le paramètre check_for_dequeue. Il s'exécutera toutes les check_for_dequeue secondes. Comme aucun fork n'est effectué, ce hook doit s'exécuter rapidement afin d'éviter de bloquer le reste du traitement.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='TEMPS_MORTS'><a class='permalink' href='#TEMPS_MORTS'>TEMPS MORTS</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='set_timeout'><a class='permalink' href='#set_timeout'>set_timeout</a></h2>
+<p class="Pp">Pour utiliser la fonctionnalité de délai d'attente optionnelle de IO::Multiplex, vous devez spécifier un délai en utilisant la méthode set_timeout.</p>
+<p class="Pp"><span class="Li">$self</span>-&gt;{net_server}-&gt;{mux}-&gt;set_timeout($fh,
+    <span class="Li">$secondes_maintenant</span>);</p>
+<p class="Pp"><span class="Li">$fh</span> peut être soit un socket client, soit un descripteur de fichier de socket d'écoute dans le mux.
+    <span class="Li">$secondes_maintenant</span> peut être fractionnaire pour obtenir des délais d'attente plus précis. Ceci est utilisé conjointement avec mux_timeout, que vous devez définir vous-même.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='mux_timeout'><a class='permalink' href='#mux_timeout'>mux_timeout</a></h2>
+<p class="Pp">La routine principale <b>loop()</b> appellera
+    <span class="Li">$obj</span>-&gt;mux_timeout($mux,
+    <span class="Li">$fh</span>) lorsque le délai d'attente spécifié dans set_timeout est atteint, où <span class="Li">$fh</span> est le même que celui spécifié dans
+    <b>set_timeout()</b> et <span class="Li">$obj</span> est son objet correspondant (soit l'objet unique spécifique au client, soit l'objet de rappel principal d'écoute) et <span class="Li">$mux</span> est l'objet principal IO::Multiplex lui-même.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INTERFACE_DE_RAPPEL'><a class='permalink' href='#INTERFACE_DE_RAPPEL'>INTERFACE DE RAPPEL</a></h1>
+<p class="Pp">Les objets de rappel doivent prendre en charge l'interface suivante. Vous n'avez pas à fournir toutes ces méthodes, fournissez simplement celles qui vous intéressent. Elles sont identiques aux hooks IO::Multiplex, sauf que STDOUT est lié au descripteur de fichier client correspondant pour votre commodité et pour mieux émuler le modèle Net::Server. Cependant, contrairement à certaines autres personnalités de Net::Server, vous ne devez jamais lire directement depuis STDIN. Vous devez définir une ou plusieurs des méthodes suivantes :</p>
+<section class="Ss">
+<h2 class="Ss" id='mux_connection_($mux,$fh)'><a class='permalink' href='#mux_connection_($mux,$fh)'>mux_connection   ($mux,$fh)</a></h2>
+<p class="Pp">(OPTIONNEL) Exécuté une fois lorsque le client se connecte initialement si allow_deny réussit. Notez que le hash de propriété
+    <span class="Li">&quot;$self-&gt;{net_server}-&gt;{server}&quot;</span> peut être modifié par des connexions futures via Net::Server. Toutes les valeurs qu'il contient et que cet objet pourrait avoir besoin d'utiliser plus tard doivent être copiées dans son propre objet à ce stade.</p>
+<pre>Exemple:
+$self-&gt;{peerport} = $self-&gt;{net_server}-&gt;{server}-&gt;{peerport};</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='mux_input_($mux,$fh,\$data)'><a class='permalink' href='#mux_input_($mux,$fh,\$data)'>mux_input   ($mux,$fh,\$data)</a></h2>
+<p class="Pp">(REQUIS) Exécuté chaque fois qu'un paquet est lu. Il doit consommer
+    <span class="Li">$data</span> en commençant par la gauche et laisser les données non consommées dans le scalaire pour les futurs appels à mux_input.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='mux_eof_($mux,$fh,\$data)'><a class='permalink' href='#mux_eof_($mux,$fh,\$data)'>mux_eof   ($mux,$fh,\$data)</a></h2>
+<p class="Pp">(OPTIONNEL) Exécuté une fois lorsque le client a fini d'écrire. Il doit consommer le reste de <span class="Li">$data</span> puisque <b>mux_input()</b> ne sera plus jamais exécuté.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='mux_close_($mux,$fh)'><a class='permalink' href='#mux_close_($mux,$fh)'>mux_close   ($mux,$fh)</a></h2>
+<p class="Pp">(OPTIONNEL) Exécuté après la fermeture complète du socket client. Aucune autre tentative de lecture ou d'écriture vers le client ou vers
+    STDOUT ne doit être effectuée.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='mux_timeout_($mux,$fh)'><a class='permalink' href='#mux_timeout_($mux,$fh)'>mux_timeout   ($mux,$fh)</a></h2>
+<p class="Pp">(OPTIONNEL) Exécuté une fois lorsque le réglage set_timeout expire, comme expliqué ci-dessus.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id=' BUGS'><a class='permalink' href='# BUGS'> BUGS</a></h1>
+<p class="Pp">Ceci n'est connu que pour fonctionner avec des serveurs TCP.</p>
+<p class="Pp">Si vous avez besoin d'utiliser l'interface set_timeout /
+    mux_timeout de style IO::Multiplex, vous ne pouvez pas utiliser le
+    check_for_d de style Net::Server</p>
+</div>
+</section>
+                
+            </article>
+            
+            <aside id="content-right">
+                
+            </aside>
+            
+        </main>
+        <footer>
+            
+        </footer>
+    </body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <title>Net::Server::Multiplex(3pm)</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link rel="stylesheet" href="style.css" type="text/css" />
+        <link rel="stylesheet" href="responsive.css" type="text/css" />
+    </head>
+    <body>
+        
+        <main>
+            <article>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NAME</a></h1>
+<p class="Pp">Net::Server::Multiplex - A multiplexing server subclass</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>
+    use Net::Server;
+    use Net::Server::Multiplex;
+
+    my $server = Net::Server::Multiplex->new(
+        Proto     =&gt; 'tcp',
+        Address   =&gt; 'localhost',
+        Port      =&gt; 8080,
+        ReuseAddr =&gt; 1,
+        MaxServers =&gt; 5,
+        MinServers =&gt; 2,
+        MaxRequests =&gt; 100,
+        Timeout   =&gt; 10,
+        Listen    =&gt; 10,
+        AllowApologies =&gt; 1,
+        User =&gt; 'nobody',
+        Group =&gt; 'nobody',
+        PidFile =&gt; '/var/run/myserver.pid',
+        LogFile =&gt; '/var/log/myserver.log',
+    );
+
+    $server-&gt;run(
+        sub {
+            my $connection = shift;
+            # handle connection
+        }
+    );
+</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">This module extends <a href="Net::Server.html">Net::Server</a> to
+    provide a multiplexing server, using the <a href="IO::Multiplex.html">IO::Multiplex</a>
+    module to handle multiple client connections efficiently.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PROCESS_FLOW'><a class='permalink' href='#PROCESS_FLOW'>PROCESS FLOW</a></h1>
+<p class="Pp">The server accepts incoming connections and forks a new process for
+    each connection. Each child process then uses <a href="IO::Multiplex.html">IO::Multiplex</a>
+    to handle multiple connections within that process. This approach allows for
+    a large number of concurrent connections without a prohibitive number of
+    processes.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CLIENT_PROCESSING'><a class='permalink' href='#CLIENT_PROCESSING'>CLIENT PROCESSING</a></h1>
+<p class="Pp">The <code class="Li">run</code> method takes a subroutine reference
+    as an argument. This subroutine is called for each new client connection. The
+    subroutine receives the client connection object as its argument and is
+    responsible for handling the communication with the client.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='HOOKS'><a class='permalink' href='#HOOKS'>HOOKS</a></h1>
+<p class="Pp"><code class="Nm">Net::Server::Multiplex</code> supports the following
+    hooks:</p>
+<dl class="Bl-tag">
+<dt id="pre_accept"><a class="permalink" href="#pre_accept">pre_accept</a></dt>
+<dd>Called before accepting a new connection.</dd>
+<dt id="post_accept"><a class="permalink" href="#post_accept">post_accept</a></dt>
+<dd>Called after accepting a new connection.</dd>
+<dt id="pre_fork"><a class="permalink" href="#pre_fork">pre_fork</a></dt>
+<dd>Called before forking a new process.</dd>
+<dt id="post_fork"><a class="permalink" href="#post_fork">post_fork</a></dt>
+<dd>Called after forking a new process (in the child process).</dd>
+<dt id="pre_client"><a class="permalink" href="#pre_client">pre_client</a></dt>
+<dd>Called before handling a client connection.</dd>
+<dt id="post_client"><a class="permalink" href="#post_client">post_client</a></dt>
+<dd>Called after handling a client connection.</dd>
+<dt id="pre_close"><a class="permalink" href="#pre_close">pre_close</a></dt>
+<dd>Called before closing a client connection.</dd>
+<dt id="post_close"><a class="permalink" href="#post_close">post_close</a></dt>
+<dd>Called after closing a client connection.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='TIMEOUTS'><a class='permalink' href='#TIMEOUTS'>TIMEOUTS</a></h1>
+<p class="Pp">The <code class="Li">Timeout</code> parameter sets the maximum time
+    a client connection can remain idle. If a connection exceeds this timeout,
+    it will be closed.</p>
+<p class="Pp">The <code class="Li">MuxTimeout</code> parameter is used internally
+    by <a href="IO::Multiplex.html">IO::Multiplex</a> to specify the maximum
+    time to wait for activity on any multiplexed socket before checking for
+    timeouts.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CALLBACK_INTERFACE'><a class='permalink' href='#CALLBACK_INTERFACE'>CALLBACK INTERFACE</a></h1>
+<p class="Pp">The <code class="Nm">run_dequeue</code> method provides a compatibility
+    interface to comply with the Net::Server::Fork style
+    <code class="Nm">run_dequeue</code>. It is implemented in terms of the
+    IO::Multiplex style <code class="Nm">set_timeout</code> and
+    <code class="Nm">mux_timeout</code> methods. This method will not work if
+    the <code class="Li">check_for_dequeue</code> option is specified.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BUGS'><a class='permalink' href='#BUGS'>BUGS</a></h1>
+<p class="Pp">This section is intentionally left blank. See <a href="Net::Server.html">Net::Server</a>
+    for known bugs.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTHOR</a></h1>
+<p class="Pp">Rob Brown &lt;bbb@cpan.org&gt;</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MAINTAINER'><a class='permalink' href='#MAINTAINER'>MAINTAINER</a></h1>
+<p class="Pp">Paul Seamons &lt;paul@seamons.com&gt;</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='LICENSE'><a class='permalink' href='#LICENSE'>LICENSE</a></h1>
+<pre>This package may be distributed under the terms of either the
+GNU General Public License
+   or the
+Perl Artistic License
+All rights reserved.</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>SEE ALSO</a></h1>
+<p class="Pp">Net::Server by Paul Seamons &lt;paul@seamons.com&gt;,</p>
+<p class="Pp">IO::Multiplex by Bruce Keeler &lt;bruce@gridpoint.com&gt;.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Package information:</p>
+    <dl>
+        <dt>Package name:</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-net-server/">extra/perl-net-server</a></dd>
+        <dt>Version:</dt>
+        <dd>2.014-5</dd>
+        <dt>Upstream:</dt>
+        <dd><a href="https://metacpan.org/release/Net-Server">https://metacpan.org/release/Net-Server</a></dd>
+        <dt>Licenses:</dt>
+        <dd>PerlArtistic, GPL</dd>
+        <dt>Manuals:</dt>
+        <dd><a href="/listing/extra/perl-net-server/">/listing/extra/perl-net-server/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table of contents</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NAME</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#PROCESS_FLOW">PROCESS FLOW</a></li>
+        
+            <li><a href="#CLIENT_PROCESSING">CLIENT PROCESSING</a></li>
+        
+            <li><a href="#HOOKS">HOOKS</a></li>
+        
+            <li><a href="#TIMEOUTS">TIMEOUTS</a></li>
+        
+            <li><a href="#CALLBACK_INTERFACE">CALLBACK INTERFACE</a></li>
+        
+            <li><a href="#BUGS">BUGS</a></li>
+        
+            <li><a href="#AUTHOR">AUTHOR</a></li>
+        
+            <li><a href="#MAINTAINER">MAINTAINER</a></li>
+        
+            <li><a href="#LICENSE">LICENSE</a></li>
+        
+            <li><a href="#SEE_ALSO">SEE ALSO</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Other formats:
+        
+            <a href="/man/Net::Server::Multiplex.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/Net::Server::Multiplex.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>The website is available under the terms of the <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               license, except for the contents of the manual pages, which have their own license
+               specified in the corresponding Arch Linux package.
+            </p>
+        </footer>
+    </body>
+</html>

@@ -1,0 +1,565 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>DBD::SQLite::VirtualTable(3pm) — Pages manuelles d'Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">DBD__SQLite__VirtualTable(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/perl-dbd-sqlite/">perl-dbd-sqlite</a></p>
+<p class="lic">Licences: GPL, PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">DBD::SQLite::VirtualTable(3)</td>
+    <td class="head-vol">Documentation Perl contribuée par les utilisateurs</td>
+    <td class="head-rtitle">DBD::SQLite::VirtualTable(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">DBD::SQLite::VirtualTable -- Tables virtuelles SQLite implémentées en
+    Perl</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre># register the virtual table module within sqlite
+$dbh-&gt;sqlite_create_module(mod_name =&gt; "DBD::SQLite::VirtualTable::Subclass");
+# create a virtual table
+$dbh-&gt;do("CREATE VIRTUAL TABLE vtbl USING mod_name(arg1, arg2, ...)")
+# use it as any regular table
+my $sth = $dbh-&gt;prepare("SELECT * FROM vtbl WHERE ...");</pre>
+<p class="Pp"><b>Note</b> : les sous-classes ou les instances de VirtualTable ne sont pas
+    appelées directement depuis le code Perl ; tout se passe indirectement
+    via des instructions SQL au sein de SQLite.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Ce module est une classe abstraite pour implémenter des tables
+    virtuelles SQLite, écrites en Perl. Ces tables ressemblent à des tables
+    normales et sont accessibles via des instructions SQL normales et l'API
+    DBI normale ; mais l'implémentation se fait par des appels cachés à une
+    classe Perl. C'est la même idée que les variables liées (tied) de Perl,
+    mais au niveau de SQLite.</p>
+<p class="Pp">La classe abstraite actuelle ne peut pas être utilisée directement,
+    donc le synopsis ci-dessus est juste là pour donner une idée générale.
+    Les classes concrètes et utilisables fournies avec la présente
+    distribution sont :</p>
+<ul class="Bl-bullet">
+  <li>DBD::SQLite::VirtualTable::FileContent : implémente une colonne virtuelle qui
+      expose le contenu de fichiers. C'est particulièrement utile en
+      conjonction avec un index plein texte ; voir DBD::SQLite::Fulltext_search.</li>
+  <li>DBD::SQLite::VirtualTable::PerlData : se lie à un tableau Perl au sein du
+      programme Perl. Cela peut être utilisé pour des opérations simples
+      d'import/export, à des fins de débogage, pour joindre des données de
+      différentes sources, etc.</li>
+</ul>
+<p class="Pp">D'autres tables virtuelles Perl peuvent également être publiées
+    séparément sur CPAN.</p>
+<p class="Pp">Les chapitres suivants documentent la structure de la classe
+    abstraite et expliquent comment écrire de nouvelles sous-classes ; ceci
+    est destiné aux <b>auteurs de modules</b>, pas aux utilisateurs finaux. Si vous avez juste besoin d'utiliser
+    un module de table virtuelle, référez-vous à la documentation de ce
+    module.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ARCHITECTURE'><a class='permalink' href='#ARCHITECTURE'>ARCHITECTURE</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='Classes'><a class='permalink' href='#Classes'>Classes</a></h2>
+<p class="Pp">Un module de table virtuelle pour SQLite est implémenté à travers une
+    paire de classes :</p>
+<ul class="Bl-bullet">
+  <li>la <b>classe table</b> implémente des méthodes pour créer ou se connecter à une
+      table virtuelle, pour la détruire, pour ouvrir de nouvelles recherches,
+      etc.</li>
+  <li>la <b>classe curseur</b> implémente des méthodes pour exécuter une instruction SQL
+      spécifique</li>
+</ul>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Methods'><a class='permalink' href='#Methods'>Méthodes</a></h2>
+<p class="Pp">La plupart des méthodes dans les deux classes ne sont pas appelées
+    directement depuis le code Perl : ce sont plutôt des rappels (callbacks),
+    appelés depuis le noyau sqlite. Conformément aux conventions Perl
+    courantes, de telles méthodes ont des noms en majuscules.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='TABLE_METHODS'><a class='permalink' href='#TABLE_METHODS'>MÉTHODES DE TABLE</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='Class_methods_for_registering_the_module'><a class='permalink' href='#Class_methods_for_registering_the_module'>Méthodes de classe pour enregistrer le module</a></h2>
+<p class="Pp"><i>CREATE_MODULE</i></p>
+<pre>$class-&gt;CREATE_MODULE($sqlite_module_name);</pre>
+<p class="Pp">Appelé lorsque le code client invoque</p>
+<pre>$dbh-&gt;sqlite_create_module($sqlite_module_name =&gt; $class);</pre>
+<p class="Pp">L'implémentation par défaut est vide.</p>
+<p class="Pp"><i>DESTROY_MODULE</i></p>
+<pre>$class-&gt;DESTROY_MODULE();</pre>
+<p class="Pp">Appelé automatiquement lorsque la connexion à la base de données est
+    fermée. L'implémentation par défaut est vide.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Class_methods_for_creating_a_vtable_instance'><a class='permalink' href='#Class_methods_for_creating_a_vtable_instance'>Méthodes de classe pour créer une instance de table virtuelle</a></h2>
+<p class="Pp"><i>CREATE</i></p>
+<pre>$class-&gt;CREATE($dbh_ref, $module_name, $db_name, $vtab_name, @args);</pre>
+<p class="Pp">Appelé lorsque sqlite reçoit une instruction</p>
+<pre>CREATE VIRTUAL TABLE $db_name.$vtab_name USING $module_name(@args)</pre>
+<p class="Pp">L'implémentation par défaut appelle simplement "NEW".</p>
+<p class="Pp"><i>CONNECT</i></p>
+<pre>$class-&gt;CONNECT($dbh_ref, $module_name, $db_name, $vtab_name, @args);</pre>
+<p class="Pp">Appelé lors de la tentative d'accès à une table virtuelle qui avait été
+    créée lors d'une connexion précédente à la base de données. Les arguments
+    de création ont été stockés dans la base de données sqlite et sont
+    passés à nouveau à la méthode CONNECT.</p>
+<p class="Pp">L'implémentation par défaut appelle simplement "NEW".</p>
+<p class="Pp"><i>_PREPARE_SELF</i></p>
+<pre>$class-&gt;_PREPARE_SELF($dbh_ref, $module_name, $db_name, $vtab_name, @args);</pre>
+<p class="Pp">Prépare la structure de données pour une instance de table virtuelle.
+    <span class="Li">@args</span> est
+  <br/>
+   simplement la collection de chaînes (séparées par des virgules) qui ont été données
+  <br/>
+   dans l'instruction <span class="Li">"CREATE VIRTUAL TABLE"</span>
+    ; chaque sous-classe devrait
+  <br/>
+   décider quoi faire de cette information,</p>
+<p class="Pp">La méthode analyse <span class="Li">@args</span> pour différencier les <i>options</i> (chaînes de la forme
+    <span class="Li">$key</span>=<span class="Li">$value</span> ou
+    <span class="Li">$key</span>=<span class="Li">"$value"</span>,
+    stockées dans <span class="Li">"$self-&gt;{options}"</span>), et les
+    <i>colonnes</i> (les autres <span class="Li">@args</span>, stockées dans
+    <span class="Li">"$self-&gt;{columns}"</span>). Elle crée un
+    hashref avec les champs suivants :</p>
+<dl class="Bl-tag">
+  <dt>"dbh_ref"</dt>
+  <dd>une référence faible à la <span class="Li">$dbh</span> connexion à la base de données (voir
+      Scalar::Util pour une explication des références faibles).</dd>
+  <dt>"module_name"</dt>
+  <dd>nom du module tel que déclaré à sqlite (à ne pas confondre avec le
+      nom de la classe Perl).</dd>
+  <dt>"db_name"</dt>
+  <dd>nom de la base de données (généralement <span class="Li">'main'</span> ou
+      <span class="Li">'temp'</span>), mais cela peut aussi être une base de données
+    attachée</dd>
+  <dt>"vtab_name"</dt>
+  <dd>nom de la table virtuelle</dd>
+  <dt>"columns"</dt>
+  <dd>arrayref des déclarations de colonnes</dd>
+  <dt>"options"</dt>
+  <dd>hashref des déclarations d'options</dd>
+</dl>
+<p class="Pp">Cette méthode ne devrait pas être redéfinie, car elle effectue un
+    travail général censé être utile pour toutes les sous-classes. À la
+    place, les sous-classes peuvent redéfinir la méthode "NEW".</p>
+<p class="Pp"><i>NEW</i></p>
+<pre>$class-&gt;NEW($dbh_ref, $module_name, $db_name, $vtab_name, @args);</pre>
+<p class="Pp">Instancie une table virtuelle.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Instance_methods_called_from_the_sqlite_kernel'><a class='permalink' href='#Instance_methods_called_from_the_sqlite_kernel'>Méthodes d'instance appelées depuis le noyau sqlite</a></h2>
+<p class="Pp"><i>DROP</i></p>
+<p class="Pp">Appelé chaque fois qu'une table virtuelle est détruite depuis la base
+    de données via l'instruction SQL <span class="Li">"DROP TABLE"</span> .</p>
+<p class="Pp">Juste après l'appel <span class="Li">DROP()</span> , l'instance Perl
+    sera détruite (et appellera donc automatiquement la méthode
+    <span class="Li">DESTROY()</span> si une telle méthode est présente).</p>
+<p class="Pp">L'implémentation par défaut de DROP est vide.</p>
+<p class="Pp"><b>Note</b> : cela correspond à la méthode
+    <span class="Li">"xDestroy"</span> dans la documentation de SQLite ; ici, elle n'a pas été nommée
+    <span class="Li">"DESTROY"</span>, pour éviter toute confusion avec la méthode Perl standard <span class="Li">"DESTROY"</span> pour la destruction des objets.</p>
+<p class="Pp"><i>DISCONNECT</i></p>
+<p class="Pp">Appelé pour chaque table virtuelle juste avant que la connexion à la
+    base de données ne soit fermée.</p>
+<p class="Pp">Juste après l'appel <span class="Li">DISCONNECT()</span> , l'instance Perl
+    sera détruite (et appellera donc automatiquement la méthode
+    <span class="Li">DESTROY()</span> si une telle méthode est présente).</p>
+<p class="Pp">L'implémentation par défaut de DISCONNECT est vide.</p>
+<p class="Pp"><i>VTAB_TO_DECLARE</i></p>
+<p class="Pp">Cette méthode est appelée automatiquement juste après "CREATE"
+    ou "CONNECT", pour enregistrer les colonnes de la table virtuelle au sein
+    du noyau sqlite. La méthode devrait retourner une chaîne contenant une
+    instruction SQL
+    <span class="Li">"CREATE TABLE"</span> ; mais seules les parties de déclaration des
+    colonnes seront considérées. Les colonnes peuvent être déclarées avec le
+    mot-clé spécial "HIDDEN", ce qui signifie qu'elles sont utilisées
+    en interne pour l'implémentation de la table virtuelle et ne sont pas
+    visibles par les utilisateurs -- voir <a href='http://sqlite.org/c3ref/declare_vtab.html'>http://sqlite.org/c3ref/declare_vtab.html</a> et
+    <a href='http://www.sqlite.org/vtab.html#hiddencol'>http://www.sqlite.org/vtab.html#hiddencol</a> pour des explications
+  détaillées.</p>
+<p class="Pp">L'implémentation par défaut retourne :</p>
+<pre>CREATE TABLE $self-&gt;{vtab_name}(@{$self-&gt;{columns}})</pre>
+<p class="Pp"><i>BEST_INDEX</i></p>
+<pre>my $index_info = $vtab-&gt;BEST_INDEX($constraints, $order_by)</pre>
+<p class="Pp">C'est la méthode la plus complexe à redéfinir dans les sous-classes. Cette
+    méthode sera appelée au début d'une nouvelle requête sur la table virtuelle ;
+    le travail de la méthode consiste à assembler certaines informations qui seront utilisées</p>
+<dl class="Bl-tag">
+  <dt id="a)"><a class="permalink" href="#a)">a)</a></dt>
+  <dd>par le noyau de sqlite pour décider de la meilleure stratégie de recherche</dd>
+  <dt id="b)"><a class="permalink" href="#b)">b)</a></dt>
+  <dd>par la méthode "FILTER" du curseur pour produire le sous-ensemble désiré de
+      lignes de la table virtuelle.</dd>
+</dl>
+<p class="Pp">En appelant cette méthode, le noyau SQLite indique à la table
+    virtuelle qu'il doit accéder à un sous-ensemble des lignes de la table virtuelle
+    et qu'il souhaite connaître la manière la plus efficace d'effectuer cet accès. La
+    <span class="Li">"BEST_INDEX"</span> méthode répond avec des
+    informations que le noyau SQLite peut ensuite utiliser pour effectuer une recherche
+    efficace de la table virtuelle.</p>
+<p class="Pp">La méthode prend en entrée une liste de
+    <span class="Li">$constraints</span> et une liste de
+    <span class="Li">$order_by</span> instructions. Elle retourne un hashref de
+    propriétés d'indexation, décrites ci-dessous ; de plus, la méthode ajoute
+    des informations supplémentaires dans l'entrée
+    <span class="Li">$constraints</span>. Des explications détaillées sont données dans
+    <a href='http://sqlite.org/vtab.html#xbestindex'>http://sqlite.org/vtab.html#xbestindex</a>.</p>
+<p class="Pp">Contraintes d'entrée</p>
+<p class="Pp">Les éléments du <span class="Li">$constraints</span> arrayref
+    correspondent à des clauses spécifiques de la <span class="Li">"WHERE
+    ..."</span> partie de la requête SQL. Chaque contrainte est un hashref avec
+    les clés :</p>
+<dl class="Bl-tag">
+  <dt>"col"</dt>
+  <dd>l'index entier de la colonne du côté gauche de la
+    contrainte</dd>
+  <dt>"op"</dt>
+  <dd>l'opérateur de comparaison, exprimé sous forme de chaîne contenant
+      <span class="Li">'='</span>, <span class="Li">'&gt;'</span>,
+      <span class="Li">'&gt;='</span>, <span class="Li">'&lt;'</span>,
+      <span class="Li">'&lt;='</span> ou <span class="Li">'MATCH'</span>.</dd>
+  <dt>"usable"</dt>
+  <dd>un booléen indiquant si cette contrainte est utilisable ; certaines contraintes peuvent
+      ne pas être utilisables en raison de la manière dont les tables sont ordonnées dans une jointure.</dd>
+</dl>
+<p class="Pp">Le <span class="Li">$constraints</span> arrayref est utilisé à la fois pour
+    l'entrée et pour la sortie. Pendant l'itération sur le tableau, la méthode doit ajouter
+    les clés suivantes dans les contraintes utilisables :</p>
+<dl class="Bl-tag">
+  <dt>"argvIndex"</dt>
+  <dd>Un index dans le tableau <span class="Li">@values</span> qui sera
+      passé à la méthode "FILTER" du curseur. En d'autres termes, si la
+      contrainte courante correspond au fragment SQL
+      <span class="Li">"WHERE ... AND foo &lt; 123 ..."</span>, et
+      que le <span class="Li">"argvIndex"</span> correspondant prend
+      la valeur 5, cela signifie que la <span class="Li">"FILTER"</span>
+      méthode recevra <span class="Li">123</span> dans
+      <span class="Li">$values[5]</span>.</dd>
+  <dt>"omit"</dt>
+  <dd>Un booléen indiquant au noyau de sqlite qu'il peut omettre de revérifier
+      en toute sécurité cette contrainte avant de retourner le jeu de résultats au
+      programme appelant ; cela signifie que la méthode FILTER a accompli le travail de filtrage
+      sur cette contrainte et qu'il n'est pas nécessaire d'effectuer d'autres vérifications.</dd>
+</dl>
+<p class="Pp">La <span class="Li">"BEST_INDEX"</span> méthode ne recevra pas
+    nécessairement toutes les contraintes de la clause SQL
+    <span class="Li">"WHERE"</span> : par exemple, une contrainte
+    comme <span class="Li">"col1 &lt; col2 + col3"</span> ne peut pas être
+    traitée à ce niveau. De plus, la
+    <span class="Li">"BEST_INDEX"</span> pourrait décider d'ignorer certaines
+    des contraintes reçues. C'est pourquoi un second passage sur les résultats sera
+    effectué par le noyau de sqlite.</p>
+<p class="Pp">Informations d'entrée "order_by"</p>
+<p class="Pp">Le <span class="Li">$order_by</span> arrayref correspond aux clauses
+    <span class="Li">"ORDER BY"</span> dans la requête SQL. Chaque
+    entrée est un hashref avec les clés :</p>
+<dl class="Bl-tag">
+  <dt>"col"</dt>
+  <dd>l'index entier de la colonne qui est ordonnée</dd>
+  <dt>"desc"</dt>
+  <dd>un booléen indiquant si l'ordre est DESCendant ou ascendant</dd>
+</dl>
+<p class="Pp">Ces informations pourraient être utilisées par certaines sous-classes pour optimiser
+    la stratégie de requête ; mais généralement le noyau de sqlite effectuera un autre
+    passage de tri une fois que tous les résultats sont rassemblés.</p>
+<p class="Pp">Informations hashref retournées par BEST_INDEX</p>
+<p class="Pp">La méthode doit retourner un hashref avec les clés suivantes :</p>
+<dl class="Bl-tag">
+  <dt>"idxNum"</dt>
+  <dd>Un entier arbitraire associé à cet index ; cette information sera
+      transmise à "FILTER".</dd>
+  <dt>"idxStr"</dt>
+  <dd>Une chaîne arbitraire associée à cet index ; cette information sera
+      transmise à "FILTER".</dd>
+  <dt>"orderByConsumed"</dt>
+  <dd>Un booléen indiquant au noyau de sqlite si les <span class="Li">$order_by</span>
+      informations ont été prises en compte ou non.</dd>
+  <dt>"estimatedCost"</dt>
+  <dd>Un flottant qui devrait être défini sur le nombre estimé d'opérations d'accès au disque
+      nécessaires pour exécuter cette requête sur la table virtuelle. Le
+      noyau SQLite appellera souvent BEST_INDEX plusieurs fois avec différentes
+      contraintes, obtiendra plusieurs estimations de coût, puis choisira le plan de
+      requête qui donne la plus faible estimation.</dd>
+  <dt>"estimatedRows"</dt>
+  <dd>Un entier donnant le nombre estimé de lignes retournées par cette
+    requête.</dd>
+</dl>
+<p class="Pp"><i>OPEN</i></p>
+<p class="Pp">Appelé pour instancier un nouveau curseur. L'implémentation par défaut
+    ajoute <span class="Li">"::Cursor"</span> au nom de classe courant et appelle <span class="Li">NEW()</span> dans cette classe de
+  curseur.</p>
+<p class="Pp"><i>_SQLITE_UPDATE</i></p>
+<p class="Pp">C'est la méthode de dispatch implémentant le
+    <span class="Li">xUpdate()</span> rappel pour les tables virtuelles. L'implémentation par défaut
+    applique l'algorithme décrit dans
+    <a href='http://sqlite.org/vtab.html#xupdate'>http://sqlite.org/vtab.html#xupdate</a> pour décider d'appeler
+    "INSERT", "DELETE" ou "UPDATE" ; il n'y a donc pas
+    de raison de redéfinir cette méthode dans les sous-classes.</p>
+<p class="Pp"><i>INSERT</i></p>
+<pre>my $rowid = $vtab-&gt;INSERT($new_rowid, @values);</pre>
+<p class="Pp">Cette méthode devrait être redéfinie dans les sous-classes pour implémenter
+    l'insertion d'une nouvelle ligne dans la table virtuelle. La taille du
+    <span class="Li">@values</span> tableau correspond au nombre de colonnes
+    déclarées via "VTAB_TO_DECLARE". Le
+    <span class="Li">$new_rowid</span> peut être explicitement donné, ou il peut être
+    <span class="Li">"undef"</span>, auquel cas la méthode doit
+    calculer un nouvel id et le retourner comme résultat de l'appel de méthode.</p>
+<p class="Pp"><i>DELETE</i></p>
+<pre>$vtab-&gt;INSERT($old_rowid);</pre>
+<p class="Pp">Cette méthode devrait être redéfinie dans les sous-classes pour implémenter
+    la suppression d'une ligne de la table virtuelle.</p>
+<p class="Pp"><i>UPDATE</i></p>
+<pre>$vtab-&gt;UPDATE($old_rowid, $new_rowid, @values);</pre>
+<p class="Pp">Cette méthode devrait être redéfinie dans les sous-classes pour implémenter une mise à jour de ligne
+    au sein de la table virtuelle. Habituellement <span class="Li">$old_rowid</span>
+    est égal à <span class="Li">$new_rowid</span>, ce qui est une mise à jour régulière ;
+    cependant, le rowid pourrait être changé depuis une instruction SQL telle que</p>
+<pre>UPDATE table SET rowid=rowid+1 WHERE ...;</pre>
+<p class="Pp"><i>FIND_FUNCTION</i></p>
+<pre>$vtab-&gt;FIND_FUNCTION($num_args, $func_name);</pre>
+<p class="Pp">Lorsqu'une fonction utilise une colonne d'une table virtuelle comme son premier
+    argument, cette méthode est appelée pour voir si la table virtuelle souhaiterait
+    surcharger la fonction. Les paramètres sont le nombre d'arguments de la
+    fonction, et le nom de la fonction. Si aucun surchargement n'est souhaité, cette
+    méthode devrait retourner faux. Pour surcharger la fonction, cette méthode devrait
+    retourner un coderef vers l'implémentation de la fonction.</p>
+<p class="Pp">Chaque table virtuelle conserve un cache des résultats des appels à FIND_FUNCTION
+    , donc la méthode ne sera appelée qu'une fois pour chaque paire
+    <span class="Li">"($num_args, $func_name)"</span>.</p>
+<p class="Pp"><i>BEGIN_TRANSACTION</i></p>
+<p class="Pp">Appelé pour commencer une transaction sur la table virtuelle.</p>
+<p class="Pp"><i>SYNC_TRANSACTION</i></p>
+<p class="Pp">Appelé pour signaler le début d'un commit en deux phases sur la table
+    virtuelle.</p>
+<p class="Pp"><i>SYNC_TRANSACTION</i></p>
+<p class="Pp">Appelé pour valider une transaction de table virtuelle.</p>
+<p class="Pp"><i>ROLLBACK_TRANSACTION</i></p>
+<p class="Pp">Appelé pour annuler une transaction de table virtuelle.</p>
+<p class="Pp"><i>RENAME</i></p>
+<pre>$vtab-&gt;RENAME($new_name)</pre>
+<p class="Pp">Appelé pour renommer une table virtuelle.</p>
+<p class="Pp"><i>SAVEPOINT</i></p>
+<pre>$vtab-&gt;SAVEPOINT($savepoint)</pre>
+<p class="Pp">Appelé pour signaler à la table virtuelle de sauvegarder son état actuel au
+    point de sauvegarde <span class="Li">$savepoint</span> (un entier).</p>
+<p class="Pp"><i>ROLLBACK_TO</i></p>
+<pre>$vtab-&gt;ROLLBACK_TO($savepoint)</pre>
+<p class="Pp">Appelé pour signaler à la table virtuelle de retourner à l'état
+    <span class="Li">$savepoint</span>. Cela invalidera tous les points de sauvegarde avec
+    des valeurs supérieures à <span class="Li">$savepoint</span>.</p>
+<p class="Pp"><i>RELEASE</i></p>
+<pre>$vtab-&gt;RELEASE($savepoint)</pre>
+<p class="Pp">Appelé pour invalider tous les points de sauvegarde avec des valeurs supérieures ou égales
+    à <span class="Li">$savepoint</span>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Utility_instance_methods'><a class='permalink' href='#Utility_instance_methods'>Méthodes utilitaires d'instance</a></h2>
+<p class="Pp">Les méthodes de cette section sont en minuscules, car elles ne sont pas
+    appelées directement depuis le noyau de sqlite ; ce sont des méthodes utilitaires à
+    appeler depuis les autres méthodes décrites ci-dessus.</p>
+<p class="Pp"><i>dbh</i></p>
+<p class="Pp">Cette méthode retourne le gestionnaire de base de données
+    (<span class="Li">$dbh</span>) associé à la table virtuelle
+  courante.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CURSOR_METHODS'><a class='permalink' href='#CURSOR_METHODS'>MÉTHODES DE CURSEUR</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='Class_methods'><a class='permalink' href='#Class_methods'>Méthodes de classe</a></h2>
+<p class="Pp"><i>NEW</i></p>
+<pre>my $cursor = $cursor_class-&gt;NEW($vtable, @args)</pre>
+<p class="Pp">Instancie un nouveau curseur. L'implémentation par défaut retourne simplement
+    un hashref béni avec les clés <span class="Li">"vtable"</span> et
+    <span class="Li">"args"</span>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Instance_methods'><a class='permalink' href='#Instance_methods'>Méthodes d'instance</a></h2>
+<p class="Pp"><i>FILTER</i></p>
+<pre>$cursor-&gt;FILTER($idxNum, $idxStr, @values);</pre>
+<p class="Pp">Cette méthode commence une recherche dans une table virtuelle.</p>
+<p class="Pp">Les arguments <span class="Li">$idxNum</span> et
+    <span class="Li">$idxStr</span> correspondent aux valeurs retournées par
+    "BEST_INDEX" pour l'index choisi. Les significations spécifiques de ces
+    valeurs sont sans importance pour SQLite, tant que
+    <span class="Li">"BEST_INDEX"</span> et
+    <span class="Li">"FILTER"</span> sont d'accord sur ce que cette signification
+  est.</p>
+<p class="Pp">La <span class="Li">"BEST_INDEX"</span> méthode a pu
+    demander les valeurs de certaines expressions en utilisant les
+    <span class="Li">"argvIndex"</span> valeurs de la liste
+    <span class="Li">$constraints</span> . Ces valeurs sont passées à
+    <span class="Li">"FILTER"</span> à travers le tableau
+    <span class="Li">@values</span> .</p>
+<p class="Pp">Si la table virtuelle contient une ou plusieurs lignes correspondant aux
+    critères de recherche, alors le curseur doit être laissé pointant sur la première ligne.
+    Les appels suivants à "EOF" doivent renvoyer faux. S'il n'y a aucune ligne
+    correspondante, alors le curseur doit être laissé dans un état qui fera
+    renvoyer vrai par "EOF". Le moteur SQLite utilisera les
+    méthodes "COLUMN" et "ROWID" pour accéder au contenu de cette ligne.
+    La méthode "NEXT" sera utilisée pour passer à la ligne suivante.</p>
+<p class="Pp"><i>EOF</i></p>
+<p class="Pp">Cette méthode doit renvoyer faux si le curseur pointe actuellement vers une
+    ligne de données valide, ou vrai sinon. Cette méthode est appelée par le moteur SQL
+    immédiatement après chaque invocation de "FILTER" et
+    "NEXT".</p>
+<p class="Pp"><i>NEXT</i></p>
+<p class="Pp">Cette méthode avance le curseur vers la ligne suivante d'un ensemble de résultats
+    initié par "FILTER". Si le curseur pointe déjà vers la
+    dernière ligne lorsque cette méthode est appelée, alors le curseur ne pointe plus vers
+    des données valides et un appel subséquent à la méthode "EOF" doit renvoyer
+    vrai. Si le curseur est avancé avec succès vers une autre ligne de contenu, alors
+    les appels suivants à "EOF" doivent renvoyer faux.</p>
+<p class="Pp"><i>COLUMN</i></p>
+<pre>my $value = $cursor-&gt;COLUMN($idxCol);</pre>
+<p class="Pp">Le noyau SQLite invoque cette méthode afin de trouver la valeur pour
+    la N-ième colonne de la ligne courante. N est basé sur zéro, donc la première colonne est
+    numérotée 0.</p>
+<p class="Pp"><i>ROWID</i></p>
+<pre>my $value = $cursor-&gt;ROWID;</pre>
+<p class="Pp">Renvoie le <i>rowid</i> de la ligne vers laquelle le curseur est actuellement
+    en train de pointer.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR   AUSSI</a></h1>
+<p class="Pp">SQLite::VirtualTable est un autre module pour les tables virtuelles écrit
+    en Perl, mais conçu pour le cas d'utilisation inverse : au lieu de démarrer un programme Perl
+    et d'y intégrer la bibliothèque SQLite, l'utilisation prévue est de
+    démarrer un programme sqlite, et d'y intégrer l'interpréteur Perl.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTEUR</a></h1>
+<p class="Pp">Laurent Dami &lt;dami@cpan.org&gt;</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT_AND_LICENSE'><a class='permalink' href='#COPYRIGHT_AND_LICENSE'>DROITS   D'AUTEUR   ET   LICENCE</a></h1>
+<p class="Pp">Copyright Laurent Dami, 2014.</p>
+<p class="Pp">Des parties du code sont empruntées à SQLite::VirtualTable,
+    copyright (C) 2006, 2009 par Qindel Formacion y Servicios, S. L.</p>
+<p class="Pp">Cette bibliothèque est un logiciel libre ; vous pouvez la redistribuer et/ou
+    la modifier selon les mêmes termes que Perl lui-même.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/perl-dbd-sqlite/">extra/perl-dbd-sqlite</a></dd>
+        <dt>Version :</dt>
+        <dd>1.76-2</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://search.cpan.org/dist/DBD-SQLite">https://search.cpan.org/dist/DBD-SQLite</a></dd>
+        <dt>Licences :</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-dbd-sqlite/">/listing/extra/perl-dbd-sqlite/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">RÉSUMÉ</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#ARCHITECTURE">ARCHITECTURE</a></li>
+        
+            <li><a href="#TABLE_METHODS">MÉTHODES DE TABLE</a></li>
+        
+            <li><a href="#CURSOR_METHODS">MÉTHODES DE CURSEUR</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+            <li><a href="#AUTHOR">AUTEUR</a></li>
+        
+            <li><a href="#COPYRIGHT_AND_LICENSE">DROITS D'AUTEUR ET LICENCE</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/DBD::SQLite::VirtualTable.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/DBD::SQLite::VirtualTable.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible selon les termes de la <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               licence, sauf pour le contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

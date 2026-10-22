@@ -1,0 +1,1672 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Net::Server(3pm) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Net__Server(3pm)</h1>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Net::Server(3)</td>
+    <td class="head-vol">Documentation Perl Contribuée par l'Utilisateur</td>
+    <td class="head-rtitle">Net::Server(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">Net::Server - Moteur de serveur Perl extensible et général</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>#!/usr/bin/perl -w -T
+package MyPackage;
+use base qw(Net::Server);
+sub process_request {
+    my $self = shift;
+    while (&lt;STDIN&gt;) {
+        s/[\r\n]+$//;
+        print &quot;Vous avez dit '$_'\015\012&quot;; # écho de base
+        last if /quit/i;
+    }
+}
+MyPackage-&gt;run(port =&gt; 160, ipv =&gt; '*');
+# commande rapide pour démarrer
+perl -e 'use base qw(Net::Server); main-&gt;run(port =&gt; 20208)'
+NOTE : à partir de Net::Server 2.005, la valeur par défaut pour
+      ipv est IPv* ce qui signifie que si aucun hôte n'est passé, ou
+      si un nom d'hôte est passé, tous les sockets IPv4 et IPv6 disponibles seront
+      liés. Vous pouvez forcer IPv4 uniquement en ajoutant un ipv =&gt; 4
+      dans l'une des configurations possibles. </pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='FEATURES'><a class='permalink' href='#FEATURES'>FONCTIONNALITÉS</a></h1>
+<pre>* Prise en charge complète d'IPv6
+* Sockets SSL fonctionnels et https (avec et sans IO::Socket::SSL)
+* Mode Serveur Unique
+* Mode Serveur Inetd
+* Mode Simple Préfork (PreForkSimple)
+* Mode Géré Préfork (PreFork)
+* Mode Fork
+* Mode Multiplexage utilisant un seul processus
+* Acceptation multi-ports en modes Single, Preforking et Forking
+* Daemon HTTP de base (prend en charge IPv6, SSL, journaux de style apache complets)
+* Daemon PSGI de base
+* Acceptation/réception simultanée sur les sockets tcp/udp/unix, ssl/tcp et IPv4/IPv6
+* Gestion sécurisée des signaux en modes Fork/PreFork pour éviter les problèmes de signaux Perl
+* Crochets personnalisables par l'utilisateur
+* Capacité de Chroot après la liaison
+* Changement d'utilisateur et de groupe après la liaison
+* Contrôle d'accès de base autoriser/refuser
+* Journalisation configurable (Sys::Syslog, Log::Log4perl, log_file, STDERR, ou le vôtre)
+* Serveur gérable par HUP (redémarrages propres via sig HUP)
+* Arrêts gracieux (via sig QUIT)
+* Déploiement à chaud en modes Fork et PreFork (via sig TTIN et TTOU)
+* Capacité de défilement dans tous les modes Fork et PreFork.
+* Compatible Taint
+* Écrit en Perl
+* Protection contre les dépassements de tampon
+* Flux de processus propre
+* Extensibilité</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp"><span class="Li">&quot;Net::Server&quot;</span> est un moteur de
+    serveur Perl extensible et générique.</p>
+<p class="Pp"><span class="Li">&quot;Net::Server&quot;</span> tente d'être un
+    serveur générique comme <span class="Li">&quot;Net::Daemon&quot;</span> et
+    <span class="Li">&quot;NetServer::Generic&quot;</span>. Il inclut la capacité
+    de fonctionner comme un processus inetd
+    (<span class="Li">&quot;Net::Server::INET&quot;</span>), un serveur à connexion
+    unique (<span class="Li">&quot;Net::Server&quot;</span> ou
+    <span class="Li">&quot;Net::Server::Single&quot;</span>), un serveur par
+    fork (<span class="Li">&quot;Net::Server::Fork&quot;</span>), un serveur
+    préfork qui maintient un nombre constant d'enfants préforkés
+    (<span class="Li">&quot;Net::Server::PreForkSimple&quot;</span>), ou comme
+    un serveur préfork géré qui maintient le nombre d'enfants en fonction de la
+    charge du serveur (<span class="Li">&quot;Net::Server::PreFork&quot;</span>).
+    Dans tous les types sauf inetd, le serveur offre la possibilité de se
+    connecter à un ou plusieurs ports serveur.</p>
+<p class="Pp">Les types de serveurs supplémentaires sont rendus possibles via
+    des &quot;personnalités&quot; ou des sous-classes de
+    <span class="Li">&quot;Net::Server&quot;</span>. En déplaçant les différents
+    types de serveurs hors de la classe principale
+    <span class="Li">&quot;Net::Server&quot;</span>, le concept
+    <span class="Li">&quot;Net::Server&quot;</span> est facilement extensible à
+    d'autres types (dans un avenir proche, nous aimerions ajouter une
+    personnalité &quot;Thread&quot;).</p>
+<p class="Pp"><span class="Li">&quot;Net::Server&quot;</span> emprunte plusieurs
+    concepts au serveur Web Apache.
+    <span class="Li">&quot;Net::Server&quot;</span> utilise des &quot;crochets&quot;
+    pour permettre à des serveurs personnalisés tels que SMTP, HTTP, POP3, etc.
+    d'être superposés à la classe de base
+    <span class="Li">&quot;Net::Server&quot;</span>. De plus, la classe
+    <span class="Li">&quot;Net::Server::PreFork&quot;</span> emprunte les concepts
+    de min_start_servers, max_servers et min_waiting servers.
+    <span class="Li">&quot;Net::Server::PreFork&quot;</span> utilise également le
+    concept d'une acceptation sérialisée par flock lors de l'acceptation sur
+    plusieurs ports (PreFork peut choisir entre flock, IPC::Semaphore et pipe pour
+    contrôler la sérialisation).</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PERSONALITIES'><a class='permalink' href='#PERSONALITIES'>PERSONNALITÉS</a></h1>
+<p class="Pp"><span class="Li">&quot;Net::Server&quot;</span> est construit autour
+    d'une classe commune (Net::Server) et est étendu à l'aide de sous-classes, ou
+    <span class="Li">&quot;personnalités&quot;</span>. Chaque personnalité
+    hérite, surcharge ou améliore les méthodes de base de la classe de base.</p>
+<p class="Pp">Plusieurs personnalités de base sont incluses avec le package
+    Net::Server, chacune ayant son utilité propre.</p>
+<dl class="Bl-tag">
+  <dt id="Fork"><a class="permalink" href="#Fork">Fork</a></dt>
+  <dd>Trouvé dans le module Net/Server/Fork.pm (voir Net::Server::Fork). Ce
+      serveur se lie à un ou plusieurs ports puis attend une connexion. Lorsqu'une
+      demande client est reçue, le parent crée un enfant par fork, qui gère alors
+      le client et se termine. Ceci est bien pour les services modérément sollicités.</dd>
+  <dt id="INET"><a class="permalink" href="#INET">INET</a></dt>
+  <dd>Trouvé dans le module Net/Server/INET.pm (voir Net::Server::INET). Ce
+      serveur est conçu pour être utilisé avec inetd. Les méthodes
+      <span class="Li">&quot;pre_bind&quot;</span>,
+      <span class="Li">&quot;bind&quot;</span>,
+      <span class="Li">&quot;accept&quot;</span> et
+      <span class="Li">&quot;post_accept&quot;</span> sont toutes surchargées car
+      ces services sont gérés par le démon INET.</dd>
+  <dt id="MultiType"><a class="permalink" href="#MultiType">MultiType</a></dt>
+  <dd>Trouvé dans le module Net/Server/MultiType.pm (voir Net::Server::MultiType).
+      Ce serveur n'a aucune fonctionnalité de serveur propre. Il est conçu pour les
+      serveurs qui ont besoin d'un moyen simple et facile de basculer entre
+      différentes personnalités. Plusieurs paramètres
+      <span class="Li">&quot;server_type&quot;</span> peuvent être donnés et
+      Net::Server::MultiType parcourra jusqu'à ce qu'il trouve une classe qu'il
+      peut utiliser.</dd>
+  <dt id="Multiplex"><a class="permalink" href="#Multiplex">Multiplex</a></dt>
+  <dd>Trouvé dans le module Net/Server/Multiplex.pm (voir Net::Server::Multiplex).
+      Ce serveur se lie à un ou plusieurs ports. Il utilise IO::Multiplex pour
+      multiplexer entre l'attente de nouvelles connexions et l'attente d'entrée
+      sur les connexions établies. Cette personnalité est conçue pour s'exécuter
+      en un seul processus sans fork. La méthode
+      <span class="Li">&quot;process_request&quot;</span> n'est jamais utilisée,
+      mais le rappel <span class="Li">&quot;mux_input&quot;</span> est utilisé à
+      la place (voir aussi IO::Multiplex). Voir examples/samplechat.pl pour un
+      exemple utilisant la plupart des fonctionnalités de Net::Server::Multiplex.</dd>
+  <dt id="PreForkSimple"><a class="permalink" href="#PreForkSimple">PreForkSimple</a></dt>
+  <dd>Trouvé dans le module Net/Server/PreFork.pm (voir Net::Server::PreFork). Ce
+      serveur se lie à un ou plusieurs ports, puis crée par fork
+      <span class="Li">&quot;max_servers&quot;</span> processus enfants. Le serveur
+      s'assurera qu'à tout moment, il y a toujours
+      <span class="Li">&quot;max_servers&quot;</span> processus disponibles pour
+      recevoir une demande client. Chacun de ces enfants traitera jusqu'à
+      <span class="Li">&quot;max_requests&quot;</span> connexions client. Ce type
+      est bon pour un site très sollicité qui peut dédier des processus
+      max_server quel que soit le niveau de charge. Il devrait bien évoluer pour
+      la plupart des applications. L'acceptation multi-ports est réalisée en
+      utilisant soit flock, IPC::Semaphore, soit pipe pour sérialiser les
+      enfants. La sérialisation peut également être activée pour un port unique
+      afin de contourner un système d'exploitation qui n'autorise pas plusieurs
+      enfants à accepter simultanément. Pour une discussion plus approfondie sur
+      la sérialisation, voir Net::Server::PreFork.</dd>
+  <dt id="PreFork"><a class="permalink" href="#PreFork">PreFork</a></dt>
+  <dd>Trouvé dans le module Net/Server/PreFork.pm (voir Net::Server::PreFork). Ce
+      serveur se lie à un ou plusieurs ports, puis crée par fork
+      <span class="Li">&quot;min_servers&quot;</span> processus enfants. Le serveur
+      s'assurera qu'à tout moment, il y a au moins
+      <span class="Li">&quot;min_spare_servers&quot;</span> mais pas plus de
+      <span class="Li">&quot;max_spare_servers&quot;</span> processus disponibles
+      pour recevoir une demande client, jusqu'à un maximum de
+      <span class="Li">&quot;max_servers&quot;</span>. Chacun de ces enfants
+      traitera jusqu'à <span class="Li">&quot;max_requests&quot;</span> connexions
+      client. Ce type est bon pour un site très sollicité et devrait bien évoluer
+      pour la plupart des applications. L'acceptation multi-ports est réalisée en
+      utilisant soit flock, IPC::Semaphore, soit pipe pour sérialiser les
+      enfants. La sérialisation peut également être activée pour un port unique
+      afin de contourner un système d'exploitation qui n'autorise pas plusieurs
+      enfants à accepter simultanément. Pour une discussion plus approfondie sur
+      la sérialisation, voir Net::Server::PreFork.</dd>
+  <dt id="Single"><a class="permalink" href="#Single">Single</a></dt>
+  <dd>Toutes les méthodes reviennent à Net::Server. Cette personnalité n'est
+      fournie que comme parallélisme pour Net::Server::MultiType.</dd>
+  <dt id="HTTP"><a class="permalink" href="#HTTP">HTTP</a></dt>
+  <dd>Trouvé dans le module Net/Server/HTTP.pm (voir Net::Server::HTTP). Ce
+      serveur est un démon HTTP de base qui prend en charge IPv6, SSL et les
+      journaux de style Apache.</dd>
+  <dt id="PSGI"><a class="permalink" href="#PSGI">PSGI</a></dt>
+  <dd>Trouvé dans le module Net/Server/PSGI.pm (voir Net::Server::PSGI). Ce
+      serveur est un démon PSGI de base qui prend en charge IPv6 et SSL.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTEUR</a></h1>
+<p class="Pp">Rocky Bernstein &lt;rocky@lemur.com&gt;</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT'><a class='permalink' href='#COPYRIGHT'>DROITS D'AUTEUR</a></h1>
+<p class="Pp">Copyright (c) 2000-2008, Rocky Bernstein. Tous droits réservés.</p>
+<p class="Pp">Ce programme est libre ; vous pouvez le redistribuer et/ou le
+    modifier sous les mêmes conditions que Perl lui-même.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR AUSSI</a></h1>
+<p class="Pp"><a class="Nm" href="Net::Server::Fork.html">Net::Server::Fork(3)</a>, <a class="Nm" href="Net::Server::INET.html">Net::Server::INET(3)</a>, <a class="Nm" href="Net::Server::MultiType.html">Net::Server::MultiType(3)</a>, <a class="Nm" href="Net::Server::Multiplex.html">Net::Server::Multiplex(3)</a>, <a class="Nm" href="Net::Server::PreFork.html">Net::Server::PreFork(3)</a>, <a class="Nm" href="Net::Server::Single.html">Net::Server::Single(3)</a>, <a class="Nm" href="Net::Server::HTTP.html">Net::Server::HTTP(3)</a>, <a class="Nm" href="Net::Server::PSGI.html">Net::Server::PSGI(3)</a>, <a class="Nm" href="IO::Multiplex.html">IO::Multiplex(3)</a>, <a class="Nm" href="IO::Socket::SSL.html">IO::Socket::SSL(3)</a></p>
+<p class="Pp"><a class="Nm" href="perl.html">perl(1)</a></p>
+</div>
+</section>
+                
+            </article>
+        </main>
+    </body>
+</html>
+HTTP">HTTP</a></dt>
+  <dd>Pas une personnalité distincte. Fournit un démon HTTP de base. Ceci peut
+      être combiné avec le protocole SSL ou SSLEAY pour fournir un démon HTTPS. Voir
+      Net::Server::HTTP.</dd>
+</dl>
+<p class="Pp"><span class="Li">&quot;Net::Server&quot;</span> a été partiellement
+    écrit pour faciliter l'ajout de nouvelles personnalités. L'utilisation de modules
+    séparés construits sur une architecture ouverte permet l'ajout facile de nouvelles fonctionnalités, un processus de développement séparé et une réduction du code superflu dans le module principal.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SOCKET_ACCESS'><a class='permalink' href='#SOCKET_ACCESS'>ACCÈS AUX SOCKET</a></h1>
+<p class="Pp">Une fois démarré, Net::Server s'occupe de se lier au port
+    et d'attendre les connexions. Une fois qu'une connexion est reçue, Net::Server accepte sur le socket et stockera le résultat (la connexion client)
+    dans <span class="Li">$self</span>-&gt;{server}-&gt;{client}. Cette propriété est un Socket béni dans les classes IO::Socket. Les serveurs UDP sont légèrement
+    différents en ce sens qu'ils effectueront un <b>recv</b> au lieu d'un
+    <b>accept</b>.</p>
+<p class="Pp">Pour faciliter la programmation, lors de la phase post_accept, STDIN
+    et STDOUT sont ouverts à la connexion client. Cela permet aux programmes d'être écrits en utilisant &lt;STDIN&gt; et print &quot;out\n&quot; pour imprimer sur la
+    connexion client. UDP nécessitera l'utilisation d'un appel -&gt;send.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SAMPLE_CODE'><a class='permalink' href='#SAMPLE_CODE'>EXEMPLE DE CODE</a></h1>
+<p class="Pp">Ce qui suit est un serveur très simple. La fonctionnalité principale
+    se produit dans l'appel de la méthode process_request comme montré ci-dessous. Notez l'utilisation des timeouts pour empêcher le déni de service lors de la lecture. (D'autres exemples d'utilisation de
+    <span class="Li">&quot;Net::Server&quot;</span> peuvent, ou seront, inclus avec cette distribution).</p>
+<pre>#!/usr/bin/perl -w -T
+package MyPackage;
+use strict;
+use base qw(Net::Server::PreFork); # n'importe quelle personnalité fera l'affaire
+MyPackage-&gt;run;
+# surcharger le gestionnaire d'écho par défaut
+sub process_request {
+    my $self = shift;
+    eval {
+        local $SIG{'ALRM'} = sub { die &quot;Timed Out!\n&quot; };
+        my $timeout = 30; # donner à l'utilisateur 30 secondes pour taper quelques lignes
+        my $previous_alarm = alarm($timeout);
+        while (&lt;STDIN&gt;) {
+            s/\r?\n$//;
+            print &quot;Vous avez dit '$_'\r\n&quot;;
+            alarm($timeout);
+        }
+        alarm($previous_alarm);
+    };
+    if ($@ =~ /timed out/i) {
+        print STDOUT &quot;Timed Out.\r\n&quot;;
+        return;
+    }
+}
+1;</pre>
+<p class="Pp">L'exécution de ce fichier depuis la ligne de commande invoquera un Net::Server utilisant la personnalité PreFork. Lors de la construction d'une couche serveur par-dessus Net::Server, il est important d'utiliser des fonctionnalités telles que les timeouts pour prévenir les attaques par déni de service.</p>
+<p class="Pp">Net::Server est livré avec un serveur d'écho intégré par défaut. Vous pouvez le tester en exécutant simplement la commande suivante depuis la ligne de commande :</p>
+<pre>net-server</pre>
+<p class="Pp">Si vous vouliez essayer une autre variante, vous pourriez essayer</p>
+<pre>net-server PreFork</pre>
+<p class="Pp">Si vous vouliez essayer un serveur HTTP de base, vous pourriez utiliser</p>
+<pre>net-server HTTP</pre>
+<p class="Pp">Ou si vous vouliez tester un CGI que vous écrivez, vous pourriez utiliser</p>
+<pre>net-server HTTP --app ../../mycgi.cgi</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ARGUMENTS'><a class='permalink' href='#ARGUMENTS'>ARGUMENTS</a></h1>
+<p class="Pp">Il y a au moins cinq façons possibles de passer des arguments à Net::Server. Ce sont : <i>les passer à la méthode new</i>, <i>les passer sur la ligne de commande</i>, <i>les passer en paramètres à run</i>, <i>utiliser un fichier de configuration</i>, <i>retourner des valeurs dans la méthode default_values</i>, ou <i>configurer les valeurs dans post_configure_hook</i>.</p>
+<p class="Pp">La méthode <span class="Li">&quot;options&quot;</span> est utilisée pour
+    déterminer quels arguments le serveur recherchera et peut être utilisée pour étendre les paramètres analysés. Tous les arguments trouvés sur la ligne de commande, les paramètres passés à run, et les arguments trouvés dans le conf_file seront comparés aux clés du modèle d'options. Tous les paramètres de ligne de commande qui ne correspondent pas resteront en place et pourront être traités davantage par le serveur dans les divers hooks (en regardant dans <span class="Li">@ARGV</span>).
+    Les arguments passés à new auront automatiquement priorité sur toutes les autres options (cela peut être utilisé si vous souhaitez interdire à un utilisateur de passer d'autres
+    arguments).</p>
+<p class="Pp">Les arguments consistent en des paires clé-valeur. Sur la ligne de commande, ces paires suivent la mode POSIX de <span class="Li">&quot;--key
+    value&quot;</span> ou <span class="Li">&quot;--key=value&quot;</span>, ainsi que
+    <span class="Li">&quot;key=value&quot;</span>. Dans le fichier de configuration, le passage de paramètres peut être mieux illustré par l'expression régulière suivante :
+    ($key,$val)=~/^(\w+)\s+(\S+?)\s+$/. Le passage d'arguments à la méthode run se fait comme suit : <span class="Li">&quot;&lt;Net::Server-&gt;run(key1
+    =&quot;</span> 'val1')&gt;&gt;. Le passage d'arguments via un objet préconstruit peut être mieux illustré dans le code suivant :</p>
+<pre>#!/usr/bin/perl -w -T
+package MyPackage;
+use strict;
+use base qw(Net::Server);
+my $server = MyPackage-&gt;new({
+    key1 =&gt; 'val1',
+});
+$server-&gt;run;</pre>
+<p class="Pp">Les cinq méthodes de passage d'arguments peuvent être utilisées simultanément. Une fois qu'un argument a été défini, il n'est pas écrasé si une autre méthode passe le même argument.
+    <span class="Li">&quot;Net::Server&quot;</span> recherchera les arguments dans l'ordre suivant :</p>
+<pre>1) Arguments passés à la méthode C&lt;new&gt;.
+2) Arguments passés sur la ligne de commande.
+3) Arguments passés à la méthode C&lt;run&gt;.
+4) Arguments passés via un fichier de configuration.
+5) Arguments définis dans la méthode C&lt;default_values&gt;.</pre>
+<p class="Pp">De plus, les hooks suivants sont disponibles :</p>
+<pre>1) Arguments définis dans le configure_hook (se produit après new
+   mais avant que toutes les autres zones ne soient vérifiées).
+2) Arguments définis et validés dans le post_configure_hook
+   (se produit après que toutes les autres zones aient été vérifiées).</pre>
+<p class="Pp">Chacun de ces niveaux remplacera les paramètres du même nom spécifiés dans les niveaux suivants. Par exemple, spécifier --setsid=0 sur la ligne de commande remplacera une valeur de &quot;setsid 1&quot; dans le fichier de configuration.</p>
+<p class="Pp">Notez que la méthode configure_hook ne retourne pas de valeurs à définir, mais est là pour permettre la configuration de valeurs avant que la méthode de configuration ne soit appelée.</p>
+<p class="Pp">Les paires clé/valeur utilisées par le serveur sont supprimées par le processus de configuration afin que les couches serveur au-dessus de
+    <span class="Li">&quot;Net::Server&quot;</span> puissent passer et lire leurs propres paramètres.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ADDING_CUSTOM_ARGUMENTS'><a class='permalink' href='#ADDING_CUSTOM_ARGUMENTS'>AJOUT D'ARGUMENTS PERSONNALISÉS</a></h1>
+<p class="Pp">Il est possible d'ajouter vos propres paramètres personnalisés à ceux analysés par Net::Server. Le code suivant montre comment cela est fait :</p>
+<pre>sub options {
+    my $self     = shift;
+    my $prop     = $self-&gt;{'server'};
+    my $template = shift;
+    # configurer les options dans les classes parentes
+    $self-&gt;SUPER::options($template);
+    # ajouter une option à valeur unique
+    $prop-&gt;{'my_option'} ||= undef;
+    $template-&gt;{'my_option'} = \ $prop-&gt;{'my_option'};
+    # ajouter une option à valeurs multiples
+    $prop-&gt;{'an_arrayref_item'} ||= [];
+    $template-&gt;{'an_arrayref_item'} = $prop-&gt;{'an_arrayref_item'};
+}</pre>
+<p class="Pp">La surcharge de la méthode <span class="Li">&quot;options&quot;</span>
+    permet d'ajouter vos propres champs personnalisés. Un hashref de modèle est passé, qui doit ensuite être modifié pour contenir tous vos champs personnalisés. Les champs destinés à recevoir une seule valeur scalaire doivent avoir une référence vers le scalaire de destination. Les champs destinés à recevoir plusieurs valeurs doivent référencer l'arrayref de destination correspondant.</p>
+<p class="Pp">Il vous incombe de valider vos options personnalisées une fois qu'elles ont été analysées. Le post_configure_hook est un bon endroit pour effectuer votre validation.</p>
+<p class="Pp">Certains e-mails ont demandé pourquoi nous utilisons cette méthode de "modèle". L'idée est que vous créez la structure de données pour stocker les valeurs, et vous créez également un moyen d'insérer les valeurs dans la structure de données. Le modèle est le moyen d'acheminer les valeurs vers la structure de données du serveur. Une des possibilités (qui n'est probablement pas beaucoup utilisée) est qu'en vous permettant de spécifier le mappage, vous pourriez construire une structure de données imbriquée - même si les arguments passés sont plats. Cela vous permet également de configurer des alias pour vos noms.</p>
+<p class="Pp">Par exemple, une structure de base pourrait ressembler à ceci :</p>
+<pre>$prop = $self-&gt;{'server'}
+$prop-&gt;{'my_custom_option'} ||= undef;
+$prop-&gt;{'my_custom_array'}  ||= [];
+$template = {
+    my_custom_option =&gt; \ $prop-&gt;{'my_custom_option'},
+    mco              =&gt; \ $prop-&gt;{'my_custom_option'}, # alias
+    my_custom_array  =&gt; $prop-&gt;{'my_custom_array'},
+    mca              =&gt; $prop-&gt;{'my_custom_array'}, # un alias
+};
+$template-&gt;{'mco2'} = $template-&gt;{'mco'}; # une autre façon d'aliaser</pre>
+<p class="Pp">Mais vous pourriez aussi avoir des données plus complexes :</p>
+<pre>$prop = $self-&gt;{'server'};
+$prop-&gt;{'one_layer'} = {
+    two_layer =&gt; [
+        undef,
+        undef,
+    ],
+};
+$template = {
+    param1 =&gt; \ $prop-&gt;{'one_layer'}-&gt;{'two_layer'}-&gt;[0],
+    param2 =&gt; \ $prop-&gt;{'one_layer'}-&gt;{'two_layer'}-&gt;[1],
+};</pre>
+<p class="Pp">Ceci est bien sûr un exemple artificiel - mais il montre que vous pouvez obtenir les données des arguments plats passés à n'importe quel type de structure dont vous avez besoin - avec seulement un peu d'effort.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DEFAULT_ARGUMENTS_FOR_Net::Server'><a class='permalink' href='#DEFAULT_ARGUMENTS_FOR_Net::Server'>ARGUMENTS PAR DÉFAUT POUR Net::Server</a></h1>
+<p class="Pp">Les arguments suivants sont disponibles dans les modules
+    <span class="Li">&quot;Net::Server&quot;</span> ou
+    <span class="Li">&quot;Net::Server::Single&quot;</span> par défaut. (D'autres
+    personnalités peuvent utiliser des paramètres supplémentaires et peuvent éventuellement ne pas utiliser les paramètres de la classe de base.)</p>
+<pre>Clé               Valeur                    Défaut
+conf_file         &quot;nom_fichier&quot;               undef
+log_level         0-4                      2
+log_file          (nom_fichier|Sys::Syslog
+                   |Log::Log4perl)         undef
+log_function                               undef
+port              \d+                      20203
+host              &quot;hôte&quot;                   &quot;*&quot;
+ipv               (4|6|*)                  *
+proto             (tcp|udp|unix)           &quot;tcp&quot;
+listen            \d+                      SOMAXCONN
+ipv6_package      (IO::Socket::INET6
+                   |IO::Socket::IP)
+## paramètres syslog (si log_file eq Sys::Syslog)
+syslog_logsock    (native|unix|inet|udp
+                   |tcp|stream|console)    unix (sur Sys::Syslog &lt; 0.15)
+syslog_ident      &quot;identité&quot;               &quot;net_server&quot;
+syslog_logopt     (cons|ndelay|nowait|pid) pid
+syslog_facility   \w+                      daemon
+reverse_lookups   (1|double|double-debug)  undef
+double_reverse_lookups  (1|debug|autofail) undef
+allow             /regex/                  none
+deny              /regex/                  none
+cidr_allow        CIDR                     none
+cidr_deny         CIDR                     none
+## paramètres de daemonization
+pid_file          &quot;nom_fichier&quot;               undef
+chroot            &quot;répertoire&quot;              undef
+user              (uid|nom_utilisateur)           &quot;nobody&quot;
+grou</pre>
+p             (gid|group)              &quot;nobody&quot;
+background        1                        undef
+setsid            1                        undef
+no_close_by_child (1|undef)                undef
+## Ver Net::Server::Proto::(TCP|UDP|UNIX|SSL|SSLeay|etc)
+## pour plus d'exemples de paramètres.
+
+<dl class="Bl-tag">
+  <dt id="conf_file"><a class="permalink" href="#conf_file">conf_file</a></dt>
+  <dd>Nom du fichier depuis lequel les paires clé-valeur supplémentaires pour initialiser le serveur seront lues. La valeur par défaut est undef.
+    <p class="Pp">Il existe deux façons de spécifier un emplacement par défaut pour conf_file. La première consiste à passer la valeur par défaut à la méthode run, comme suit :</p>
+    <pre>MyServer-&gt;run({
+   conf_file =&gt; '/etc/my_server.conf',
+});
+</pre>
+    <p class="Pp">Si l'utilisateur final passe --conf_file=/etc/their_server.conf, la valeur sera remplacée.</p>
+    <p class="Pp">La deuxième façon a été ajoutée dans la version 0.96. Elle utilise la méthode default_values, comme suit :</p>
+    <pre>sub default_values {
+    return {
+        conf_file =&gt; '/etc/my_server.conf',
+    }
+}
+</pre>
+    <p class="Pp">Cette méthode a l'avantage de pouvoir être surchargée dans la méthode run.</p>
+    <p class="Pp">Si vous ne voulez pas que l'utilisateur puisse spécifier un conf_file, vous pouvez passer conf_file à la méthode new lors de la création de votre objet :</p>
+    <pre>MyServer-&gt;new({
+   conf_file =&gt; '/etc/my_server.conf',
+})-&gt;run;
+</pre>
+    <p class="Pp">Si vous le passez ainsi, la valeur passée à new supplantera toute autre valeur passée.</p>
+  </dd>
+  <dt id="log_level"><a class="permalink" href="#log_level">log_level</a></dt>
+  <dd>Plage de 0 à 4 en niveau. Spécifie quel niveau d'erreur sera enregistré. "0" signifie que l'enregistrement est désactivé. "4" signifie très verbeux. Ces niveaux doivent correspondre aux niveaux syslog. La valeur par défaut est 2. Ces niveaux correspondent aux niveaux syslog selon les paires clé/valeur suivantes : 0=&gt;'err', 1=&gt;'warning', 2=&gt;'notice', 3=&gt;'info', 4=&gt;'debug'.</dd>
+  <dt id="log_file"><a class="permalink" href="#log_file">log_file</a></dt>
+  <dd>Nom du fichier journal ou du système de journalisation où écrire. Si aucun nom n'est spécifié et que le hook write_to_log n'est pas surchargé, le journal sera envoyé à STDERR. La valeur par défaut est undef.
+    <p class="Pp">log_file peut également être le nom d'une classe de journalisation enfichable de Net::Server. Net::Server est livré avec Sys::Syslog et Log::Log4perl. Si log_file ressemble au nom d'un module, "Net::Server::Log::" sera ajouté au début et le module sera requis. La classe doit fournir une méthode "initialize" qui renvoie une fonction unique qui sera utilisée pour la journalisation. La fonction renvoyée sera passée le niveau du message et le message.</p>
+    <p class="Pp">Si le nom magique "Sys::Syslog" est utilisé, tous les journaux seront traités par le module Net::Server::Log::Sys::Syslog. Si syslog est utilisé, les paramètres <span class="Li">&quot;syslog_logsock&quot;</span>, <span class="Li">&quot;syslog_ident&quot;</span>, <span class="Li">&quot;syslog_logopt&quot;</span> et <span class="Li">&quot;syslog_facility&quot;</span> peuvent également être définis. Voir Net::Server::Log::Sys::Syslog.</p>
+    <p class="Pp">Si le nom magique "Log::Log4perl" est utilisé, tous les journaux seront dirigés vers le système Log4perl. Si utilisé, <span class="Li">&quot;log4perl_conf&quot;</span>, <span class="Li">&quot;log4perl_poll&quot;</span>, <span class="Li">&quot;log4perl_logger&quot;</span> peuvent être définis. Voir Net::Server::Log::Log::Log4per.</p>
+    <p class="Pp">Si un <span class="Li">&quot;log_file&quot;</span> est spécifié ou si <span class="Li">&quot;setsid&quot;</span> est défini, STDIN et STDOUT seront automatiquement ouverts sur /dev/null et STDERR sera ouvert sur STDOUT. Cela évitera que toute sortie ne soit déposée dans le terminal.</p>
+  </dd>
+  <dt id="log_function"><a class="permalink" href="#log_function">log_function</a></dt>
+  <dd>Peut prendre un coderef ou un nom de méthode qui sera appelé lorsqu'un événement de journalisation se produit. Le niveau du message et le message de l'événement lui seront transmis.
+    <p class="Pp">Note : Les fonctions dépendantes de stdout ne fonctionneront pas pendant process_request si tie_stdout est activé (comme dans Net::Server::HTTP).</p>
+  </dd>
+  <dt id="pid_file"><a class="permalink" href="#pid_file">pid_file</a></dt>
+  <dd>Nom du fichier où le PID du processus parent est stocké. S'applique généralement uniquement aux serveurs qui forquent. La valeur par défaut est none (undef).</dd>
+  <dt id="port"><a class="permalink" href="#port">port</a></dt>
+  <dd>Voir Net::Server::Proto pour des exemples de configuration supplémentaires.
+    <p class="Pp">Port local auquel se lier. S'il s'agit d'un port bas, le processus doit démarrer en tant que root. Si plusieurs ports sont spécifiés, ils seront tous ouverts au démarrage du serveur. Il peut s'agir de la forme <span class="Li">&quot;host:port/proto&quot;</span>, <span class="Li">&quot;host:port/proto/ipv&quot;</span>, <span class="Li">&quot;host:port&quot;</span>, <span class="Li">&quot;port/proto&quot;</span>, ou <span class="Li">&quot;port&quot;</span>, où <i>host</i> représente un nom d'hôte sur la machine locale, et <i>port</i> représente le numéro de port (par exemple, "80") ou la désignation du service (par exemple, "http"), où <i>ipv</i> représente la version du protocole (IPv4 ou IPv6 ou IPv*) et <i>proto</i> représente le protocole à utiliser. Voir Net::Server::Proto. Voici quelques chaînes de ports valides :</p>
+    <pre>20203                            # port seulement
+localhost:20203                  # hôte et port
+localhost:http                   # localhost avec port 80
+localhost:20203/tcp              # hôte, port, protocole
+localhost:20203/tcp/IPv*         # hôte, port, protocole et famille
+localhost, 20203, tcp, IPv*      # idem
+localhost | 20203 | tcp | IPv*   # idem
+localhost:20203/IPv*             # lier toutes les interfaces locales pour IPv4 ou 6 (par défaut)
+localhost:20203/IPv4/IPv6        # lier localhost sur IPv4 et 6 (échoue si ne peut pas faire les deux)
+*:20203                          # lier toutes les interfaces locales
+</pre>
+    <p class="Pp">De plus, lorsqu'il est passé en code (non en ligne et non en configuration), le port peut être passé sous forme de hashref ou d'arrayhashref d'informations :</p>
+    <pre>port =&gt; {
+    host  =&gt; 'localhost',
+    port  =&gt; '20203',
+    ipv   =&gt; 6,     # IPv6 seulement
+    proto =&gt; 'udp', # protocole UDP
+}
+port =&gt; [{
+    host  =&gt; '*',
+    port  =&gt; '20203',
+    ipv   =&gt; 4,     # IPv4 seulement
+    proto =&gt; 'tcp', # (défaut)
+}, {
+    host  =&gt; 'localhost',
+    port  =&gt; '20204',
+    ipv   =&gt; '*',      # défaut - toutes les interfaces IPv4 et IPv6 liées à localhost
+    proto =&gt; 'ssleay', # ou ssl - utilisant SSL
+}],
+</pre>
+    <p class="Pp">Un <i>host</i> explicite dans une spécification de port supplante une adresse de liaison par défaut (un <span class="Li">&quot;host&quot;</span>, voir ci-dessous). La partie <i>host</i> peut être entre crochets, mais lorsqu'il s'agit d'une adresse IPv6 numérique, elle doit être entre crochets pour éviter toute ambiguïté dans l'analyse d'un numéro de port, par exemple : "[::1]:80". Cependant, vous pouvez également utiliser des barres verticales, des espaces blancs ou des virgules pour séparer ces éléments. Note : l'hôte et le numéro de port doivent venir en premier.</p>
+    <p class="Pp">Si le protocole n'est pas spécifié, <i>proto</i> sera utilisé comme le <span class="Li">&quot;proto&quot;</span> spécifié dans les arguments. Si <span class="Li">&quot;proto&quot;</span> n'est pas spécifié, "tcp" sera utilisé par défaut. Si <i>host</i> n'est pas spécifié, <i>host</i> sera utilisé comme le <span class="Li">&quot;host&quot;</span> spécifié dans les arguments. Si <span class="Li">&quot;host&quot;</span> n'est pas spécifié, "*" sera utilisé par défaut. Le port par défaut est 20203. La configuration passée à new ou run peut être un scalaire avec un numéro de port ou un tableau de ports. Si <span class="Li">&quot;ipv&quot;</span> n'est pas spécifié, "*" sera utilisé par défaut (toute adresse résolue sous IPv4 ou IPv6).</p>
+    <p class="Pp">Si vous travaillez avec des sockets Unix, vous pouvez également spécifier <span class="Li">&quot;socket_file|unix&quot;</span> ou <span class="Li">&quot;socket_file|type|unix&quot;</span> où type est SOCK_DGRAM ou SOCK_STREAM.</p>
+    <p class="Pp">Sur les systèmes qui le prennent en charge, une valeur de port de 0 peut être utilisée pour que le système d'exploitation attribue un port automatiquement. La valeur du port attribué sera stockée dans la propriété NS_port de l'objet Net::Server::Proto::TCP et sera également disponible dans la méthode sockport. Lorsque le serveur traite une requête, la propriété $self->{server}->{sockport} contient le port connecté.</p>
+  </dd>
+  <dt id="host"><a class="permalink" href="#host">host</a></dt>
+  <dd>Hôte local ou adresse sur laquelle le port sera lié. Si '*' est donné, le port sera lié à toutes les adresses disponibles sur la machine. L'argument <span class="Li">&quot;host&quot;</span> fournit un hôte local par défaut si l'argument <span class="Li">&quot;port&quot;</span> omet une spécification d'hôte. Voir Net::Server::Proto. Voir IO::Socket. La configuration passée à new ou run peut être un scalaire avec un seul hôte ou un tableau d'hôtes - si le tableau d'hôtes est plus court que le tableau de ports, le dernier enregistrement sera utilisé pour étendre le tableau d'hôtes jusqu'à la taille du tableau de ports.
+    <p class="Pp">Si une adresse IPv4 est passée, un socket IPv4 sera créé. Si une adresse IPv6 est passée, un socket IPv6 sera créé. Si un nom d'hôte est passé, Net::Server examinera la valeur de ipv (par défaut IPv4) pour déterminer le type de socket à créer. La spécification ipv peut éventuellement être passée dans le nom d'hôte.</p>
+    <pre>host =&gt; &quot;127.0.0.1&quot;,  # une adresse IPv4
+host =&gt; &quot;::1&quot;,        # une adresse IPv6
+host =&gt; 'localhost',  # adresses correspondant à localhost (par défaut tout IPv4 et/ou IPv6)
+host =&gt; 'localhost/IPv*',  # idem
+ipv  =&gt; 6,
+host =&gt; 'localhost',  # adresses correspondant à localhost (IPv6)
+ipv  =&gt; 4,
+host =&gt; 'localhost',  # adresses correspondant à localhost (IPv4)
+ipv  =&gt; 'IPv4 IPv6',
+host =&gt; 'localhost',  # adresses correspondant à localhost (nécessite IPv6 et IPv4)
+host =&gt; '*',          # toute interface locale (tout IPv6 ou IPv4)
+host =&gt; '*/IPv*',     # idem (tout IPv6 ou IPv4)
+ipv  =&gt; 4,
+host =&gt; '*',          # toute interface IPv4 locale
+</pre>
+  </dd>
+  <dt id="proto"><a class="permalink" href="#proto">proto</a></dt>
+  <dd>Voir Net::Server::Proto. Protocole à utiliser lors de la liaison des ports. Voir IO::Socket. Depuis la version 2.0, Net::Server prend en charge tcp, udp, unix, unixdgram, ssl et ssleay. D'autres types devront être ajoutés ultérieurement (ou des modules personnalisés étendant la classe Net::Server::Proto pourront être utilisés). La configuration passée à new ou run peut être un scalaire avec un seul proto ou un tableau de protos - si le tableau de protos est plus court que le tableau de ports, le dernier enregistrement sera utilisé pour étendre le tableau de protos jusqu'à la taille du tableau de ports.
+    <p class="Pp">De plus, proto peut également contenir la spécification d'ipv.</p>
+  </dd>
+  <dt id="ipv"><a class="permalink" href="#ipv">ipv (IPv4 et IPv6)</a></dt>
+  <dd>Voir Net::Server::Proto.
+    <p class="Pp">Ce paramètre est utilisé pour spécifier le type de socket à créer. La valeur par défaut est IPv4.</p>
+  </dd>
+  <dt id="log_level"><a class="permalink" href="#log_level">log_level</a></dt>
+  <dd>Plage de 0 à 4 en niveau. Spécifie quel niveau d'erreur sera enregistré. "0" signifie que l'enregistrement est désactivé. "4" signifie très verbeux. Ces niveaux doivent correspondre aux niveaux syslog. La valeur par défaut est 2. Ces niveaux correspondent aux niveaux syslog selon les paires clé/valeur suivantes : 0=&gt;'err', 1=&gt;'warning', 2=&gt;'notice', 3=&gt;'info', 4=&gt;'debug'.</dd>
+</dl><p class="Pp">IPv6 est maintenant disponible sous Net::Server. Il sera utilisé
+        automatiquement si une adresse IPv6 est passée, ou si ipv est explicitement
+        défini sur IPv6, ou si ipv est laissé à la valeur par défaut d'IPv*. C'est
+        un changement significatif par rapport aux versions 2.004 et antérieures
+        où la valeur par défaut était IPv4. Cependant, le comportement précédent
+        a causé de la confusion sur les hôtes uniquement IPv6, et sur les hôtes
+        qui n'avaient que des entrées IPv6 pour un nom d'hôte local. Essayer de
+        passer une adresse IPv4 lorsque ipv est défini sur 6 (uniquement 6 - pas
+        * ou 4) entraînera une erreur.</p>
+        <pre>localhost:20203 # utilisera IPv6 s'il existe une entrée correspondante pour localhost
+                # utilisera également IPv4 s'il existe une entrée v4 correspondante pour localhost
+localhost:20203:IPv*  # identique (par défaut)
+localhost:20203:IPv6  # utilisera IPv6
+[::1]:20203           # utilisera IPv6 (adresse de style IPv6)
+localhost:20203:IPv4  # utilisera IPv4
+127.0.0.1:20203       # utilisera IPv4 (adresse de style IPv4)
+localhost:20203:IPv4:IPv6 # se liera aux deux v4 et v6 - échoue sinon
+# ou sous forme de hashref comme
+port =&gt; {
+    host =&gt; &quot;localhost&quot;,
+    ipv  =&gt; 6, # se lie uniquement à IPv6
+}
+port =&gt; {
+    host =&gt; &quot;localhost&quot;,
+    ipv  =&gt; 4, # se lie uniquement à IPv4
+}
+port =&gt; {
+    host =&gt; &quot;::1&quot;,
+    ipv  =&gt; &quot;IPv6&quot;, # identique à passer &quot;6&quot;
+}
+port =&gt; {
+    host =&gt; &quot;localhost/IPv*&quot;,       # n'importe quel IPv4 ou IPv6
+}
+port =&gt; {
+    host =&gt; &quot;localhost IPv4 IPv6&quot;,  # doit créer les deux
+}
+</pre>
+    <p class="Pp">Dans de nombreuses solutions Net::Server proposées, IPv* était activé par
+        défaut. Pour les versions 2.000 à 2.004, le défaut précédent d'IPv4 était
+        utilisé. Nous avons tenté de faciliter la définition d'IPv4, d'IPv6 ou d'IPv*.
+        Si vous ne voulez pas ou n'avez pas besoin d'IPv6, définissez simplement
+        ipv sur 4, passez IPv4 dans la spécification de port, définissez
+        <span class="Li">$ENV</span>{'IPV'}=4; avant d'exécuter le serveur, définissez
+        <span class="Li">$ENV</span>{'NO_IPV6'}, ou désinstallez IO::Socket::IP et/ou
+        IO::Socket::INET6.</p>
+    <p class="Pp">Sur ma machine locale, la commande suivante produit la sortie
+        suivante :</p>
+        <pre>perl -e 'use base qw(Net::Server); main-&gt;run(host =&gt; &quot;localhost&quot;)'
+Résolu [localhost]:20203 en [::1]:20203, IPv6
+Résolu [localhost]:20203 en [127.0.0.1]:20203, IPv4
+Liaison au port TCP 20203 sur l'hôte ::1 avec IPv6
+Liaison au port TCP 20203 sur l'hôte 127.0.0.1 avec IPv4
+</pre>
+    <p class="Pp">Ma machine locale a l'IPv6 activé et il existe des entrées pour
+        localhost sur IPv6 ::1 et IPv4 127.0.0.1. Je pourrais également choisir de
+        lier explicitement les ports plutôt que de dépendre de ipv =&gt; &quot;*&quot;
+        pour les résoudre, comme dans l'exemple suivant :</p>
+        <pre>perl -e 'use base qw(Net::Server); main-&gt;run(port =&gt; [20203,20203], host =&gt; &quot;localhost&quot;, ipv =&gt; [4,6])'
+Liaison au port TCP 20203 sur l'hôte localhost avec IPv4
+Liaison au port TCP 20203 sur l'hôte localhost avec IPv6
+</pre>
+    <p class="Pp">Il existe un cas spécial d'utilisation de host =&gt; &quot;*&quot; ainsi que
+        de ipv =&gt; &quot;*&quot;. La méthode Net::Server::Proto::_bindv6only est utilisée pour
+        vérifier le paramètre système de
+        <span class="Li">&quot;sysctl -n net.ipv6.bindv6only&quot;</span> (ou
+        net.inet6.ip6.v6only). Si ce paramètre est faux, un socket IPv6 écoutera
+        l'adresse IPv4 correspondante. Par exemple, l'adresse [::] (équivalent IPv6
+        de INADDR_ANY) écoutera également 0.0.0.0. L'adresse ::FFFF:127.0.0.1
+        (IPv6) écouterait également 127.0.0.1 (IPv4). Dans ce cas, un seul socket
+        sera créé car il gérera les deux cas (une erreur est retournée si une tentative
+        est faite d'écouter les deux adresses lorsque bindv6only est faux).</p>
+    <p class="Pp">Cependant, si net.ipv6.bindv6only (ou son équivalent) est vrai,
+        alors un nom d'hôte (tel que *) résolvant à la fois une entrée IPv4 et une
+        entrée IPv6 entraînera un socket IPv4 ainsi qu'un socket IPv6.</p>
+    <p class="Pp">Sur ma machine linux qui utilise par défaut net.ipv6.bindv6only=0, la
+        sortie suivante est produite.</p>
+        <pre>perl -e 'use base qw(Net::Server); main-&gt;run(host =&gt; &quot;*&quot;)'
+Résolu [*]:8080 en [::]:8080, IPv6
+N'inclut pas l'hôte résolu [0.0.0.0] IPv4 car il sera géré par [::] IPv6
+Liaison au port TCP 8080 sur l'hôte :: avec IPv6
+</pre>
+    <p class="Pp">Si j'exécute <span class="Li">&quot;sudo /sbin/sysctl -w
+        net.ipv6.bindv6only=1&quot;</span>, la sortie suivante est produite.</p>
+        <pre>perl -e 'use base qw(Net::Server); main-&gt;run(host =&gt; &quot;*&quot;)'
+Résolu [*]:8080 en [0.0.0.0]:8080, IPv4
+Résolu [*]:8080 en [::]:8080, IPv6
+Liaison au port TCP 8080 sur l'hôte 0.0.0.0 avec IPv4
+Liaison au port TCP 8080 sur l'hôte :: avec IPv6
+</pre>
+    <p class="Pp">BSD diffère de linux et utilise généralement par défaut
+        net.inet6.ip6.v6only=0. S'il ne peut être déterminé sur votre OS, il sera
+        par défaut faux et le message de journalisation passera de &quot;il sera
+        géré&quot; à &quot;il devrait être géré&quot; (si vous avez un moyen peu coûteux
+        en ressources de vérifier sur votre plateforme, n'hésitez pas à m'envoyer un
+        e-mail). Assurez-vous de vérifier les journaux lors des tests de votre
+        serveur pour vous assurer que vous avez lié les ports souhaités. Vous pouvez
+        toujours passer des spécifications de port IPv4 et IPv6 explicites
+        individuelles si nécessaire. Par exemple, si votre système dispose
+        d'interfaces IPv4 et IPv6 mais que vous souhaitez uniquement vous lier aux
+        entrées IPv6, vous devriez utiliser un nom d'hôte de [::] au lieu de [*].</p>
+    <p class="Pp">Si bindv6only (ou son équivalent) est faux, et que vous recevez
+        une connexion IPv4 sur un port IPv6 lié, la représentation textuelle de
+        l'adresse IPv4 du pair sera généralement sous la forme d'une adresse IPv6
+        mappée IPv4, par exemple &quot;::FFFF:127.0.0.1&quot;.</p>
+    <p class="Pp">Le paramètre ipv a été choisi car il n'entre pas en conflit avec
+        d'autres utilisations existantes, il est très similaire à ipv4 ou ipv6, il
+        permet au code utilisateur de ne pas avoir besoin de connaître
+        Socket::AF_INET ou IO::Socket::INET6 ou Socket::AF_UNSPEC, et il est
+        court.</p>
+  </dd>
+  <dt id="listen"><a class="permalink" href="#listen">listen</a></dt>
+  <dd>Voir IO::Socket. Non utilisé avec le protocole udp (ou UNIX SOCK_DGRAM).</dd>
+  <dt id="ipv6_package"><a class="permalink" href="#ipv6_package">ipv6_package</a></dt>
+  <dd>Net::Server::Proto essaiera de déterminer la classe de socket appropriée à
+      utiliser si un socket v6 est nécessaire. Il essaiera par défaut IO::Socket::IP
+      en premier, puis IO::Socket::INET6. La spécification de ce package permet
+      d'utiliser un package spécifique (notez que IO::Socket::SSL utilisé par
+      Proto::SSL détermine lui-même son package de socket ipv6).</dd>
+  <dt id="reverse_lookups"><a class="permalink" href="#reverse_lookups">reverse_lookups</a></dt>
+  <dd>Spécifie s'il faut rechercher le nom d'hôte de l'IP connecté. Les informations
+      sont mises en cache dans l'objet serveur sous la propriété
+      <span class="Li">&quot;peerhost&quot;</span>. Par défaut, la recherche
+      inversée n'est pas utilisée (undef).</p>
+    <p class="Pp">Peut être défini sur les valeurs &quot;double&quot;,
+        &quot;double-detail&quot;, &quot;double-autofail&quot;, ou
+        &quot;double-debug&quot; pour définir double_reverse_lookups.</p>
+  </dd>
+  <dt id="double_reverse_lookups"><a class="permalink" href="#double_reverse_lookups">double_reverse_lookups</a></dt>
+  <dd>Si défini, définit également reverse_lookups.</p>
+    <p class="Pp">Identique à la définition de reverse_lookups sur &quot;double&quot;. Recherche
+        les IP auxquelles le nom d'hôte se résout pour s'assurer que l'IP de connexion
+        est l'une de ces IP.</p>
+    <p class="Pp">Définit peerhost_rev comme un hashref des adresses IP auxquelles le nom
+        s'est résolu lors de get_client_info.</p>
+    <p class="Pp">Si double_reverse_lookups est défini, la méthode
+        double_reverse_lookup est appelée pendant la méthode allow_deny. La méthode
+        double_reverse_lookup reçoit :</p>
+        <pre>addr  - l'adresse IPv4 ou IPv6
+host  - le nom d'hôte auquel addr s'est résolu
+addrs - le hashref des adresses IP auxquelles host s'est résolu
+orig  - l'adresse originale non filtrée
+</pre>
+    <p class="Pp">Fait retourner false à allow_deny s'il n'y a pas de nom d'hôte, pas
+        d'IP inversées, ou si l'une des adresses IP ne correspond pas à l'adresse IP
+        de connexion. Envoie un message de niveau de journalisation 3.</p>
+    <p class="Pp">Peut définir double_reverse_lookups sur l'une des options suivantes
+        pour ajuster la journalisation :</p>
+        <pre>detail   - ajoute les addrs aux messages d'échec
+autofail - échoue à chaque connexion et journalise
+debug    - journalise les informations d'adresse (mais ne pas échouer) pour les connexions réussies
+</pre>
+    <p class="Pp">Les commandes en ligne suivantes peuvent aider au débogage :</p>
+        <pre>net-server HTTP --reverse_lookups=double-debug --log_level=3
+# curl localhost:8080 dans une autre fenêtre
+2022/11/30-22:16:45 CONNECT TCP Peer: &quot;[::ffff:127.0.0.1]:44766&quot; (localhost)  Local: &quot;[::ffff:127.0.0.1]:8080&quot;
+2022/11/30-22:16:45 Double reverse debug:  addr: 127.0.0.1,  host: localhost,  addrs: (127.0.0.1),  orig_addr: ::ffff:127.0.0.1
+</pre>
+    <p class="Pp">La double_reverse_lookup est appelée avant l'exécution des règles
+        allow/deny.</p>
+  </dd>
+  <dt id="allow/deny"><a class="permalink" href="#allow/deny">allow/deny</a></dt>
+  <dd>Peut être spécifié plusieurs fois. Contient une regex à comparer au peeraddr
+      entrant ou au peerhost (si reverse_lookups a été activé). Si les options
+      allow ou deny sont données, le client entrant doit correspondre à un allow et
+      ne pas correspondre à un deny, sinon la connexion client sera fermée. Par défaut,
+      des tableaux vides.</dd>
+  <dt id="cidr_allow/cidr_deny"><a class="permalink" href="#cidr_allow/cidr_deny">cidr_allow/cidr_deny</a></dt>
+  <dd>Peut être spécifié plusieurs fois. Contient un bloc CIDR à comparer au
+      peeraddr entrant. Si les options cidr_allow ou cidr_deny sont données, le
+      client entrant doit correspondre à un cidr_allow et ne pas correspondre à un
+      cidr_deny, sinon la connexion client sera fermée. Par défaut, des tableaux
+      vides.</dd>
+  <dt id="chroot"><a class="permalink" href="#chroot">chroot</a></dt>
+  <dd>Répertoire vers lequel se chrooter après que le processus de liaison a eu lieu et
+      que le serveur s'exécute toujours en tant que root. Par défaut, undef.</dd>
+  <dt id="user"><a class="permalink" href="#user">user</a></dt>
+  <dd>Identifiant utilisateur ou nom d'utilisateur à adopter après que le processus de
+      liaison a eu lieu. Par défaut, &quot;nobody.&quot; Si vous souhaitez que le
+      serveur s'exécute en tant que root, vous devrez spécifier
+      <span class="Li">&quot;user&quot;</span> égal à &quot;root&quot;.</dd>
+  <dt id="group"><a class="permalink" href="#group">group</a></dt>
+  <dd>Identifiant de groupe ou nom de groupe à adopter après que le processus de
+      liaison a eu lieu. Par défaut, &quot;nobody.&quot; Si vous souhaitez que le
+      serveur s'exécute en tant que root, vous devrez spécifier
+      <span class="Li">&quot;group&quot;</span> égal à &quot;root&quot;.</dd>
+  <dt id="background"><a class="permalink" href="#background">background</a></dt>
+  <dd>Spécifie si le serveur doit forker après la méthode bind pour se libérer de la
+      ligne de commande. Par défaut, undef. Le processus sera également mis en arrière-plan
+      si <span class="Li">&quot;setsid&quot;</span> est défini.</dd>
+  <dt id="setsid"><a class="permalink" href="#setsid">setsid</a></dt>
+  <dd>Spécifie si le serveur doit forker après la méthode bind pour se libérer de la
+      ligne de commande, puis exécuter la commande
+      <span class="Li">POSIX::setsid()</span> pour véritablement démoniaiser.
+      Par défaut, undef. Si un <span class="Li">&quot;log_file&quot;</span> est donné ou si
+      <span class="Li">&quot;setsid&quot;</span> est défini, STDIN et STDOUT seront
+      automatiquement ouverts sur /dev/null et STDERR sera ouvert sur STDOUT. Cela
+      empêchera toute sortie d'apparaître sur le
+    terminal.</dd>
+  <dt id="no_close_by_child"><a class="permalink" href="#no_close_by_child">no_close_by_child</a></dt>
+  <dd>Booléen. Spécifie si un enfant</dd>
+</dl>
+ked child process has permission or
+      not to shutdown the entire server process. If set to 1, the child may NOT
+      signal the parent to shutdown all children. Default is undef (not
+    set).</dd>
+  <dt id="no_client_stdout"><a class="permalink" href="#no_client_stdout">no_client_stdout</a></dt>
+  <dd>Booléen. Valeur par défaut : undef (non défini). Indique que STDIN et STDOUT ne doivent pas être ouverts sur le handle client une fois qu'une connexion a été acceptée. Par défaut, Net::Server ouvrira STDIN et STDOUT sur le socket client, ce qui facilitera la lecture et l'écriture directes depuis et vers le socket pour de nombreux types de scripts en utilisant les méthodes d'impression et de lecture normales. La désactivation de cette option est utile sur les clients qui peuvent ouvrir leurs propres connexions à STDIN et STDOUT.
+    <p class="Pp">Cette option n'a aucun effet sur STDIN et STDOUT, qui disposent d'une propriété client magique liée aux STDIN et STDOUT déjà ouverts.</p>
+  </dd>
+  <dt id="leave_children_open_on_hup"><a class="permalink" href="#leave_children_open_on_hup">leave_children_open_on_hup</a></dt>
+  <dd>Booléen. Valeur par défaut : undef (non défini). Si défini, le processus parent ne tentera pas de fermer les processus enfants si le processus parent reçoit un signal HUP. Le processus parent reconfigurera le port ouvert et commencera à suivre un nouvel ensemble d'enfants.
+    <p class="Pp">Les enfants d'un serveur Fork se termineront après leur requête en cours. Les enfants d'un serveur de type Prefork termineront la requête en cours puis se termineront.</p>
+    <p class="Pp">Note - le processus parent nouvellement redémarré démarrera un nouvel ensemble de serveurs sur les serveurs fork. Le nouveau processus parent tentera de suivre les enfants du processus parent précédent, mais les canaux de communication personnalisés (pipes ouverts du processus enfant vers le processus parent précédent) ne seront plus disponibles pour les anciens processus enfants. Les nouveaux processus enfants se connecteront toujours correctement au nouveau processus parent.</p>
+  </dd>
+  <dt id="sig_passthrough"><a class="permalink" href="#sig_passthrough">sig_passthrough</a></dt>
+  <dd>Par défaut : none. Permet de transmettre les signaux demandés aux enfants. Prend un seul nom de signal, une liste de noms séparés par des virgules ou un tableau de noms de signaux. Il envoie d'abord les signaux aux enfants avant d'appeler tout signal actuellement enregistré sous ce nom.</dd>
+  <dt id="tie_client_stdout"><a class="permalink" href="#tie_client_stdout">tie_client_stdout</a></dt>
+  <dd>Par défaut : undef. Si défini, utilisera l'interface liée de Net::Server::TiedHandle pour STDIN et STDOUT. Cette interface permet à SSL et SSLEAY de fonctionner. Elle permet également d'intercepter la lecture et l'écriture via les callbacks tied_stdin_callback et tied_stdout_callback.</dd>
+  <dt id="tied_stdin_callback"><a class="permalink" href="#tied_stdin_callback">tied_stdin_callback</a></dt>
+  <dd>Par défaut : undef. Appelé lors de la lecture de données STDIN si tie_client_stdout a été défini, ou si la méthode tie_stdout du handle client renvoie true. Il reçoit la connexion client, le nom de la méthode qui serait appelée, et les arguments qui sont passés. Le callback est alors responsable d'appeler cette méthode sur le handle ou d'effectuer une autre opération d'entrée.</dd>
+  <dt id="tied_stdout_callback"><a class="permalink" href="#tied_stdout_callback">tied_stdout_callback</a></dt>
+  <dd>Par défaut : undef. Appelé lors de l'écriture de données sur STDOUT si tie_client_stdout a été défini, ou si la méthode tie_stdout du handle client renvoie true. Il reçoit la connexion client, le nom de la méthode qui serait appelée, et les arguments qui sont passés. Le callback est alors responsable d'appeler cette méthode sur le handle ou d'effectuer une autre opération de sortie.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PROPERTIES'><a class='permalink' href='#PROPERTIES'>PROPRIÉTÉS</a></h1>
+<p class="Pp">Tous les <span class="Li">&quot;ARGUMENTS&quot;</span> listés ci-dessus
+    deviennent des propriétés de l'objet serveur sous le même nom. Ces propriétés,
+    ainsi que d'autres propriétés internes, sont disponibles pendant les hooks et
+    d'autres appels de méthode.</p>
+<p class="Pp">La structure d'un objet Net::Server est illustrée ci-dessous :</p>
+<pre>$self = bless({
+    server =&gt; {
+        key1 =&gt; 'val1',
+        # plus de clés/valeurs
+    },
+}, 'Net::Server');</pre>
+<p class="Pp">Cette structure a été choisie afin que toutes les propriétés liées
+    au serveur soient regroupées sous une seule clé du hash de l'objet. Ceci afin
+    que d'autres objets puissent s'appuyer sur la classe d'objet Net::Server tout
+    en conservant un espace de noms relativement propre dans le hash.</p>
+<p class="Pp">Vous pouvez obtenir et définir les propriétés de deux manières. La
+    manière suggérée est d'accéder directement aux propriétés via</p>
+<pre>my $val = $self-&gt;{server}-&gt;{key1};</pre>
+<p class="Pp">L'accès direct aux propriétés accélérera le processus du serveur -
+    bien que certains pourraient juger cela comme un mauvais style. Une deuxième
+    manière a été fournie pour les types orientés objet qui croient aux méthodes.
+    La deuxième manière consiste en les méthodes suivantes :</p>
+<pre>my $val = $self-&gt;get_property( 'key1' );
+my $self-&gt;set_property( key1 =&gt; 'val1' );</pre>
+<p class="Pp">Les propriétés peuvent être modifiées à tout moment avec prudence
+    (ne pas mettre la propriété sock à undef, car cela fermerait la connexion
+    client).</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CONFIGURATION_FILE'><a class='permalink' href='#CONFIGURATION_FILE'>FICHIER DE CONFIGURATION</a></h1>
+<p class="Pp"><span class="Li">&quot;Net::Server&quot;</span> permet l'utilisation
+    d'un fichier de configuration pour lire les paramètres du serveur. Le format
+    de ce fichier de configuration est simple, avec des paires clé-valeur. Les
+    commentaires et les lignes vides sont ignorés.</p>
+<pre>  #-------------- file test.conf --------------
+  ### utilisateur et groupe à devenir
+  user        quelqu'un
+  group       toutlemonde
+  # journalisation ?
+  log_file    /var/log/server.log
+  log_level   3
+  pid_file    /tmp/server.pid
+  # directive syslog optionnelle
+  # utilisée à la place de log_file ci-dessus
+  #log_file       Sys::Syslog
+  #syslog_logsock unix
+  #syslog_ident   myserver
+  #syslog_logopt  pid|cons
+  # contrôle d'accès
+  allow       .+\.(net|com)
+  allow       domain\.com
+  deny        a.+
+  cidr_allow  127.0.0.0/8
+  cidr_allow  192.0.2.0/24
+  cidr_deny   192.0.2.4/30
+  # lancer le processus en arrière-plan ?
+  background  1
+  # ports où se lier (ceci devrait lier
+  # 127.0.0.1:20205 sur IPv6 et
+  # localhost:20204 sur IPv4)
+  # Voir Net::Server::Proto
+  host        127.0.0.1
+  ipv         IPv6
+  port        localhost:20204/IPv4
+  port        20205
+  # recherches inverses ?
+  # reverse_lookups on
+#-------------- file test.conf --------------</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PROCESS_FLOW'><a class='permalink' href='#PROCESS_FLOW'>FLUX DE PROCESSUS</a></h1>
+<p class="Pp">Le flux de processus est écrit de manière ouverte, facile à
+    remplacer et facile à accrocher. Le flux de base est montré ci-dessous. C'est
+    le flux de la méthode <span class="Li">&quot;$self-&gt;run&quot;</span>.</p>
+<pre>$self-&gt;configure_hook;
+$self-&gt;configure(@_);
+$self-&gt;post_configure;
+$self-&gt;post_configure_hook;
+$self-&gt;pre_bind;
+$self-&gt;bind;
+$self-&gt;post_bind_hook;
+$self-&gt;post_bind;
+$self-&gt;pre_loop_hook;
+$self-&gt;loop;
+### routines dans un $self-&gt;loop standard
+# $self-&gt;accept;
+# $self-&gt;run_client_connection;
+# $self-&gt;done;
+$self-&gt;pre_server_close_hook;
+$self-&gt;server_close;</pre>
+<p class="Pp">Le serveur se termine ensuite.</p>
+<p class="Pp">Pendant la phase de traitement du client
+    (<span class="Li">&quot;$self-&gt;run_client_connection&quot;</span>), ce qui
+    suit représente le flux du programme :</p>
+<pre>$self-&gt;post_accept;
+$self-&gt;get_client_info;
+$self-&gt;post_accept_hook;
+if ($self-&gt;allow_deny
+    &amp;&amp; $self-&gt;allow_deny_hook) {
+    $self-&gt;process_request;
+} else {
+    $self-&gt;request_denied_hook;
+}
+$self-&gt;post_process_request_hook;
+$self-&gt;post_process_request;
+$self-&gt;post_client_connection_hook;</pre>
+<p class="Pp">La méthode allow_deny appelle
+    <span class="Li">$self</span>-&gt;double_reverse_lookup si les recherches
+    inverses doubles sont activées.</p>
+<p class="Pp">Le processus boucle ensuite et attend la prochaine connexion. Pour
+    une discussion plus approfondie, veuillez lire le code.</p>
+<p class="Pp">Pendant la phase de fermeture du serveur
+    (<span class="Li">&quot;$self-&gt;server_close&quot;</span>), ce qui suit
+    représente le flux du programme :</p>
+<pre>$self-&gt;close_children;  # si il y en a
+$self-&gt;post_child_cleanup_hook;
+if (Restarting server) {
+    $self-&gt;restart_close_hook();
+    $self-&gt;hup_server;
+}
+$self-&gt;shutdown_sockets;
+$self-&gt;server_exit;</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MAIN_SERVER_METHODS'><a class='permalink' href='#MAIN_SERVER_METHODS'>MÉTHODES PRINCIPALES DU SERVEUR</a></h1>
+<dl class="Bl-tag">
+  <dt>&quot;$self-&gt;run&quot;</dt>
+  <dd>Cette méthode intègre le flux de processus principal. Ce flux est listé
+      ci-dessus.
+    <p class="Pp">La méthode run peut être appelée de l'une des manières
+        suivantes.</p>
+        <pre>MyPackage-&gt;run(port =&gt; 20201);
+MyPackage-&gt;new({port =&gt; 20201})-&gt;run;
+my $obj = bless {server=&gt;{port =&gt; 20201}}, 'MyPackage';
+$obj-&gt;run;
+</pre>
+    <p class="Pp">La méthode -&gt;run devrait typiquement être la dernière méthode
+        appelée dans un script de démarrage de serveur (le serveur se terminera
+        à la fin de la méthode -&gt;run).</p>
+  </dd>
+  <dt>&quot;$self-&gt;configure&quot;</dt>
+  <dd>Cette méthode tente de lire les configurations depuis la ligne de commande,
+      depuis l'appel de la méthode run, ou depuis un fichier conf_file spécifié
+      (le conf_file peut être spécifié par des paramètres passés, ou dans les
+      default_values). Tous les paramètres configurés sont ensuite stockés dans la
+      propriété {&quot;server&quot;} de l'objet Server.</dd>
+  <dt>&quot;$self-&gt;post_configure&quot;</dt>
+  <dd>Le hook post_configure commence le démarrage du serveur. Pendant que cette
+      méthode s'exécute, les instances de serveur en cours sont vérifiées, les
+      pid_files sont créés, les log_files sont créés, Sys::Syslog est
+      initialisé (si nécessaire), le lancement du processus en arrière-plan se
+      produit et le serveur ferme STDIN et STDOUT (si nécessaire).</dd>
+  <dt>&quot;$self-&gt;pre_bind&quot;</dt>
+  <dd>Cette méthode est utilisée pour initialiser tous les objets socket utilisés
+      par le serveur.</dd>
+  <dt>&quot;$self-&gt;bind&quot;</dt>
+  <dd>Cette méthode se lie effectivement aux sockets initialisés (ou se relie si le
+      serveur a reçu un HUP).</dd>
+  <dt>&quot;$self-&gt;post_bind&quot;</dt>
+  <dd>Pendant cette méthode, les privilèges sont abaissés. Les signaux INT, TERM
+      et QUIT sont configurés pour exécuter server_close. Sig PIPE est configuré
+      sur IGNORE. Sig CHLD est configuré sur sig_chld. Et sig HUP est configuré
+      pour appeler sig_hup.
+    <p class="Pp">Sous les personnalités Fork, PreFork et PreFork simple, ces
+        signaux sont enregistrés en utilisant Net::Server::SIG pour permettre une
+        gestion sûre des signaux.</p>
+  </dd>
+  <dt>&quot;$self-&gt;loop&quot;</dt>
+  <dd>Pendant cette phase, le serveur accepte les connexions entrantes. Le
+      comportement de la manière dont l'acceptation se produit et si un processus
+      enfant gère la connexion est contrôlé par le type de personnalité
+      Net::Server utilisé.
+    <p class="Pp">Net::Server et Net::Server single n'acceptent qu'une seule
+        connexion à la fois.</p>
+    <p class="Pp">Net::Server::INET exécute une connexion puis se termine (pour
+        être utilisé par les démons inetd ou xinetd).</p>
+    <p class="Pp">Net::Server::MultiPlex permet à un processus de gérer
+        simultanément plusieurs connexions (mais nécessite de réécrire le code
+        process_request pour fonctionner d'une manière plus proche de celle des
+        &quot;paquets&quot;).</p>
+    <p class="Pp">Net::Server::Fork crée un nouveau processus enfant pour chaque
+        connexion entrante.</p>
+    <p class="Pp">Net::Server::PreForkSimple démarre un nombre fixe de processus
+        qui acceptent tous les connexions entrantes.</p>
+    <p class="Pp">Net::Server::PreFork démarre un nombre de base de processus
+        enfants qui acceptent tous les connexions entrantes</p>
+  </dd>
+</dl>
+</section>
+Voici le contenu traduit en français, en conservant la structure du fichier :
+
+```html
+<section class="Sh">
+<h1 class="Sh" id="SERVEUR_INTERNE_METHODS"><a class='permalink' href='#SERVEUR_INTERNE_METHODS'>MÉTHODES INTERNES DU SERVEUR</a></h1>
+<dl class="Bl-tag">
+  <dt>"$self-&gt;server_startup"</dt>
+  <dd>Cette méthode est appelée juste avant que le serveur ne commence réellement à écouter les connexions.
+    <p class="Pp">Cette méthode initialise le serveur, la mise en place des options de configuration, l'ouverture des sockets et la gestion des signaux. Elle prépare le serveur à accepter les connexions entrantes.</p>
+    <p class="Pp">Elle peut être surchargée pour des initialisations personnalisées avant que le serveur ne commence à accepter les connexions.</p>
+  </dd>
+  <dt>"$self-&gt;server_init"</dt>
+  <dd>Cette méthode est appelée au début de la méthode <span class="Li">run</span>.
+    <p class="Pp">Elle est utilisée pour configurer le serveur, lire les options de configuration, initialiser les fichiers de journalisation et les fichiers de processus (pid_files). La méthode charge le reste de la configuration.</p>
+  </dd>
+  <dt>"$self-&gt;run"</dt>
+  <dd>La méthode principale qui fait tourner le serveur.
+    <p class="Pp">Elle appelle <span class="Li">server_startup</span>, puis entre dans une boucle pour accepter et gérer les connexions entrantes.</p>
+    <p class="Pp">Pour chaque connexion, elle appelle <span class="Li">run_client_connection</span>. Elle continue jusqu'à ce que le serveur soit signalé pour s'arrêter ou redémarrer.</p>
+  </dd>
+  <dt>"$self-&gt;pre_background_hook"</dt>
+  <dd>Ce hook est appelé avant que le processus serveur ne passe en arrière-plan (fork).</dd>
+  <dt>"$self-&gt;background_hook"</dt>
+  <dd>Ce hook est appelé après que le processus serveur est passé en arrière-plan (fork). Il est utile pour nettoyer le terminal parent.</dd>
+  <dt>"$self-&gt;accept_loop"</dt>
+  <dd>Cette méthode gère la boucle d'acceptation des connexions.
+    <p class="Pp">Selon les options de configuration, elle peut gérer plusieurs ports d'écoute simultanément.</p>
+    <p class="Pp">Elle s'arrête lorsque le serveur reçoit un signal pour se terminer ou redémarrer.</p>
+  </dd>
+  <dt>"$self-&gt;post_accept_loop_hook"</dt>
+  <dd>Ce hook est appelé juste après la fin de la boucle d'acceptation et juste avant que le serveur ne s'arrête.</dd>
+  <dt>"$self-&gt;server_close"</dt>
+  <dd>Cette méthode est appelée une fois que le serveur a reçu le signal de fin, de redémarrage (via HUP), ou que la méthode <span class="Li">loop</span> s'est terminée.
+    <p class="Pp">Cette méthode s'occupe de nettoyer les processus enfants restants, de définir les indicateurs appropriés sur les sockets (pour le HUP), de fermer la journalisation, puis de fermer les sockets ouverts.</p>
+    <p class="Pp">Peut éventuellement recevoir une valeur de sortie qui sera transmise à l'appel de <span class="Li">server_exit</span>.</p>
+  </dd>
+  <dt>"$self-&gt;server_exit"</dt>
+  <dd>Cette méthode est appelée à la fin de <span class="Li">server_close</span>. Elle appelle <span class="Li">exit</span>, mais peut être surchargée pour d'autres actions. À ce stade, tous les services doivent être arrêtés.
+    <p class="Pp">Peut éventuellement recevoir une valeur de sortie qui sera transmise à l'appel de <span class="Li">exit</span>.</p>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="MÉTHODES_DE_CONNEXION_CLIENT_PRINCIPALES"><a class='permalink' href='#MÉTHODES_DE_CONNEXION_CLIENT_PRINCIPALES'>MÉTHODES DE CONNEXION CLIENT PRINCIPALES</a></h1>
+<dl class="Bl-tag">
+  <dt>"$self-&gt;run_client_connection"</dt>
+  <dd>Cette méthode est exécutée après que le serveur a accepté et reçu une connexion client. Le flux complet du processus est listé ci-dessus sous FLUX DE PROCESSUS. Cette méthode prend en charge la gestion de chaque connexion client.</dd>
+  <dt>"$self-&gt;post_accept"</dt>
+  <dd>Cette méthode ouvre STDIN et STDOUT sur le socket client. Cela permet à n'importe quelle méthode pendant la phase <span class="Li">run_client_connection</span> d'imprimer directement sur le socket client et de lire directement depuis celui-ci.</dd>
+  <dt>"$self-&gt;get_client_info"</dt>
+  <dd>Cette méthode recherche des informations sur la connexion client telles que l'adresse IP, le type de socket et le nom d'hôte (si nécessaire).
+    <p class="Pp">Définit les éléments suivants dans <span class="Li">$self</span>-&gt;{'server'} (notez que ces noms ne correspondent pas nécessairement aux noms des bibliothèques IO::Socket) :</p>
+        <pre>sockaddr     - Adresse IP lisible à laquelle la connexion a été établie
+sockport     - Port local auquel la connexion a été établie
+peeraddr     - Adresse IP lisible de la source distante (IPv6 ou IPv4)
+peerport     - Port source de la connexion
+peerhost     - Nom d'hôte résolu à partir de l'adresse IP (si possible)
+peerhost_rev - Hasher d'adresses IP de la recherche inversée du peerhost - seulement défini si double_reverse_lookups est activé
+</pre>
+  </dd>
+  <dt>"$self-&gt;allow_deny"</dt>
+  <dd>Cette méthode utilise les règles définies dans les paramètres de configuration <span class="Li">allow</span> et <span class="Li">deny</span> pour déterminer si l'adresse IP doit être acceptée.</dd>
+  <dt>"$self-&gt;double_reverse_lookup"</dt>
+  <dd>Appelée si la valeur <span class="Li">double_reverse_lookups</span> est définie ou si <span class="Li">reverse_lookups</span> est définie sur &quot;double&quot;. Utilise les adresses IP du hashref <span class="Li">peerhost_rev</span> pour vérifier que l'IP de la connexion est valide pour le nom d'hôte. Voir la configuration <span class="Li">double_reverse_lookups</span>.</dd>
+  <dt>"$self-&gt;process_request"</dt>
+  <dd>Cette méthode est destinée à gérer toute la communication client. À ce stade, STDIN et STDOUT sont ouverts vers le client, l'adresse IP a été vérifiée. Le serveur peut alors interagir avec la connexion client selon l'API ou le protocole que le serveur implémente. Notez que l'implémentation par défaut utilise STDIN et STDOUT et ne fonctionnera pas si l'indicateur <span class="Li">no_client_stdout</span> est défini.
+    <p class="Pp">C'est la méthode principale à surcharger.</p>
+    <p class="Pp">La méthode par défaut implémente un simple serveur d'écho qui répétera tout ce qui est envoyé. Il quittera l'enfant si &quot;quit&quot; est envoyé, et quittera le serveur si &quot;exit&quot; est envoyé.</p>
+    <p class="Pp">Depuis la version 2.000, le descripteur du client est passé en argument.</p>
+  </dd>
+  <dt>"$self-&gt;post_process_request"</dt>
+  <dd>Cette méthode est utilisée pour nettoyer la connexion client et gérer toute comptabilité parent/enfant pour les serveurs qui utilisent le fork.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="HOOKS"><a class='permalink' href='#HOOKS'>HOOKS</a></h1>
+<p class="Pp"><span class="Li">&quot;Net::Server&quot;</span> fournit un certain nombre de &quot;hooks&quot; permettant aux serveurs construits sur <span class="Li">&quot;Net::Server&quot;</span> de réagir à différents niveaux d'exécution sans avoir à utiliser <span class="Li">&quot;SUPER&quot;</span> dans les méthodes principales intégrées. L'emplacement des hooks peut être vu dans la section FLUX DE PROCESSUS.</p>
+<p class="Pp">Presque toutes les méthodes de hook par défaut ne font rien. Pour utiliser un hook, il suffit de surcharger la méthode dans votre sous-classe. Par exemple, pour ajouter votre propre <span class="Li">post_configure_hook</span>, vous pourriez faire quelque chose comme suit :</p>
+<pre>package MyServer;
+sub post_configure_hook {
+    my $self = shift;
+    my $prop = $self-&gt;{'server'};
+    # faire une validation ici
+}</pre>
+<p class="Pp">Ce qui suit décrit les hooks disponibles dans la classe <span class="Li">Net::Server</span> simple (d'autres variantes comme Fork ou PreFork ont des hooks supplémentaires).</p>
+<dl class="Bl-tag">
+  <dt>"$self-&gt;configure_hook()"</dt>
+  <dd>Ce hook a lieu immédiatement après l'appel de la méthode <span class="Li">&quot;-&gt;run()&quot;</span>. Ce hook permet de configurer l'objet avant que toute configuration intégrée n'ait lieu. Cela permet une configurabilité personnalisée.</dd>
+  <dt>"$self-&gt;post_configure_hook()"</dt>
+  <dd>Ce hook se produit juste après la lecture des paramètres de configuration et l'initiation de la journalisation et de la création du fichier pid. Il se produit également avant l'appel des méthodes <span class="Li">&quot;-&gt;pre_bind()&quot;</span> et <span class="Li">&quot;-&gt;bind()&quot;</span>. Ce hook permet de vérifier les paramètres de configuration.</dd>
+  <dt>"$self-&gt;post_bind_hook()"</dt>
+  <dd>Ce hook se produit juste après le processus de liaison (bind) et juste avant que toute opération de chroot, de changement d'utilisateur ou de groupe ne se produise. À ce stade, le processus s'exécutera toujours sous l'utilisateur qui a démarré le serveur.</dd>
+  <dt>"$self-&gt;pre_loop_hook()"</dt>
+  <dd>Ce hook se produit après que le chroot, le changement d'utilisateur et le changement de groupe ont eu lieu. Il permet une préparation avant le début de la boucle.</dd>
+  <dt>"$self-&gt;can_read_hook()"</dt>
+  <dd>Ce hook se produit après qu'un socket devient lisible lors d'une requête <span class="Li">accept_multi_port</span> (accept_multi_port est utilisé s'il y a plusieurs ports liés pour accepter, ou si le paramètre de configuration <span class="Li">&quot;multi_port&quot;</span> est défini sur vrai). Ce hook est destiné à permettre le traitement de descripteurs arbitraires ajoutés à <span class="Li">IO::Select</span> utilisé pour <span class="Li">accept_multi_port</span>. Ces descripteurs pourraient être ajoutés pendant le <span class="Li">post_bind_hook</span>. Aucun support interne n'est ajouté pour le traitement de ces descripteurs ou leur ajout à <span class="Li">IO::Socket</span>. Il faut être prudent quant à ce qui se passe pendant le <span class="Li">can_read_hook</span>, car un temps de réponse long rendra le serveur susceptible aux attaques par déni de service (DOS). Une valeur de retour vraie indique que le serveur ne doit pas transmettre le descripteur lisible aux phases <span class="Li">post_accept</span> et <span class="Li">process_request</span>.
+    <p class="Pp">Il est généralement suggéré de rechercher d'autres moyens pour envoyer des messages via des sockets non créés par Net::Server.</p>
+  </dd>
+  <dt>"$self-&gt;post_accept_hook()"</dt>
+  <dd>Ce hook se produit après qu'un client s'est connecté au serveur. À ce stade, STDIN et STDOUT sont mappés au socket client. Ce hook se produit avant le traitement de la requête.</dd>
+  <dt>"$self-&gt;allow_deny_hook()"</dt>
+  <dd>Ce hook permet de vérifier les informations IP et hôte au-delà de la routine <span class="Li">&quot;$self-&gt;allow_deny()&quot;</span>. Si ce hook retourne 1, la requête client sera traitée, sinon, la requête sera refusée.
+    <p class="Pp">Depuis la version 2.000, la connexion client est passée en argument.</p>
+  </dd>
+  <dt>"$self-&gt;request_denied_hook()"</dt>
+  <dd>Ce hook se produit si <span class="Li">&quot;$self-&gt;allow_deny()&quot;</span> ou <span class="Li">&quot;$self-&gt;allow_deny_hook()&quot;</span> ont eu lieu.</dd>
+  <dt>"$self-&gt;post_process_request_hook()"</dt>
+  <dd>Ce hook se produit après le traitement de la requête, mais avant que la connexion client ne soit fermée.</dd>
+  <dt>"$self-&gt;post_client_connection_hook"</dt>
+  <dd>C'est un dernier hook qui se produit à la toute fin de la méthode <span class="Li">run_client_connection</span>. À ce stade, toutes les autres méthodes et hooks qui s'exécuteront pendant <span class="Li">run_client_connection</span> ont terminé et la connexion client a déjà été fermée.
+    <p class="Pp">élément <span class="Li">&quot;$self-&gt;other_child_died_hook($pid)&quot;</span></p>
+    <p class="Pp">Net::Server prend le contrôle de la gestion des signaux et du nettoyage des processus enfants ; cela rend difficile de savoir quand un processus enfant se termine s'il n'a pas été démarré par Net::Server lui-même. Si Net::Server remarque qu'un autre processus enfant meurt qu'il n'a pas démarré, il déclenchera ce hook avec le PID du processus terminé.</p>
+  </dd>
+  <dt>"$self-&gt;pre_server_close_hook()"</dt>
+  <dd>Ce hook se produit avant que le serveur ne commence sa fermeture.</dd>
+  <dt>"$self-&gt;write_to_log_hook"</dt>
+  <dd>Ce hook gère l'écriture dans les fichiers de log. Le hook par défaut consiste à écrire sur STDERR, ou sur le nom de fichier contenu dans le paramètre <span class="Li">&quot;log_file&quot;</span>. Les arguments passés sont un niveau de log de 0 à 4 (4 étant très verbeux), et une ligne de log. Si <span class="Li">log_file</span> est égal à &quot;Sys::Syslog&quot;, alors la journalisation ira vers Sys::Syslog et contournera le <span class="Li">write_to_log_hook</span>.</dd>
+  <dt>"$self-&gt;fatal_hook"</dt>
+  <dd>Ce hook se produit lorsque le serveur rencontre une erreur irrécupérable. Les arguments passés sont le message d'erreur, le package, le fichier et le numéro de ligne. Le hook peut fermer le serveur, mais il est suggéré qu'il retourne simplement et utilise les fonctionnalités d'arrêt intégrées.</dd>
+  <dt>"$self-&gt;post_child_cleanup_hook"</dt>
+  <dd>Ce hook se produit dans le processus serveur parent après que tous les enfants ont été arrêtés et juste avant que le serveur ne redémarre ou ne quitte. Il est destiné au nettoyage supplémentaire des informations. À ce stade, les fichiers pid et les fichiers de verrouillage existent toujours.</dd>
+  <dt>"$self-&gt;restart_open_hook"</dt>
+  <dd>Ce hook se produit si un serveur a reçu un signal HUP (redémarré via le signal HUP). Il se produit juste avant de rouvrir les descripteurs de fichiers des sockets qui étaient déjà ouverts.</dd>
+  <dt>"$self-&gt;restart_close_hook"</dt>
+  <dd>Ce hook se produit si un serveur a reçu un signal HUP (redémarré via le signal HUP). Il se produit juste avant de redémarrer le serveur via <span class="Li">exec</span>.</dd>
+  <dt>"$self-&gt;child_init_hook()"</dt>
+  <dd>Ce hook est appelé pendant le fonctionnement des serveurs utilisant le fork. Il est également appelé pendant <span class="Li">run_dequeue</span>. Il s'exécute juste après le fork et après que les signaux ont été nettoyés. S'il s'agit d'un processus de dequeue, la chaîne 'dequeue' sera passée en argument.
+    <p class="Pp">Si vos processus enfants auront besoin de nombres aléatoires, ce hook est un bon endroit pour initialiser <span class="Li">srand</span> (les processus issus de fork maintiennent la même graine aléatoire sauf si elle est modifiée).</p>
+        <pre>sub child_init_hook {
+    # d'après perldoc -f srand
+    srand(time ^ $$ ^ unpack &quot;%L*&quot;, `ps axww | gzip -f`);
+}
+</pre>
+  </dd>
+  <dt>"$self-&gt;pre_fork_hook()"</dt>
+  <dd>Similaire au hook <span class="Li">child_</span></dd>
+</dl>
+</section>
+```<section class="Sh">
+<h1 class="Sh" id='INIT_HOOK'><a class='permalink' href='#INIT_HOOK'>INICIO</a></h1>
+<dl class="Bl-tag">
+  <dt>&quot;$self-&gt;init_hook&quot;</dt>
+  <dd>Est appelé juste avant le fork.</dd>
+  <dt>&quot;$self-&gt;register_child($pid, $type)&quot;</dt>
+  <dd>Est appelé quand le processus enfant a été forké. Le type sera un de
+      dequeue, fork, prefork ou preforksimple selon où l'enfant a été créé.</dd>
+  <dt>&quot;$self-&gt;child_finish_hook&quot;</dt>
+  <dd>Similaire au hook d'initialisation, mais est appelé quand le processus forké est
+      sur le point de se terminer.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='OTHER_METHODS'><a class='permalink' href='#OTHER_METHODS'>AUTRES MÉTHODES</a></h1>
+<dl class="Bl-tag">
+  <dt>&quot;$self-&gt;default_values&quot;</dt>
+  <dd>Permet de retourner des valeurs de configuration qui seront utilisées si aucune autre valeur n'a été trouvée.</dd>
+  <dt>&quot;$self-&gt;handle_syslog_error&quot;</dt>
+  <dd>Est appelé quand log_file est défini sur 'Sys::Syslog' et qu'il y a une erreur lors de l'écriture dans le syslog. Deux arguments sont passés, la valeur de $@ et un arrayref contenant les arguments qui ont été passés à la fonction log lorsque l'erreur s'est produite.</dd>
+  <dt>&quot;$self-&gt;log&quot;</dt>
+  <dd>Les paramètres sont un niveau de log et un message. Si le niveau de log est 'Sys::Syslog', les paramètres peuvent alternativement être un niveau de log, une chaîne de formatage et des paramètres de formatage supplémentaires. (Le deuxième paramètre est supposé être une chaîne de formatage si plus d'arguments sont passés). Passer des chaînes de formatage arbitraires à Sys::Syslog rendra le serveur vulnérable à l'exploitation. La maintenance du serveur doit s'assurer que toute chaîne traitée comme format est contrôlée.</dd>
+  <pre># en supposant log_file = 'Sys::Syslog'
+$self-&gt;log(1, &quot;Mon message avec %s dedans&quot;);
+# envoie &quot;%s&quot;, &quot;Mon message avec %s dedans&quot; au syslog
+$self-&gt;log(1, &quot;Mon message avec %s dedans&quot;, &quot;Foo&quot;);
+# envoie &quot;Mon message avec %s dedans&quot;, &quot;Foo&quot; au syslog
+</pre>
+  <dd>Si log_file est défini sur un fichier (autre que Sys::Syslog), le message sera ajouté au fichier log en appelant la fonction write_to_log_hook.</dd>
+  <dd>Si le log_file est Sys::Syslog et qu'une erreur se produit lors de l'écriture, la fonction handle_syslog_error est appelée et l'exception d'erreur est passée. Le comportement par défaut de handle_syslog_error est de faire die - mais cela pourrait facilement être indiqué pour ne rien faire avec le code suivant dans votre classe héritée :</dd>
+  <pre>sub handle_syslog_error {}
+</pre>
+  <dd>Si le log avait été fermé, vous pourriez essayer de le rouvrir dans le gestionnaire d'erreurs avec le code suivant :</dd>
+  <pre>sub handle_syslog_error {
+    my $self = shift;
+    $self-&gt;open_syslog;
+}
+</pre>
+  <dd>La méthode new est utilisée depuis Net::Server 0.91. Cette méthode prend un nom de classe et un hashref d'arguments comme paramètres. Le hashref d'arguments devient la propriété 'server' de l'objet.</dd>
+  <pre>package MyPackage;
+use base qw(Net::Server);
+my $obj = MyPackage-&gt;new({port =&gt; 20201});
+# équivalent à
+my $obj = bless {server =&gt; {port =&gt; 20201}}, 'MyPackage';
+</pre>
+  <dd>La méthode open_syslog est appelée pendant post_configure lorsque l'option log_file est définie sur 'Sys::Syslog'. Par défaut, elle utilise les options configurées dans ce document. Si un comportement plus personnalisé est souhaité, la méthode peut être remplacée et Sys::Syslog::openlog appelée avec les paramètres personnalisés.</dd>
+  <dd>La méthode shutdown_sockets ferme tous les sockets qui sont ouverts. Elle est appelée à la fin de la méthode server_close.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='RESTARTING'><a class='permalink' href='#RESTARTING'>REDÉMARRAGE</a></h1>
+<p class="Pp">Chacun des personnages de serveur (sauf INET) prend en charge le redémarrage via le signal HUP (voir &quot;kill -l&quot;). Lorsqu'un HUP est reçu, le serveur ferme les enfants (s'il y en a), s'assure que les sockets sont ouverts et se réexécute en utilisant les mêmes arguments de ligne de commande qui ont initialement lancé le serveur. (Note : il est important que @ARGV ne soit pas modifié tant que &quot;-&gt;run&quot; n'est pas appelé).</p>
+<p class="Pp">Net::Server tente de trouver la ligne de commande utilisée pour lancer le programme. La tentative est effectuée avant le traitement de tout fichier de configuration ou argument. Le résultat de cette tentative est stocké à l'aide de la méthode &quot;-&gt;commandline&quot;. Le contenu de la ligne de commande peut également être récupéré en utilisant la même méthode. Le contenu stocké peut contenir des éléments taint qui provoqueront l'arrêt du serveur lorsqu'il est utilisé avec le drapeau -T (mode taint). Comme il est impossible de décider arbitrairement de ce qui est sûr et de ce qui ne l'est pas, le programme individuel doit nettoyer les éléments taint avant un redémarrage.</p>
+<pre>sub configure_hook{
+    my $self = shift;
+    ### voir le contenu
+    my $ref  = $self-&gt;commandline;
+    use Data::Dumper;
+    print Dumper $ref;
+    ### décontamination arbitraire - très risqué
+    my @untainted = map {/(.+)/;$1} @$ref;
+    $self-&gt;commandline(\@untainted)
+}</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SHUTDOWN'><a class='permalink' href='#SHUTDOWN'>ARRÊT</a></h1>
+<p class="Pp">Chacun des personnages Fork et PreFork prend en charge un arrêt en douceur via le signal QUIT. Lorsqu'un QUIT est reçu, le parent signale aux enfants puis attend leur fermeture.</p>
+<p class="Pp">Tous les personnages de serveur prennent en charge un arrêt en douceur via les signaux TERM et INT.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='HOT_DEPLOY'><a class='permalink' href='#HOT_DEPLOY'>DÉPLOIEMENT</a></h1>
+<p class="Pp">Depuis la version 2.000, les personnages Fork et PreFork acceptent les signaux TTIN et TTOU. Lorsqu'un TTIN est reçu, max_servers est incrémenté de 1. Si un TTOU est reçu, max_servers est décrémenté de 1. Cela permet d'ajuster le nombre de processus de traitement sans avoir à redémarrer le serveur.</p>
+<p class="Pp">Si log_level est défini sur 3, la nouvelle valeur est affichée dans les logs.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='FILES'><a class='permalink' href='#FILES'>FICHIERS</a></h1>
+<p class="Pp">Les fichiers suivants sont installés dans le cadre de cette distribution.</p>
+<pre>Net/Server.pm
+Net/Server/Fork.pm
+Net/Server/INET.pm
+Net/Server/MultiType.pm
+Net/Server/PreForkSimple.pm
+Net/Server/PreFork.pm
+Net/Server/Single.pm
+Net/Server/Daemonize.pm
+Net/Server/SIG.pm
+Net/Server/Proto.pm
+Net/Server/Proto/*.pm</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INSTALL'><a class='permalink' href='#INSTALL'>INSTALLATION</a></h1>
+<p class="Pp">Téléchargez et extrayez l'archive avant d'exécuter ces commandes dans votre répertoire racine :</p>
+<pre>perl Makefile.PL
+make
+make test
+make install</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTEUR</a></h1>
+<p class="Pp">Paul Seamons &lt;paul at seamons.com&gt;</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='THANKS'><a class='permalink' href='#THANKS'>REMERCIEMENTS</a></h1>
+<p class="Pp">Alors que nous nous déplaçons vers le flux GitHub, veuillez vous assurer d'ajouter votre nom aux crédits lors de la soumission de correctifs (si vous le souhaitez, vous pouvez être mentionné).</p>
+<p class="Pp">Merci à Rob Brown (bbb at cpan.org) pour son aide sur des concepts tels que le suivi de sélection sérialisé par flock à la manière d'Apache et la référence à IO::Select qui rend possible les serveurs multi-ports. Et pour avoir enquêté sur la possibilité de laisser les sockets ouverts pendant exec (ce qui rend possible le HUP).</p>
+<p class="Pp">Merci à Jonathan J. Miner &lt;miner at doit.wisc.edu&gt; pour avoir corrigé un problème dans les recherches inverses.</p>
+<p class="Pp">Merci à Bennett Todd &lt;bet at rahul.net&gt; d'avoir signalé un problème sur Solaris 2.5.1 qui ne permet pas à plusieurs enfants d'accepter sur le même port en même temps. Ainsi que pour avoir montré des exemples de code de Viktor Duchovni qui représentent maintenant l'option de sémaphore dans l'argument serialize du serveur PreFork.</p>
+<p class="Pp">Merci à <i>traveler</i> et <i>merlyn</i> de <a href='http://perlmonks.org'>http://perlmonks.org</a> pour avoir pointé dans la bonne direction pour déterminer le protocole d'une connexion socket.</p>
+<p class="Pp">Merci à Jeremy Howard &lt;j+daemonize at howard.fm&gt; pour avoir suggéré plusieurs idées et pour son travail sur Net::Server::Daemonize.</p>
+<p class="Pp">Merci à Vadim &lt;vadim at hardison.net&gt; pour les correctifs visant à implémenter la communication parent-enfant dans PreFork.pm.</p>
+<p class="Pp">Merci à Carl Lewis pour avoir suggéré &quot;-&quot; dans les noms d'utilisateurs.</p>
+<p class="Pp">Merci à Slaven Rezic pour avoir suggéré Reuse =&gt; 1 dans Proto::UDP.</p>
+<p class="Pp">Merci à Tim Watt pour avoir ajouté udp_broadcast à Proto::UDP.</p>
+<p class="Pp">Merci à Christopher A Bongaarts pour avoir signalé des problèmes dans l'implémentation de Proto::SSL qui bloque actuellement l'acceptation et la négociation SSL. Voir Net::Server::Proto::SSL.</p>
+<p class="Pp">Merci à Alessandro Zummo pour avoir signalé plusieurs bugs, dont certains dans la configuration, les arguments de commande et cidr_allow.</p>
+<p class="Pp">Merci à d'autres personnes pour avoir corrigé des bugs au fil des ans. Ces remerciements et d'autres peuvent être trouvés dans le fichier Changes ainsi que dans les commentaires CVS.</p>
+<p class="Pp">Merci à Ben Cohen et tye (sur Perlmonks) d'avoir trouvé et diagnostiqué un comportement plus correct pour gérer la réouverture de STDIN et STDOUT dans les gestionnaires de clients.</p>
+<p class="Pp">Merci à Mark Martinec pour son aide sur les problèmes de STDIN et STDOUT (il a proposé un drapeau qui est maintenant le drapeau no_client_stdout).</p>
+<p class="Pp">Merci à David (DSCHWEI) sur cpan pour avoir demandé l'option nofatal avec syslog.</p>
+<p class="Pp">Merci à Andreas Kippnick et Peter Beckman pour avoir suggéré de laisser les connexions enfants ouvertes pendant un HUP (ceci est maintenant disponible avec le drapeau leave_children_open_on_hup).</p>
+<p class="Pp">Merci à LUPE sur cpan pour avoir aidé à corriger le HUP avec taint.</p>
+<p class="Pp">Merci à Michael Virnstein pour avoir corrigé un bug dans la section check_for_dead du serveur PreFork.</p>
+<p class="Pp">Merci à Rob Mueller pour avoir corrigé le patch dans PreForkSimple afin d'ouvrir le fichier lock_file une seule fois lors de l'appel du parent. Cette correction devrait être portable sur les systèmes prenant en charge flock. Rob a également suggéré de ne pas fermer STDIN/STDOUT mais de les rouvrir vers /dev/null pour éviter des avertissements indésirables. Il a également suggéré une court-circuit dans post_accept s'il s'agit d'UDP. Il a également suggéré de nettoyer une partie du code de gestion des enfants dans PreFork.</p>
+<p class="Pp">Merci à Mark Martinec pour avoir suggéré plus de messages de log pendant fail_accept.</p>
+<p class="Pp">Merci à Bill Nesbitt et Carlos Velasco pour avoir signalé le bug de double décrémentation dans PreFork.pm (rt #21271)</p>
+<p class="Pp">Merci à John W. Krahn pour avoir signalé la précédence claire avec l'ouverture sans parenthèses et ||.</p>
+<p class="Pp">Merci à Ricardo Signes pour avoir signalé le bug setuid dans perl 5.6.1 (rt #21262).</p>
+<p class="Pp">Merci à Carlos Velasco pour avoir mis à jour les options de syslog (rt #21265). Et pour des corrections supplémentaires plus tard.</p>
+<p class="Pp">Merci à Steven Lembark pour avoir signalé que no_client_stdout ne fonctionnait pas avec le serveur Multiplex.</p>
+<p class="Pp">Merci à Peter Beckman pour avoir suggéré de passer les mots-clés Sys::SysLog par la méthode -&gt;log et pour avoir suggéré d'autoriser plus de types de caractères pour syslog_ident. Également à Pet</p>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR AUSSI</a></h1>
+<p class="Pp">Veuillez consulter également Net::Server::Fork, Net::Server::INET, Net::Server::PreForkSimple, Net::Server::PreFork, Net::Server::MultiType, Net::Server::Single Net::Server::HTTP</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='A_FAIRE'><a class='permalink' href='#A_FAIRE'>À FAIRE</a></h1>
+<p class="Pp">Améliorer la suite de tests pour couvrir entièrement le code (en utilisant Devel::Cover). Toute personne souhaitant m'envoyer des correctifs aux fichiers t/*.t qui amélioreraient la couverture gagnerait un grand merci.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DEPOT_DE_CODE'><a class='permalink' href='#DEPOT_DE_CODE'>DÉPÔT DE CODE</a></h1>
+<p class="Pp"><a href='https://github.com/rhandom/perl-net-server'>https://github.com/rhandom/perl-net-server</a></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR_2'><a class='permalink' href='#AUTEUR_2'>AUTEUR</a></h1>
+<pre>Paul Seamons &lt;paul at seamons.com&gt;
+http://seamons.com/
+Rob Brown &lt;bbb at cpan.org&gt;</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='LICENCE'><a class='permalink' href='#LICENCE'>LICENCE</a></h1>
+<p class="Pp">Ce paquet peut être distribué sous les termes de la</p>
+<pre>Licence Publique Générale GNU
+  ou la Licence Artistique Perl</pre>
+<p class="Pp">Tous droits réservés.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+<main>
+<article>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Net::Server</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">Utilisez <code class="synopsis">Net::Server</code> pour créer un serveur.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CARACTERISTIQUES'><a class='permalink' href='#CARACTERISTIQUES'>CARACTÉRISTIQUES</a></h1>
+<p class="Pp">Caractéristiques de <code class="synopsis">Net::Server</code> :</p>
+<ul>
+<li>Serveur multi-threadé</li>
+<li>Support pour IPv4 et IPv6</li>
+<li>Support pour plusieurs backends</li>
+<li>Support pour les E/S asynchrones</li>
+<li>Support pour la programmation événementielle</li>
+<li>Support pour la gestion des signaux</li>
+<li>Support pour les hooks personnalisés</li>
+<li>Support pour la configuration dynamique</li>
+<li>Support pour le déploiement à chaud</li>
+<li>Support pour le redémarrage</li>
+</ul>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Net::Server est une implémentation de serveur qui fournit un moyen simple et efficace de créer un serveur en Perl. Il prend en charge à la fois IPv4 et IPv6, et peut être configuré pour utiliser différents backends. Il prend également en charge les E/S asynchrones et la programmation événementielle, ce qui le rend adapté aux applications hautes performances.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PERSONNALITES'><a class='permalink' href='#PERSONNALITES'>PERSONNALITÉS</a></h1>
+<p class="Pp">Personnalités de <code class="synopsis">Net::Server</code> :</p>
+<ul>
+<li>Multi-threadé</li>
+<li>Support IPv4 et IPv6</li>
+<li>Plusieurs backends</li>
+<li>E/S asynchrones</li>
+<li>Programmation événementielle</li>
+<li>Gestion des signaux</li>
+<li>Hooks personnalisés</li>
+<li>Configuration dynamique</li>
+<li>Déploiement à chaud</li>
+<li>Redémarrage</li>
+</ul>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ACCES_AU_SOCKET'><a class='permalink' href='#ACCES_AU_SOCKET'>ACCÈS AU SOCKET</a></h1>
+<p class="Pp">Accès aux sockets dans <code class="synopsis">Net::Server</code> :</p>
+<ul>
+<li>Support IPv4 et IPv6</li>
+<li>Serveur multi-threadé</li>
+<li>Support pour plusieurs backends</li>
+<li>E/S asynchrones</li>
+<li>Programmation événementielle</li>
+<li>Gestion des signaux</li>
+<li>Hooks personnalisés</li>
+<li>Configuration dynamique</li>
+<li>Déploiement à chaud</li>
+<li>Redémarrage</li>
+</ul>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXEMPLE_DE_CODE'><a class='permalink' href='#EXEMPLE_DE_CODE'>EXEMPLE DE CODE</a></h1>
+<p class="Pp">Exemple de code pour <code class="synopsis">Net::Server</code> :</p>
+<pre><code class="language-perl">
+use Net::Server;
+
+my $server = Net::Server-&gt;new(
+    listen =&gt; '0.0.0.0:8080',
+    server =&gt; 'my_server',
+);
+
+$server-&gt;run();
+</code></pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ARGUMENTS'><a class='permalink' href='#ARGUMENTS'>ARGUMENTS</a></h1>
+<p class="Pp">Arguments pour <code class="synopsis">Net::Server</code> :</p>
+<ul>
+<li>listen - Adresse IP et port d'écoute</li>
+<li>server - Nom du serveur</li>
+<li>max_servers - Nombre maximum de serveurs à exécuter</li>
+<li>max_connections - Nombre maximum de connexions par serveur</li>
+<li>max_children - Nombre maximum d'enfants à exécuter</li>
+<li>max_restarts - Nombre maximum de redémarrages</li>
+<li>timeout - Délai d'attente pour les connexions</li>
+<li>log - Fichier de journalisation où écrire</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+<li>log_file - Fichier de journalisation</li>
+<li>log_level - Niveau de journalisation</li>
+<li>log_format - Format de journalisation</li>
+<li>log_rotate - Rotation des journaux</li>
+<li>log_tz - Fuseau horaire</li>
+<li>log_time - Format de l'heure</li>
+<li>log_timezone - Fuseau horaire</li>
+<li>log_timestamp - Format du horodatage</li>
+<li>log_verbosity - Niveau de verbosité</li>
+</ul>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<pre>Paul Seamons &lt;paul at seamons.com&gt;
+http://seamons.com/
+Rob Brown &lt;bbb at cpan.org&gt;</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='LICENCE_1'><a class='permalink' href='#LICENCE_1'>LICENCE</a></h1>
+<p class="Pp">Ce paquet peut être distribué sous les termes de la</p>
+<pre>Licence Publique Générale GNU
+  ou la Licence Artistique Perl</pre>
+<p class="Pp">Tous droits réservés.</p>
+</section>
+</article>
+</main>

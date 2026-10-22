@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>MPI_Op_create(3) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">MPI_Op_create(3)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/openmpi/">openmpi</a></p>
+<p class="lic">Licences: BSD-3-Clause ET LicenseRef-MPICH</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">MPI_Op_create(3)</td>
+    <td class="head-vol">Open MPI</td>
+    <td class="head-rtitle">MPI_Op_create(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<p class="Pp"><i>MPI_Op_create</i> crée un handle de fonction personnalisée qui peut être utilisé plus tard dans <i>MPI_Reduce</i>, <i>MPI_Allreduce</i>, <i>MPI_Reduce_scatter</i> et <i>MPI_Scan</i>. La fonction personnalisée est supposée être associative. Si commute = true, alors l'opération doit être à la fois commutative et associative. Si commute = false, l'ordre des opérandes est fixe et est défini comme l'ordre croissant des rangs de processus, en commençant par le processus zéro. L'ordre d'évaluation peut être modifié, en exploitant l'associativité de l'opération. Si commute = true, l'ordre d'évaluation peut être modifié, en exploitant la commutativité et l'associativité.</p>
+<p class="Pp"><i>function</i> est la fonction personnalisée qui doit avoir les quatre arguments suivants : invec, inoutvec, len et datatype.</p>
+<p class="Pp">Le prototype ANSI-C de la fonction est le suivant :</p>
+<div class="Bd-indent">
+<div class="Bd-indent">
+<pre>typedef void MPI_User_function(void *invec, void *inoutvec,
+                               int *len,
+                               MPI_Datatype *datatype);</pre>
+</div>
+</div>
+<p class="Pp">La déclaration de la fonction personnalisée en Fortran est la suivante.</p>
+<div class="Bd-indent">
+<div class="Bd-indent">
+<pre>FUNCTION USER_FUNCTION( INVEC(*), INOUTVEC(*), LEN, TYPE)
+&lt;type&gt; INVEC(LEN), INOUTVEC(LEN)
+ INTEGER LEN, TYPE</pre>
+</div>
+</div>
+<p class="Pp">L'argument datatype est un handle vers le type de données qui a été passé dans l'appel à <i>MPI_Reduce</i>. La fonction de réduction personnalisée doit être écrite de manière à ce que ce qui suit soit vrai : Supposons que u[0], ..., u[len-1] soient les len éléments du tampon de communication décrits par les arguments invec, len et datatype lors de l'invocation de la fonction ; et que v[0], ..., v[len-1] soient les len éléments du tampon de communication décrits par les arguments inoutvec, len et datatype lors de l'invocation de la fonction ; et que w[0], ..., w[len-1] soient les len éléments du tampon de communication décrits par les arguments inoutvec, len et datatype lors du retour de la fonction ; alors w[i] = u[i] ou v[i], pour i=0, ..., len-1, où o est l'opération de réduction que la fonction calcule.</p>
+<p class="Pp">En bref, nous pouvons considérer invec et inoutvec comme des tableaux de len éléments que la fonction combine. Le résultat de la réduction écrase les valeurs dans inoutvec, d'où le nom de l'opération. Chaque invocation de la fonction produit une évaluation ponctuelle de l'opération de réduction sur len éléments : c'est-à-dire que la fonction renvoie dans inoutvec[i] la valeur de u[i] ou inoutvec[i], pour i=0, ..., count-1, où o est l'opération de combinaison calculée par la fonction.</p>
+<p class="Pp">Internelement, en comparant la valeur de l'argument datatype avec des handles globaux connus, il est possible de surcharger l'utilisation d'une seule fonction personnalisée pour plusieurs types de données. </p>
+<p class="Pp">Les types de données généraux peuvent être passés à la fonction personnalisée. Cependant, l'utilisation de types de données non contigus peut entraîner des inefficacités.</p>
+<p class="Pp">Aucune fonction de communication MPI ne peut être appelée à l'intérieur de la fonction personnalisée. <i>MPI_Abort</i> peut être appelée à l'intérieur de la fonction en cas d'erreur.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='NOTES'><a class='permalink' href='#NOTES'>NOTES</a></h1>
+<p class="Pp">Supposons qu'une bibliothèque de fonctions de réduction personnalisées surchargées soit définie : L'argument datatype est utilisé pour sélectionner la voie d'exécution appropriée en fonction des types d'opérandes. La fonction personnalisée ne peut pas décoder l'argument datatype qu'elle reçoit et ne peut pas identifier par elle-même la correspondance entre les handles de données et les données qu'ils représentent. Cette correspondance a été établie lors de la création des types de données. Avant d'utiliser la bibliothèque, un préambule d'initialisation de la bibliothèque doit être exécuté. Ce code de préambule définira les types de données que la bibliothèque utilisera et stockera les handles de ces types de données dans des variables globales et statiques partagées par le code utilisateur et le code de la bibliothèque.</p>
+<p class="Pp"><b>Exemple :</b> Exemple de fonction de réduction personnalisée :</p>
+<p class="Pp">Calculer le produit d'un tableau de nombres complexes, en C.</p>
+<div class="Bd-indent">
+<div class="Bd-indent">
+<pre>typedef struct {
+    double real, imag;
+} Complex;
+/* la fonction personnalisée */
+void myProd( Complex *in, Complex *inout, int *len,
+             MPI_Datatype *dptr )
+{
+    int i;
+    Complex c;
+for (i=0; i&lt; *len; ++i) {
+        c.real = inout-&gt;real*in-&gt;real -
+                   inout-&gt;imag*in-&gt;imag;
+        c.imag = inout-&gt;real*in-&gt;imag +
+                   inout-&gt;imag*in-&gt;real;
+        *inout = c;
+        in++; inout++;
+    }
+}
+/* et, pour l'appeler... */
+...
+/* chaque processus a un tableau de 100 Complexes */
+    Complex a[100], answer[100];
+    MPI_Op myOp;
+    MPI_Datatype ctype;
+/* expliquer à MPI comment le type Complex est défini */
+   MPI_Type_contiguous( 2, MPI_DOUBLE, &amp;ctype );
+    MPI_Type_commit( &amp;ctype );
+    /* créer l'opération de produit complexe personnalisée */
+    MPI_Op_create( myProd, True, &amp;myOp );
+    MPI_Reduce( a, answer, 100, ctype, myOp, root, comm );
+    /* à ce stade, la réponse, composée de 100 Complexes, réside dans le processus racine */
+</pre>
+</div>
+</div>
+<p class="Pp">La version Fortran de <i>MPI_Reduce</i> appellera une fonction de réduction personnalisée en utilisant les conventions d'appel Fortran et passera un argument de type de données Fortran ; la version C utilisera les conventions d'appel C et la représentation du handle de type de données en C. Les utilisateurs qui prévoient de mélanger les langages devraient définir leurs fonctions de réduction en conséquence.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='NOTES_SUR_LES_OPÉRATIONS_COLLECTIVES'><a class='permalink' href='#NOTES_SUR_LES_OPÉRATIONS_COLLECTIVES'>NOTES SUR LES OPÉRATIONS COLLECTIVES</a></h1>
+<p class="Pp">Les fonctions de réduction (MPI_Op) ne renvoient pas de valeur d'erreur. Par conséquent, si elles détectent une erreur, elles ne peuvent qu'appeler <i>MPI_Abort</i> ou ignorer le problème. Ainsi, si vous changez le gestionnaire d'erreurs de MPI_ERRORS_ARE_FATAL à autre chose, par exemple MPI_ERRORS_RETURN, aucune erreur ne peut être signalée.</p>
+<p class="Pp">La raison en est le problème de performance lié à la garantie que toutes les routines d'opération collectives renvoient la même valeur d'erreur.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ERREURS'><a class='permalink' href='#ERREURS'>ERREURS</a></h1>
+<p class="Pp">La plupart des routines MPI renvoient une valeur d'erreur ; les routines C la renvoient comme résultat de la fonction et les routines Fortran dans le dernier argument.</p>
+<p class="Pp">Avant de renvoyer la valeur d'erreur, le gestionnaire d'erreurs associé à l'objet de communication (par exemple, communicator, window, file) est appelé. S'il n'y a pas d'objet de communication associé à l'appel MPI, l'appel est considéré comme associé à MPI_COMM_SELF et le gestionnaire d'erreurs associé est appelé. Lorsque MPI_COMM_SELF n'est pas initialisé (c'est-à-dire avant <i>MPI_Init</i>/<i>MPI_Init_thread</i>, après <i>MPI_Finalize</i>, ou lorsque le modèle de session est utilisé exclusivement), le gestionnaire d'erreurs initial est déclenché. Le gestionnaire d'erreurs initial peut être modifié en appelant <i>MPI_Comm_set_errhandler</i> sur MPI_COMM_SELF lors de l'utilisation du modèle du monde, ou via l'argument mpi_initial_errhandler de mpiexec ou la clé d'info de <i>MPI_Comm_spawn</i>/<i>MPI_Comm_spawn_multiple</i>. Si aucun autre gestionnaire d'erreurs approprié n'existe, l'erreur MPI_ERRORS_RETURN se produit.</p>
+</section>
+</article>
+</main>
+</body>
+</html> handler est appelé pour les fonctions E/S MPI et le gestionnaire d'erreurs
+    MPI_ERRORS_ABORT est appelé pour toutes les autres fonctions MPI.</p>
+<p class="Pp">Open MPI inclut trois gestionnaires d'erreurs prédéfinis qui
+    peuvent être utilisés :</p>
+<div class="Bd-indent">
+<ul class="Bl-bullet">
+  <li><b>MPI_ERRORS_ARE_FATAL</b> Provoque l'abandon de tous les processus MPI connectés.</li>
+  <li><b>MPI_ERRORS_ABORT</b> Un gestionnaire d'erreurs qui peut être invoqué sur un
+      communicateur, une fenêtre, un fichier ou une session. Lorsqu'il est appelé sur un communicateur, il agit comme si
+      <i>MPI_Abort</i> avait été appelé sur ce communicateur. S'il est appelé sur une
+      fenêtre ou un fichier, il agit comme si <i>MPI_Abort</i> avait été appelé sur un
+      communicateur contenant le groupe de processus de la fenêtre ou du fichier correspondant. S'il est appelé sur une
+      session, il n'abandonne que le processus local.</li>
+  <li><b>MPI_ERRORS_RETURN</b> Retourne un code d'erreur à l'application.</li>
+</ul>
+</div>
+<p class="Pp">Les applications MPI peuvent également implémenter leurs propres gestionnaires
+    d'erreurs en appelant :</p>
+<div class="Bd-indent">
+<ul class="Bl-bullet">
+  <li><i>MPI_Comm_create_errhandler</i> puis <i>MPI_Comm_set_errhandler</i></li>
+  <li><i>MPI_File_create_errhandler</i> puis <i>MPI_File_set_errhandler</i></li>
+  <li><i>MPI_Session_create_errhandler</i> puis
+      <i>MPI_Session_set_errhandler</i> ou à <i>MPI_Session_init</i></li>
+  <li><i>MPI_Win_create_errhandler</i> puis <i>MPI_Win_set_errhandler</i></li>
+</ul>
+</div>
+<p class="Pp">Notez que MPI ne garantit pas qu'un programme MPI puisse continuer après une
+    erreur.</p>
+<p class="Pp">Voir la <i>page de manuel MPI</i> pour une liste complète des <i>codes d'erreur
+    MPI</i>.</p>
+<p class="Pp">Voir la section Gestion des erreurs de la norme MPI-3.1 pour plus
+    d'informations.</p>
+<p class="Pp"><b>VOIR AUSSI :</b></p>
+<div class="Bd-indent">
+<div class="Bd-indent">
+<div class="Bd-indent">
+<ul class="Bl-bullet">
+  <li><i>MPI_Reduce</i></li>
+  <li><i>MPI_Reduce_scatter</i></li>
+  <li><i>MPI_Allreduce</i></li>
+  <li><i>MPI_Scan</i></li>
+  <li><i>MPI_Op_free</i></li>
+</ul>
+</div>
+</div>
+</div>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT'><a class='permalink' href='#COPYRIGHT'>DROITS D'AUTEUR</a></h1>
+<p class="Pp">2003-2025, La communauté Open MPI</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">30 octobre 2025</td>
+    <td class="foot-os"></td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page man" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/openmpi/">extra/openmpi</a></dd>
+        <dt>Version :</dt>
+        <dd>5.0.9-2</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://www.open-mpi.org">https://www.open-mpi.org</a></dd>
+        <dt>Licences :</dt>
+        <dd>BSD-3-Clause ET LicenseRef-MPICH</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/openmpi/">/listing/extra/openmpi/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#SYNTAX">SYNTAXE</a></li>
+        
+            <li><a href="#INPUT_PARAMETERS">PARAMÈTRES D'ENTRÉE</a></li>
+        
+            <li><a href="#OUTPUT_PARAMETERS">PARAMÈTRES DE SORTIE</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#NOTES">NOTES</a></li>
+        
+            <li><a href="#NOTES_ON_COLLECTIVE_OPERATIONS">NOTES SUR LES OPÉRATIONS COLLECTIVES</a></li>
+        
+            <li><a href="#ERRORS">ERREURS</a></li>
+        
+            <li><a href="#COPYRIGHT">DROITS D'AUTEUR</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/MPI_Op_create.3.fr.txt">txt</a>, 
+        
+            <a href="/man/MPI_Op_create.3.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages man, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

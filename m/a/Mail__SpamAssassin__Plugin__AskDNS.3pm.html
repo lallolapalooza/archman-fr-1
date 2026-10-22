@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Mail::SpamAssassin::Plugin::AskDNS(3pm) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Mail__SpamAssassin__Plugin__AskDNS(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/spamassassin/">spamassassin</a></p>
+<p class="lic">Licences: APACHE</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Mail::SpamAssassin::Plugin::AskDNS(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">Mail::SpamAssassin::Plugin::AskDNS(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">AskDNS - forme une requête DNS en utilisant des valeurs de tags, et interroge les listes DNSxL</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNTAXE</a></h1>
+<pre>loadplugin  Mail::SpamAssassin::Plugin::AskDNS
+askdns D_IN_DWL _DKIMDOMAIN_._vouch.dwl.spamhaus.org TXT /\b(transaction|list|all)\b/</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">En utilisant un modèle de requête DNS spécifié dans un paramètre d'une règle askdns, le plugin remplace les noms de tags tels qu'ils sont trouvés dans le modèle par leurs valeurs et lance des requêtes DNS dès que les valeurs des tags sont disponibles. Lorsque les réponses DNS arrivent, elles sont filtrées selon le type d'enregistrement de ressource DNS demandé et une expression de filtrage de sous-règle optionnelle, produisant un coup de règle si une réponse satisfait aux conditions de filtrage.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='RULE_DEFINITIONS_AND_PRIVILEGED_SETTINGS'><a class='permalink' href='#RULE_DEFINITIONS_AND_PRIVILEGED_SETTINGS'>DÉFINITIONS DE RÈGLES ET PARAMÈTRES PRIVILÉGIÉS</a></h1>
+<dl class="Bl-tag">
+  <dt id="askdns"><a class="permalink" href="#askdns">askdns NOM_DE_LA_RÈGLE
+    modèle_de_requête [type_enr [filtre_sous_requête]]</a></dt>
+  <dd>Un modèle de requête est une chaîne qui sera développée pour produire un nom de domaine à utiliser dans une requête DNS. Le modèle peut inclure des noms de tags SpamAssassin, qui seront remplacés par leurs valeurs pour former un domaine de requête final.
+    <p class="Pp">Le domaine de requête final doit respecter les règles régissant les domaines DNS, c'est-à-dire qu'il doit être composé de champs de 63 caractères maximum chacun, délimités par des points, n'excédant pas 255 caractères. Les noms de domaine internationaux (en UTF-8) sont autorisés et seront encodés en encodage compatible ASCII (ACE) selon les règles IDN. Les requêtes invalides syntaxiquement résultantes seront écartées par le code du résolveur DNS (avec quelques avertissements informatifs).</p>
+    <p class="Pp">Il peut y avoir un point final, mais il est redondant / ne porte aucune sémantique, car SpamAssassin utilise une méthode Net::DSN::Resolver::send pour interroger le DNS, qui ignore les options de résolveur DNS 'search' ou 'domain'. Les noms de domaine dans les requêtes DNS ne sont pas sensibles à la casse.</p>
+    <p class="Pp">Un nom de tag est une chaîne de lettres majuscules, précédée et suivie d'un caractère underscore. Cette syntaxe reflète le paramètre add_header, à la différence près que les tags ne peuvent pas avoir de paramètres entre parenthèses lorsqu'ils sont utilisés dans des modèles askdns (exceptions trouvées ci-dessous). Les noms de tags peuvent apparaître n'importe où dans le modèle - chaque zone DNS interrogée prescrit comment une requête doit être formée.</p>
+    <p class="Pp">Le tag spécial pris en charge <b>HEADER()</b> peut être utilisé pour interroger n'importe quel contenu d'en-tête, en utilisant les mêmes noms/modificateurs d'en-tête que ceux pris en charge par les règles d'en-tête. Par exemple, _HEADER(Reply-To:addr:domain)_ peut être utilisé pour interroger la partie domaine tronquée de l'adresse Reply-To. Voir la documentation de Mail::SpamAssassin::Conf sur les règles d'en-tête.</p>
+    <p class="Pp">Un modèle de requête peut contenir n'importe quel nombre de noms de tags, y compris aucun, bien que dans le scénario le plus couramment anticipé, exactement un nom de tag apparaîtrait dans chaque règle askdns. Les noms de tags spécifiés sont considérés comme des dépendances. Les règles Askdns avec des dépendances sur le même ensemble de tags sont groupées, et toutes les requêtes d'un groupe sont lancées dès que toutes leurs dépendances sont satisfaites, c'est-à-dire lorsque la dernière des valeurs de tags attendues devient disponible par un appel à <b>set_tag()</b> depuis un autre plugin ou ailleurs dans le code SpamAssassin.</p>
+    <p class="Pp">Les requêtes lancées depuis toutes les règles askdns sont également groupées selon une paire : type de requête et nom de requête développé. Même s'il existe plusieurs règles produisant la même paire type/domaine, une seule requête DNS est lancée, et une réponse à une telle requête contribue à toutes les règles constituantes.</p>
+    <p class="Pp">Un tag peut produire aucune, une ou plusieurs valeurs. Les règles Askdns attendant un tag qui ne reçoit jamais sa valeur ne résultent jamais en une requête DNS. Les tags qui produisent plusieurs valeurs entraîneront le lancement de plusieurs requêtes, chacune avec un modèle développé utilisant l'une des valeurs du tag. Un exemple est un tag DKIMDOMAIN qui produit une liste de domaines de signature, un pour chaque signature valide dans un message signé.</p>
+    <p class="Pp">Lorsque plus d'un nom de tag distinct apparaît dans un modèle, chacun potentiellement produisant plusieurs valeurs, un produit cartésien est formé, et chaque tuple résulte en le lancement d'une requête DNS (doublons exclus). Par exemple, un modèle de requête _A_._B_.example._A_.com où le tag A est une liste (11,22) et B est (xx,yy,zz), produira les requêtes : 11.xx.example.11.com, 22.xx.example.22.com, 11.yy.example.11.com, 22.yy.example.22.com, 11.zz.example.11.com, 22.zz.example.22.com .</p>
+    <p class="Pp">Un paramètre type_enr suivant le modèle de requête est une liste d'enregistrements de ressources DNS (RR) attendus, séparés par des virgules. L'absence du paramètre type_enr implique 'A'. Une réponse DNS peut apporter des enregistrements de plusieurs types, mais seuls les enregistrements de ressources d'un type trouvé dans la liste du paramètre type_enr sont considérés, les autres enregistrements trouvés dans la section de réponse d'une réponse DNS sont ignorés pour cette règle. Une valeur ANY dans le paramètre type_enr correspond à n'importe quel type d'enregistrement de ressource. Une section de réponse DNS vide ne correspond pas à ANY.</p>
+    <p class="Pp">Le paramètre type_enr fournit non seulement un filtre pour les types d'enregistrements trouvés dans la réponse DNS, mais détermine également le type de requête DNS. Si un seul type d'enregistrement est spécifié dans le paramètre (par exemple, TXT), alors c'est aussi le type d'enregistrement de la requête. Lorsque plus d'un type d'enregistrement est spécifié (par exemple, A, AAAA, TXT) ou si ANY est spécifié, alors le type de requête DNS sera ANY et le paramètre type_enr agira uniquement comme un filtre sur le résultat.</p>
+    <p class="Pp">Les types d'enregistrements actuellement reconnus dans le paramètre type_enr sont : ANY, A, AAAA, MX, TXT, PTR, NAPTR, NS, SOA, CERT, CNAME, DNAME, DHCID, HINFO, MINFO, RP, HIP, IPSECKEY, KX, LOC, GPOS, SRV, OPENPGPKEY, SSHFP, SPF, TLSA, URI, CAA, CSYNC.</p>
+    <p class="Pp"><a href='https://www.iana.org/assignments/dns-parameters/dns-parameters.xml'>https://www.iana.org/assignments/dns-parameters/dns-parameters.xml</a></p>
+    <p class="Pp">Le dernier paramètre optionnel d'une règle est une expression de filtrage, également appelée sous-règle. Sa fonction est très similaire à celle de la sous-règle dans les règles URIDNSBL, ou dans les règles d'évaluation check_rbl. La principale différence est qu'avec les règles askdns, il n'est pas nécessaire de grouper manuellement les règles en fonction de leur zone interrogée, car le regroupement est automatique et les requêtes en double sont implicitement éliminées.</p>
+    <p class="Pp">Le paramètre de filtrage de sous-règle peut être : une chaîne simple, une expression régulière, une seule valeur numérique ou une paire de valeurs numériques, ou une liste de rcodes (codes d'état DNS d'une réponse). L'absence du paramètre de filtrage implique aucun filtrage, c'est-à-dire que toute réponse DNS positive (rcode=NOERROR) du type d'enregistrement demandé entraînera un coup de règle, quel que soit le type d'enregistrement renvoyé avec la réponse.</p>
+    <p class="Pp">Lorsqu'une chaîne simple est utilisée comme filtre, elle doit être entourée de guillemets simples ou doubles. Pour que la règle frappe, la réponse doit correspondre exactement à la chaîne de filtrage, et le type d'enregistrement de la réponse doit correspondre au type de requête. L'utilisation typique est une chaîne de texte exacte pour les requêtes TXT, ou une adresse IPv4 quadriflocquée exacte. Dans le cas d'un enregistrement TXT ou SPF qui peut renvoyer plusieurs chaînes de caractères (tel que défini dans la section 3.3 de [RFC1035]), ces chaînes sont concaténées sans délimiteur avant de comparer le résultat à la chaîne de filtrage. Ceci suit les exigences de plusieurs documents, tels que RFC 5518, RFC 7208, RFC 4871, RFC 5617. Exemples de paramètre de filtrage texte brut : &quot;127.0.0.1&quot;, &quot;transaction&quot;, 'list' .</p>
+    <p class="Pp">Une expression régulière suit la syntaxe perl familière comme /.../ ou m{...} éventuellement suivie de drapeaux regexp (comme 'i' pour l'insensibilité à la casse). Si une réponse DNS correspond au type d'enregistrement demandé et à l'expression régulière, la règle frappe. Exemples : /^127\.0\.0\.\d+$/, m{\bdial up\b}i .</p>
+    <p class="Pp">Une seule valeur numérique peut être un nombre décimal, ou un nombre hexadécimal préfixé par 0x. Un tel filtre numérique est typiquement utilisé avec des requêtes DNS de type A. La valeur renvoyée (une adresse IPv4) est masquée avec la valeur de filtrage spécifiée et testée pour tomber dans une plage réseau 127.0.0.0/8 - la règle frappe si le résultat est non nul : ((r &amp; n) != 0) &amp;&amp; ((r &amp; 0xff000000) == 0x7f000000). Un exemple : 0x10 .</p>
+    <p class="Pp">Une paire de valeurs numériques (chacune décimale, hexadécimale ou quadriflocquée) délimitée par un '-' spécifie une plage d'adresses IPv4, et une paire de valeurs délimitées par un '/' spécifie une adresse IPv4 suivie d'un masque de bits. Encore une fois, ce type d'expression de filtrage est principalement destiné aux requêtes DNS de type A. La règle frappe si le type d'enregistrement correspond et que l'adresse IP renvoyée se situe dans la plage spécifiée : (r &gt;= n1 &amp;&amp; r &lt;= n2), ou ma</p>
+</dd>
+</dl>
+</section>
+
+</div>
+</section>
+
+            </article>
+            <aside id="content-right">
+                
+            </aside>
+        </main>
+        <footer>
+            
+        </footer>
+    </body>
+</html>
+<!DOCTYPE html>
+<html lang="fr">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="description" content="Manual page for Mail::SpamAssassin::Plugin::AskDNS" />
+        <meta name="author" content="The SpamAssassin Project" />
+        <meta name="generator" content="mandoc" />
+        <title>Mail::SpamAssassin::Plugin::AskDNS(3pm) - Manual Page</title>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" />
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" />
+        <link rel="stylesheet" href="/css/style.css" />
+        <link rel="stylesheet" href="/css/print.css" media="print" />
+        <link rel="icon" href="/favicon.ico" type="image/x-icon" />
+    </head>
+    <body>
+        <main class="container">
+            <article>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NAME</a></h1>
+<p class="Nm">Mail::SpamAssassin::Plugin::AskDNS - DNS lookups for SpamAssassin</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<p class="Pp">
+<pre>
+    loadplugin Mail::SpamAssassin::Plugin::AskDNS
+    
+    # Example rules
+    body __ASKDNS_TEST__ /.*/
+    describe __ASKDNS_TEST__ AskDNS test
+    score __ASKDNS_TEST__ 1.0
+    
+    # Referencing AskDNS in a rule
+    tflags async
+    header __TEST_DNS__ eval:askdns_test('test.example.com', 'A', '192.168.1.1')
+    describe __TEST_DNS__ DNS lookup for test.example.com
+    score __TEST_DNS__ 1.0
+    
+    # Referencing AskDNS with different parameters
+    tflags async
+    header __TEST_DNS_NXDOMAIN__ eval:askdns_test('nonexistent.example.com', 'A', '192.168.1.1', 'NXDOMAIN')
+    describe __TEST_DNS_NXDOMAIN__ DNS lookup expected to return NXDOMAIN
+    score __TEST_DNS_NXDOMAIN__ 1.0
+</pre>
+</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">This plugin provides a way for SpamAssassin rules to perform DNS
+    lookups, and use the results of those lookups in SpamAssassin scoring
+    rules.</p>
+<p class="Pp">The primary interface is the <code class="Li">askdns_test</code>
+    Perl function, which can be used within the <code class="Li">eval</code>
+    test of a SpamAssassin rule.</p>
+<p class="Pp">The function signature is:</p>
+<p class="Pp">
+<pre>
+    askdns_test(host, type, filter, rcode_filter)
+</pre>
+</p>
+<ul class="Bl-item">
+    <li><code class="Li">host</code>: The hostname to query.</li>
+    <li><code class="Li">type</code>: The DNS record type to query (e.g., A, MX, TXT,
+        PTR, SOA, SPF, etc.).</li>
+    <li><code class="Li">filter</code>: The result filter. This can be a numeric
+        IP address, a hostname, or a list of numeric IP addresses/hostnames.
+        If specified, the result of the DNS lookup will be checked against this
+        filter.</li>
+    <li><code class="Li">rcode_filter</code>: An optional DNS response code
+        (rcode) filter. This can be a numeric value or a name (e.g., NOERROR,
+        NXDOMAIN, SERVFAIL, etc.).</li>
+</ul>
+<p class="Pp">The function returns <code class="Li">1</code> if the DNS lookup
+    is successful and matches the specified filters, and <code class="Li">0</code>
+    otherwise.</p>
+<p class="Pp">The <code class="Li">host</code> and <code class="Li">type</code>
+    parameters are straightforward. The <code class="Li">filter</code> and
+    <code class="Li">rcode_filter</code> parameters provide flexibility in
+    matching DNS responses.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='RULE_DEFINITIONS_AND_PRIVILEGED_SETTINGS'><a class='permalink' href='#RULE_DEFINITIONS_AND_PRIVILEGED_SETTINGS'>RULE DEFINITIONS AND PRIVILEGED SETTINGS</a></h1>
+<p class="Pp">The following describes the parameters used in the filtering
+    parameters of the <code class="Li">askdns_test</code> function.</p>
+<dl class="Bl-tag">
+    <dt><b>Numeric IP addresses and bitmasks</b></dt>
+    <dd>
+      <p class="Pp">Numeric IP addresses can be specified in standard dotted-decimal
+          notation (e.g., <code class="Li">127.0.0.1</code>) or as a hexadecimal
+          value (e.g., <code class="Li">0x7f000001</code>).</p>
+      <p class="Pp">A numeric IP address can be combined with a bitmask to
+          specify a range or a subset of IP addresses. The bitmask is specified
+          using a forward slash (<code class="Li">/</code>) followed by the
+          bitmask itself. The bitmask uses the same notation as the IP
+          address.</p>
+      <p class="Pp">The comparison is performed using a bitwise AND operation. A
+          value <code class="Li">r</code> matches a pattern <code class="Li">n/m</code>
+          if <code class="Li">(r &amp; m) == (n &amp; m)</code>.</p>
+      <p class="Pp">As a shorthand notation, a single quad-dotted value is
+          equivalent to a n-n form, i.e. it must match the returned value exactly
+          with all its bits.</p>
+      <p class="Pp">Some typical examples of a numeric filtering parameter are:
+          <code class="Li">127.0.1.2</code>,
+          <code class="Li">127.0.1.20-127.0.1.39</code>,
+          <code class="Li">127.0.1.0/255.255.255.0</code>,
+          <code class="Li">0.0.0.16/0.0.0.16</code>,
+          <code class="Li">0x10/0x10</code>,
+          <code class="Li">16</code>,
+          <code class="Li">0x10</code>.</p>
+    </dd>
+    <dt><b>DNS status codes (rcode)</b></dt>
+    <dd>
+      <p class="Pp">Lastly, the filtering parameter can be a comma-separated list
+          of DNS status codes (rcode), enclosed in square brackets. Rcodes can be
+          represented either by their numeric decimal values (0=NOERROR,
+          3=NXDOMAIN, ...), or their names. See
+          <a href='https://www.iana.org/assignments/dns-parameters'>https://www.iana.org/assignments/dns-parameters</a>
+          for the list of names. When testing for a rcode where rcode is nonzero, a
+          RR type parameter is ignored as a filter, as there is typically no
+          answer section in a DNS reply when rcode indicates an error. Example:
+          <code class="Li">[NXDOMAIN]</code>, or
+          <code class="Li">[FormErr,ServFail,4,5]</code>.</p>
+    </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='NOTES'><a class='permalink' href='#NOTES'>NOTES</a></h1>
+<p class="Pp">DNS timeout can be set with <span class="Li">&quot;rbl_timeout&quot;</span>
+    option. See the <span class="Li">&quot;Mail::SpamAssassin::Conf&quot;</span> POD
+    for details on <span class="Li">&quot;rbl_timeout&quot;</span>.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page man" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/spamassassin/">extra/spamassassin</a></dd>
+        <dt>Version :</dt>
+        <dd>4.0.1-5</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://spamassassin.apache.org">https://spamassassin.apache.org</a></dd>
+        <dt>Licences :</dt>
+        <dd>APACHE</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/spamassassin/">/listing/extra/spamassassin/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#RULE_DEFINITIONS_AND_PRIVILEGED_SETTINGS">RÉÉFINITIONS DE RÈGLES ET PARAMÈTRES PRIVILÉGIÉS</a></li>
+        
+            <li><a href="#NOTES">NOTES</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Mail::SpamAssassin::Plugin::AskDNS.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/Mail::SpamAssassin::Plugin::AskDNS.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages man, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

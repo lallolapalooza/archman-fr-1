@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Type::Tiny::Manual::UsingWithMouse(3pm) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Type__Tiny__Manual__UsingWithMouse(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-type-tiny/">perl-type-tiny</a></p>
+<p class="lic">Licences: PerlArtistic, GPL</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Type::Tiny::Manual::UsingWithMouse(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">Type::Tiny::Manual::UsingWithMouse(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">Type::Tiny::Manual::UsingWithMouse - comment utiliser Type::Tiny avec
+    Mouse</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="MANUEL"><a class='permalink' href='#MANUEL'>MANUEL</a></h1>
+<p class="Pp">Lisez d'abord Type::Tiny::Manual::UsingWithMoo,
+    Type::Tiny::Manual::UsingWithMoo2, et Type::Tiny::Manual::UsingWithMoo3.
+    Tout ce qui se trouve dans ces parties du manuel devrait fonctionner exactement de la même manière avec
+    Mouse.</p>
+<p class="Pp">Cette partie du manuel se concentrera sur les spécificités de Mouse.</p>
+<p class="Pp">Globalement, Type::Tiny est moins bien testé avec Mouse qu'avec
+    Moose et Moo, mais il existe tout de même un bon nombre de cas de test pour l'utilisation de Type::Tiny avec Mouse,
+    et il n'y a pas de problèmes majeurs connus avec le support de Type::Tiny pour Mouse.</p>
+<section class="Ss">
+<h2 class="Ss" id="Pourquoi_utiliser_Type::Tiny_en_général_?"><a class='permalink' href='#Pourquoi_utiliser_Type::Tiny_en_général_?'>Pourquoi utiliser Type::Tiny en général ?</a></h2>
+<p class="Pp">Mouse dispose d'un système de contraintes de type intégré qui est assez pratique à utiliser, mais il y a plusieurs raisons pour lesquelles vous devriez envisager d'utiliser Type::Tiny à la place.</p>
+<ul class="Bl-bullet">
+  <li>Type::Tiny fournit des méthodes utiles comme
+      <span class="Li">"where"</span> et
+      <span class="Li">"plus_coercions"</span> qui permettent d'ajuster facilement les contraintes de type et les coercions sur une base par attribut.
+    <p class="Pp">Quelque chose comme ceci est beaucoup plus difficile à faire avec des types Mouse purs :</p>
+        <pre>has name =&gt; (
+  is      =&gt; "ro",
+  isa     =&gt; Str-&gt;plus_coercions(
+    ArrayRef[Str], sub { join " " x @$_ },
+  ),
+  coerce  =&gt; 1,
+);
+</pre>
+    <p class="Pp">Mouse tend à encourager la définition des coercions globalement, donc si vous vouliez qu'un attribut <b>Str</b> puisse être cohérit de <b>ArrayRef[Str]</b>, alors <i>tous</i> les attributs <b>Str</b> seraient cohérit de <b>ArrayRef[Str]</b>, et ils le feraient tous de la même manière. (Même si cela pourrait avoir du sens de joindre par un espace dans certains endroits, une virgule dans d'autres, et un saut de ligne dans d'autres encore !)</p>
+  </li>
+  <li>Type::Tiny fournit des coercions profondes automatiques, donc si le type <b>Xyz</b> a une coercion, le suivant devrait "simplement fonctionner" :
+        <pre>has xyzlist =&gt; ( is =&gt; 'ro', isa =&gt; ArrayRef[Xyz], coerce =&gt; 1 );
+</pre>
+  </li>
+  <li>Type::Tiny offre une plus large sélection de types intégrés.</li>
+  <li>En utilisant Type::Tiny, vous pouvez utiliser les mêmes contraintes de type et coercions pour les attributs et les paramètres de méthode, dans du code Mouse et non-Mouse.</li>
+</ul>
+</section>
+<section class="Ss">
+<h2 class="Ss" id="Type::Utils"><a class='permalink' href='#Type::Utils'>Type::Utils</a></h2>
+<p class="Pp">Si vous avez utilisé Mouse::Util::TypeConstraints, vous êtes peut-être habitué à utiliser un DSL pour déclarer les contraintes de type :</p>
+<pre>use Mouse::Util::TypeConstraints;
+
+subtype 'Natural',
+  as 'Int',
+  where { $_ &gt; 0 };</pre>
+<p class="Pp">Il existe un module appelé Type::Utils qui fournit un DSL très similaire pour déclarer des types dans des bibliothèques de types basées sur Type::Library.</p>
+<pre>package My::Types {
+  use Type::Library -base;
+  use Type::Utils;
+  use Types::Standard qw( Int );
+
+  declare 'Natural',
+    as Int,
+    where { $_ &gt; 0 };
+}</pre>
+<p class="Pp">Personnellement, je préfère cependant la manière plus orientée objet de déclarer des types.</p>
+<p class="Pp">Dans Mouse, vous pourriez également déclarer des types comme ceci dans des classes et des rôles. Contrairement à Mouse, Type::Tiny ne conserve pas les types dans un seul espace de noms global plat, donc cela ne fonctionne pas exactement de la même manière avec Type::Utils. Cela crée toujours le type, mais ne le stocke dans aucune bibliothèque de types ; le type est retourné.</p>
+<pre>package My::Class {
+  use Mouse;
+  use Type::Utils;
+  use Types::Standard qw( Int );
+
+  my $Natural =          # stocker le type dans une variable
+    declare 'Natural',
+    as Int,
+    where { $_ &gt; 0 };
+
+  has number =&gt; ( is =&gt; 'ro', isa =&gt; $Natural );
+}</pre>
+<p class="Pp">Mais vraiment, la manière orientée objet n'est-elle pas plus propre ?</p>
+<pre>package My::Class {
+  use Mouse;
+  use Types::Standard qw( Int );
+
+  has number =&gt; (
+    is   =&gt; 'ro',
+    isa  =&gt; Int-&gt;where('$_ &gt; 0'),
+  );
+}</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id="Type::Tiny_et_MouseX::Types"><a class='permalink' href='#Type::Tiny_et_MouseX::Types'>Type::Tiny et MouseX::Types</a></h2>
+<p class="Pp">Types::Standard devrait être un remplacement direct pour MooseX::Types. Et Types::Common::Numeric et Types::Common::String devraient facilement remplacer MouseX::Types::Common::Numeric et MouseX::Types::Common::String.</p>
+<p class="Pp">Cela dit, si vous souhaitez utiliser un mélange de Type::Tiny et de MouseX::Types, ils devraient s'intégrer de manière assez transparente.</p>
+<pre>use Types::Standard qw( ArrayRef );
+use MouseX::Types::Mouse qw( Int );
+
+# cela devrait simplement fonctionner
+my $list_of_nums = ArrayRef[Int];
+
+# et ceci
+my $list_or_num = ArrayRef | Int;</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id="Paramètre_d'importation_&quot;-mouse&quot;"><a class='permalink' href='#Paramètre_d'importation_"-mouse"'>Paramètre d'importation "-mouse"</a></h2>
+<p class="Pp">Si vous avez lu jusqu'ici dans le manuel, vous saurez que c'est la manière habituelle d'importer des contraintes de type :</p>
+<pre>use Types::Standard qw( Int );</pre>
+<p class="Pp">Et le <span class="Li">"Int"</span> qui est importé est une fonction qui ne prend aucun argument et renvoie la contrainte de type <b>Int</b>, qui est un objet béni dans la classe Type::Tiny.</p>
+<p class="Pp">Type::Tiny simule l'API de Mouse::Meta::TypeConstraint si bien que la plupart du code Mouse et MouseX ne pourront pas faire la différence.</p>
+<p class="Pp">Mais et si vous avez besoin d'un vrai objet Mouse::Meta::TypeConstraint ?</p>
+<pre>use Types::Standard -mouse, qw( Int );</pre>
+<p class="Pp">Maintenant, la fonction <span class="Li">"Int"</span> importée renverra une véritable contrainte de type Mouse native.</p>
+<p class="Pp">Ce drapeau est principalement un vestige de l'époque où les objets natifs de Type::Tiny ne fonctionnaient <i>pas</i> directement dans Mouse. Dans 99,9 % des cas, il n'y a aucune raison de l'utiliser et de nombreuses raisons de ne pas le faire. (Les contraintes de type natif de Mouse n'offrent pas de méthodes utiles comme
+    <span class="Li">"plus_coercions"</span> et
+    <span class="Li">"where"</span>.)</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id="Méthode_&quot;mouse_type&quot;"><a class='permalink' href='#Méthode_"-mouse_type"'>"mouse_type" Méthode</a></h2>
+<p class="Pp">Une autre façon rapide d'obtenir un objet contrainte de type Mouse natif à partir d'un objet Type::Tiny est d'appeler la méthode
+    <span class="Li">"mouse_type"</span> :</p>
+<pre>use Types::Standard qw( Int );
+
+my $tiny_type   = Int;
+my $mouse_type  = $tiny_type-&gt;mouse_type;</pre>
+<p class="Pp">En interne, c'est ce que fait le drapeau
+    <span class="Li">"-mouse"</span> lors de l'importation des fonctions.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id="Performance_de_Type::Tiny"><a class='permalink' href='#Performance_de_Type::Tiny'>Performance de Type::Tiny</a></h2>
+<p class="Pp">Type::Tiny devrait s'exécuter à peu près aussi vite que les types Mouse. C'est parce que, lorsque c'est possible, il utilisera les implémentations XS de Mouse pour les vérifications de type afin d'effectuer le travail le plus lourd.</p>
+<p class="Pp">Il existe quelques contraintes de type pour lesquelles Type::Tiny préfère faire les choses sans l'aide de Mouse, pour des raisons de cohérence et d'exactitude. Par exemple, l'implémentation XS de Mouse pour <b>Bool</b> est... étrange... elle accepte les objets bénis qui surchargent
+    <span class="Li">"bool"</span>, mais seulement s'ils renvoient false. S'ils renvoient true, c'est une erreur de contrainte de type.</p>
+<p class="Pp">Utiliser Type::Tiny au lieu des contraintes de type de Mouse ne devrait pas faire de différence significative dans les performances de votre code.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="PROCHAINES_ÉTAPE"><a class='permalink' href='#PROCHAINES_ÉTAPE'>PROCHAINES ÉTAPES</a></h1>
+<p class="Pp">Voici votre prochaine étape :</p>
+<dl class="Bl-tag">
+  <dt>&#x2022;</dt>
+  <dd>Type::Tiny::Manual::UsingWithMite
+    <p class="Pp">Comment utiliser Type::Tiny avec Mite, y compris comment écrire un projet Perl entier en utilisant du code propre de type Moose et sans dépendances externes. (Même pas de dépendances sur Mite ou Type::Tiny !)</p>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTEUR"><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Toby Inkster &lt;tobyink@cpan.org&gt;.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="COPYRIGHT_ET_LICENCE"><a class='permalink' href='#COPYRIGHT_ET_LICENCE'>COPYRIGHT ET LICENCE</a></h1>
+<p class="Pp">Ce logiciel est copyright (c) 2013-2014, 2017-2025 par Toby
+    Inkster.</p>
+<p class="Pp">C'est un logiciel libre ; vous pouvez le redistribuer et/ou le modifier sous les mêmes termes que le système du langage de programmation Perl 5 lui-même.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXCLUSION_DE_GARANTIES"><a class='permalink' href='#EXCLUSION_DE_GARANTIES'>EXCLUSION DE GARANTIES</a></h1>
+<p class="Pp">CE PAQUET EST FOURNI &quot;TEL QUEL&quot; ET SANS AUCUNE GARANTIE EXPRESSE OU IMPLICITE, Y COMPRIS, SANS LIMITATION, LES GARANTIES IMPLICITES DE QUALITÉ MARCHANDE ET D'ADÉQUATION À UN USAGE PARTICULIER.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-11-02</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+   </section>
+
+            </aside>
+        </main>
+    </body>
+</html>
+ <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher une page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Rechercher" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-type-tiny/">extra/perl-type-tiny</a></dd>
+        <dt>Version :</dt>
+        <dd>2.008004-1</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://metacpan.org/release/Type-Tiny">https://metacpan.org/release/Type-Tiny</a></dd>
+        <dt>Licences :</dt>
+        <dd>PerlArtistic, GPL</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-type-tiny/">/listing/extra/perl-type-tiny/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#MANUAL">MANUEL</a></li>
+        
+            <li><a href="#NEXT_STEPS">PROCHAINES ÉTAPES</a></li>
+        
+            <li><a href="#AUTHOR">AUTEUR</a></li>
+        
+            <li><a href="#COPYRIGHT_AND_LICENCE">DROITS D'AUTEUR ET LICENCE</a></li>
+        
+            <li><a href="#DISCLAIMER_OF_WARRANTIES">AVERTISSEMENT DE NON-GARANTIE</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Type::Tiny::Manual::UsingWithMouse.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/Type::Tiny::Manual::UsingWithMouse.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

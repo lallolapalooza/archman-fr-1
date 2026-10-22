@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>POE::Filter::Grep(3pm) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">POE__Filter__Grep(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-poe/">perl-poe</a></p>
+<p class="lic">Licences: GPL, PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">POE::Filter::Grep(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">POE::Filter::Grep(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">POE::Filter::Grep - sélectionne ou supprime des éléments basés sur des règles simples</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>#!perl
+use POE qw(
+  Wheel::FollowTail
+  Filter::Line Filter::Grep Filter::Stackable
+);
+POE::Session-&gt;create(
+  inline_states =&gt; {
+    _start =&gt; sub {
+      my $parse_input_as_lines = POE::Filter::Line-&gt;new();
+      my $select_sudo_log_lines = POE::Filter::Grep-&gt;new(
+        Put =&gt; sub { 1 },
+        Get =&gt; sub {
+          my $input = shift;
+          return $input =~ /sudo\[\d+\]/i;
+        },
+      );
+      my $filter_stack = POE::Filter::Stackable-&gt;new(
+        Filters =&gt; [
+          $parse_input_as_lines, # premier pour get, dernier pour put
+          $select_sudo_log_lines, # premier pour put, dernier pour get
+        ]
+      );
+      $_[HEAP]{tailor} = POE::Wheel::FollowTail-&gt;new(
+        Filename =&gt; &quot;/var/log/system.log&quot;,
+        InputEvent =&gt; &quot;got_log_line&quot;,
+        Filter =&gt; $filter_stack,
+      );
+    },
+    got_log_line =&gt; sub {
+      print &quot;Log: $_[ARG0]\n&quot;;
+    }
+  }
+);
+POE::Kernel-&gt;run();
+exit;</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">POE::Filter::Grep sélectionne ou supprime des éléments basés sur des tests simples. Il peut être utilisé pour filtrer l'entrée, la sortie, ou les deux. Ce filtre est nommé et modélisé d'après la fonction intégrée <b>grep()</b> de Perl.</p>
+<p class="Pp">POE::Filter::Grep est conçu pour être combiné avec d'autres filtres via POE::Filter::Stackable. Dans l'exemple de la &quot;SYNOPSIS&quot;, une pile de filtres est créée pour analyser les journaux sous forme de lignes et supprimer toutes les entrées qui ne concernent pas un processus sudo. (Ou si votre verre est à moitié plein, la pile ne sélectionne que les entrées qui mentionnent sudo.)</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='METHODES_DE_FILTRE_PUBLIQUES'><a class='permalink' href='#METHODES_DE_FILTRE_PUBLIQUES'>MÉTHODES DE FILTRE PUBLIQUES</a></h1>
+<p class="Pp">En plus des méthodes POE::Filter habituelles, POE::Filter::Grep prend également en charge les suivantes.</p>
+<section class="Ss">
+<h2 class="Ss" id='new'><a class='permalink' href='#new'>new</a></h2>
+<p class="Pp"><b>new()</b> construit un nouvel objet POE::Filter::Grep. Il doit soit être appelé avec un seul paramètre Code, soit avec les paramètres Put et Get. Les valeurs pour Code, Put et Get sont des références de code qui, lorsqu'elles sont invoquées, retournent vrai pour sélectionner un élément ou faux pour le rejeter. Une fonction Code sera utilisée pour l'entrée et la sortie, tandis que les fonctions Get et Put permettent de filtrer l'entrée et la sortie de différentes manières. L'élément en question sera passé comme seul paramètre de la fonction.</p>
+<pre>sub reject_bidoofs {
+  my $pokemon = shift;
+  return 1 if $pokemon ne &quot;bidoof&quot;;
+  return;
+}
+my $gotta_catch_nearly_all = POE::Filter::Grep-&gt;new(
+  Code =&gt; \&amp;reject_bidoofs,
+);</pre>
+<p class="Pp">Forcer le comportement en lecture seule :</p>
+<pre>my $read_only = POE::Filter::Grep-&gt;new(
+  Get =&gt; sub { 1 },
+  Put =&gt; sub { 0 },
+);</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='modify'><a class='permalink' href='#modify'>modify</a></h2>
+<p class="Pp"><b>modify()</b> modifie le comportement d'un objet POE::Filter::Grep à l'exécution. Il accepte les mêmes paramètres que <b>new()</b> et remplace les tests existants par de nouveaux.</p>
+<pre># Ne pas donner nos Dialgas.
+$gotta_catch_nearly_all-&gt;modify(
+  Get =&gt; sub { 1 },
+  Put =&gt; sub { return shift() ne &quot;dialga&quot; },
+);</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR AUSSI</a></h1>
+<p class="Pp">POE::Filter pour plus d'informations sur les filtres en général.</p>
+<p class="Pp">POE::Filter::Stackable pour plus de détails sur l'empilement des filtres.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id=' BUGS'><a class='permalink' href='# BUGS'> BUGS</a></h1>
+<p class="Pp">Aucun connu.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEURS_&amp;amp;_DROITS_D_AUTEUR'><a class='permalink' href='#AUTEURS_&amp;amp;_DROITS_D_AUTEUR'>AUTEURS &amp; DROITS D'AUTEUR</a></h1>
+<p class="Pp">Le filtre Grep a été contribué par Dieter Pearcey. La documentation est fournie par Rocco Caputo.</p>
+<p class="Pp">Veuillez consulter la page de manuel POE pour plus d'informations sur les auteurs et les contributeurs.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2024-07-13</td>
+    <td class="foot-os">perl v5.38.2</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher une page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-poe/">extra/perl-poe</a></dd>
+        <dt>Version :</dt>
+        <dd>1.370-2</dd>
+        <dt>En amont :</dt>
+        <dd><a href="https://search.cpan.org/dist/POE">https://search.cpan.org/dist/POE</a></dd>
+        <dt>Licences :</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-poe/">/listing/extra/perl-poe/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#METHODES_DE_FILTRE_PUBLIQUES">MÉTHODES DE FILTRE PUBLIQUES</a></li>
+        
+            <li><a href="#VOIR_AUSSI">VOIR AUSSI</a></li>
+        
+            <li><a href="#BUGS">BUGS</a></li>
+        
+            <li><a href="#AUTEURS_&amp;amp;_DROITS_D_AUTEUR">AUTEURS &amp; DROITS D'AUTEUR</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/POE::Filter::Grep.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/POE::Filter::Grep.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

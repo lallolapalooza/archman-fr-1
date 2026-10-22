@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Tree::DAG_Node(3pm) — Pages man Arch Linux</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Tree__DAG_Node(3pm)</h1>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Tree::DAG_Node(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">Tree::DAG_Node(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">Tree::DAG_Node - Un arbre N-aire</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPIS</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='Utilisation_comme_classe_de_base'><a class='permalink' href='#Utilisation_comme_classe_de_base'>Utilisation comme classe de base</a></h2>
+<pre>package Game::Tree::Node;
+use parent 'Tree::DAG_Node';
+# Ajoutez maintenant vos propres méthodes qui remplacent ou étendent les méthodes de C&lt;Tree::DAG_Node&gt;...</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Utilisation_comme_classe_seule'><a class='permalink' href='#Utilisation_comme_classe_seule'>Utilisation comme classe seule</a></h2>
+<pre>use Tree::DAG_Node;
+my($root) = Tree::DAG_Node -&gt; new({name =&gt; 'root', attributes =&gt; {uid =&gt; 0} });
+$root -&gt; add_daughter(Tree::DAG_Node -&gt; new({name =&gt; 'one', attributes =&gt; {uid =&gt; 1} }) );
+$root -&gt; add_daughter(Tree::DAG_Node -&gt; new({name =&gt; 'two', attributes =&gt; {} }) );
+$root -&gt; add_daughter(Tree::DAG_Node -&gt; new({name =&gt; 'three'}) ); # Les attributs sont initialisés à {}.</pre>
+<p class="Pp">Ou alors :</p>
+<pre>my($count) = 0;
+my($tree)  = Tree::DAG_Node -&gt; new({name =&gt; 'Root', attributes =&gt; {'uid' =&gt; $count} });</pre>
+<p class="Pp">Ou encore :</p>
+<pre>my $root = Tree::DAG_Node -&gt; new();
+$root -&gt; name(&quot;Je suis au sommet&quot;);
+$root -&gt; attributes({uid =&gt; 0});
+my $new_daughter = $root -&gt; new_daughter;
+$new_daughter -&gt; name('Un autre nœud');
+$new_daughter -&gt; attributes({uid =&gt; 1});
+...</pre>
+<p class="Pp">Enfin, pour des wrappers sophistiqués appelés <b>_add_daughter()</b>
+    autour de <span class="Li">new()</span>, consultez ces modules :
+    Marpa::Demo::StringParser et GraphViz2::Marpa. Ces deux modules utilisent
+    Moo.</p>
+<p class="Pp">Voir les scripts/*.pl pour d'autres exemples.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Utilisation_avec_des_donnees_utf-8'><a class='permalink' href='#Utilisation_avec_des_donnees_utf-8'>Utilisation avec des données utf-8</a></h2>
+<p class="Pp">read_tree($file_name) fonctionne avec des données utf-8. Voir
+    t/read.tree.t et t/tree.utf8.attributes.txt. Un tel fichier peut être créé en
+    redirigeant la sortie de <b>tree2string()</b> vers un fichier de type utf-8.</p>
+<p class="Pp">Voir la documentation de Encode pour la différence entre utf8 et
+    utf-8. En bref, utilisez utf-8.</p>
+<p class="Pp">Voir aussi les scripts/write_tree.pl, scripts/read.tree.pl et
+    scripts/read.tree.log.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Cette classe encapsule/crée/manipule des objets qui représentent des
+    nœuds dans une structure arborescente. La structure arborescente n'est pas un
+    objet en soi, mais émerge des liens que vous créez entre les nœuds. Cette
+    classe fournit les méthodes pour créer des liens qui peuvent être utilisés pour
+    construire un arbre, tout en vous empêchant de créer des liens qui ne sont pas
+    autorisés dans un arbre (comme un nœud étant sa propre mère ou ancêtre, ou
+    un nœud ayant deux mères).</p>
+<p class="Pp">Voici ce que j'entends par une « structure arborescente », un peu
+    répétitif :</p>
+<dl class="Bl-tag">
+  <dt id="o"><a class="permalink" href="#o">o Un arbre est un cas particulier d'un
+    graphe orienté acyclique</a></dt>
+  <dd></dd>
+  <dt id="o~2"><a class="permalink" href="#o~2">o Un arbre est un réseau de nœuds
+    où il y a exactement un nœud racine</a></dt>
+  <dd>De plus, la seule relation primaire entre les nœuds est la relation mère-fille.</dd>
+  <dt id="o~3"><a class="permalink" href="#o~3">o Aucun nœud ne peut être sa propre
+    mère, ou la mère de sa mère, etc.</a></dt>
+  <dd></dd>
+  <dt id="o~4"><a class="permalink" href="#o~4">o Chaque nœud de l'arbre a
+    exactement un parent</a></dt>
+  <dd>Sauf la racine bien sûr, qui n'a pas de parent.</dd>
+  <dt id="o~5"><a class="permalink" href="#o~5">o Chaque nœud peut avoir n'importe quel
+    nombre (0 .. N) de filles</a></dt>
+  <dd>Les filles d'un nœud donné constituent une liste *ordonnée*.
+    <p class="Pp">Cependant, vous êtes libre de considérer cet ordre comme non
+        pertinent. Certaines applications ont besoin que les filles soient ordonnées,
+        j'ai donc choisi de considérer cela comme le cas général.</p>
+  </dd>
+  <dt id="o~6"><a class="permalink" href="#o~6">o Un nœud ne peut apparaître que dans un
+    seul arbre, et une seule fois dans cet arbre</a></dt>
+  <dd>Notamment (remarquable car cela ne découle pas des deux points ci-dessus), un
+      nœud ne peut pas apparaître deux fois dans la liste des filles de sa mère.</dd>
+  <dt id="o~7"><a class="permalink" href="#o~7">o Il y a une idée de haut par rapport à
+    bas</a></dt>
+  <dd>Haut signifie vers la racine, et bas signifie loin de la racine (et vers
+      les feuilles).</dd>
+  <dt id="o~8"><a class="permalink" href="#o~8">o Il y a une idée de gauche par rapport à
+    droite</a></dt>
+  <dd>Gauche signifie vers le début (index 0) de la liste des filles d'un nœud donné,
+      et droite signifie vers la fin de la liste des filles d'un nœud donné.</dd>
+</dl>
+<p class="Pp">Les arbres tels que décrits ci-dessus ont diverses applications, parmi
+    elles : la représentation de la constitution syntaxique en linguistique formelle ;
+    la représentation des contingences dans un arbre de jeu ; la représentation de la
+    syntaxe abstraite dans l'analyse de tout langage informatique -- que ce soit dans
+    des arbres d'expression pour les langages de programmation, ou dans la constitution
+    de l'analyse d'un document en langage de balisage. (Certaines de ces applications
+    n'utiliseront peut-être pas le fait que les filles sont ordonnées.)</p>
+<p class="Pp">(Note : les B-Arbres sont un cas très particulier des types d'arbres
+    ci-dessus, et sont mieux traités avec leur propre classe. Consultez CPAN pour des
+    modules encapsulant des B-Arbres ; ou si vous voulez réellement une base de données,
+    et que pour une raison quelconque vous avez fini par regarder ici, allez voir
+    AnyDBM_File.)</p>
+<p class="Pp">Beaucoup de classes de base ne sont utilisables qu'en tant que telles --
+    mais <span class="Li">&quot;Tree::DAG_Node&quot;</span> peut être utilisé comme une
+    classe normale. Vous pouvez y aller et dire :</p>
+<pre>use Tree::DAG_Node;
+my $root = Tree::DAG_Node-&gt;new();
+$root-&gt;name(&quot;Je suis au sommet&quot;);
+$new_daughter = Tree::DAG_Node-&gt;new();
+$new_daughter-&gt;name(&quot;Plus&quot;);
+$root-&gt;add_daughter($new_daughter);</pre>
+<p class="Pp">et ainsi de suite, en construisant et en reliant des objets de
+    <span class="Li">&quot;Tree::DAG_Node&quot;</span> et en en faisant des structures
+    arborescentes utiles.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='UNE_NOTE_AU_LECTEUR'><a class='permalink' href='#UNE_NOTE_AU_LECTEUR'>UNE NOTE AU LECTEUR</a></h1>
+<p class="Pp">Cette classe est grande et fournit de nombreuses méthodes. Si votre
+    problème est simple (par exemple, simplement représenter un arbre d'analyse
+    simple), cette classe pourrait sembler être l'utilisation d'un marteau atomique
+    pour écraser une mouche. Mais la complexité des fonctionnalités de ce module ne
+    devrait pas nuire à l'efficacité de l'utilisation de cette classe dans un but
+    simple. En fait, je serais très surpris qu'un utilisateur ait jamais besoin de
+    plus d'un tiers des méthodes de cette classe. Et rappelez-vous : un marteau
+    atomique *va* tuer cette mouche.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CONTENU_DES_OBJETS'><a class='permalink' href='#CONTENU_DES_OBJETS'>CONTENU DES OBJETS</a></h1>
+<p class="Pp">Implémentationnellement, chaque nœud d'un arbre est un objet, au sens
+    d'une structure de données arbitrairement complexe appartenant à une classe
+    (vraisemblablement <span class="Li">&quot;Tree::DAG_Node&quot;</span>, ou celles
+    qui en dérivent) qui fournit des méthodes.</p>
+<p class="Pp">Les attributs d'un objet-nœud sont :</p>
+<dl class="Bl-tag">
+  <dt id="o~9"><a class="permalink" href="#o~9">o mère -- la mère de ce nœud. undef
+    s'il s'agit d'une racine</a></dt>
+  <dd></dd>
+  <dt id="o~10"><a class="permalink" href="#o~10">o filles -- la liste (éventuellement
+    vide) des filles de ce nœud</a></dt>
+  <dd></dd>
+  <dt id="o~11"><a class="permalink" href="#o~11">o nom -- le nom de ce nœud</a></dt>
+  <dd>N'a pas besoin d'être unique, ni même imprimable. Il est imprimé dans
+      certaines des diverses méthodes de vidage, mais c'est à vous de voir si vous
+      n'y mettez rien de significatif ou d'imprimable.</dd>
+  <dt id="o~12"><a class="permalink" href="#o~12">o attributs -- tout ce que l'utilisateur
+    veut en faire</a></dt>
+  <dd>Vraisemblablement un hashref contenant les attributs que l'utilisateur veut
+      stocker sans risquer de conflit avec les attributs réels de l'objet. (Exemple
+      d'utilisation : attributs d'une balise SGML -- vous ne voudriez certainement
+      pas que l'existence d'une paire « mother=foo » dans une telle balise
+      entre en conflit avec l'attribut « mother » de l'objet nœud.)
+    <p class="Pp">Outre (par défaut) son initialisation à {}, et le fait d'avoir
+        la méthode d'accès appelée « attributes » (décrite plus loin), je ne
+        fais rien avec les « attributs » dans ce module. J'ai essentiellement
+        conçu cela pour que les utilisateurs qui ne veulent pas/n'ont pas besoin de
+        se soucier de dériver une classe de <span class="Li">&quot;Tree::DAG_Node&quot;</span>,
+        puissent quand même attacher les données qu'ils souhaitent dans un nœud.</p>
+  </dd>
+</dl>
+<p class="Pp">« mère » et « filles » sont des attributs liés aux liens --
+    ils ne sont jamais écrits directement, mais sont modifiés de manière appropriée par
+    les « méthodes de liaison », décrites ci-dessous.</p>
+<p class="Pp">Les deux autres (et tous ceux que vous pourriez ajouter dans des
+    classes dérivées) sont simplement accessibles via les méthodes du même nom,
+    discutées plus loin.</p>
+<section class="Ss">
+<h2 class="Ss" id='À_propos_de_linterface_documentée'><a class='permalink' href='#À_propos_de_linterface_documentée'>À propos de l'interface documentée</a></h2>
+<p class="Pp">Tenez-vous-en à l'interface documentée (et aux commentaires dans le
+    code source -- en particulier ceux qui disent « non documenté ! » et/ou
+    « déconseillé ! » -- ne comptent pas comme documentation !)</p>
+</section>
+</section>
+</div>
+</section>
+
+            </article>
+            
+        </main>
+        <footer>
+            
+        </footer>
+    </body>
+</html>
+, et ne vous fiez
+    pas à un comportement qui ne fait pas partie de l'interface documentée.</p>
+<p class="Pp">Plus précisément, à moins que la documentation d'une méthode
+    particulière ne dise « cette méthode renvoie telle ou telle valeur », alors
+    vous ne devriez pas vous fier à ce qu'elle renvoie quoi que ce soit de
+    significatif.</p>
+<p class="Pp">Une connaissance *superficielle* des détails les plus généraux du
+    code source de cette classe est supposée pour quiconque utilise cette classe
+    comme classe de base – surtout si vous remplacez des méthodes existantes, et
+    *absolument* si vous remplacez des méthodes de liaison.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CONSTRUCTEUR_PRINCIPAL_ET_INITIALISEUR'><a class='permalink' href='#CONSTRUCTEUR_PRINCIPAL_ET_INITIALISEUR'>CONSTRUCTEUR PRINCIPAL ET INITIALISEUR</a></h1>
+<dl class="Bl-tag">
+  <dt id="le"><a class="permalink" href="#le">le constructeur
+    CLASS-&gt;<b>new()</b> ou CLASS-&gt;new($options)</a></dt>
+  <dd>Ceci crée un nouvel objet nœud, appelle
+      <span class="Li">$object</span>-&gt;_init($options) pour lui fournir des
+      valeurs par défaut raisonnables (comme : nom indéfini, mère indéfinie, pas
+      de filles, réglage 'attributs' d'un nouveau hashref vide), et renvoie l'objet
+      créé. (Si vous venez de dire « CLASS-&gt;<b>new()</b> » ou « CLASS-&gt;new »,
+      alors il fait semblant que vous ayez appelé « CLASS-&gt;new({}) ».)
+    <p class="Pp">Voir aussi les commentaires sous « new($hashref) » pour les
+        options prises en charge lors de l'appel à <b>new()</b>.</p>
+    <p class="Pp">Si vous utilisez <span class="Li">&quot;Tree::DAG_Node&quot;</span>
+        comme superclasse, et que vous ajoutez des attributs qui doivent être
+        initialisés, ce que vous devez faire est de fournir une méthode _init
+        qui appelle <span class="Li">$this</span>-&gt;SUPER::_init($options)
+        pour utiliser la méthode _init de sa superclasse, puis initialise les
+        nouveaux attributs :</p>
+        <pre>sub _init {
+  my($this, $options) = @_[0,1];
+  $this-&gt;SUPER::_init($options); # appelle _init de ma superclasse pour
+    # initialiser tous les attributs que j'hérite
+  # Maintenant initialiser /mes/ nouveaux attributs :
+  $this-&gt;{'amigos'} = []; # par exemple
+}
+</pre>
+  </dd>
+  <dt id="le~2"><a class="permalink" href="#le~2">le constructeur
+    $obj-&gt;<b>new()</b> ou $obj-&gt;new($options)</a></dt>
+  <dd>Juste une autre façon d'accéder à la méthode « new($hashref) ». Ceci ne
+      *copie pas* <span class="Li">$obj</span>, mais construit simplement un nouvel
+      objet de la même classe que lui. Vous épargne la peine de faire
+      <span class="Li">$class</span> = ref <span class="Li">$obj</span>;
+      <span class="Li">$obj2</span> =
+    <span class="Li">$class</span>-&gt;new;</dd>
+  <dt id="le~3"><a class="permalink" href="#le~3">la méthode
+    $node-&gt;_init($options)</a></dt>
+  <dd>Initialise les valeurs des attributs de l'objet. Voir la discussion
+      ci-dessus. On suppose que ceci ne devrait être appelé que par le cœur du
+      constructeur « new($hashref) » – jamais par l'utilisateur final.
+    <p class="Pp">Actuellement, il n'y a pas d'options documentées pour les mettre
+        dans le hashref <span class="Li">$options</span>, mais (au cas où vous
+        voudriez ignorer le sermon ci-dessus) l'option existe pour que vous
+        utilisiez <span class="Li">$options</span> pour quelque chose d'utile dans
+        une classe dérivée.</p>
+    <p class="Pp">Veuillez consulter le code source pour plus d'informations.</p>
+  </dd>
+  <dt id="voir"><a class="permalink" href="#voir">voir aussi (ci-dessous) les
+    constructeurs « new_daughter » et
+    « new_daughter_left »</a></dt>
+  <dd></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES'><a class='permalink' href='#MÉTHODES'>MÉTHODES</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='ajouter_fille(LISTE)'><a class='permalink' href='#ajouter_fille(LISTE)'>ajouter_fille(LISTE)</a></h2>
+<p class="Pp">Un synonyme exact de « add_daughters(LISTE) ».</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='ajouter_filles(LISTE)'><a class='permalink' href='#ajouter_filles(LISTE)'>ajouter_filles(LISTE)</a></h2>
+<p class="Pp">Cette méthode ajoute les objets nœuds dans LISTE à la fin (droite)
+    de la liste des *filles* de <span class="Li">$mère</span>. Faire d'un nœud N1
+    la fille d'un autre nœud N2 signifie également que l'attribut *mère* de N1 est
+    automatiquement défini sur N2 ; cela signifie également que N1 cesse d'être
+    la fille de qui que ce soit d'autre en devenant la fille de N2.</p>
+<p class="Pp">Si vous essayez de faire d'un nœud sa propre mère, une erreur fatale
+    en résulte. Si vous essayez de prendre un des ancêtres d'un nœud N1 et d'en
+    faire également une fille de N1, une erreur fatale en résulte. Une erreur
+    fatale en résulte si quelque chose dans LISTE n'est pas un objet nœud.</p>
+<p class="Pp">Si vous essayez de faire de N1 une fille de N2, mais qu'il est *déjà*
+    une fille de N2, alors ceci est une opération nulle – cela ne déplacera pas de
+    tels nœuds à la fin de la liste ou quoi que ce soit ; cela saute simplement
+    de faire quoi que ce soit avec eux.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='ajouter_fille_gauche(LISTE)'><a class='permalink' href='#ajouter_fille_gauche(LISTE)'>ajouter_fille_gauche(LISTE)</a></h2>
+<p class="Pp">Un synonyme exact de « add_daughters_left(LISTE) ».</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='ajouter_filles_gauche(LISTE)'><a class='permalink' href='#ajouter_filles_gauche(LISTE)'>ajouter_filles_gauche(LISTE)</a></h2>
+<p class="Pp">Cette méthode est identique à « add_daughters(LISTE) », sauf qu'elle
+    ajoute les objets nœuds dans LISTE au début (gauche) de la liste des filles
+    de <span class="Li">$mère</span>, au lieu de la fin (droite).</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='ajouter_sœur_gauche(LISTE)'><a class='permalink' href='#ajouter_sœur_gauche(LISTE)'>ajouter_sœur_gauche(LISTE)</a></h2>
+<p class="Pp">Un synonyme exact de « add_left_sisters(LISTE) ».</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='ajouter_sœurs_gauches(LISTE)'><a class='permalink' href='#ajouter_sœurs_gauches(LISTE)'>ajouter_sœurs_gauches(LISTE)</a></h2>
+<p class="Pp">Ceci ajoute les éléments de LISTE (dans cet ordre) comme sœurs
+    immédiates gauches de <span class="Li">$nœud</span>. En d'autres termes, étant
+    donné que la liste des filles de la mère de B est (A,B,C,D), appeler
+    B-&gt;add_left_sisters(X,Y) rend la liste des filles de la mère de B (A,X,Y,B,C,D).</p>
+<p class="Pp">Si LISTE est vide, ceci est une opération nulle, et renvoie une liste
+    vide.</p>
+<p class="Pp">Ceci est fondamentalement implémenté comme un appel à
+    <span class="Li">$nœud</span>-&gt;replace_with(LISTE,
+    <span class="Li">$nœud</span>), et donc toutes les limitations et mises en garde
+    de replace_with s'appliquent.</p>
+<p class="Pp">La valeur de retour de
+    <span class="Li">$nœud</span>-&gt;add_left_sisters(LISTE) est les éléments de
+    LISTE qui ont été ajoutés, tels que renvoyés par replace_with – moins les
+    copies de <span class="Li">$nœud</span> que vous obtiendriez d'un appel direct à
+    <span class="Li">$nœud</span>-&gt;replace_with(LISTE,
+    <span class="Li">$nœud</span>).</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='ajouter_sœur_droite(LISTE)'><a class='permalink' href='#ajouter_sœur_droite(LISTE)'>ajouter_sœur_droite(LISTE)</a></h2>
+<p class="Pp">Un synonyme exact de « add_right_sisters(LISTE) ».</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='ajouter_sœurs_droites(LISTE)'><a class='permalink' href='#ajouter_sœurs_droites(LISTE)'>ajouter_sœurs_droites(LISTE)</a></h2>
+<p class="Pp">Identique à add_left_sisters (voir ci-dessus), sauf que les éléments
+    de LISTE (dans cet ordre) sont des sœurs *droites* immédiates de
+    <span class="Li">$nœud</span> ;</p>
+<p class="Pp">En d'autres termes, étant donné que la liste des filles de la mère de
+    B est (A,B,C,D), appeler B-&gt;add_right_sisters(X,Y) rend la liste des filles de
+    la mère de B (A,B,X,Y,C,D).</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>adresse()</b></h2>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='adresse(ADRESSE)'><a class='permalink' href='#adresse(ADRESSE)'>adresse(ADRESSE)</a></h2>
+<p class="Pp">Avec la première syntaxe, renvoie l'adresse de
+    <span class="Li">$nœud</span> dans son arbre, basée sur sa position dans l'arbre.
+    Une adresse est formée en notant le chemin entre la racine et
+    <span class="Li">$nœud</span>, et en concaténant les indices de filles des nœuds
+    qu'il traverse (en commençant par 0 pour la racine, et en terminant par
+    <span class="Li">$nœud</span>).</p>
+<p class="Pp">Par exemple, si pour aller du nœud RACINE au nœud
+    <span class="Li">$nœud</span>, vous passez par RACINE, A, B, et
+    <span class="Li">$nœud</span>, alors l'adresse est déterminée comme suit :</p>
+<dl class="Bl-tag">
+  <dt id="o~13"><a class="permalink" href="#o~13">o L'index de ma fille de
+    RACINE est 0</a></dt>
+  <dd></dd>
+  <dt id="o~14"><a class="permalink" href="#o~14">o L'index de ma fille de A est,
+    supposons, 2</a></dt>
+  <dd>A est à l'index 2 dans la liste des filles de RACINE.</dd>
+  <dt id="o~15"><a class="permalink" href="#o~15">o L'index de ma fille de B est,
+    supposons, 0</a></dt>
+  <dd>B est à l'index 0 dans la liste des filles de A.</dd>
+  <dt id="o~16"><a class="permalink" href="#o~16">o L'index de ma fille de
+    $nœud est, supposons, 4</a></dt>
+  <dd><span class="Li">$nœud</span> est à l'index 4 dans la liste des filles de
+      B.</dd>
+</dl>
+<p class="Pp">L'adresse du <span class="Li">$nœud</span> décrit ci-dessus est donc
+    « 0:2:0:4 ».</p>
+<p class="Pp">(À titre de cas spécial, l'adresse de la racine est toujours « 0 » ;
+    et puisque les adresses commencent à partir de la racine, toutes les adresses
+    commencent par un « 0 ».)</p>
+<p class="Pp">La seconde syntaxe, où vous fournissez une adresse, commence à la
+    racine de l'arbre auquel <span class="Li">$n'importeQuelNœud</span> appartient,
+    et renvoie le nœud correspondant à cette adresse. Renvoie undef si aucun nœud
+    ne correspond à cette adresse. Notez que cette routine peut être quelque peu
+    libérale dans son interprétation de ce qui peut constituer une adresse ; c'est-à-dire
+    qu'elle accepte « 0.2.0.4 », en plus de « 0:2:0:4 ».</p>
+<p class="Pp">Notez également que l'adresse d'un nœud dans un arbre n'est
+    significative que dans cet arbre tel qu'il est structuré actuellement.</p>
+<p class="Pp">(Considérez comment ($adresse1 cmp
+    <span class="Li">$adresse2</span>) peut vous être magiquement significatif, si
+    vous vouliez découvrir quels nœuds sont à droite de quels autres nœuds.)</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>ancetres()</b></h2>
+<p class="Pp">Renvoie la liste des ancêtres de ce nœud, en commençant par sa
+    mère, puis sa grand-mère, et en terminant par la racine. Elle le fait en
+    suivant simplement les attributs 'mère' aussi loin que possible. Donc si
+    <span class="Li">$élément</span> EST la racine, ceci renvoie une liste vide.</p>
+<p class="Pp">Considérez que scalaire($nœud-&gt;ancetres) renvoie le niveau de ce
+    nœud dans l'arbre – 2 pour une petite-fille de la racine, etc., et 0 pour la
+    racine elle-même.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>attribut()</b></h2>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='attribut(SCALAIRE)'><a class='permalink' href='#attribut(SCALAIRE)'>attribut(SCALAIRE)</a></h2>
+<p class="Pp">Synonymes exacts de « <b>attributs()</b> » et
+    « attributs(SCALAIRE) ».</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>attributs()</b></h2>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='attributs(SCALAIRE)'><a class='permalink' href='#attributs(SCALAIRE)'>attributs(SCALAIRE)</a></h2>
+<p class="Pp">Dans la première forme, renvoie la valeur de l'attribut
+    « attributs » de l'objet nœud. Dans la seconde forme, la définit à la valeur
+    de SCALAIRE. J'ai l'intention que ceci soit utilisé pour stocker une référence
+    vers un hash (probablement anonyme) que l'utilisateur peut utiliser pour
+    stocker tous les attributs qu'il ne veut pas avoir à stocker comme attributs
+    d'objet. Dans ce cas, vous n'avez jamais besoin de définir la valeur de ceci.
+    (_init l'a déjà initialisé à {}.) Au lieu de cela, vous pouvez simplement
+    faire...</p>
+<pre>$node-&gt;attributs-&gt;{'foo'} = 'bar';</pre>
+<p class="Pp">...pour écrire foo =&gt; bar.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>effacer_filles()</b></h2>
+<p class="Pp">Ceci détache toutes les filles de <span class="Li">$mère</span>.
+    Renvoie la liste de ce qui étaient autrefois les filles de
+    <span class="Li">$mère</span>.</p>
+<p class="Pp">Pas à </p>soyez confus avec &quot;remove_daughters(LIST)&quot;.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='common(LIST)'><a class='permalink' href='#common(LIST)'>common(LIST)</a></h2>
+<p class="Pp">Retourne le nœud le plus bas dans l'arbre qui est un ancêtre ou soi-même pour les nœuds <span class="Li">$node</span> et LIST.</p>
+<p class="Pp">Si les nœuds sont suffisamment éloignés dans l'arbre, la réponse est simplement la racine.</p>
+<p class="Pp">Si les nœuds ne sont pas tous dans le même arbre, la réponse est undef.</p>
+<p class="Pp">Comme cas dégénéré, si LIST est vide, retourne
+    <span class="Li">$node</span>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='common_ancestor(LIST)'><a class='permalink' href='#common_ancestor(LIST)'>common_ancestor(LIST)</a></h2>
+<p class="Pp">Retourne le nœud le plus bas qui est un ancêtre de tous les nœuds donnés (dans les nœuds <span class="Li">$node</span> et LIST). En d'autres termes, il répond à la question : &quot;Quel nœud dans l'arbre, aussi bas que possible, est l'ancêtre des nœuds donnés ($node et LIST) ?&quot;</p>
+<p class="Pp">Si les nœuds sont suffisamment éloignés, la réponse est simplement la racine -- sauf si l'un des nœuds est la racine elle-même, auquel cas la réponse est undef (puisque la racine n'a pas d'ancêtre).</p>
+<p class="Pp">Si les nœuds ne sont pas tous dans le même arbre, la réponse est undef.</p>
+<p class="Pp">Comme cas dégénéré, si LIST est vide, retourne la mère de
+    <span class="Li">$node</span> ; ce sera undef si
+    <span class="Li">$node</span> est la racine.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='copy($option)'><a class='permalink' href='#copy($option)'>copy($option)</a></h2>
+<p class="Pp">Retourne une copie du nœud appelant (l'invocant). Par exemple : my($copie) =
+    <span class="Li">$noeud</span> -&gt; copy;</p>
+<p class="Pp"><span class="Li">$option</span> est un hashref d'options, avec les paires (clé =&gt; valeur) suivantes :</p>
+<dl class="Bl-tag">
+  <dt id="o~17"><a class="permalink" href="#o~17">o no_attribute_copy =&gt;
+    $Boolean</a></dt>
+  <dd>Si défini à 1, ne copie pas les attributs du nœud.
+    <p class="Pp">Si non spécifié, la valeur par défaut est 0, ce qui copie les attributs.</p>
+  </dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>copy_at_and_under()</b></h2>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='copy_at_and_under($options)'><a class='permalink' href='#copy_at_and_under($options)'>copy_at_and_under($options)</a></h2>
+<p class="Pp">Ceci retourne une copie du sous-arbre constitué de
+    <span class="Li">$noeud</span> et de tout ce qui se trouve en dessous.</p>
+<p class="Pp">Si vous ne passez aucune option, copy_at_and_under fait semblant que vous avez passé {}.</p>
+<p class="Pp">Cela fonctionne en construisant récursivement le nouvel arbre à partir des feuilles, en dupliquant les nœuds en utilisant
+    <span class="Li">$noeud_original</span>-&gt;copy($options_ref) puis en les reliant en un nouvel arbre de la même forme.</p>
+<p class="Pp">Les options que vous spécifiez sont transmises aux appels de
+    <span class="Li">$noeud</span>-&gt;copy.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>copy_tree()</b></h2>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='copy_tree($options)'><a class='permalink' href='#copy_tree($options)'>copy_tree($options)</a></h2>
+<p class="Pp">Ceci retourne la racine d'une copie de l'arbre dont
+    <span class="Li">$noeud</span> est membre. Si vous ne passez aucune option,
+    copy_tree fait semblant que vous avez passé {}.</p>
+<p class="Pp">Cette méthode est actuellement implémentée simplement comme un appel à
+    <span class="Li">$this</span>-&gt;root-&gt;copy_at_and_under($options), mais de la magie pourrait être ajoutée à l'avenir.</p>
+<p class="Pp">Les options que vous spécifiez sont transmises aux appels de
+    <span class="Li">$noeud</span>-&gt;copy.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>daughters()</b></h2>
+<p class="Pp">Ceci retourne la liste (potentiellement vide) des filles de
+    <span class="Li">$noeud</span>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='decode_lol($lol)'><a class='permalink' href='#decode_lol($lol)'>decode_lol($lol)</a></h2>
+<p class="Pp">Retourne un arrayref ayant décodé la structure profondément imbriquée
+    <span class="Li">$lol</span>.</p>
+<p class="Pp"><span class="Li">$lol</span> sera la sortie de
+    <b>tree_to_lol()</b> ou de <b>tree_to_simple_lol()</b>.</p>
+<p class="Pp">Voir scripts/read.tree.pl, et son fichier de sortie
+    scripts/read.tree.log.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>delete_tree()</b></h2>
+<p class="Pp">Détruit l'arbre entier dont <span class="Li">$noeud</span> est membre (en commençant par la racine), en mettant à null les attributs de chaque objet nœud (y compris, le plus important, ses attributs de liaison -- espérons que cela suffise largement à éliminer toute circularité dans la structure de données), puis en le déplaçant vers la classe DEADNODE.</p>
+<p class="Pp">Utilisez ceci lorsque vous avez terminé avec l'arbre en question et que vous souhaitez libérer sa mémoire. (Si vous ne le faites pas, elle sera libérée de toute façon lorsque votre programme se terminera.)</p>
+<p class="Pp">Si vous essayez d'appeler des méthodes sur l'un des objets nœuds de l'arbre que vous avez détruit, vous obtiendrez une erreur telle que :</p>
+<pre>Can't locate object method &quot;leaves_under&quot;
+  via package &quot;DEADNODE&quot;.</pre>
+<p class="Pp">Donc, si vous voyez cela, c'est ce que vous avez mal fait. (En fait, la classe DEADNODE fournit une méthode : une méthode sans effet appelée &quot;delete_tree&quot;. Donc, si vous voulez supprimer un arbre, mais pensez que vous l'avez peut-être déjà supprimé, il est sûr d'appeler
+    <span class="Li">$noeud</span>-&gt;delete_tree dessus (à nouveau).)</p>
+<p class="Pp">La méthode &quot;<b>delete_tree()</b>&quot; est nécessaire car le ramasse-miettes de Perl ne verrait jamais (tel qu'implémenté actuellement) qu'il est temps de désallouer la mémoire utilisée par l'arbre -- jusqu'à ce que vous appeliez
+    <span class="Li">$noeud</span>-&gt;delete_tree, ou jusqu'à ce que le programme s'arrête (au moment de la &quot;destruction globale&quot;, lorsque <b>tout</b> est désalloué).</p>
+<p class="Pp">Soit dit en passant, il existe de meilleures façons de faire du ramasse-miettes sur un arbre, des façons qui ne nécessitent pas à l'utilisateur d'appeler explicitement une méthode comme &quot;<b>delete_tree()</b>&quot; -- elles impliquent des classes fictives, comme expliqué à <a href='http://mox.perl.com/misc/circle-destroy.pod'>http://mox.perl.com/misc/circle-destroy.pod</a></p>
+<p class="Pp">Cependant, introduire un concept de classe fictive dans
+    <span class="Li">&quot;Tree::DAG_Node&quot;</span> serait plutôt une distraction. Si vous souhaitez faire cela avec vos classes dérivées, via un DESTROY dans une classe fictive (ou dans une classe de métainformation de l'arbre, peut-être), alors n'hésitez pas.</p>
+<p class="Pp">Le seul cas où je peux imaginer que &quot;<b>delete_tree()</b>&quot; échoue à complètement annuler l'arbre, est si vous utilisez le hashref dans l'attribut &quot;attributes&quot; pour stocker (vraisemblablement entre autres choses) des références aux hashrefs d'&quot;attributes&quot; d'autres nœuds -- ce qui 1) est peut-être un peu étrange, et 2) est votre problème, car c'est votre structure de hash qui est circulaire, pas celle de l'arbre. Quoi qu'il en soit, considérez :</p>
+<pre># mettre à null tous mes hashes &quot;attributes&quot;
+$nimportout-&gt;root-&gt;walk_down({
+  'callback' =&gt; sub {
+    $hr = $_[0]-&gt;attributes; %$hr = (); return 1;
+  }
+});
+# Et ensuite :
+$nimportout-&gt;delete_tree;</pre>
+<p class="Pp">(Je suppose que &quot;<b>delete_tree()</b>&quot; est un
+    &quot;destructeur&quot;, ou ce qui s'en approche le plus significativement pour une structure de données riche en circularité en Perl.)</p>
+<p class="Pp">Voir aussi &quot;QUAND ET COMMENT DÉTRUIRE L'ARBRE&quot;.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>depth_under()</b></h2>
+<p class="Pp">Retourne un entier représentant le nombre de branches entre ce
+    <span class="Li">$noeud</span> et la feuille la plus distante en dessous. (En d'autres termes, ceci retourne la profondeur du sous-arbre commençant par
+    <span class="Li">$noeud</span>. Considérez scalar($it-&gt;ancestors) si vous voulez la profondeur d'un nœud dans l'arbre entier.)</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>descendants()</b></h2>
+<p class="Pp">Retourne une liste composée de tous les descendants de
+    <span class="Li">$noeud</span>. Retourne une liste vide si
+    <span class="Li">$noeud</span> est un nœud terminal.</p>
+<p class="Pp">(Notez que l'orthographe est &quot;descendants&quot;, pas
+    &quot;descendents&quot;.)</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='draw_ascii_tree([$options])'><a class='permalink' href='#draw_ascii_tree(%5B$options%5D)'>draw_ascii_tree([$options])</a></h2>
+<p class="Pp">Ici, [] représente un paramètre optionnel.</p>
+<p class="Pp">Retourne un arrayref de lignes appropriées pour l'impression.</p>
+<p class="Pp">Dessine une belle représentation en art ASCII de la structure de l'arbre.</p>
+<p class="Pp">L'arbre ressemble à ceci :</p>
+<pre>             |
+          &lt;Racine&gt;
+   /-------+-----+---+---\
+   |       |     |   |   |
+  &lt;I&gt;     &lt;H&gt;   &lt;D&gt; &lt;E&gt; &lt;B&gt;
+ /---\   /---\   |   |   |
+ |   |   |   |  &lt;F&gt; &lt;F&gt; &lt;C&gt;
+&lt;J&gt; &lt;J&gt; &lt;J&gt; &lt;J&gt;  |   |
+ |   |   |   |  &lt;G&gt; &lt;G&gt;
+&lt;K&gt; &lt;L&gt; &lt;K&gt; &lt;L&gt;
+     |       |
+    &lt;M&gt;     &lt;M&gt;
+     |       |
+    &lt;N&gt;     &lt;N&gt;
+     |       |
+    &lt;O&gt;     &lt;O&gt;</pre>
+<p class="Pp">Voir scripts/cut.and.paste.subtrees.pl.</p>
+<p class="Pp">Exemple d'utilisation :</p>
+<pre>print map(&quot;$_\n&quot;, @{$arbre-&gt;draw_ascii_tree});</pre>
+<p class="Pp"><b><i>draw_ascii_tree()</i></b> prend des paramètres que vous définissez dans le hashref
+    <span class="Li">$options</span> :</p>
+<dl class="Bl-tag">
+  <dt id="o~18"><a class="permalink" href="#o~18">o h_compact</a></dt>
+  <dd>Prend 0 ou 1. Définit l'étendue à laquelle
+      <b><i>draw_ascii_tree()</i></b> essaie d'économiser de l'espace horizontal.
+    <p class="Pp">Si je pense à un meilleur algorithme de compactage, il y aura un
+        paramètre &quot;2&quot; pour cela.</p>
+    <p class="Pp">Par défaut : 1.</p>
+  </dd>
+  <dt id="o~19"><a class="permalink" href="#o~19">o h_spacing</a></dt>
+  <dd>Prend un nombre 0 ou supérieur. Définit le nombre d'espaces insérés
+      horizontalement entre les nœuds (et les groupes de nœuds) dans un arbre.
+    <p class="Pp">Par défaut : 1.</p>
+  </dd>
+  <dt id="o~20"><a class="permalink" href="#o~20">o no_name</a></dt>
+  <dd>Si vrai, <b><i>draw_ascii_tree()</i></b> n'imprime pas le nom du
+      nœud ; il imprime simplement un &quot;*&quot;.
+    <p class="Pp">Par défaut : 0 (c'est-à-dire, imprime le nom du nœud.)</p>
+  </dd>
+  <dt id="o~21"><a class="permalink" href="#o~21">o v_compact</a></dt>
+  <dd>Prend un nombre 0, 1 ou 2. Définit le degré auquel
+      <b><i>draw_ascii_tree()</i></b> essaie d'économiser de l'espace vertical.
+      Par défaut à 1.</dd>
+</dl>
+<p class="Pp">Le code retourne parfois des arbres qui sont un peu bancals par endroits ; si quelqu'un peut suggérer un meilleur algorithme de dessin, j'en serais reconnaissant.</p>
+<p class="Pp">Voir aussi &quot;tree2string($options, [$some_tree])&quot;.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='dump_names($options)'><a class='permalink' href='#dump_names($options)'>dump_names($options)</a></h2>
+<p class="Pp">Retourne un tableau.</p>
+<p class="Pp">Extrayt, sous forme de liste indentée, les noms des nœuds à partir de
+    <span class="Li">$noeud</span>, et en continuant en dessous. Les options sont :</p>
+<dl class="Bl-tag">
+  <dt id="o~22"><a class="permalink" href="#o~22">o _depth -- Un nombre non négatif</a></dt>
+  <dd>Indiquant la profondeur à laquelle <span class="Li">$noeud</span> est considéré (et donc la génération en dessous est cette profondeur plus un, etc.). Vous pouvez choisir d'utiliser set _depth =&gt; scalar($noeud-&gt;ancestors).
+    <p class="Pp">Par défaut : 0.</p>
+  </dd>
+  <dt id="o~23"><a class="permalink" href="#o~23">o tick -- une chaîne à préfixer à chaque entrée</a></dt>
+  <dd>Cette chaîne se place entre l'espacement d'indentation et le nom du nœud. Vous pourriez préférer &quot;*&quot; ou &quot;-&gt; &quot; ou autre chose.
+    <p class="Pp">Par défaut : ''.</p>
+  </dd>
+  <dt id="o~24"><a class="permalink" href="#o~24">o indent -- la chaîne utilisée pour indenter</a></dt>
+  <dd>Une autre valeur raisonnable pourrait être '. ' (
+</pre>
+<section class="Ss">
+<h2 class="Ss" id='format_node($options,_$node)'><a class='permalink' href='#format_node($options,_$node)'>format_node($options,   $node)</a></h2>
+<p class="Pp">Retourne une chaîne composée du nom du nœud et, éventuellement, de ses attributs.</p>
+<p class="Pp">Les clés possibles dans le hashref <span class="Li">$options</span> :</p>
+<dl class="Bl-tag">
+  <dt id="o~25"><a class="permalink" href="#o~25">no_attributes =&gt; $Boolean</a></dt>
+  <dd>Si 1, les attributs du nœud ne sont pas inclus dans la chaîne retournée. <p class="Pp">Par défaut : 0 (inclut les attributs).</p>
+  </dd>
+</dl>
+<p class="Pp">Appelle <span class="Li">hashref2string($hashref)</span>.</p>
+<p class="Pp">Appelé par <span class="Li">node2string($options, <span class="Li">$node</span>, <span class="Li">$vert_dashes</span>)</span>.</p>
+<p class="Pp">N'est pas appelé normalement.</p>
+<p class="Pp">Si vous ne souhaitez pas spécifier d'options, utilisez <span class="Li">format_node({}, <span class="Li">$node</span>)</span>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>generation()</b></h2>
+<p class="Pp">Retourne une liste de tous les nœuds (parcourus de gauche à droite) qui se trouvent dans la génération de <span class="Li">$node</span> — c'est-à-dire ceux qui sont à la même distance du nœud racine. <span class="Li">$root</span>-&gt;<b>generation()</b> est simplement <span class="Li">$root</span>.</p>
+<p class="Pp">Naturellement, <span class="Li">$node</span> est toujours dans sa propre génération.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='generation_under($node)'><a class='permalink' href='#generation_under($node)'>generation_under($node)</a></h2>
+<p class="Pp">Comme <span class="Li">generation()</span>, mais ne retourne que les nœuds de la génération de <span class="Li">$node</span> qui sont également des descendants de <span class="Li">$node</span> — en d'autres termes,</p>
+<pre>@us = $node-&gt;generation_under( $node-&gt;mother-&gt;mother );</pre>
+<p class="Pp">est tous les 1er cousins de <span class="Li">$node</span> (pour utiliser un terme plus technique sur les relations), en supposant que <span class="Li">$node</span> a une grand-mère. En fait, 'cousins' n'est pas un terme très approprié, car @us inclut également les frères et sœurs de $node et $node lui-même.</p>
+<p class="Pp">En fait, <span class="Li">'generation_under($node)'</span> est simplement un alias de <span class="Li">generation()</span>, mais je suppose que ceci :</p>
+<pre>@us = $node-&gt;generation_under($way_upline);</pre>
+<p class="Pp">est plus lisible que ceci :</p>
+<pre>@us = $node-&gt;generation($way_upline);</pre>
+<p class="Pp">Mais c'est à vous de voir.</p>
+<p class="Pp"><span class="Li">$node</span>-&gt;generation_under(<span class="Li">$node</span>) retourne seulement <span class="Li">$node</span>.</p>
+<p class="Pp">Si vous appelez <span class="Li">$node</span>-&gt;generation_under(<span class="Li">$node</span>) mais que <span class="Li">$node</span> n'est pas <span class="Li">$node</span> ou un ancêtre de <span class="Li">$node</span>, cela se comporte comme si vous aviez appelé seulement <span class="Li">$node</span>-&gt;<b>generation()</b>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='hashref2string($hashref)'><a class='permalink' href='#hashref2string($hashref)'>hashref2string($hashref)</a></h2>
+<p class="Pp">Retourne le hashref donné sous forme de chaîne.</p>
+<p class="Pp">Appelé par <span class="Li">format_node($options, <span class="Li">$node</span>)</span>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='is_daughter_of($node2)'><a class='permalink' href='#is_daughter_of($node2)'>is_daughter_of($node2)</a></h2>
+<p class="Pp">Retourne vrai si <span class="Li">$node</span> est la fille de <span class="Li">$node2</span>. Actuellement implémenté comme un test de ($it-&gt;mother eq <span class="Li">$node2</span>).</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>is_node()</b></h2>
+<p class="Pp">Ceci retourne toujours vrai. Plus précisément, <span class="Li">$object</span>-&gt;can('is_node') est vrai (indépendamment de ce que <span class="Li">'is_node()</span>' ferait si elle était appelée) pour les objets appartenant à cette classe ou pour toute classe qui en dérive.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>is_root()</b></h2>
+<p class="Pp">Retourne 1 si l'appelant est la racine, et 0 sinon.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>leaves_under()</b></h2>
+<p class="Pp">Retourne une liste (parcourue de gauche à droite) de tous les nœuds feuilles sous <span class="Li">$node</span>. (« Nœuds feuilles » sont aussi appelés « nœuds terminaux » — c'est-à-dire des nœuds qui n'ont pas d'enfants.) Retourne <span class="Li">$node</span> si <span class="Li">$node</span> est lui-même un nœud feuille.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>left_sister()</b></h2>
+<p class="Pp">Retourne le nœud qui est la sœur gauche de <span class="Li">$node</span>. Si <span class="Li">$node</span> est la fille gauche (ou la seule) de sa mère (ou n'a pas de mère), alors retourne undef.</p>
+<p class="Pp">Voir aussi <span class="Li">add_left_sisters(LIST)</span> et <span class="Li">add_right_sisters(LIST)</span>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>left_sisters()</b></h2>
+<p class="Pp">Retourne une liste de nœuds qui sont des frères et sœurs à gauche de <span class="Li">$node</span>. Si <span class="Li">$node</span> est la fille gauche (ou la seule) de sa mère (ou n'a pas de mère), alors retourne une liste vide.</p>
+<p class="Pp">Voir aussi <span class="Li">add_left_sisters(LIST)</span> et <span class="Li">add_right_sisters(LIST)</span>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='lol_to_tree($lol)'><a class='permalink' href='#lol_to_tree($lol)'>lol_to_tree($lol)</a></h2>
+<p class="Pp">Doit être appelé comme méthode de classe.</p>
+<p class="Pp">Convertit une notation de type liste-de-listes- (de-listes- (de-listes...)) pour les arbres de Chomsky (ou ce qui s'en rapproche le plus en Perl) en une structure arborescente. Retourne la racine de l'arbre converti.</p>
+<p class="Pp">Les règles de conversion sont : 1) si le dernier (éventuellement le seul) élément d'une liste est un scalaire, alors il est utilisé comme attribut « name » du nœud basé sur cette liste. 2) Tous les autres éléments de la liste représentent des nœuds enfants du nœud actuel — récursivement, s'il s'agit de références de liste ; sinon, les scalaires (non terminaux) sont considérés comme des nœuds portant ce nom. Ainsi, ['Foo', 'Bar', 'N'] est une alternative à [['Foo'], ['Bar'], 'N'].</p>
+<p class="Pp">Un exemple illustre :</p>
+<pre>use Tree::DAG_Node;
+$lol =
+  [
+    [
+      [ [ 'Det:The' ],
+        [ [ 'dog' ], 'N'], 'NP'],
+      [ '/with rabies\\', 'PP'],
+      'NP'
+    ],
+    [ 'died', 'VP'],
+    'S'
+  ];
+ $tree = Tree::DAG_Node-&gt;lol_to_tree($lol);
+ $diagram = $tree-&gt;draw_ascii_tree;
+ print map &quot;$_\n&quot;, @$diagram;</pre>
+<p class="Pp">...retourne cet arbre :</p>
+<pre>                  |
+                 &lt;S&gt;
+                  |
+               /------------------\
+               |                  |
+             &lt;NP&gt;                &lt;VP&gt;
+               |                  |
+       /---------------\        &lt;died&gt;
+       |               |
+     &lt;NP&gt;            &lt;PP&gt;
+       |               |
+    /-------\   &lt;/with rabies\&gt;
+    |       |
+&lt;Det:The&gt;  &lt;N&gt;
+            |
+          &lt;dog&gt;</pre>
+<p class="Pp">Soit dit en passant (et cela découle des règles ci-dessus), lorsqu'on représente un arbre LoL consistant en un seul nœud, ceci :</p>
+<pre>$tree = Tree::DAG_Node-&gt;lol_to_tree( 'Lonely' );</pre>
+<p class="Pp">est acceptable, bien que vous aurez probablement tendance à le nommer ainsi :</p>
+<pre>$tree = Tree::DAG_Node-&gt;lol_to_tree( ['Lonely'] );</pre>
+<p class="Pp">ce qui est, bien sûr, correct.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>mother()</b></h2>
+<p class="Pp">Retourne quel nœud est la mère de <span class="Li">$node</span>. Ceci est undef si <span class="Li">$node</span> n'a pas de mère — c'est-à-dire, s'il s'agit de la racine.</p>
+<p class="Pp">Voir aussi <span class="Li">is_root()</span> et <span class="Li">root()</span>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>my_daughter_index()</b></h2>
+<p class="Pp">Retourne quel index est cette fille dans la liste des filles de sa mère. En d'autres termes, si <span class="Li">$node</span> est ($node-&gt;mother-&gt;daughters)[3], alors <span class="Li">$node</span>-&gt;my_daughter_index retourne 3.</p>
+<p class="Pp">En cas spécial, retourne 0 si <span class="Li">$node</span> n'a pas de mère.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>name()</b></h2>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='name(SCALAR)'><a class='permalink' href='#name(SCALAR)'>name(SCALAR)</a></h2>
+<p class="Pp">Dans la première forme, retourne la valeur de l'attribut "name" de l'objet nœud. Dans la seconde forme, la définit à la valeur de SCALAR.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='new($hashref)'><a class='permalink' href='#new($hashref)'>new($hashref)</a></h2>
+<p class="Pp">Les options suivantes sont supportées dans <span class="Li">$hashref :</span></p>
+<dl class="Bl-tag">
+  <dt id="o~26"><a class="permalink" href="#o~26">attributes =&gt; Un hashref d'attributs</a></dt>
+  <dd></dd>
+  <dt id="o~27"><a class="permalink" href="#o~27">daughters =&gt; Un arrayref de nœuds</a></dt>
+  <dd></dd>
+  <dt id="o~28"><a class="permalink" href="#o~28">mother =&gt; Un nœud</a></dt>
+  <dd></dd>
+  <dt id="o~29"><a class="permalink" href="#o~29">name =&gt; Une chaîne</a></dt>
+  <dd></dd>
+</dl>
+<p class="Pp">Voir aussi « CONSTRUCTEUR PRINCIPAL ET INITIALISEUR » pour une longue discussion sur la création d'objets.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>new_daughter()</b></h2>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='new_daughter($options)'><a class='permalink' href='#new_daughter($options)'>new_daughter($options)</a></h2>
+<p class="Pp">Ce <b>constructeur</b> <b>crée</b> un <b>nœud</b> (de la même classe que <span class="Li">$mother</span>), et l'ajoute à la fin de la liste des filles de <span class="Li">$mother</span>. C'est essentiellement la même chose que de faire :</p>
+<pre>$daughter = $mother-&gt;new;
+$mother-&gt;add_daughter($daughter);</pre>
+<p class="Pp">mais c'est plus efficace car (puisque $daughter est garanti nouveau et n'est lié à rien), il n'a pas besoin de vérifier si $daughter n'est pas le frère de $mother, s'il n'est pas déjà associé à une mère qui a besoin d'être détaché, etc.</p>
+<p class="Pp">Comme attendu pour un constructeur, retourne l'objet nœud créé.</p>
+<p class="Pp">Note : Si vous modifiez radicalement la gestion de 'mother'/'daughters', vous pourriez avoir à changer cette routine, car c'est l'un des endroits où elle écrit directement dans 'daughters' et 'mother'.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>new_daughter_left()</b></h2>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='new_daughter_left($options)'><a class='permalink' href='#new_daughter_left($options)'>new_daughter_left($options)</a></h2>
+<p class="Pp">C'est simplement comme <span class="Li">$mother</span>-&gt;new_daughter, mais ajoute la nouvelle fille à gauche (au début) de la liste des filles de <span class="Li">$mother</span>.</p>
+<p class="Pp">Note : Si vous modifiez radicalement la gestion de 'mother'/'daughters', vous pourriez avoir à changer cette routine, car c'est l'un des endroits où elle écrit directement dans 'daughters' et 'mother'.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='node2string($options, $node, $vert_dashes)'><a class='permalink' href='#node2string($options, $node, $vert_dashes)'>node2string($options, $node, $vert_dashes)</a></h2>
+<p class="Pp">Renvoie une chaîne du nom et des attributs du nœud, avec une indentation initiale, appropriée pour l'impression.</p>
+<p class="Pp">Clés possibles dans le hashref <span class="Li">$options</span> :</p>
+<dl class="Bl-tag">
+  <dt id="o~30"><a class="permalink" href="#o~30">o no_attributes =&gt; $Boolean</a></dt>
+  <dd>Si 1, les attributs du nœud ne sont pas inclus dans la chaîne renvoyée. <p class="Pp">Défaut : 0 (inclut les attributs).</p>
+  </dd>
+</dl>
+<p class="Pp">Ignore le paramètre <span class="Li">$vert_dashes</span>. Le code l'utilise comme espace de stockage temporaire.</p>
+<p class="Pp">Appelle "format_node($options, $node)".</p>
+<p class="Pp">Appelé par "tree2string($options, [$some_tree])".</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='quote_name($name)'><a class='permalink' href='#quote_name($name)'>quote_name($name)</a></h2>
+<p class="Pp">Renvoie la chaîne " '$name' ", utilisée dans diverses méthodes pour la sortie des noms de nœuds.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='random_network($options)'><a class='permalink' href='#random_network($options)'>random_network($options)</a></h2>
+<p class="Pp">Cette méthode peut être appelée en tant que méthode de classe ou méthode d'objet.</p>
+<p class="Pp">Dans le premier cas, elle construit un réseau de nœuds aléatoires sous un nouveau nœud, et renvoie le nœud racine de cet arbre. Dans le second cas, elle construit le réseau sous <span class="Li">$node</span>.</p>
+<p class="Pp">Actuellement, cette méthode est implémentée de manière partiellement désespérée et semi-étudiée. Je l'ai créée pour tester les méthodes de déballage d'arbres, et c'est ce que j'ai fait. Si vous souhaitez réellement vous y fier pour des applications plus sérieuses, je suggère d'examiner le code source et de voir s'il fait réellement ce que vous attendez (par exemple, sur la fiabilité de l'aléatoire) ; et n'hésitez pas à me suggérer des modifications (surtout concernant le format "J'ai réécrit random_network($options)", voici le code...).</p>
+<p class="Pp">Elle prend quatre options :</p>
+<dl class="Bl-tag">
+  <dt id="o~31"><a class="permalink" href="#o~31">o max_node_count -- nombre maximum de nœuds que cet arbre pourra avoir (en comptant la racine)</a></dt>
+  <dd>Défaut : 25.</dd>
+  <dt id="o~32"><a class="permalink" href="#o~32">o min_depth -- profondeur minimale pour l'arbre</a></dt>
+  <dd>Les nœuds ne peuvent être générés qu'après avoir atteint cette profondeur, donc l'arbre sera au moins aussi profond -- à moins que le nombre maximum de nœuds ne soit atteint.</dd>
+  <p class="Pp">Défaut : 2.</p>
+  </dd>
+  <dt id="o~33"><a class="permalink" href="#o~33">o max_depth -- profondeur maximale pour l'arbre</a></dt>
+  <dd>L'arbre ne sera pas plus profond que cela.</dd>
+  <p class="Pp">Défaut : 3 plus min_depth.</p>
+  </dd>
+  <dt id="o~34"><a class="permalink" href="#o~34">o max_children -- nombre maximum d'enfants que toute mère dans l'arbre peut avoir</a></dt>
+  <dd>Défaut : 4.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='read_attributes($s)'><a class='permalink' href='#read_attributes($s)'>read_attributes($s)</a></h2>
+<p class="Pp">Analyse la chaîne <span class="Li">$s</span> et extrait le nom et les attributs, en supposant le format généré par "tree2string($options, [$some_tree])".</p>
+<p class="Pp">Cela signifie essentiellement que la chaîne d'attributs a été générée par "hashref2string($hashref)".</p>
+<p class="Pp">Les attributs peuvent être absents, auquel cas ils sont définis comme {}.</p>
+<p class="Pp">Renvoie un nouveau nœud avec ce nom et ces attributs.</p>
+<p class="Pp">Cette méthode est destinée à être utilisée par "read_tree($file_name)".</p>
+<p class="Pp">Voir t/tree.without.attributes.txt et t/tree.with.attributes.txt pour des exemples de données.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='read_tree($file_name)'><a class='permalink' href='#read_tree($file_name)'>read_tree($file_name)</a></h2>
+<p class="Pp">Renvoie la racine de l'arbre lu depuis <span class="Li">$file_name</span>.</p>
+<p class="Pp">Le fichier doit avoir été écrit en redirigeant la sortie de "tree2string($options, [$some_tree])" vers un fichier, car il suppose le format des chaînes d'attributs stringifiées.</p>
+<p class="Pp"><b>read_tree()</b> fonctionne avec des données en utf-8. Voir t/read.tree.t et t/tree.utf8.attributes.txt.</p>
+<p class="Pp">Note : Pour appeler cette méthode, vous avez besoin d'un appelant. Ce sera un arbre à un nœud. La raison est qu'à l'intérieur de cette méthode, elle appelle plusieurs autres fonctions, et pour ces appels, elle a besoin de <span class="Li">$self</span>. Ainsi, ces fonctions peuvent être appelées de n'importe où, pas seulement de <b>read_tree()</b>.</p>
+<p class="Pp">Pour lire et écrire des arbres dans des bases de données, voir Tree::DAG_Node::Persist.</p>
+<p class="Pp">Appelle "string2hashref($s)".</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='remove_daughter(LIST)'><a class='permalink' href='#remove_daughter(LIST)'>remove_daughter(LIST)</a></h2>
+<p class="Pp">Un synonyme exact de "remove_daughters(LIST)".</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='remove_daughters(LIST)'><a class='permalink' href='#remove_daughters(LIST)'>remove_daughters(LIST)</a></h2>
+<p class="Pp">Cette fonction supprime les nœuds listés dans LIST de la liste des filles de <span class="Li">$mother</span>. C'est une opération nulle si LIST est vide. S'il y a des éléments dans LIST qui ne sont pas des filles actuelles de <span class="Li">$mother</span>, ils sont ignorés.</p>
+<p class="Pp">À ne pas confondre avec "<b>clear_daughters()</b>".</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='replace_with(LIST)'><a class='permalink' href='#replace_with(LIST)'>replace_with(LIST)</a></h2>
+<p class="Pp">Cette fonction remplace <span class="Li">$node</span> dans la liste de ses filles, en supprimant <span class="Li">$node</span> et en le remplaçant par les éléments de LIST. Elle renvoie une liste comprenant <span class="Li">$node</span> suivi de LIST, c'est-à-dire les nœuds qui l'ont remplacé.</p>
+<p class="Pp">LIST peut inclure <span class="Li">$node</span> lui-même (bien qu'il n'apparaisse qu'une seule fois au maximum). LIST peut également être la liste vide. Cependant, si un élément de LIST est un frère de <span class="Li">$node</span>, il est ignoré et n'est pas inclus dans la copie de LIST qui est retournée comme valeur.</p>
+<p class="Pp">Comme attendu de toute opération de liaison, les éléments de LIST ne peuvent pas être la mère de <span class="Li">$node</span>, ni aucun de ses ancêtres ; et les éléments de LIST, bien sûr, ne sont pas liés à leur mère (s'ils en ont une), car ils sont liés à la mère de <span class="Li">$node</span>.</p>
+<p class="Pp">(Dans le cas spécial où <span class="Li">$node</span> est la racine, cela appelle simplement `$self-&gt;unlink_from_mother` sur tous les éléments de LIST, ce qui en fait les racines de leurs propres arbres.)</p>
+<p class="Pp">Note : La liste des filles de <span class="Li">$node</span> n'est pas nécessairement affectée ; les listes de filles des nœuds dans LIST ne sont pas non plus affectées. Je le mentionne au cas où vous penseriez que replace_with modifie un nœud pour un autre, par rapport à sa liste de mère et sa liste de filles, laissant le reste de l'arbre inchangé. Si c'est ce que vous souhaitez, en remplaçant <span class="Li">$Old</span> par <span class="Li">$New</span>, alors vous souhaitez :</p>
+<pre>$New-&gt;set_daughters($Old-&gt;clear_daughters);
+$Old-&gt;replace_with($New);</pre>
+<p class="Pp">((Je ne peux pas dire que les listes de filles de <span class="Li">$node</span> et les éléments de LIST ne sont jamais affectées par replace_with — elles peuvent l'être dans ce cas :)</p>
+<pre>$N1 = ($node-&gt;daughters)[0]; # première fille de $node
+$N2 = ($N1-&gt;daughters)[0];   # première fille de $N1;
+$N3 = Tree::DAG_Node-&gt;random_network; # ou tout autre
+$node-&gt;replace_with($N1, $N2, $N3);</pre>
+<p class="Pp">En conséquence de l'unification de <span class="Li">$N1</span> et <span class="Li">$N2</span> avec la mère de <span class="Li">$node</span>, ils sont dissociés de leurs parents (respectivement <span class="Li">$node</span> et <span class="Li">$N1</span>)). Cependant, la liste des filles de <span class="Li">$N3</span> n'est pas affectée.</p>
+<p class="Pp">En d'autres termes, cette méthode fait ce qu'elle doit faire, comme vous vous y attendez.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>replace_with_daughters()</b></h2>
+<p class="Pp">Cette fonction remplace <span class="Li">$node</span> dans sa liste de filles, en supprimant <span class="Li">$node</span> et en le remplaçant par ses filles. En d'autres termes, <span class="Li">$node</span> devient la mère et la fille de ses filles qui montent et prennent sa place. Elle renvoie une liste comprenant <span class="Li">$node</span> suivi des nœuds qui étaient ses filles.</p>
+<p class="Pp">Dans le cas spécial où <span class="Li">$node</span> est la racine, elle sépare simplement ses filles de lui, en en faisant les racines de leurs propres arbres.</p>
+<p class="Pp">Efficacement, c'est la même chose que `$node-&gt;replace_with($node-&gt;daughters)`, mais c'est plus efficace, car moins de vérifications sont nécessaires. (Et je pense aussi que `$node-&gt;replace_with_daughters` est une opération plus courante dans la manipulation d'arbres que `$node-&gt;replace_with(LIST)`, donc elle mérite un nom de méthode propre, bien que ce ne soit que mon opinion.)</p>
+<p class="Pp">Note : Si vous modifiez radicalement la comptabilité 'mère'/'filles', vous pourriez devoir modifier cette routine, car c'est un des endroits qui écrit directement dans 'filles' et 'mère'.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>right_sister()</b></h2>
+<p class="Pp">Renvoie le nœud qui est la sœur droite de <span class="Li">$node</span>. Si <span class="Li">$node</span> est la fille droite la plus proche (ou la seule) de sa mère (ou n'a pas de mère), alors elle renvoie undef.</p>
+<p class="Pp">Voir aussi "add_left_sisters(LIST)" et "add_right_sisters(LIST)".</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>right_sisters()</b></h2>
+<p class="Pp">Renvoie une liste de nœuds qui sont les sœurs droites de <span class="Li">$node</span>. Si <span class="Li">$node</span> est la fille la plus proche à droite (ou la seule) de sa mère (ou n'a pas de mère), alors elle renvoie une liste vide.</p>
+<p class="Pp">Voir aussi "add_left_sisters(LIST)" et "add_right_sisters(LIST)".</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>root()</b></h2>
+<p class="Pp">Renvoie la racine de l'arbre auquel <span class="Li">$node</span> appartient. Si <span class="Li">$node</span> est la racine, le résultat est <span class="Li">$node</span> lui-même.</p>
+<p class="Pp">Ne pas confondre avec "<b>is_root()</b>".</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>self_and_descendants()</b></h2>
+<p class="Pp">Renvoie une liste qui comprend lui-même (comme élément 0) et tous les descendants de <span class="Li">$node</span>. Elle ne renvoie que lui-même si <span class="Li">$node</span> est un nœud terminal.</p>
+<p class="Pp">(Note : On écrit "descendants", pas "descendents".)</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>self_and_sisters()</b></h2>
+<p class="Pp">Renvoie une liste de tous les nœuds (dans l'ordre de gauche à droite) qui ont la même mère que <span class="Li">$node</span>, y compris <span class="Li">$node</span> lui-même. C'est simplement comme `$node-&gt;mother-&gt;daughters`, mais avec un détail : lorsque <span class="Li">$node</span> est la racine, cela échoue, tandis que `$root-&gt;self_and_siblings`, en tant que cas spécial, renvoie `$root`.</p>
+<p class="Pp">(Contrairement à ce que vous pourriez interpréter du nom de cette méthode, "self" n'est pas nécessairement le premier élément renvoyé.)</p>
+</section>id='set_daughters(LIST)'><a class='permalink' href='#set_daughters(LIST)'>set_daughters(LIST)</a></h2>
+<p class="Pp">Supprime toutes les filles de <span class="Li">$mother</span> et
+    les remplace par celles de la LISTE.</p>
+<p class="Pp">Actuellement implémenté simplement comme
+    <span class="Li">$mother</span>-&gt;clear_daughters suivi de
+    <span class="Li">$mother</span>-&gt;add_daughters(LIST).</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='simple_lol_to_tree($simple_lol)'><a class='permalink' href='#simple_lol_to_tree($simple_lol)'>simple_lol_to_tree($simple_lol)</a></h2>
+<p class="Pp">Doit être appelé comme méthode de classe.</p>
+<p class="Pp">C'est similaire à lol_to_tree, sauf que la règle 1 ne s'applique
+    pas -- c'est-à-dire que tous les scalaires (ou plutôt, tout ce qui n'est
+    pas un référence de liste) dans la structure LoL finissent comme des nœuds
+    terminaux nommés, et seuls les nœuds terminaux obtiennent des noms (et,
+    bien sûr, ce nom provient de cette valeur scalaire). Cette méthode est utile
+    pour créer des arbres d'expression, ou du moins pour les démarrer. Considérez
+    que ceci :</p>
+<pre>$tree = Tree::DAG_Node-&gt;simple_lol_to_tree(
+  [ 'foo', ['bar', ['baz'], 'quux'], 'zaz', 'pati' ]
+);</pre>
+<p class="Pp">convertit à partir d'une structure ressemblant à un arbre Lisp ou
+    Icon, si vous prétendez que les crochets sont des parenthèses.</p>
+<p class="Pp">Notez qu'il existe un cas dégénéré (peut-être surprenant) de ce que
+    j'appelle un "simple-LoL", et il ressemble à ceci :</p>
+<pre>$tree = Tree::DAG_Node-&gt;simple_lol_to_tree('Lonely');</pre>
+<p class="Pp">C'est la (seule) façon de spécifier un arbre composé d'un seul nœud,
+    qui ici obtient le nom 'Lonely'.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>sisters()</b></h2>
+<p class="Pp">Retourne une liste de tous les nœuds (de gauche à droite) qui ont le
+    même parent que <span class="Li">$node</span> -- <b>sans inclure</b>
+    <span class="Li">$node</span> lui-même. Si <span class="Li">$node</span> est la
+    racine, cela retourne une liste vide.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='string2hashref($s)'><a class='permalink' href='#string2hashref($s)'>string2hashref($s)</a></h2>
+<p class="Pp">Retourne la référence de hachage construite à partir de la chaîne.</p>
+<p class="Pp">La chaîne est attendue comme étant quelque chose comme '{AutoCommit
+    =&gt; '1', PrintError =&gt; "0", ReportError =&gt; 1}'.</p>
+<p class="Pp">La chaîne vide est retournée comme {}.</p>
+<p class="Pp">Appelé par "read_tree($file_name)".</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>tree_to_lol()</b></h2>
+<p class="Pp">Retourne cet arbre (commençant à <span class="Li">$node</span>)
+    représenté comme un LoL, similaire à ce que contient <span class="Li">$lol</span>
+    ci-dessus. (Ceci est par opposition à "tree_to_lol_notation($options)", qui
+    retourne le code visible tel qu'il est évalué et stocké dans
+    <span class="Li">$lol</span> ci-dessus.)</p>
+<p class="Pp">Les noms de nœuds indéfinis sont retournés comme la chaîne
+    'undef'.</p>
+<p class="Pp">Voir aussi "decode_lol($lol)".</p>
+<p class="Pp">Dieu seul sait à quoi cela sert -- peut-être pour l'alimenter à
+    Data::Dumper, au cas où "tree_to_lol_notation($options)" ne ferait pas
+    exactement ce que vous voulez ?</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='tree_to_lol_notation($options)'><a class='permalink' href='#tree_to_lol_notation($options)'>tree_to_lol_notation($options)</a></h2>
+<p class="Pp">Transforme un arbre (commençant à <span class="Li">$node</span>) en
+    la notation de type LoL que vous voyez dans le code exemple ci-dessus. Retourne
+    un seul grand bloc de texte. La seule option est "multiline" -- si elle est
+    vraie, elle affiche le texte dans une structure indentée comme ci-dessus ;
+    si elle est fausse (et c'est la valeur par défaut), elle affiche tout sur une
+    seule ligne (sans indentation, bien sûr).</p>
+<p class="Pp">Par exemple, en partant de l'arbre de l'exemple ci-dessus,
+  ceci :</p>
+<pre>print $tree-&gt;tree_to_lol_notation, &quot;\n&quot;;</pre>
+<p class="Pp">affiche ce qui suit (que j'ai divisé sur deux lignes pour des raisons
+    de lisibilité de la documentation) :</p>
+<pre>[[[['Det:The'], [['dog'], 'N'], 'NP'], [[&quot;/with rabies\x5c&quot;],
+'PP'], 'NP'], [['died'], 'VP'], 'S'],</pre>
+<p class="Pp">Faire ceci :</p>
+<pre>print $tree-&gt;tree_to_lol_notation({ multiline =&gt; 1 });</pre>
+<p class="Pp">affiche le même contenu, juste réparti sur plusieurs lignes, et joliment
+    indenté.</p>
+<p class="Pp">Les noms de nœuds indéfinis sont retournés comme la chaîne
+    'undef'.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>tree_to_simple_lol()</b></h2>
+<p class="Pp">Retourne cet arbre (commençant à <span class="Li">$node</span>)
+    représenté comme un simple-LoL -- c'est-à-dire, un où les nœuds non
+    terminaux sont représentés comme des références de liste, et les nœuds
+    terminaux sont obtenus à partir du contenu de l'attribut "name" de ces
+    nœuds.</p>
+<p class="Pp">Notez que dans le cas où <span class="Li">$node</span> est terminal,
+    ce que vous obtenez en retour est identique à
+    <span class="Li">$node</span>-&gt;name.</p>
+<p class="Pp">Comparer avec tree_to_simple_lol_notation.</p>
+<p class="Pp">Les noms de nœuds indéfinis sont retournés comme la chaîne
+    'undef'.</p>
+<p class="Pp">Voir aussi "decode_lol($lol)".</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='tree_to_simple_lol_notation($options)'><a class='permalink' href='#tree_to_simple_lol_notation($options)'>tree_to_simple_lol_notation($options)</a></h2>
+<p class="Pp">Une version simple-LoL de tree_to_lol_notation (qui voir) ; prend
+    les mêmes options.</p>
+<p class="Pp">Les noms de nœuds indéfinis sont retournés comme la chaîne
+    'undef'.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='tree2string($options,_[$some_tree])'><a class='permalink' href='#tree2string($options,_%5B$some_tree%5D)'>tree2string($options,   [$some_tree])</a></h2>
+<p class="Pp">Ici, les [] représentent un paramètre optionnel.</p>
+<p class="Pp">Retourne une référence de tableau de lignes, appropriée pour
+    l'impression.</p>
+<p class="Pp">Dessine une belle représentation en art ASCII de la structure de
+    l'arbre.</p>
+<p class="Pp">L'arbre ressemble à :</p>
+<pre>Root. Attributes: {}
+    |--- &#x00C2;. Attributes: {# =&gt; &quot;&#x00C2;&#x00C2;&quot;}
+    |    |--- &#x00E2;. Attributes: {# =&gt; &quot;&#x00E2;&#x00E2;&quot;}
+    |    |    |--- &#x00C9;. Attributes: {# =&gt; &quot;&#x00C9;&#x00C9;&quot;}
+    |    |--- &#x00E4;. Attributes: {# =&gt; &quot;&#x00E4;&#x00E4;&quot;}
+    |    |--- &#x00E9;. Attributes: {# =&gt; &quot;&#x00E9;&#x00E9;&quot;}
+    |         |--- &#x00D1;. Attributes: {# =&gt; &quot;&#x00D1;&#x00D1;&quot;}
+    |              |--- &#x00F1;. Attributes: {# =&gt; &quot;&#x00F1;&#x00F1;&quot;}
+    |                   |--- &#x00D4;. Attributes: {# =&gt; &quot;&#x00D4;&#x00D4;&quot;}
+    |                        |--- &#x00F4;. Attributes: {# =&gt; &quot;&#x00F4;&#x00F4;&quot;}
+    |                        |--- &#x00F4;. Attributes: {# =&gt; &quot;&#x00F4;&#x00F4;&quot;}
+    |--- &#x00DF;. Attributes: {# =&gt; &quot;&#x00DF;&#x00DF;&quot;}
+         |--- &#x00AE;. Attributes: {# =&gt; &quot;&#x00AE;&#x00AE;&quot;}
+         |    |--- &#x00A9;. Attributes: {# =&gt; &quot;&#x00A9;&#x00A9;&quot;}
+         |--- &#x00A3;. Attributes: {# =&gt; &quot;&#x00A3;&#x00A3;&quot;}
+         |--- &#x20AC;. Attributes: {# =&gt; &quot;&#x20AC;&#x20AC;&quot;}
+         |--- &#x221A;. Attributes: {# =&gt; &quot;&#x221A;&#x221A;&quot;}
+         |--- &#x00D7;xX. Attributes: {# =&gt; &quot;&#x00D7;xX&#x00D7;xX&quot;}
+              |--- &#x00ED;. Attributes: {# =&gt; &quot;&#x00ED;&#x00ED;&quot;}
+              |--- &#x00FA;. Attributes: {# =&gt; &quot;&#x00FA;&#x00FA;&quot;}
+              |--- &#x00AB;. Attributes: {# =&gt; &quot;&#x00AB;&#x00AB;&quot;}
+              |--- &#x00BB;. Attributes: {# =&gt; &quot;&#x00BB;&#x00BB;&quot;}</pre>
+<p class="Pp">Ou, sans attributs :</p>
+<pre>Root
+    |--- &#x00C2;
+    |    |--- &#x00E2;
+    |    |    |--- &#x00C9;
+    |    |--- &#x00E4;
+    |    |--- &#x00E9;
+    |         |--- &#x00D1;
+    |              |--- &#x00F1;
+    |                   |--- &#x00D4;
+    |                        |--- &#x00F4;
+    |                        |--- &#x00F4;
+    |--- &#x00DF;
+         |--- &#x00AE;
+         |    |--- &#x00A9;
+         |--- &#x00A3;
+         |--- &#x20AC;
+         |--- &#x221A;
+         |--- &#x00D7;xX
+              |--- &#x00ED;
+              |--- &#x00FA;
+              |--- &#x00AB;
+              |--- &#x00BB;</pre>
+<p class="Pp">Voir scripts/cut.and.paste.subtrees.pl.</p>
+<p class="Pp">Exemple d'utilisation :</p>
+<pre>print map(&quot;$_\n&quot;, @{$tree-&gt;tree2string});</pre>
+<p class="Pp">Peut être appelé avec <span class="Li">$some_tree</span> défini sur n'importe
+    quel <span class="Li">$node</span>, et affichera l'arbre en supposant que
+    <span class="Li">$node</span> est la racine.</p>
+<p class="Pp">Si vous ne souhaitez pas fournir d'options, utilisez tree2string({},
+    <span class="Li">$node</span>).</p>
+<p class="Pp">Clés possibles dans la référence de hachage <span class="Li">$options</span>
+    (qui vaut {} par défaut) :</p>
+<dl class="Bl-tag">
+  <dt id="o~35"><a class="permalink" href="#o~35">o no_attributes =&gt;
+    $Boolean</a></dt>
+  <dd>Si 1, les attributs du nœud ne sont pas inclus dans la chaîne retournée.
+    <p class="Pp">Par défaut : 0 (inclure les attributs).</p>
+  </dd>
+</dl>
+<p class="Pp">Appelle "node2string($options, <span class="Li">$node</span>,
+    <span class="Li">$vert_dashes</span>)".</p>
+<p class="Pp">Voir aussi "draw_ascii_tree([$options])".</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>unlink_from_mother()</b></h2>
+<p class="Pp">Supprime le nœud de la liste des filles de sa mère. S'il n'a pas de
+    mère, cela n'a aucun effet.</p>
+<p class="Pp">Retourne la mère dont le nœud a été détaché (le cas échéant).</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='walk_down($options)'><a class='permalink' href='#walk_down($options)'>walk_down($options)</a></h2>
+<p class="Pp">Effectue un parcours en profondeur de la structure au niveau et sous
+    <span class="Li">$node</span>. Ce qu'il fait à chaque nœud dépend de la valeur
+    de la référence de hachage des options, que vous devez fournir. Il y a trois
+    options, "callback" et "callbackback" (au moins l'une des deux doit être
+    définie, comme référence de sous-routine), et "_depth".</p>
+<p class="Pp">Voici ce que fait <b><i>walk_down()</i></b><i></i>, sous forme de
+    pseudocode :</p>
+<dl class="Bl-tag">
+  <dt id="o~36"><a class="permalink" href="#o~36">o Point de départ</a></dt>
+  <dd>Commencez au <span class="Li">$node</span> donné.</dd>
+  <dt id="o~37"><a class="permalink" href="#o~37">o Callback</a></dt>
+  <dd>S'il y a un <i>callback</i>, appelez-le avec <span class="Li">$node</span>
+      comme premier argument, et la référence de hachage des options comme
+      deuxième argument (qui contient potentiellement le précieux <i>_depth</i>,
+      souvenez-vous-en). Cette fonction doit retourner vrai ou faux -- si elle
+      retourne faux, cela bloquera la prochaine étape :</dd>
+  <dt id="o~38"><a class="permalink" href="#o~38">o Filles</a></dt>
+  <dd>Si <span class="Li">$node</span> a des nœuds filles, incrémentez
+      <i>_depth</i>, et appelez
+      <span class="Li">$daughter</span>-&gt;walk_down($options) pour chaque
+      fille (dans l'ordre, bien sûr), où la référence de hachage des options est
+      la même que celle avec laquelle elle a été appelée. Quand cela retourne,
+      décrémentez <i>_depth</i>.</dd>
+  <dt id="Callbackback"><a class="permalink" href="#Callbackback">Callbackback</a></dt>
+  <dd>S'il y a un <i>callbackback</i>, appelez-le simplement comme <i>callback</i>
+      (mais en ignorant la valeur de retour). Notez que le retour faux de
+      <i>callback</i> bloque le parcours sous <span class="Li">$node</span>, mais
+      ne bloque pas l'appel de callbackback pour <span class="Li">$node</span>.
+      (Soit dit en passant, dans le cas improbable où <span class="Li">$node</span>
+      a cessé d'être un objet nœud, <i>callbackback</i> ne sera pas appelé.)</dd>
+  <dt id="o~39"><a class="permalink" href="#o~39">o Retour</a></dt>
+  <dd></dd>
+</dl>
+<p class="Pp"><span class="Li">$node</span>-&gt;walk_down($options) est la façon
+    de faire récursivement des choses à un arbre (si vous commencez à la racine)
+    ou une partie d'un arbre ; si ce que vous faites est mieux fait via</p>
+ERREUR : Impossible de lire le contenu du fichier : [Errno 2] Aucun fichier ou dossier de ce type : '/home/asdf/Documents/split_file_parts/split_file_parts_split_2/Tree__DAG_Node.3pm_part7.en'ERREUR : impossible de lire le contenu du fichier : [Errno 2] Aucun fichier ou dossier de ce type : '/home/asdf/Documents/split_file_parts/split_file_parts_split_2/Tree__DAG_Node.3pm_part8.en'

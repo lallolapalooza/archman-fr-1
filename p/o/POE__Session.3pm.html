@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>POE::Session(3) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">POE__Session(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-poe/">perl-poe</a></p>
+<p class="lic">Licences: GPL, PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">POE::Session(3)</td>
+    <td class="head-vol">Documentation Perl contribuée</td>
+    <td class="head-rtitle">POE::Session(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">POE::Session - une tâche générique d'événements</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>use POE; # inclut automatiquement POE::Kernel et POE::Session
+POE::Session-&gt;create(
+  inline_states =&gt; {
+    _start =&gt; sub { $_[KERNEL]-&gt;yield(&quot;next&quot;) },
+    next   =&gt; sub {
+      print &quot;tick...\n&quot;;
+      $_[KERNEL]-&gt;delay(next =&gt; 1);
+    },
+  },
+);
+POE::Kernel-&gt;run();
+exit;</pre>
+<p class="Pp">POE::Session peut également appeler des méthodes d'objets et de classes via les callbacks &quot;object_states&quot; et &quot;package_states&quot;.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">POE::Session et ses sous-classes convertissent les événements de POE::Kernel en les conventions d'appel appropriées pour le code des applications. Dans le langage des patrons de conception, POE::Session sont des adaptateurs entre POE::Kernel et le code des applications.</p>
+<p class="Pp">Les sessions gérées par POE::Kernel sont plutôt des structures de tâches génériques. Heureusement, ces deux concepts sont presque identiques dans leur nom.</p>
+<section class="Ss">
+<h2 class="Ss" id='A_notion_on_nomenclature'><a class='permalink' href='#A_notion_on_nomenclature'>Une précision sur la nomenclature</a></h2>
+<p class="Pp">Ce document fera référence aux gestionnaires d'événements comme des &quot;états&quot; dans certains cas inévitables. Les sessions étaient à l'origine conçues comme des machines à états événementiels, mais leur but a évolué avec le temps. Certains des anciens termes sont maintenus dans l'API pour des raisons de compatibilité ascendante.</p>
+<p class="Pp">De manière confuse, POE::NFA est une classe pour implémenter réellement des machines à états événementiels. Sa documentation utilise &quot;état&quot; dans le sens propre.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='USING_POE::Session'><a class='permalink' href='#USING_POE::Session'>UTILISATION DE POE::Session</a></h1>
+<p class="Pp">POE::Session a deux objectifs principaux. Premièrement, il associe des noms d'événements à du code qui les gère. Deuxièmement, il associe une interface de distribution d'événements cohérente aux gestionnaires.</p>
+<p class="Pp">Considérez l'exemple de la &quot;SYNOPSIS&quot;. Une instance de POE::Session est créée avec deux &quot;inline_states&quot;, chacun associant un nom d'événement (&quot;_start&quot; et &quot;next&quot;) à une sous-routine inline. POE::Session s'assure que &quot;$_[KERNEL]&quot; et ainsi de suite ont du sens dans un gestionnaire d'événements.</p>
+<p class="Pp">Les gestionnaires d'événements peuvent également être des méthodes d'objets ou de classes, en utilisant respectivement &quot;object_states&quot; et &quot;package_states&quot;. Le format de &quot;create()&quot; est différent de celui de &quot;inline_states&quot;, mais la convention d'appel est presque identique.</p>
+<p class="Pp">Notez que l'objet créé de POE::Session n'a pas été sauvegardé dans une variable. Le nouvel objet POE::Session est donné à POE::Kernel, qui le gère ensuite et utilise toutes ses ressources.</p>
+<p class="Pp">Il est possible de conserver des références aux nouveaux objets POE::Session, mais ce n'est généralement pas nécessaire. Si un programme ne fait pas attention à la clôture de ces références, des références circulaires seront créées, qui seront perdues lorsque POE::Kernel détruira normalement l'objet POE::Session. Il est recommandé de conserver plutôt l'identifiant de la session.</p>
+<section class="Ss">
+<h2 class="Ss" id='POE::Session&apos;s_Calling_Convention'><a class='permalink' href='#POE::Session&apos;s_Calling_Convention'>Convention d'appel de POE::Session</a></h2>
+<p class="Pp">Le plus grand obstacle syntaxique que la plupart des gens rencontrent avec POE est la convention d'appel inhabituelle de POE::Session. Par exemple :</p>
+<pre>sub handle_event {
+  my ($kernel, $heap, $parameter) = @_[KERNEL, HEAP, ARG0];
+  ...;
+}</pre>
+<p class="Pp">Ou l'utilisation de &quot;$_[KERNEL]&quot;, &quot;$_[HEAP]&quot; et &quot;$_[ARG0]&quot; inline, comme c'est fait dans la plupart des exemples.</p>
+<p class="Pp">Ce qui se passe ici est assez basique. En Perl, les paramètres sont passés aux sous-routines ou méthodes en utilisant le tableau @_ . Les constantes &quot;KERNEL&quot;, &quot;HEAP&quot;, &quot;ARG0&quot; et d'autres sont exportées par POE::Session (incluses gratuitement lorsque vous utilisez POE). Voici pourquoi c'est utilisé :</p>
+<dl class="Bl-tag">
+  <dt>1.</dt>
+  <dd>Dans le cas courant, passer des paramètres dans @_ est plus rapide que de passer des références de hachage ou de tableau, puis de les déréférencer dans le gestionnaire.</dd>
+  <dt>2.</dt>
+  <dd>Les erreurs dans les listes de paramètres basées sur des hachages sont soit des erreurs d'exécution douces, soit elles nécessitent une vérification constante à l'exécution. Les constantes sont soit connues à la compilation, soit elles provoquent des erreurs claires à la compilation.</dd>
+  <dt>3.</dt>
+  <dd>L'accès aux indices de @_ avec des constantes permet de déplacer les paramètres dans le futur sans casser le code des applications.</dd>
+  <dt>4.</dt>
+  <dd>Les gestionnaires d'événements n'ont pas besoin de tous les éléments de @_. Les slices permettent aux gestionnaires d'utiliser uniquement les paramètres qui les intéressent.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='POE::Session_Parameters'><a class='permalink' href='#POE::Session_Parameters'>Paramètres de POE::Session</a></h2>
+<p class="Pp">Les gestionnaires d'événements reçoivent la majeure partie de leur contexte d'exécution via jusqu'à neuf paramètres de rappel. POE::Kernel en fournit beaucoup.</p>
+<p class="Pp">&quot;$_[OBJECT]&quot;</p>
+<p class="Pp">&quot;$_[OBJECT]&quot; est &quot;$self&quot; pour les gestionnaires d'événements qui sont des méthodes d'objet. C'est le nom de la classe (paquet) pour les gestionnaires d'événements basés sur une classe. C'est undef pour les callbacks de code plat, qui n'ont pas de valeur spéciale &quot;$self&quot;.</p>
+<p class="Pp">&quot;OBJECT&quot; est toujours zéro, car &quot;$_[0]&quot; est toujours &quot;$self&quot; ou &quot;$class&quot; dans les méthodes d'objet et de classe. Les callbacks de code plat ont un placeholder &quot;undef&quot; à &quot;$_[0]&quot; afin que les autres indices restent valides.</p>
+<p class="Pp">Il est utile pour les gestionnaires basés sur des méthodes d'appeler d'autres méthodes du même objet. &quot;$_[OBJECT]&quot; aide à y parvenir.</p>
+<pre>sub ui_update_everything {
+  my $self = $_[OBJECT];
+  $self-&gt;update_menu();
+  $self-&gt;update_main_window();
+  $self-&gt;update_status_line();
+}</pre>
+<p class="Pp">Vous pouvez également utiliser l'héritage de méthodes. Ici, nous appelons &quot;$self-&gt;a_method(@_)&quot;. Comme l'opérateur &quot;-&gt;&quot; en Perl ajoute &quot;$self&quot; au début de @_, nous devons d'abord déplacer une copie pour conserver les positions des paramètres POE :</p>
+<pre>sub a_method {
+  my $self = shift;
+  $self-&gt;SUPER::a_method( @_ );
+  # ... plus de travail ...
+}</pre>
+<p class="Pp">&quot;$_[SESSION]&quot;</p>
+<p class="Pp">&quot;$_[SESSION]&quot; est une référence à l'objet de session actuel. Cela permet aux gestionnaires d'accéder aux méthodes de leur session. Les programmes peuvent également comparer &quot;$_[SESSION]&quot; à &quot;$_[SENDER]&quot; pour vérifier que les événements de session internes ne proviennent pas d'autres sessions.</p>
+<p class="Pp">&quot;$_[SESSION]&quot; peut également être utilisé comme cible pour les événements internes de &quot;post()&quot; et &quot;call()&quot;. &quot;yield()&quot; est légèrement plus pratique et plus efficace que &quot;post($_[SESSION], ...)&quot; cependant.</p>
+<p class="Pp">Il est mal vu d'accéder directement à une autre session. La méthode recommandée est de manipuler une session via un gestionnaire d'événements.</p>
+<pre>sub enable_trace {
+  my $previous_trace = $_[SESSION]-&gt;option( trace =&gt; 1 );
+  my $id = $_[SESSION]-&gt;ID;
+  if ($previous_trace) {
+    print &quot;Session $id: dispatch trace is still on.\n&quot;;
+  }
+  else {
+    print &quot;Session $id: dispatch trace has been enabled.\n&quot;;
+  }
+}</pre>
+<p class="Pp">&quot;$_[KERNEL]&quot;</p>
+<p class="Pp">&quot;$_[KERNEL]&quot; est toujours une référence à l'unique instance POE::Kernel du programme d'application. Il est le plus souvent utilisé pour appeler des méthodes de POE::Kernel depuis des gestionnaires d'événements.</p>
+<pre># Définir un minuteur de 10 secondes.
+$_[KERNEL]-&gt;delay( time_is_up =&gt; 10 );</pre>
+<p class="Pp">&quot;$_[HEAP]&quot;</p>
+<p class="Pp">Chaque objet POE::Session contient son propre espace de noms de variables, connu sous le nom de &quot;HEAP&quot; de sa session. Il est modélisé et nommé d'après les tas de mémoire du processus (pas de priorité). Les tas sont par défaut des références de hachage anonymes, mais peuvent être initialisés dans &quot;create()&quot; pour être presque n'importe quoi. POE::Session lui-même n'utilise jamais &quot;$_[HEAP]&quot;, bien que certains composants de POE le fassent.</p>
+<p class="Pp">Les tas ne se chevauchent pas entre les sessions, bien que le paramètre &quot;heap&quot; de &quot;create()&quot; puisse être utilisé pour le faire.</p>
+<p class="Pp">Les tas ne se chevauchent pas entre les sessions, bien que le paramètre &quot;heap&quot; de &quot;create()&quot; puisse être utilisé pour le faire.</p>
+</section>
+</article>
+</main>
+</body>
+</html>
+<section class="Ss">
+<h2 class="Ss" id='Using_POE::Session_With_Objects'><a class='permalink' href='#Using_POE::Session_With_Objects'>Utilisation de POE::Session avec des Objets</a></h2>
+<p class="Pp">Une session peut gérer des événements dans plusieurs objets. Ou, d'un autre point de vue, plusieurs objets peuvent être combinés en une seule session. Et, que diriez-vous ? Introduisons aussi quelques bouts de code en ligne !</p>
+<pre>POE::Session-&gt;create(
+  object_states =&gt; [
+    $object_1 =&gt; { event_1a =&gt; &quot;method_1a&quot; },
+    $object_2 =&gt; { event_2a =&gt; &quot;method_2a&quot; },
+  ],
+  inline_states =&gt; {
+    event_3 =&gt; \&amp;piece_of_code,
+  },
+);</pre>
+<p class="Pp">Cependant, un seul des gestionnaires peut être affecté à un nom d'événement donné. Les doublons écrasent les précédents.</p>
+<p class="Pp">event_1a est géré en appelant &quot;$object_1-&gt;method_1a(...)&quot;. &quot;$_[OBJECT]&quot; est &quot;$object_1&quot; dans ce cas. &quot;$_[HEAP]&quot; appartient à la session, ce qui signifie que toutes les données stockées ici seront disponibles pour tout autre gestionnaire d'événement, quel que soit l'objet. </p>
+<p class="Pp">event_2a est géré en appelant &quot;$object_2-&gt;method_2a(...)&quot;. Dans ce cas, &quot;$_[OBJECT]&quot; est &quot;$object_2&quot;. &quot;$_[HEAP]&quot; est le même hashref anonyme qui a été passé au gestionnaire d'event_1a, bien que les méthodes soient résolues au moment où l'événement est géré (liaison tardive).</p>
+<p class="Pp">event_3 est géré en appelant &quot;piece_of_code(...)&quot;. &quot;$_[OBJECT]&quot; est &quot;undef&quot; ici, car il n'y a pas d'objet. Et, encore une fois, &quot;$_[HEAP]&quot; est le même hashref partagé que les gestionnaires d'event_1a et d'event_2a ont vu.</p>
+<p class="Pp">Fait intéressant, il n'y a aucune raison technique pour qu'un seul objet ne puisse pas gérer les événements de plus d'une session :</p>
+<pre>for (1..2) {
+  POE::Session-&gt;create(
+    object_states =&gt; [
+      $object_4 =&gt; { event_4 =&gt; &quot;method_4&quot; },
+    ]
+  );
+}</pre>
+<p class="Pp">Maintenant, &quot;$object_4-&gt;method_4(...)&quot; peut être appelé pour gérer les événements d'une de deux sessions. Dans les deux cas, &quot;$_[OBJECT]&quot; sera &quot;$object_4&quot;, mais &quot;$_[HEAP]&quot; stockera des données spécifiques à une session particulière.</p>
+<p class="Pp">Il en va de même pour les états en ligne. Une sous-routine peut gérer des événements de plusieurs sessions. &quot;$_[SESSION]&quot; et &quot;$_[HEAP]&quot; peuvent être utilisés dans le gestionnaire pour accéder facilement au contexte de la session dans laquelle l'événement est traité.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PUBLIC_METHODS'><a class='permalink' href='#PUBLIC_METHODS'>MÉTHODES PUBLIQUES</a></h1>
+<p class="Pp">POE::Session n'a que quelques méthodes publiques.</p>
+<section class="Ss">
+<h2 class="Ss" id='create_LOTS_OF_STUFF'><a class='permalink' href='#create_LOTS_OF_STUFF'>create LOTS_OF_STUFF</a></h2>
+<p class="Pp"><span class="Li">create()</span> lance une nouvelle session. Renvoie un nouvel objet POE::Session en cas de succès, bien que la plupart des applications n'auront pas besoin de le conserver.</p>
+<p class="Pp"><span class="Li">create()</span> appelle le gestionnaire _start de la session nouvellement lancée avant de la renvoyer.</p>
+<p class="Pp"><span class="Li">create()</span> passe également le nouvel objet POE::Session au POE::Kernel. Le noyau POE conserve l'objet pour distribuer les événements. L'objet sera libéré lorsque le noyau détectera que l'objet est devenu mourant. Cela devrait provoquer la destruction de l'objet par Perl si le code d'application ne l'a pas conservé.</p>
+<p class="Pp"><span class="Li">create()</span> accepte plusieurs paramètres nommés, dont la plupart sont facultatifs. Cependant, ces paramètres ne sont pas contenus dans un hashref.</p>
+<p class="Pp"><i>args =&gt; ARRAYREF</i></p>
+<p class="Pp">Le paramètre &quot;args&quot; accepte une référence à une liste de paramètres qui seront passés au gestionnaire _start de la session aux positions &quot;ARG0&quot; à &quot;$#_&quot; (la fin de &quot; @_ &quot;).</p>
+<p class="Pp">Cet exemple affichera &quot;arg0 arg1 etc.&quot; :</p>
+<pre>POE::Session-&gt;create(
+  inline_states =&gt; {
+    _start =&gt; sub {
+      print &quot;Session started with arguments: @_[ARG0..$#_]\n&quot;;
+    },
+  },
+  args =&gt; [ 'arg0', 'arg1', 'etc.' ],
+);</pre>
+<p class="Pp"><i>heap =&gt; ANYTHING</i></p>
+<p class="Pp">Le paramètre &quot;heap&quot; permet d'initialiser le tas d'une session différemment lors de son instanciation. Les tas sont généralement des hashrefs anonymes, mais &quot;heap&quot; peut les définir comme des références de tableau ou même des objets.</p>
+<p class="Pp">Cet exemple affichera &quot;tree&quot; :</p>
+<pre>POE::Session-&gt;create(
+  inline_states =&gt; {
+    _start =&gt; sub {
+      print &quot;Slot 0 = $_[HEAP][0]\n&quot;;
+    },
+  },
+  heap =&gt; [ 'tree', 'bear' ],
+);</pre>
+<p class="Pp">Vous devez être prudent lors de l'initialisation du tas avec autre chose qu'un comportement de hashref. Certaines bibliothèques supposent un comportement de hashref et échoueront si le tas ne se comporte pas ainsi.</p>
+<p class="Pp"><i>inline_states =&gt; HASHREF</i></p>
+<p class="Pp">&quot;inline_states&quot; mappe les noms d'événements aux sous-routines qui les géreront. Sa valeur est un hashref qui mappe les noms d'événements aux références de code de leurs gestionnaires correspondants :</p>
+<pre>POE::Session-&gt;create(
+  inline_states =&gt; {
+    _start =&gt; sub {
+      print &quot;arg0=$_[ARG0], arg1=$_[ARG1], etc.=$_[ARG2]\n&quot;;
+    },
+    _stop  =&gt; \&amp;stop_handler,
+  },
+  args =&gt; [qw( arg0 arg1 etc. )],
+);</pre>
+<p class="Pp">Le terme &quot;inline&quot; vient du fait que les références de code peuvent être dans des sous-routines anonymes.</p>
+<p class="Pp">Soyez très prudent avec les fermetures, cependant. &quot;Méfiez-vous des références circulaires&quot;.</p>
+<p class="Pp"><i>object_states =&gt; ARRAYREF</i></p>
+<p class="Pp">&quot;object_states&quot; associe un ou plusieurs objets à une session et mappe les noms d'événements aux méthodes des objets qui les géreront. Sa valeur est un arrayref ; les hashrefs ne seraient pas valides.</p>
+<p class="Pp">Ici, _start est géré par &quot;$object-&gt;_session_start()&quot; et _stop déclenche &quot;$object-&gt;_session_stop()&quot; :</p>
+<pre>POE::Session-&gt;create(
+  object_states =&gt; [
+    $object =&gt; {
+      _start =&gt; '_session_start',
+      _stop  =&gt; '_session_stop',
+    }
+  ]
+);</pre>
+<p class="Pp">POE::Session prend également en charge une forme courte où les noms d'événements et de méthodes sont identiques. Ici, _start invoque &quot;$object-&gt;_start()&quot; et _stop déclenche &quot;$object-&gt;_stop()&quot; :</p>
+<pre>POE::Session-&gt;create(
+  object_states =&gt; [
+    $object =&gt; [ '_start', '_stop' ],
+  ]
+);</pre>
+<p class="Pp">Les méthodes sont vérifiées lors de la création de la session, mais sont également résolues au moment où le gestionnaire est appelé (liaison tardive). La plupart du temps, une méthode ne changera pas, mais dans certains cas, comme l'héritage dynamique, elle pourrait résoudre à une sous-routine différente.</p>
+<p class="Pp"><i>options =&gt; HASHREF</i></p>
+<p class="Pp">Les sessions POE::Session prennent en charge un petit nombre d'options, qui peuvent être initialisées avec le paramètre constructeur &quot;option&quot; et modifiées à l'exécution avec la méthode &quot;option()|/option&quot;.</p>
+<p class="Pp">&quot;option&quot; prend un hashref avec des paires option =&gt; valeur :</p>
+<pre>POE::Session-&gt;create(
+  ... set up h</pre>
+ndlers ...,
+  options => { trace => 1, debug => 1 },
+);</pre>
+<p class="Pp">Ceci est équivalent à l'exemple précédent :</p>
+<pre>POE::Session-&gt;create(
+  ... configuration des gestionnaires ...,
+)-&gt;option( trace => 1, debug => 1 );</pre>
+<p class="Pp">Les options et valeurs prises en charge sont documentées avec la
+    méthode <span class="Li">&quot;option()|/option&quot;</span>.</p>
+<p class="Pp"><i>package_states =&gt; ARRAYREF</i></p>
+<p class="Pp"><span class="Li">&quot;package_states&quot;</span> associe une
+    ou plusieurs classes à une session et mappe les noms d'événements aux méthodes de classe qui les
+    géreront. Sa fonction est analogue à
+    <span class="Li">&quot;object_states&quot;</span>, mais ce sont des noms de paquetages qui sont spécifiés plutôt que des objets.</p>
+<p class="Pp">En fait, la documentation suivante est une copie de la description
+    de <span class="Li">&quot;object_states&quot;</span> avec quelques substitutions de mots.</p>
+<p class="Pp">La valeur de <span class="Li">&quot;package_states&quot;</span>
+    est un <b>ARRAYREF</b> pour être cohérent avec
+    <span class="Li">&quot;object_states&quot;</span>, même si les noms de classes
+    (également connus sous le nom de noms de paquets) sont déjà des chaînes de caractères, il n'est donc pas nécessaire d'éviter de les convertir en chaînes.</p>
+<p class="Pp">Ici, _start est géré par
+    <span class="Li">&quot;$class_name-&gt;_session_start()&quot;</span> et
+    _stop déclenche
+    <span class="Li">&quot;$class_name-&gt;_session_stop()&quot;</span> :</p>
+<pre>POE::Session-&gt;create(
+  package_states => [
+    $class_name => {
+      _start => '_session_start',
+      _stop  => '_session_stop',
+    }
+  ]
+);</pre>
+<p class="Pp">POE::Session prend également en charge une forme courte où le nom de l'événement et le nom de la méthode sont identiques. Ici, _start invoque
+    <span class="Li">&quot;$class_name-&gt;_start()&quot;</span>, et _stop
+    déclenche <span class="Li">&quot;$class_name-&gt;_stop()&quot;</span> :</p>
+<pre>POE::Session-&gt;create(
+  package_states => [
+    $class_name => [ '_start', '_stop' ],
+  ]
+);</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='ID'><a class='permalink' href='#ID'>ID</a></h2>
+<p class="Pp"><span class="Li">ID()</span> renvoie l'identifiant unique de l'instance de session. Il s'agit d'un entier qui commence à 1 et augmente indéfiniment, ou jusqu'à ce que le nombre revienne à zéro.</p>
+<p class="Pp">Il est théoriquement possible qu'un ID de session ne soit pas unique, mais cela nécessite la création d'au moins 4,29 milliards de sessions au cours de la durée de vie d'un programme. POE garantit cependant qu'aucune session n'aura le même ID en même temps ; votre ordinateur n'a pas assez de mémoire pour stocker 4,29 milliards d'objets de session.</p>
+<p class="Pp">L'ID d'une session est unique dans un processus en cours d'exécution, mais plusieurs processus auront probablement les mêmes ID de session. Si un ID global est requis, il devra inclure à la fois
+    <span class="Li">&quot;$_[KERNEL]-&gt;ID&quot;</span> et
+    <span class="Li">&quot;$_[SESSION]-&gt;ID&quot;</span>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='option_OPTION_NAME_[,_OPTION_VALUE_[,_OPTION_NAME,_OPTION_VALUE]..._]'><a class='permalink' href='#option_OPTION_NAME_%5B,_OPTION_VALUE_%5B,_OPTION_NAME,_OPTION_VALUE%5D..._%5D'>option   NOM_OPTION [, VALEUR_OPTION [, NOM_OPTION, VALEUR_OPTION]... ]</a></h2>
+<p class="Pp"><span class="Li">option()</span> définit et/ou récupère les valeurs de diverses options de session. Les options en question sont implémentées par POE::Session et n'ont aucune signification particulière ailleurs.</p>
+<p class="Pp">Elle peut être appelée avec un seul NOM_OPTION pour récupérer la valeur de cette option.</p>
+<pre>my $trace_value = $_[SESSION]-&gt;option('trace');</pre>
+<p class="Pp"><span class="Li">option()</span> définit la valeur d'une option lorsqu'elle est appelée avec une seule paire NOM_OPTION, VALEUR_OPTION. Dans ce cas,
+    <span class="Li">option()</span> renvoie la valeur précédente de l'option.</p>
+<pre>my $previous_trace = $_[SESSION]-&gt;option(trace => 1);</pre>
+<p class="Pp"><span class="Li">option()</span> peut également être utilisé pour définir les valeurs de plusieurs options à la fois. Dans ce cas,
+    <span class="Li">option()</span> renvoie les valeurs précédentes de toutes les options spécifiées dans un hashref anonyme :</p>
+<pre>my $previous_values = $_[SESSION]-&gt;option(
+  trace => 1,
+  debug => 1,
+);
+print &quot;Previous option values:\n&quot;;
+while (my ($option, $old_value) = each %$previous_values) {
+  print &quot;  $option = $old_value\n&quot;;
+}</pre>
+<p class="Pp">POE::Session prend actuellement en charge trois options :</p>
+<p class="Pp"><i>L'option &quot;debug&quot;.</i></p>
+<p class="Pp">L'option &quot;debug&quot; est destinée à activer des avertissements supplémentaires lorsque des choses étranges se produisent au sein de POE::Session. À l'heure actuelle, il n'y a qu'un seul avertissement supplémentaire :</p>
+<dl class="Bl-tag">
+  <dt>&#x2022;</dt>
+  <dd>La redéfinition d'un gestionnaire d'événements ne provoque généralement pas d'avertissement, mais elle le fera lorsque l'option &quot;debug&quot; sera définie.</dd>
+</dl>
+<p class="Pp"><i>L'option &quot;default&quot;.</i></p>
+<p class="Pp">L'activation de l'option &quot;default&quot; transforme les événements inconnus en avertissements, s'il n'y a pas de gestionnaire _default pour les intercepter.</p>
+<p class="Pp">Le drapeau de classe
+    <span class="Li">&quot;POE::Session::ASSERT_STATES&quot;</span> est implémenté en activant l'option &quot;default&quot; sur toutes les nouvelles sessions.</p>
+<p class="Pp"><i>L'option &quot;trace&quot;.</i></p>
+<p class="Pp">Activez l'option &quot;trace&quot; pour enregistrer toutes les événements distribués à une session particulière. Il s'agit d'une option de trace spécifique à la session qui permet de déboguer des sessions individuelles.</p>
+<p class="Pp">Le traçage au niveau de la session indique également lorsque les événements sont redirigés vers _default. Cela peut être utilisé pour découvrir des erreurs de nommage d'événements.</p>
+<p class="Pp"><i>Options définies par l'utilisateur.</i></p>
+<p class="Pp"><span class="Li">option()</span> ne vérifie pas si les NOMS_OPTION sont connus, donc
+    <span class="Li">option()</span> peut être utilisé pour stocker et récupérer des informations définies par l'utilisateur.</p>
+<p class="Pp">Choisissez les noms d'options avec prudence. Il n'y a pas de convention établie pour éviter les collisions d'espaces de noms entre les options définies par l'utilisateur et les futures options internes.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='postback_EVENT_NAME,_EVENT_PARAMETERS'><a class='permalink' href='#postback_EVENT_NAME,_EVENT_PARAMETERS'>postback   NOM_EVENEMENT, PARAMETRES_EVENEMENT</a></h2>
+<p class="Pp"><span class="Li">postback()</span> fabrique des rappels qui publient des événements POE. Il renvoie une référence de code anonyme qui publiera NOM_EVENEMENT à la session cible, avec des PARAMETRES_EVENEMENT optionnels dans une référence de tableau dans ARG0. Les paramètres passés au rappel seront envoyés dans une référence de tableau dans ARG1.</p>
+<p class="Pp">En d'autres termes, ARG0 permet au créateur du postback de transmettre un contexte à travers le postback. ARG1 permet à l'appelant de renvoyer des informations.</p>
+<p class="Pp">Cet exemple crée une référence de code qui, lorsqu'elle est appelée, publie &quot;ok_button&quot; sur <span class="Li">$some_session</span> avec ARG0 contenant <span class="Li">&quot;[ 8, 6, 7 ]&quot;</span>.</p>
+<pre>my $postback = $some_session-&gt;postback( &quot;ok_button&quot;, 8, 6, 7 );</pre>
+<p class="Pp">Voici un exemple de gestionnaire d'événements pour &quot;ok_button&quot;.</p>
+<pre>sub handle_ok_button {
+  my ($creation_args, $called_args) = @_[ARG0, ARG1];
+  print &quot;Postback created with (@$creation_args).\n&quot;;
+  print &quot;Postback called with (@$called_args).\n&quot;;
+}</pre>
+<p class="Pp">Appeler <span class="Li">$postback</span>-&gt;(5, 3, 0, 9) effectuerait l'équivalent de...</p>
+<pre>$poe_kernel-&gt;post(
+  $some_session, &quot;ok_button&quot;,
+  [ 8, 6, 7 ],
+  [ 5, 3, 0, 9 ]
+);</pre>
+<p class="Pp">Ceci serait affiché lorsque &quot;ok_button&quot; serait distribué à <b>handle_ok_button()</b> :</p>
+<pre>Postback created with (8 6 7).
+Postback called with (5 3 0 9).</pre>
+<p class="Pp">Les postbacks détiennent des références à leurs sessions cibles. Par conséquent, les sessions ayant des postbacks en attente resteront actives. Sous tous les boucles d'événements sauf Tk, les postbacks sont bénis afin que DESTROY puisse être appelé lorsque leurs utilisateurs ont terminé. Cela déclenche une décrémentation de leurs compteurs de références, permettant aux sessions de s'arrêter.</p>
+<p class="Pp">Les postbacks ont une méthode, <b>weaken()</b>, qui peut être utilisée pour réduire leur compteur de références sur demande. <b>weaken()</b> renvoie le postback, vous pouvez donc faire :</p>
+<pre>my $postback = $session-&gt;postback(&quot;foo&quot;)-&gt;weaken();</pre>
+<p class="Pp">Les postbacks ont été créés comme un adaptateur léger entre les bibliothèques de rappels et POE. Le problème en question était de savoir comment transformer les rappels des widgets de la boîte à outils graphique de Tk en événements POE sans sous-classer plusieurs classes Tk. La solution consistait à fournir à Tk des rappels ordinaires qui publiaient des événements POE.</p>
+<p class="Pp">Puisque <span class="Li">postback()</span> et
+    <span class="Li">callback()</span> sont des méthodes de session, elles peuvent être appelées sur
+    <span class="Li">$_[SESSION]</span> ou
+    <span class="Li">$_[SENDER]</span>, selon les besoins particuliers. Il existe généralement de meilleures façons d'interagir entre les sessions que d'abuser des postbacks, cependant.</p>
+<p class="Pp">Voici un bref exemple d'attachement d'un bouton Gtk2 à un gestionnaire d'événements POE :</p>
+<pre>my $btn = Gtk2::Button-&gt;new(&quot;Clear&quot;);
+$btn-&gt;signal_connect( &quot;clicked&quot;, $_[SESSION]-&gt;postback(&quot;ev_clear&quot;) );</pre>
+<p class="Pp">Points à retenir : La session restera active tant que
+    <span class="Li">$btn</span> existera et détiendra une copie du postback de
+    <span class="Li">$_</span>[SESSION]. Tous les paramètres passés par le bouton Gtk2 seront dans ARG1.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='callback_EVENT_NAME,_EVENT_PARAMETERS'><a class='permalink' href='#callback_EVENT_NAME,_EVENT_PARAMETERS'>callback   NOM_EVENEMENT, PARAMETRES_EVENEMENT</a></h2>
+<p class="Pp"><b>callback()</b> fabrique des rappels qui utilisent
+    <span class="Li">&quot;$poe_kernel-&gt;call()&quot;</span> pour délivrer des événements POE plutôt que
+    <span class="Li">&quot;$poe_kernel-&gt;post()&quot;</span>. Il est identique à
+    <span class="Li">postback()</span> à tous les autres égards.</p>
+<p class="Pp"><b>callback()</b> a été créé pour éviter les conditions de concurrence qui surviennent lorsque des bibliothèques externes supposent que les rappels s'exécuteront de manière synchrone.
+    File::Find en est un exemple évident (mais pas nécessairement approprié). Il fournit beaucoup d'informations dans des variables locales qui cessent d'être valides après le rappel. Les informations ne seraient plus disponibles au moment où un événement <b>post()</b>é serait distribué.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='get_heap'><a class='permalink' href='#get_heap'>get_heap</a></h2>
+<p class="Pp"><span class="Li">get_heap()</span> renvoie une référence au tas d'une session. C'est la même valeur que <span class="Li">$_[HEAP]</span> pour la session cible. <span class="Li">get_heap()</span> est destiné à être utilisé avec <span class="Li">$poe_kernel</span> et <span class="Li">get_active_session()</span> de POE::Kernel afin que les bibliothèques n'aient pas besoin que ces trois valeurs courantes leur soient explicitement passées.</p>
+<p class="Pp">C'est-à-dire qu'il évite le besoin de :</p>
+<pre>sub some_helper_function {
+  my ($kernel, $session, $heap, @specific_parameters) = @_;
+  ...;
+}</pre>
+<p class="Pp">Plutôt, les fonctions d'aide peuvent utiliser :</p>
+<pre>use POE::Kernel; # exporte $poe_kernel
+sub some_helper_function {
+  my (@specific_parameters) = @_;
+  my $session = $poe_kernel-&gt;get_active_session();
+  my $heap = $session-&gt;get_heap();
+}</pre>
+<p class="Pp">Ce n'est pas très pratique pour les personnes qui écrivent des bibliothèques, mais cela rend les bibliothèques beaucoup plus pratiques à utiliser.</p>
+<p class="Pp">L'utilisation de <span class="Li">get_heap()</span> pour casser l'encapsulation d'une autre session est fortement déconseillée.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='instantiate_CREATE_PARAMETERS'><a class='permalink' href=
+<h1><a class='permalink' href='#instantiate_CREATE_PARAMETERS'>instantiate   CREATE_PARAMETERS</a></h1>
+<p class="Pp"><span class="Li">instantiate()</span> crée et retourne un objet
+    POE::Session vide. Il est appelé avec les CREATE_PARAMETERS dans une référence
+    de hachage juste avant que <span class="Li">create()</span> ne les traite.
+    Les modifications apportées aux CREATE_PARAMETERS affecteront la manière dont
+    <span class="Li">create()</span> initialise la nouvelle session.</p>
+<p class="Pp">Les sous-classes peuvent redéfinir <span class="Li">instantiate()</span>
+    pour modifier la structure de la session sous-jacente. Elles peuvent étendre
+    <span class="Li">instantiate()</span> pour ajouter de nouveaux paramètres à
+    <span class="Li">create()</span>.</p>
+<p class="Pp">Tous les paramètres non reconnus par <span class="Li">create()</span>
+    doivent être supprimés des CREATE_PARAMETERS avant que
+    <span class="Li">instantiate()</span> ne retourne.
+    <span class="Li">create()</span> plantera s'il découvre des paramètres
+    inconnus.</p>
+<p class="Pp">Assurez-vous de retourner <span class="Li">$self</span> depuis
+    instantiate.</p>
+<pre>sub instantiate {
+  my ($class, $create_params) = @_;
+  # La classe de base instancie la nouvelle session.
+  my $self = $class-&gt;SUPER::instantiate($create_parameters);
+  # Étendre les paramètres reconnus par create().
+  my $new_option = delete $create_parameters-&gt;{new_option};
+  if (defined $new_option) {
+    # ... personnaliser $self ici ...
+  }
+  return $self;
+}</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='try_alloc_START_ARGS'><a class='permalink' href='#try_alloc_START_ARGS'>try_alloc   START_ARGS</a></h2>
+<p class="Pp"><span class="Li">try_alloc()</span> appelle
+    <span class="Li">session_alloc()</span> de POE::Kernel pour allouer une
+    structure de session et commencer à gérer la session au sein du noyau de
+    POE. Il est appelé à la fin de <span class="Li">create()</span> de POE::Session.
+    Il retourne <span class="Li">$self</span>.</p>
+<p class="Pp">C'est un crochet de sous-classement pour la personnalisation tardive
+    de la session avant que <span class="Li">create()</span> ne retourne. Il peut
+    également affecter le contenu de <span class="Li">@_[ARG0..$#_]</span> qui
+    est passé au gestionnaire _start de la session.</p>
+<pre>sub try_alloc {
+  my ($self, @start_args) = @_;
+  # Initialisation tardive.
+  # ...
+  # Donner $self à POE::Kernel.
+  return $self-&gt;SUPER::try_alloc(@args);
+}</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='POE::Session&apos;s_EVENTS'><a class='permalink' href='#POE::Session&apos;s_EVENTS'>ÉVÉNEMENTS DE POE::Session</a></h1>
+<p class="Pp">Veuillez ne pas définir de nouveaux événements commençant par un
+    trait d'union au début. POE revendique les événements commençant par /^_/
+    comme étant les siens.</p>
+<p class="Pp">POE::Session ne génère qu'un seul événement, _default. Tous les autres
+    événements internes de POE sont générés par (et documentés dans) POE::Kernel.</p>
+<section class="Ss">
+<h2 class="Ss" id='default'><a class='permalink' href='#default'>_default</a></h2>
+<p class="Pp">_default est l'équivalent de <span class="Li">&quot;AUTOLOAD&quot;</span>
+    pour les gestionnaires d'événements. Si POE::Session ne trouve pas de
+    gestionnaire au moment de la distribution, il tente de rediriger l'événement
+    vers le gestionnaire de _default à la place.</p>
+<p class="Pp">S'il n'y a pas de gestionnaire _default, POE::Session supprimera
+    silencieusement l'événement, sauf si l'option &quot;default&quot; est définie.</p>
+<p class="Pp">Pour préserver les informations originales, l'événement original
+    est légèrement modifié avant d'être redirigé vers le gestionnaire _default :
+    les paramètres originaux de l'événement sont déplacés dans une référence de
+    tableau dans ARG1, et le nom de l'événement original est passé à _default
+    dans ARG0.</p>
+<pre>sub handle_default {
+  my ($event, $args) = @_[ARG0, ARG1];
+  print(
+    &quot;La session &quot;, $_[SESSION]-&gt;ID,
+    &quot; a intercepté l'événement non géré $event avec (@$args).\n&quot;
+  );
+}</pre>
+<p class="Pp">_default est très flexible. Il peut être utilisé pour le débogage, ou
+    pour gérer des noms d'événements générés dynamiquement sans pré-définir leurs
+    gestionnaires. En ce sens, _default fonctionne de manière analogue à
+    <span class="Li">&quot;AUTOLOAD&quot;</span> de Perl.</p>
+<p class="Pp">_default peut également être utilisé comme clause par défaut ou
+    &quot;autrement&quot; d'une instruction switch. Considérez un gestionnaire
+    d'entrée qui déclenche des événements basés sur un nom de commande :</p>
+<pre>sub parse_command {
+  my ($command, @parameters) = split /\s+/, $_[ARG0];
+  $_[KERNEL]-&gt;post( &quot;cmd_$command&quot;, @parameters );
+}</pre>
+<p class="Pp">Un gestionnaire _default peut être utilisé pour émettre des erreurs
+    pour des commandes inconnues :</p>
+<pre>sub handle_default {
+  my $event = $_[ARG0];
+  return unless $event =~ /^cmd_(\S+)/;
+  warn &quot;Commande inconnue : $1\n&quot;;
+}</pre>
+<p class="Pp">Le comportement _default est implémenté dans POE::Session, il peut donc
+    être différent pour d'autres types de sessions.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='POE::Session&apos;s_Debugging_Features'><a class='permalink' href='#POE::Session&apos;s_Debugging_Features'>Fonctionnalités de débogage de POE::Session</a></h2>
+<p class="Pp">POE::Session contient une assertion de débogage, pour le moment.</p>
+<p class="Pp"><i>ASSERT_STATES</i></p>
+<p class="Pp">Définir ASSERT_STATES à vrai fait que chaque session émet un avertissement
+    lorsqu'on lui demande de gérer des événements inconnus. Session.pm implémente
+    les fonctionnalités d'ASSERT_STATES en définissant l'option &quot;default&quot;
+    à vrai au lieu de faux. Voir la méthode <b>option()</b> plus tôt dans ce
+    document pour plus de détails sur l'option &quot;default&quot;.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR AUSSI</a></h1>
+<p class="Pp">POE::Kernel.</p>
+<p class="Pp">La section VOIR AUSSI dans POE contient une table des matières couvrant
+    l'ensemble de la distribution POE.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BUGS'><a class='permalink' href='#BUGS'>BOGUES</a></h1>
+<p class="Pp">Il y a une possibilité que les ID de session entrent en collision après
+    que la valeur entière de Perl ait débordé. Cela peut se produire après aussi
+    peu que 4,29 milliards de sessions.</p>
+<section class="Ss">
+<h2 class="Ss" id='Beware_circular_references'><a class='permalink' href='#Beware_circular_references'>Attention aux références circulaires</a></h2>
+<p class="Pp">Comme vous le savez probablement déjà, une référence circulaire est lorsque
+    une variable fait partie d'une chaîne de références qui finit par se référer
+    à elle-même. Perl ne récupérera pas la mémoire impliquée dans une telle chaîne
+    de références tant que la chaîne ne sera pas manuellement rompue.</p>
+<p class="Pp">Ici, une POE::Session est créée qui se réfère à elle-même via un scalaire
+    externe. Les gestionnaires d'événements importent <span class="Li">$session</span>
+    via des fermetures qui sont ensuite stockées dans
+    <span class="Li">$session</span>. Même si cette session s'arrête, les
+    références circulaires resteront.</p>
+<pre>my $session;
+$session = POE::Session-&gt;create(
+  inline_states =&gt; {
+    _start =&gt; sub {
+      $_[HEAP]-&gt;{todo} = [ qw( step1 step2 step2a ) ],
+      $_[KERNEL]-&gt;post( $session, 'next' );
+    },
+    next =&gt; sub {
+      my $next = shift @{ $_[HEAP]-&gt;{todo} };
+      return unless $next;
+      $_[KERNEL]-&gt;post( $session, $next );
+    }
+    # ....
+  }
+);</pre>
+<p class="Pp">Réduit à l'essentiel :</p>
+<pre>my %event_handlers;
+$event_handler{_start} = sub { \%event_handlers };</pre>
+<p class="Pp">Notez également qu'une sous-routine anonyme crée une fermeture sur toutes
+    les variables lexicales dans la portée où elle a été définie, même si elle n'y
+    fait pas référence. <span class="Li">$session</span> est toujours détenue
+    dans une référence circulaire ici :</p>
+<pre>my $self = $package-&gt;new;
+my $session;
+$session = POE::Session-&gt;create(
+  inline_state =&gt; {
+    _start =&gt; sub { $self-&gt;_start( @_[ARG0..$#_] ) }
+  }
+);</pre>
+<p class="Pp">Pour éviter cela, une session peut définir un alias pour elle-même. D'autres
+    parties du programme peuvent alors y faire référence par alias. Dans ce cas,
+    il n'est pas nécessaire de suivre la session soi-même (POE::Kernel s'en
+    chargera de toute façon).</p>
+<pre>POE::Session-&gt;create(
+  inline_states =&gt; {
+    _start =&gt; sub {
+      $_[HEAP]-&gt;{todo} = [ qw( step1 step2 step2a ) ],
+      $_[KERNEL]-&gt;alias_set('step_doer');
+      $_[KERNEL]-&gt;post( 'step_doer', 'next' );
+    },
+    next =&gt; sub {
+      my $next = shift @{ $_[HEAP]-&gt;{todo} };
+      return unless $next;
+      $_[KERNEL]-&gt;post( 'step_doer', $next );
+    }
+    # ....
+  }
+);</pre>
+<p class="Pp">Les alias ne sont même pas nécessaires dans l'exemple précédent car la
+    session se réfère à elle-même. On pourrait plutôt utiliser la méthode
+    <span class="Li">yield()</span> de POE::Kernel pour renvoyer l'événement à
+    la session actuelle :</p>
+<pre>next =&gt; sub {
+  my $next = shift @{ $_[HEAP]-&gt;{todo} };
+  return unless $next;
+  $_[KERNEL]-&gt;yield( $next );
+}</pre>
+<p class="Pp">Ou le paramètre &quot;$_[SESSION]&quot; passé à chaque gestionnaire
+    d'événements, mais <span class="Li">yield()</span> est plus efficace.</p>
+<pre>next =&gt; sub {
+  my $next = shift @{ $_[HEAP]-&gt;{todo} };
+  return unless $next;
+  $_[KERNEL]-&gt;post( $_[SESSION], $next );
+}</pre>
+<p class="Pp">Dans la même veine que &quot;$_[SESSION]&quot;, une session peut
+    répondre à l'expéditeur d'un événement en postant à &quot;$_[SENDER]&quot;.
+    C'est idéal pour répondre aux requêtes.</p>
+<p class="Pp">Si un programme doit conserver une sorte de référence de session dynamique,
+    il est recommandé d'utiliser l'ID numérique de la session plutôt que l'objet
+    lui-même. Un ID de session peut être reconverti en son objet, mais
+    <b>post()</b> accepte les ID de session ainsi que les objets et les alias :</p>
+<pre>my $session_id;
+$session_id = POE::Session-&gt;create(
+  inline_states =&gt; {
+    _start =&gt; sub {
+      $_[HEAP]-&gt;{todo} = [ qw( step1 step2 step2a ) ],
+      $_[KERNEL]-&gt;post( $session_id, 'next' );
+    },
+    # ....
+  }
+)-&gt;ID;</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHORS_&amp;amp;_COPYRIGHTS'><a class='permalink' href='#AUTHORS_&amp;amp;_COPYRIGHTS'>AUTEURS &amp; DROITS D'AUTEUR</a></h1>
+<p class="Pp">Veuillez consulter POE pour plus d'informations sur les auteurs et les
+    contributeurs.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2024-07-13</td>
+    <td class="foot-os">perl v5.38.2</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-poe/">extra/perl-poe</a></dd>
+        <dt>Version :</dt>
+        <dd>1.370-2</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://search.cpan.org/dist/POE">https://search.cpan.org/dist/POE</a></dd>
+        <dt>Licences :</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-poe/">/listing/extra/perl-poe/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#USING_POE::Session">UTILISATION DE POE::Session</a></li>
+        
+            <li><a href="#PUBLIC_METHODS">MÉTHODES PUBLIQUES</a></li>
+        
+            <li><a href="#POE::Session&apos;s_EVENTS">ÉVÉNEMENTS DE POE::Session</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+            <li><a href="#BUGS">BOGUES</a></li>
+        
+            <li><a href="#AUTHORS_&amp;amp;_COPYRIGHTS">AUTEURS &amp; DROITS D'AUTEUR</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/POE::Session.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/POE::Session.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+            </aside>
+        </div>
+    </main>
+    <footer>
+        <p>Page générée le 2024-07-13 à 12:24:07 (UTC)</p>
+    </footer>
+</body>
+</html>
+<p><a href="raw">brut</a></p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

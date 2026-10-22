@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Tk::Trace(3pm) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Tk__Trace(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/perl-tk/">perl-tk</a></p>
+<p class="lic">Licences: PerlArtistic, GPL, personnalisé</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Tk::Trace(3)</td>
+    <td class="head-vol">Documentation perl/Tk</td>
+    <td class="head-rtitle">Tk::Trace(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Tk::Trace - émuler les fonctions de traçage Tcl/Tk.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<pre>use Tk::Trace
+$mw-&gt;traceVariable(\$v, 'wru' =&gt; [\&amp;update_meter, $scale]);
+%vinfo = $mw-&gt;traceVinfo(\$v);
+print &quot;Infos de traçage :\n  &quot;, join(&quot;\n  &quot;, @{$vinfo{-legible}}), &quot;\n&quot;;
+$mw-&gt;traceVdelete(\$v);</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Ce module de classe émule la famille de commandes Tcl/Tk <b>trace</b>
+    en liant des sous-routines de votre conception à des variables Perl en utilisant
+    les fonctionnalités simples de <b>Tie::Watch</b>.</p>
+<p class="Pp">Le format de rappel est calqué sur le schéma Perl/Tk : fournissez soit
+    une référence de code, soit une référence de tableau et passez la référence de
+    code de rappel dans le premier élément du tableau, suivie des arguments de
+    rappel.</p>
+<p class="Pp">Les rappels utilisateur reçoivent ces arguments :</p>
+<pre>$_[0]        = undef pour un scalaire, index/clé pour un tableau/hash
+$_[1]        = valeur actuelle (lecture), nouvelle (écriture), finale (undef) de la variable
+$_[2]        = opération (r, w, ou u)
+$_[3 .. $#_] = arguments optionnels du rappel utilisateur</pre>
+<p class="Pp">En tant qu'utilisateur de Trace, vous avez une responsabilité importante
+    lors de la rédaction de votre rappel, car vous contrôlez la valeur finale
+    attribuée à la variable. Un rappel typique pourrait ressembler à ceci :</p>
+<pre>sub callback {
+   my($index, $value, $op, @args) = @_;
+   return if $op eq 'u';
+   # .... code qui utilise $value ...
+   return $value;     # valeur finale de la variable
+}</pre>
+<p class="Pp">Notez que la valeur de retour du rappel devient la valeur finale de
+    la variable, pour les traces de lecture ou d'écriture.</p>
+<p class="Pp">Pour les opérations d'écriture, la variable est mise à jour avec sa
+    nouvelle valeur avant que le rappel ne soit invoqué.</p>
+<p class="Pp">Plusieurs rappels de lecture, d'écriture et d'undef peuvent être
+    attachés à une variable, qui sont invoqués dans l'ordre inverse de leur
+    création.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES'><a class='permalink' href='#MÉTHODES'>MÉTHODES</a></h1>
+<dl class="Bl-tag">
+  <dt>$mw-&gt;traceVariable(refVar, op =&gt; callback);</dt>
+  <dd><b>refVar</b> est une référence à la variable scalaire, tableau ou hash que
+      vous souhaitez tracer. <b>op</b> est l'opération de traçage, et peut être
+      toute combinaison de <b>r</b> pour lecture, <b>w</b> pour écriture, et <b>u</b>
+      pour undef. <b>callback</b> est un rappel Perl/Tk standard, et est invoqué,
+      en fonction de la valeur de <b>op</b>, chaque fois que la variable est
+      lue, écrite ou détruite.</dd>
+  <dt>%vinfo = $mw-&gt;traceVinfo(refVar);</dt>
+  <dd>Retourne un hash détaillant les internes de l'objet Trace, avec ces clés :
+      <pre>%vinfo = (
+    -variable =&gt;  refVar
+    -debug    =&gt;  '0'
+    -shadow   =&gt;  '1'
+    -value    =&gt;  'BONJOUR SCALAR'
+    -destroy  =&gt;  callback
+    -fetch    =&gt;  callback
+    -store    =&gt;  callback
+    -legible  =&gt;  données formatées ci-dessus sous forme de liste de chaînes, pour impression
+);
+</pre>
+    <p class="Pp">Pour les objets Trace de tableau et de hash, la clé <b>-value</b>
+        est remplacée par une clé <b>-ptr</b> qui est une référence au tableau ou
+        hash parallèle. De plus, pour un tableau ou un hash, il y a des paires clé/valeur
+        pour tous les rappels spécifiques à la variable.</p>
+  </dd>
+  <dt>$mw-&gt;traceVdelete(\$v);</dt>
+  <dd>Arrêter de tracer la variable.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXEMPLES'><a class='permalink' href='#EXEMPLES'>EXEMPLES</a></h1>
+<pre># Tracer la variable d'un Scale et déplacer un indicateur à l'unisson.
+use Tk;
+use Tk::widgets qw/Trace/;
+$pi = 3.1415926;
+$mw = MainWindow-&gt;new;
+$c = $mw-&gt;Canvas( qw/-width 200 -height 110 -bd 2 -relief sunken/ )-&gt;grid;
+$c-&gt;createLine( qw/100 100 10 100 -tag meter -arrow last -width 5/ );
+$s = $mw-&gt;Scale( qw/-orient h -from 0 -to 100 -variable/ =&gt; \$v )-&gt;grid;
+$mw-&gt;Label( -text =&gt; 'Faites-moi glisser pendant 5 secondes' )-&gt;grid;
+$mw-&gt;traceVariable( \$v, 'w' =&gt; [ \&amp;update_meter, $s ] );
+$mw-&gt;after( 5000 =&gt; sub {
+    print &quot;Temps de dé-traçage ...\n&quot;;
+    %vinfo = $s-&gt;traceVinfo( \$v );
+    print &quot;Infos de suivi  :\n  &quot;, join(&quot;\n  &quot;, @{$vinfo{-legible}}), &quot;\n&quot;;
+    $c-&gt;traceVdelete( \$v );
+});
+MainLoop;
+sub update_meter {
+    my( $index, $value, $op, @args ) = @_;
+    return if $op eq 'u';
+    $min = $s-&gt;cget( -from );
+    $max = $s-&gt;cget( -to );
+    $pos = $value / abs( $max - $min );
+    $x = 100.0 - 90.0 * ( cos( $pos * $pi ) );
+    $y = 100.0 - 90.0 * ( sin( $pos * $pi ) );
+    $c-&gt;coords( qw/meter 100 100/, $x, $y );
+    return $value;
+}
+# Entrée avec texte prédictif.
+use Tk;
+use Tk::widgets qw/ LabEntry Trace /;
+use strict;
+my @words =  qw/radio television telephone turntable microphone/;
+my $mw = MainWindow-&gt;new;
+my $e = $mw-&gt;LabEntry(
+    qw/ -label Chose -width 40 /,
+    -labelPack    =&gt; [ qw/ -side left / ],
+    -textvariable =&gt; \my $thing,
+);
+my $t = $mw-&gt;Text( qw/ -height 10 -width 50 / );;
+$t-&gt;pack( $e, qw/ -side top / );
+$e-&gt;focus;
+$e-&gt;traceVariable( \$thing, 'w', [ \&amp;trace_thing, $e, $t ] );
+foreach my $k ( 1 .. 12 ) {
+    $e-&gt;bind( &quot;&lt;F${k}&gt;&quot; =&gt; [ \&amp;ins, $t, Ev('K') ] );
+}
+$e-&gt;bind( '&lt;Return&gt;' =&gt;
+          sub {
+              print &quot;$thing\n&quot;;
+              $_[0]-&gt;delete( 0, 'end' );
+          }
+);
+MainLoop;
+sub trace_thing {
+    my( $index, $value, $op, $e, $t ) = @_;
+    return unless $value;
+    $t-&gt;delete( qw/ 1.0 end / );
+    foreach my $w ( @words ) {
+        if ( $w =~ /^$value/ ) {
+            $t-&gt;insert( 'end', &quot;$w\n&quot; );
+        }
+    }
+    return $value;
+} # end trace_thing
+sub ins {
+    my( $e, $t, $K ) = @_;
+    my( $index ) = $K =~ /^F(\d+)$/;
+    $e-&gt;delete( 0, 'end' );
+    $e-&gt;insert( 'end', $t-&gt;get( &quot;$index.0&quot;, &quot;$index.0 lineend&quot; ) );
+    $t-&gt;delete( qw/ 1.0 end / );
+} # end ins</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='HISTORIQUE'><a class='permalink' href='#HISTORIQUE'>HISTORIQUE</a></h1>
+<pre>Stephen.O.Lidie@Lehigh.EDU, Lehigh University Computing Center, 2000/08/01
+. Version 1.0, pour Tk800.022.
+sol0@Lehigh.EDU, Lehigh University Computing Center, 2003/09/22
+. Version 1.1, pour Tk804.025, ajout du support de multiples tracages du même
+  type sur la même variable.</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_DACTIVITÉ'><a class='permalink' href='#DROITS_DACTIVITÉ'>DROITS D'ACTIVITÉ</a></h1>
+<p class="Pp">Copyright (C) 2000 - 2003 Stephen O. Lidie. Tous droits réservés.</p>
+<p class="Pp">Ce programme est un logiciel libre ; vous pouvez le redistribuer et/ou le
+    modifier selon les mêmes termes que Perl lui-même.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">Tk804.036</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans les pages de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/perl-tk/">extra/perl-tk</a></dd>
+        <dt>Version :</dt>
+        <dd>804.036-8</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://search.cpan.org/dist/Tk">https://search.cpan.org/dist/Tk</a></dd>
+        <dt>Licences :</dt>
+        <dd>PerlArtistic, GPL, personnalisé</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-tk/">/listing/extra/perl-tk/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#SYNTAXE">SYNTAXE</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#MÉTHODES">MÉTHODES</a></li>
+        
+            <li><a href="#EXEMPLES">EXEMPLES</a></li>
+        
+            <li><a href="#HISTORIQUE">HISTORIQUE</a></li>
+        
+            <li><a href="#DROITS_DACTIVITÉ">DROITS D'ACTIVITÉ</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Tk::Trace.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/Tk::Trace.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

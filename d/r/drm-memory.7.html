@@ -1,0 +1,364 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>drm-memory(7) — Pages manuelles </title>d'Arch
+Arch
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">drm-memory(7)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/libdrm/">libdrm</a></p>
+
+        7)
+Nom
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">drm-memory - </td>Gestion
+    <td class="head-vol">de la mémoire DRM
+</td>Synopsis
+    <td class="head-rtitle">#incl</td>ude &lt;</tr>xf86d</table>rm.h&gt;
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='Name'><a class='permalink' href='#Name'></a></h1>D
+<p class="Pp">escription
+De</p> nombreux GPU </section>haut de gamme
+<section class="Sh">
+<h1 class="Sh" id='Synopsis'><a class='permalink' href='#Synopsis'>modernes </a></h1>sont
+<p class="Pp"><b>équip</b></p>és de </section>leurs
+<section class="Sh">
+<h1 class="Sh" id='Description'><a class='permalink' href='#Description'>propres </a></h1>gestionnaires
+<p class="Pp">de mémoire.
+    Ils incluent même plusieurs caches différents qui doivent être synchronisés lors des accès. Les textures, les tampons de trame, les tampons de commandes et plus encore doivent être stockés dans une mémoire à laquelle le GPU peut accéder rapidement. Par conséquent, la gestion de la mémoire sur les GPU dépend fortement du pilote et du matériel.
+Cependant, il </p>existe
+<p class="Pp">plusieurs frameworks dans le noyau qui sont utilisés par plus d'un pilote. Ceux-ci peuvent être utilisés pour un réglage de mode trivial sans nécessiter de code dépendant du pilote. Mais pour un rendu accéléré par le matériel, vous devez lire les pages manuelles du pilote avec lequel vous souhaitez travailler.
+Tampons </p>bêtes
+<section class="Ss">
+<h2 class="Ss" id='Dumb-Buffers'><a class='permalink' href='#Dumb-Buffers'>(Dumb-Buffers</a></h2>)
+<p class="Pp">Presque tous les pilotes matériels DRM du noyau prennent en charge une
+    <i>API appelée
+</i>Dumb-Buffers. Cette API permet de créer des tampons de taille arbitraire qui peuvent être utilisés pour le scanout. Ces tampons peuvent être
+    <a href='/man/mmap.2.en'>mappés </a>en mémoire via
+mmap(2) afin que vous puissiez y effectuer du rendu sur le CPU. Cependant, l'accès GPU à ces tampons est souvent impossible. Par conséquent, ils conviennent à des tâches simples mais ne sont pas adaptés </p>aux
+<p class="Pp">compositions <b>et rendus complexes.
+L'
+</b>ioctl DRM_IOCTL_MODE_CREATE_DUMB peut être utilisé pour créer un tampon bête. Le noyau renverra un handle 32 bits qui peut être utilisé pour gérer le tampon avec l'API DRM. Vous pouvez créer des
+    <a href='/man/drmModeAddFB.3.en'>tampons de trame </a>avec
+drmModeAddFB(3) et l'utiliser pour le réglage de mode et le scanout. Pour accéder au tampon, vous devez d'abord récupérer l'offset du
+    <b>tampon. L'
+ioctl </b>DRM_IOCTL_MODE_MAP_DUMB demande au sous-système DRM de préparer le tampon pour le mappage en mémoire et renvoie un faux offset qui peut être utilisé <a href='/man/mmap.2.en'>avec</a>
+mma</p>p(2)
+<p class="Pp">.
+L' <b>ioctl DRM_IOCTL_MODE_CREATE_DUMB </b>prend comme argument une structure de type
+struct <b>drm_mode_c</b>reate_dum</p>b :
+struct
+<div class="Bd-indent">
+<div class="Bd-indent">
+<pre>drm_mode_create_dumb {
+    __u32 height;</pre>
+    __u32 width;
+    __u32 bpp;
+    __u3</div>2 flags;
+    __u32 handle;
+    __u32 pitc</div>h;
+    __u64 size;
+};
+Les champs
+height,
+<p class="Pp">width,
+bpp <i>et
+</i>flags <i>doive</i>nt <i>être </i>fournis
+    <i>par </i>l'appelant. Les autres champs sont remplis par le noyau avec les valeurs de retour.
+height et
+width sont les <i>dimensions </i>du <i>tampon </i>rectangulaire qui est créé.
+bpp est le
+    nombre de bits par pixel et <i>doit </i>être un multiple de 8. Le plus souvent, vous voudrez passer 32 ici. Le champ flags est actuellement inutilisé et doit être mis à zéro. Des drapeaux différents pour modifier le comportement peuvent être ajoutés à l'avenir. Après l'appel de l'ioctl, les champs handle, pitch et size sont remplis par le noyau.
+handle est un handle GEM 32 bits qui identifie <i>le </i>tampon. Il est utilisé par plusieurs autres appels qui prennent un handle GEM ou un tampon mémoire comme argument. Le
+champ pitch est le pitch (ou stride) du nouveau <i>tampon.</i> La plupart des pilotes utilisent des valeurs de stride alignées sur 32 ou 64 bits. Le champ size contient la taille absolue en octets du tampon. Celle-ci peut normalement aussi être calculée avec
+(height * pitch + width) * bpp / 4.
+Pour <b>préparer le ta</b>mpon pour
+mmap(</p>2), vous devez
+<p class="Pp">utiliser l'
+ioctl <a href='/man/mmap.2.en'>DRM_IOCTL</a>_MODE_MAP_DUMB. Il prend comme
+    <b>argument une structure de </b>type
+struct drm_mode_map_dumb :
+struct drm_mode_map_dumb { <b>__u32 ha</b>ndle;
+ </p>   __u32
+<div class="Bd-indent">
+<div class="Bd-indent">
+<pre>pad;
+    __u64 offset;</pre>
+};
+Vous devez mettre </div>le handle GEM qui a été</div> précédemment récupéré
+<p class="Pp">via
+DRM_IOCTL_MODE_CREATE_DUMB dans le
+champ handle. Le
+champ pad est un
+    <b>remplissage inutilisé et </b>doit être mis <i>à zéro.</i> Une fois terminé,
+    <i>le
+</i>champ offset contiendra un offset qui peut être utilisé avec
+mmap(2) sur le
+    <i>descripteur </i>de fichier DRM.
+Si vous n'avez plus besoin de votre
+    <a href='/man/mmap.2.en'>tampon </a>bête, vous devez le détruire </p>avec
+<p class="Pp">DRM_IOCTL_MODE_DESTROY_DUMB. Si vous fermez le descripteur de fichier DRM, tous les <b>tampons bêtes ouverts sont </b>automatiquement détruits. Cette ioctl prend comme argument une structure de type
+struct
+    drm_mode_destroy_dumb :
+struct drm_mode_destroy_dumb {
+    __u32 <b>handle;
+};
+V</b>ous n'avez b</p>esoin que de
+<div class="Bd-indent">
+<div class="Bd-indent">
+<pre>mettre votre han</pre>dle dans le
+cha</div>mp handle.
+    </div>Après cet appel,
+<p class="Pp">le handle est invalide et peut être réutilisé <i>pour de nouveaux tampons par l</i>'API dumb.
+TTM
+TTM signifie
+Tr</p>anslation Table Manager et est </section>un
+    gestionnaire de mémoire
+<section class="Ss">
+<h2 class="Ss" id='TTM'><a class='permalink' href='#TTM'></a></h2>g
+<p class="Pp"><i>énérique </i>fourni <i>par le noyau. Il ne fournit pas une API espace utilisateur commune, vous devez don</i>c examiner l'interface de chaque pilote si vous souhaitez l'utiliser. Voir par ex</p>emple les pages manuelles de radeon pour plus d'informations sur la gestion de la</section> mémoire avec radeon et TTM.
+GEM
+GEM signifie
+Graphics Execution Manager et est un
+<section class="Ss">
+<h2 class="Ss" id='GEM'><a class='permalink' href='#GEM'>framewo</a></h2>rk
+<p class="Pp"><i>de </i>gestion de la <i>mémoire DRM générique dans </i>le noyau, utilisé par de nombreux pilotes différents. GEM est conçu pour gérer la mémoire graphique, contrôler l'accès au contexte d'exécution du périphérique graphique et gérer essentiellement l'environnement NUMA unique au matériel graphique moderne. GEM permet à plusieurs applications de partager les ressources du périphérique graphique sans avoir à recharger constamment toute la carte graphique. Les données peuvent être partagées entre plusieurs applications, GEM veillant à ce que la synchronisation mémoire appropriée se produise.
+GEM fournit des mécanismes simples pour gérer les </p>données
+<p class="Pp">graphiques et contrôler le flux d'exécution au sein du sous-système DRM de Linux. Cependant, GEM n'est pas un framework entièrement indépendant du pilote. Au lieu de cela, il fournit de nombreuses fonctions partagées entre de nombreux pilotes, mais chaque pilote doit implémenter la plupart de la gestion de la mémoire avec des ioctls dépendant du pilote. Cette page manuel essaie de décrire la sémantique (et, le cas échéant, la syntaxe) partagée entre tous les pilotes qui utilisent GEM.
+Toutes les API GEM sont définies comme des
+</p>ioctl(2)
+<p class="Pp">sur le descripteur de fichier <a href='/man/ioctl.2.en'>DRM. Une </a>application doit être autorisée via
+drmAuthMagic(3) par le DRM-Master actuel <a href='/man/drmAuthMagic.3.en'>pour accéder au </a>sous-système GEM. Un pilote qui ne prend pas en charge GEM renverra
+ENODEV pour toutes ces ioctls. Les handles d'objets <b>invalides </b>renvoient
+EINVAL et les noms d'objets invalides renvoient <b>ENOENT.</b>
+GEM fournit des primitives de gestion
+  <b>d</b></p>e
+<p class="Pp">mémoire explicites. Des pages système sont allouées lorsque l'objet est créé, soit comme stockage fondamental pour le matériel où la mémoire système est utilisée directement par le processeur graphique, soit comme magasin de sauvegarde pour la mémoire résidente du processeur graphique.
+Les objets sont </p>référencés
+<p class="Pp">depuis l'espace utilisateur à l'aide de handles. Ceux-ci sont, à toutes fins pratiques, équivalents aux descripteurs de fichier mais évitent la surcharge. Les pilotes de noyau plus récents prennent également en <b>charge </b>l'infrastructure
+drm-prime (7)
+    qui peut renvoyer de véritables descripteurs de fichier pour les handles GEM en utilisant l'API DMA-BUF de Linux. Les objets peuvent être publiés avec un nom afin que d'autres applications et processus puissent y accéder. Le nom reste valide tant que l'objet existe. Les objets GEM sont comptés par références dans le noyau. L'objet n'est détruit que lorsque tous les handles de l'espace </p>utilisateur
+<p class="Pp">ont été fermés.
+Les tampons GEM ne peuvent pas être créés avec une API générique. Chaque pilote fournit sa propre API pour créer des
+    <b>tampons GEM. Voir </b>par <b>exemple
+</b>DRM_I915_GEM_CREATE,
+    <b>DRM_NOUVEAU_GEM_NEW ou
+</b>DRM_RADEON_GEM_CREATE. Chacune de ces ioctls renvoie un handle GEM qui peut être passé à différentes ioctls <i>génériques.</i> La
+bibliothèque libgbm <i>de la
+</i>distribution mesa3D essaie de fournir une API indépendante du pilote pour créer des tampons GBM et récupérer un handle GBM pour ceux-ci. Elle permet de créer des tampons pour différents cas d'utilisation, y compris le scanout, le rendu, les curseurs et l'accès CPU. Voir la bibliothèque libgbm pour plus d'informations ou consulter les pages manuelles dépendant <a href='/man/drm-intel.7.en'>du pilote </a>(par
+    <a href='/man/drm-radeon.7.en'>exemple</a>
+drm-i</p>ntel(7)
+<p class="Pp">ou
+drm-radeon(7)).
+Les tampons <a href='/man/drmCloseBufferHandle.3.en'>GEM peuvent être fermés </a>avec
+drmCloseBufferHandle(3). Elle
+    prend comme argument le handle GEM à fermer. Après cet appel, le handle GEM ne peut plus être utilisé par ce processus et peut être réutilisé pour de nouveaux </p>objets
+<p class="Pp">GEM par l'API GEM.
+Si vous souhaitez partager des objets GEM entre différents processus, vous pouvez créer un nom pour ceux-ci et passer ce nom à d'autres processus qui peuvent alors ouvrir cet objet GEM. Les noms sont actuellement des ID entiers de 32 bits et n'ont pas de protection particulière. C'est-à-dire que si vous mettez un nom sur votre objet GEM, tout autre client ayant accès au périphérique DRM et
+    <a href='/man/drmAuthMagic.3.en'>authentifié via
+</a>drmAuthMagic(3) par le DRM-Master <i>actuel,</i> peut nom
+    et ouvrir ou accéder à l'objet GEM. Si vous souhaitez un contrôle d'accès plus fin, vous pouvez utiliser la nouvelle <a href='/man/drm-prime.7.en'>API drm-prime(7)</a> pour récupérer
+    des descripteurs de fichiers pour les handles GEM. Pour créer un nom pour un handle GEM, vous utilisez l' <b>ioctl DRM_IOCTL_GEM_FLINK.</b> Elle prend comme argument une structure de
+    type <b>struct </b>drm_gem_</p>flink :
+<div class="Bd-indent">
+<div class="Bd-indent">
+<pre>struct drm_gem_flink {
+    __u32 handle;
+    __u32 name;</pre>
+</div>}</div>;
+<p class="Pp">Vous devez mettre votre handle dans le champ <i>handle.</i> Après
+    la fin de l'opération, le noyau a placé le nouveau nom unique dans le champ name. Vous
+    pouvez maintenant passer ce nom à d'autres processus qui peuvent alors importer le nom
+    avec l' <b>ioctl DRM_IOCTL_GEM_OPEN.</b> Elle prend comme argument une structure
+    de type <b>struct </b>drm_gem</p>_open :
+<div class="Bd-indent">
+<div class="Bd-indent">
+<pre>struct drm_gem_open {
+    __u32 name;
+    __u32 handle;
+    __u32 size;</pre>
+</div>}</div>;
+<p class="Pp">Vous devez remplir le champ <i>name </i>avec le nom de l'
+    objet GEM que vous souhaitez ouvrir. Le noyau remplira les champs <i>handle
+</i>    et <i>size </i>avec le nouveau handle et la nouvelle taille de l'objet GEM. Vous
+    pouvez maintenant accéder à l'objet GEM via le handle comme si vous l'aviez créé avec l'
+    API </p>GEM.
+<p class="Pp">En dehors de la gestion générique des tampons, l'API GEM ne fournit
+    aucun accès générique. Chaque pilote implémente sa propre fonctionnalité au-dessus de
+    cette API. Cela inclut les tampons d'exécution, la gestion GTT, la création de contextes,
+    l'accès CPU, les E/S GPU et plus encore. L'API de niveau supérieur suivante est <i>OpenGL. </i>Donc
+    si vous souhaitez utiliser plus de fonctionnalités GPU, vous devriez utiliser la
+    bibliothèque <i>mesa3D
+</i>    pour créer des contextes OpenGL sur les périphériques DRM. Cela <i>ne
+ </i>   nécessite aucun système de fenêtrage comme X11, mais peut également être fait sur des périphériques DRM bruts.
+    Cependant, cela dépasse le cadre de cette page de manuel. Vous pouvez jeter un
+    œil à d'autres pages de manuel mesa3D, y compris libgbm et libEGL. Le rendu logiciel 2D
+    (rendu avec le CPU) peut être réalisé avec l'API dumb-buffer de manière indépendante du pilote, cependant, pour
+    un rendu 2D ou 3D accéléré par le matériel, vous devez utiliser OpenGL. Toute autre API
+    qui tente d'abstraire les détails internes du pilote pour accéder aux tampons d'exécution GEM
+    et aux autres détails internes du GPU réinventerait simplement OpenGL, elle n'est donc pas fournie.
+    Mais si vous avez besoin d'informations plus détaillées pour un pilote spécifique, vous pouvez
+    jeter un œil aux pages de manuel des pilotes, y compris <a href='/man/drm-intel.7.en'>drm-intel(7)</a>,
+    <a href='/man/drm-radeon.7.en'>drm-radeon(7)</a> et <a href='/man/drm-nouveau.7.en'>drm-nouveau(7). </a>Cependant, l'
+    infrastructure
+    <a href='/man/drm-prime.7.en'>drm-prime(7) et l'API GEM générique décrite ici
+    permettent aux gestionnaires </a>d'affichage de gérer les tampons graphiques et les clients de rendu sans
+    aucun</p>e connaissance approfondie du GPU utilisé. De plus, cela permet de déplacer
+    d</section>es objets entre GPU et d'implémenter des serveurs d'affichage complexes qui ne fon</section>t aucun
+    rendu par eux-mêmes. Voir sa page de manuel pour plus d'informations.
+<section class="Sh">
+<h1 class="Sh" id='Examples'><a class='permalink' href='#Examples'>Exemple</a></h1>s
+<p class="Pp">Cette section inclut des exemples pour les tâches de gestion de mémoire
+  de </p>base.
+<section class="Ss">
+<h2 class="Ss" id='Dumb-Buffers_2'><a class='permalink' href='#Dumb-Buffers_2'>Tampons stupides </a></h2>(Dumb-Buffers)
+<p class="Pp">Cet exemple montre comment créer un dumb-buffer via l'API DRM
+    générique. C'est indépendant du pilote (tant que le pilote prend en charge les
+    dumb-buffers) et fournit des tampons mappés en mémoire qui peuvent être utilisés pour
+    l'affichage (scanout). Cet exemple crée un tampon Full HD 1920x1080 avec 32
+    bits par pixel et une profondeur de couleur de 24 bits. Le tampon est ensuite lié à un
+    framebuffer qui peut être utilisé pour l'affichage avec l'API KMS (voir
+    <a href='/man/drm-kms.7.en'>drm-kms(7)</a>)</p>.
+<div class="Bd-indent">
+<div class="Bd-indent">
+<pre>struct drm_mode_create_dumb creq;
+struct drm_mode_destroy_dumb dreq;
+struct drm_mode_map_dumb mreq;
+uint32_t fb;
+int ret;
+void *map;
+/* create dumb buffer */
+memset(&amp;creq, 0, sizeof(creq));
+creq.width = 1920;
+creq.height </pre>= 1080;
+creq.bpp = 32;
+ret = drmIoctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &amp;creq);
+if (ret &lt; 0) {
+    /* buffer creation failed; see "errno" for more error codes */
+    ...
+}
+/* creq.pitch, creq.handle and creq.size are fille</div>d by this ioctl with
+ * the requested values and can be used now. */
+/* create framebuffer object for the dumb-buffer */
+ret = drmModeAddFB(fd, 1920, 1080, 24, 32, creq.pitch, creq.handle, &amp;fb);
+if (ret) {
+    /* frame bu</div>ffer creation failed; see "errno" */
+    ...
+}
+/* the framebuffer "fb" can now used for scanout with KMS */
+/* prepare buffer for memory mapping */
+memset(&amp;mreq, 0, sizeof(mreq));
+mreq.handle = creq.handle;
+ret = drmIoctl</section>(fd, DRM_IOCTL_MODE_MAP_DUMB, &amp;mreq);
+if (ret) {
+    /* DRM buffer preparation failed; see "errno" */
+    ...
+}
+/* mreq.offset now contains the new offset that can be used with mmap() */
+/* perform actual memory mapping </section>*/
+map = mmap(0, creq.size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, mreq.offset);
+if (map == MAP_FAILED) {
+    /* memory-mapping failed; see "errno" */
+    ...
+}
+/* clear the framebuffer to 0 */
+memset(map, 0, creq.size);
+<section class="Sh">
+<h1 class="Sh" id='Reporting_Bugs'><a class='permalink' href='#Reporting_Bugs'>Rapport de </a></h1>bugs
+<p class="Pp">Les bugs dans ce manuel doivent être signalés à
+    <a href='https://gitlab.freedesktop.org/mesa/libdrm/-/issues'>https://gitlab.freedesktop.org/mesa/libdrm/-/issu</a></p>e</section>s
+<section class="Sh">
+<h1 class="Sh" id='See_Also'><a class='permalink' href='#See_Also'>Voir </a></h1>aussi
+<p class="Pp"><a href='/man/drm.7.en'>drm(7)</a>, <a href='/man/drm-kms.7.en'>drm-kms(7)</a>, <a href='/man/drm-prime.7.en'>drm-prime(7)</a>,
+    <a href='/man/drmAvailable.3.en'>drmAvailable(3)</a>, <a href='/man/drmOpen.3.en'>drmOpen(3)</a>, <a href='/man/drm-intel.7.en'>drm-intel(7)</a>,
+    <a href='/man/drm-radeon.7.en'>drm-radeon(7)</a>, <a href='/man/drm-nouveau.7.en'>drm-</a></p>nou</section>vea</div>u(7)
+<table class="foot">
+  <tr>
+    <td class="foot-date">Septembre </td>2012
+    <td class="foot-os"></td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le </p>paquet :
+    <dl>
+        <dt>Nom du </dt>paquet :
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/libdrm/">extra/l</a></dd>ibdrm
+        <dt>Version </dt>:
+        <dd>2.4.</dd>129-1
+        <dt>Amont </dt>:
+        <dd><a href="https://dri.freedesktop.org/">https://dri.freedesktop.</a></dd>org/
+        <dt>Licences </dt>:
+        <dd>M</dd>IT
+        <dt>Manuels </dt>:
+        <dd><a href="/listing/extra/libdrm/">/listing/extra/l</a></dd>ibdr</dl>m</section>/
+
+<details>
+    <summary>Table des </summary>matières
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#Name">N</a></li>om
+        
+            <li><a href="#Synopsis">Sy</a></li>nopsis
+        
+            <li><a href="#Description">Desc</a></li>ription
+        
+            <li><a href="#Examples">Ex</a></li>emples
+        
+            <li><a href="#Reporting_Bugs">Rapport </a></li>de bugs
+        
+            <li><a href="#See_Also">Vo</a></li>ir</ul> a</nav>us</details>si
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/drm-memory.7.en.txt">t</a>xt, 
+        
+            <a href="/man/drm-memory.7.en.raw"></a>r</p>a</nav></aside></main>w
+        <footer>
+            de manuel.
+            <p>Le site web est disponible selon les termes de la <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">licence
+               GPL-3</a>.0, sauf pour le contenu des</p> pages de manuel, qui ont le</footer>ur propre licence
+         </body>      spécifiée dans le paqu</html>et Arch Linux correspondant.

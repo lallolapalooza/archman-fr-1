@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Net::XMPP::Namespaces(3pm) — Pages man Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Net__XMPP__Namespaces(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-net-xmpp/">perl-net-xmpp</a></p>
+<p class="lic">Licences: GPL, PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Net::XMPP::Namespaces(3pm)</td>
+    <td class="head-vol">Documentation Perl Contribuée par l'Utilisateur</td>
+    <td class="head-rtitle">Net::XMPP::Namespaces(3pm)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Net::XMPP::Namespaces - Discussion approfondie sur la manière dont les espaces de noms sont gérés</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<p class="Pp">Net::XMPP::Namespaces offre un aperçu détaillé de la manière dont Net::XMPP gère les espaces de noms, et comment ajouter les vôtres. Il sert également de dépôt pour toutes les informations d'espace de noms dont Net::XMPP a besoin.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">XMPP en tant que protocole est très bien défini. Il existe trois principaux paquets de niveau supérieur (message, iq et présence). Il existe également un moyen d'étendre le protocole de manière très claire et structurée, via des espaces de noms.</p>
+<p class="Pp">Deux manières principales dont les espaces de noms sont utilisés dans Jabber sont de faire de &lt;iq/&gt; un wrapper générique, et comme moyen d'ajouter des données à n'importe quel paquet via une balise enfant &lt;x/&gt;. Nous utiliserons &lt;x/&gt; pour représenter le paquet, mais en réalité, il pourrait s'agir de n'importe quelle balise enfant : &lt;foo/&gt;, &lt;data/&gt;, &lt;error/&gt;, etc.</p>
+<p class="Pp">Le paquet Info/Query &lt;iq/&gt; utilise des espaces de noms pour déterminer le type d'informations à accéder. Habituellement, il y a une balise &lt;query/&gt; dans le &lt;iq/&gt; qui représente l'espace de noms, mais en fait, il peut s'agir de n'importe quelle balise. La définition de la partie Query est la première balise qui a un espace de noms.</p>
+<pre>&lt;iq type=&quot;get&quot;&gt;&lt;query xmlns=&quot;...&quot;/&gt;&lt;/iq&gt;</pre>
+<p class="Pp">ou</p>
+<pre>&lt;iq type=&quot;get&quot;&gt;&lt;foo xmlns=&quot;...&quot;/&gt;&lt;/iq&gt;</pre>
+<p class="Pp">Après ce stanza de requête, il peut y avoir un nombre quelconque d'autres stanzas (&lt;x/&gt; tags) que vous souhaitez inclure. Le paquet Query est représenté et disponible en appelant <b>GetQuery()</b> ou <b>GetChild()</b>, et les autres espaces de noms sont disponibles en appelant <b>GetChild()</b>.</p>
+<p class="Pp">La balise X est juste un moyen de transmettre des données sur d'autres paquets. Comme intégrer l'horodatage d'un message en utilisant jabber:x:delay, ou signer sa présence pour le chiffrement en utilisant jabber:x:signed.</p>
+<p class="Pp">À cette fin, Net::XMPP a cherché à trouver un moyen simple et clair de définir les fonctions nécessaires pour accéder au XML d'un espace de noms. Nous passerons en revue les documents complets, puis montrerons deux exemples d'espaces de noms réels afin que vous puissiez voir de quoi nous parlons.</p>
+<section class="Ss">
+<h2 class="Ss" id='Vue_d_ensemble'><a class='permalink' href='#Vue_d_ensemble'>Vue d'ensemble</a></h2>
+<p class="Pp">Pour éviter que de nombreux modules désagréables ne consomment de la mémoire inutilement, et pour éviter de devoir changer 15 modules lorsqu'une modification mineure est introduite, les modules Net::XMPP ont poussé AUTOLOAD à l'extrême. Namespaces.pm n'est rien d'autre qu'un ensemble d'appels de fonctions qui génère un grand hachage de hachages. Le hachage est accédé par la fonction AUTOLOAD de Stanza.pm pour faire quelque chose. (Cela aura du sens, je le promets.)</p>
+<p class="Pp">Avant de continuer, je vous suggère vivement de lire un livre sur Perl traitant d'AUTOLOAD et de son fonctionnement. À partir de maintenant, je supposerai que vous comprenez.</p>
+<p class="Pp">Lorsque vous créez un objet Net::XMPP::IQ et que vous lui ajoutez une Query (NewChild), plusieurs choses se produisent en arrière-plan. L'argument de NewChild est l'espace de noms que vous souhaitez ajouter. (espace-de-noms-personnalisé)</p>
+<p class="Pp">Maintenant que vous avez un objet Query avec lequel travailler, vous appellerez les fonctions GetXXX et SetXXX pour définir les données. Il n'y a pas de fonctions GetXXX et SetXXXX définies. Vous ne pouvez pas regarder dans le fichier Namespaces.pm et les trouver. Au lieu de cela, vous trouverez quelque chose comme ceci :</p>
+<pre>&amp;add_ns(ns    =&gt; &quot;monespace&quot;,
+        tag   =&gt; &quot;maballe&quot;,
+        xpath =&gt; {
+                  JID       =&gt; { type=&gt;'jid', path =&gt; '@jid' },
+                  Username  =&gt; { path =&gt; 'username/text()' },
+                  Test      =&gt; { type =&gt; 'master' }
+                 }
+       );</pre>
+<p class="Pp">Lorsque la fonction <b>GetUsername()</b> est appelée, la fonction AUTOLOAD recherche dans le hachage Namespaces.pm une clé "Username". En fonction du "type" du champ (scalaire étant le défaut), elle utilisera le "path" comme une XPath pour récupérer les données et appeler la méthode <b>XPathGet()</b> dans Stanza.pm.</p>
+<p class="Pp">Confus encore ?</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Espaces_de_noms_privés_Net::XMPP'><a class='permalink' href='#Espaces_de_noms_privés_Net::XMPP'>Espaces de noms privés Net::XMPP</a></h2>
+<p class="Pp">Et c'est là que cela commence à devenir un peu délicat. Lorsque vous voyez un espace de noms avec __netxmpp__, ou __netjabber__ de Net::Jabber, au début, il s'agit généralement de quelque chose de personnalisé pour Net::XMPP et NON de la partie réelle du protocole XMPP.</p>
+<p class="Pp">Il existe certains endroits où la structure du XML autorise plusieurs enfants du même nom. Les principaux endroits où vous verrez ce comportement sont là où vous avez plusieurs balises du même nom et celles-ci ont des enfants en dessous (jabber:iq:roster).</p>
+<p class="Pp">Dans jabber:iq:roster, la balise &lt;item/&gt; peut être répétée plusieurs fois, et est un peu comme un mini-espace de noms en soi. À cette fin, nous la traitons comme un espace de noms séparé et avons défini un espace de noms __netxmpp__:iq:roster:item pour le contenir. Ce qui se passe, c'est ceci : dans mon code, je définis que la balise des &lt;item/&gt; est "item" et tout ce qui a ce nom de balise doit créer un nouvel objet Net::XMPP::Stanza avec l'espace de noms __netxmpp__:iq:roster:item qui devient alors un enfant de l'objet Stanza jabber:iq:roster. De plus, lorsque vous souhaitez ajouter un nouvel élément à un projet jabber:iq:roster, vous appelez NewQuery avec l'espace de noms privé.</p>
+<p class="Pp">Je sais que cela semble compliqué. Et si après avoir lu l'intégralité de ce document, cela reste compliqué, envoyez-moi un e-mail, posez des questions, et je les surveillerai et ajusterai ces documents pour répondre aux questions que les gens posent.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>add_ns()</b></h2>
+<p class="Pp">Pour répéter, voici un exemple d'appel à <b>add_ns()</b> :</p>
+<pre>add_ns(ns    =&gt; &quot;monespace&quot;,
+        tag   =&gt; &quot;maballe&quot;,
+        xpath =&gt; {
+                  JID       =&gt; { type=&gt;'jid', path =&gt; '@jid' },
+                  Username  =&gt; { path =&gt; 'username/text()' },
+                  Test      =&gt; { type =&gt; 'master' }
+                 }
+       );</pre>
+<p class="Pp">ns - C'est le nouvel espace de noms que vous essayez d'ajouter.</p>
+<p class="Pp">tag - C'est la balise racine à utiliser pour les objets basés sur cet espace de noms.</p>
+<p class="Pp">xpath - La référence de hachage passée dans l'appel add_ns à chaque nom d'entrée indique à Net::XMPP comment gérer les appels ultérieurs <b>GetXXXX()</b>, <b>SetXXXX()</b>, <b>DefinedXXXX()</b>, <b>RemoveXXXX()</b>, <b>AddXXXX()</b>. Les options de base que vous pouvez passer sont :</p>
+<p class="Pp">type - Ceci indique à Stanza comment gérer l'appel. Les valeurs possibles sont :</p>
+<pre>         array - La valeur à définir et retournée est une référence
+                 de tableau. Par exemple, &lt;group/&gt; dans jabber:iq:roster.
+         child - Ceci indique à Stanza qu'il doit rechercher les enfants
+                 portant les noms de style __netxmpp__. AddXXX() ajoute
+                 un nouvel enfant, et GetXXX() renverra un nouvel objet
+                 Stanza représentant le paquet.
+         flag - Ceci est pour les éléments enfants qui sont des balises
+                en eux-mêmes : &lt;foo/&gt;. Puisque la présence de la balise est
+                ce qui est important, et qu'il n'y a pas de cdata à stocker,
+                nous l'appelons simplement un drapeau.
+         jid - La valeur est un Jabber ID. GetXXX() renverra un objet
+               Net::XMPP::JID à moins que vous ne lui passiez "jid", alors il
+               renvoie une chaîne.
+         master - Les appels GetXXX() et SetXXX() renvoient et prennent un
+                  hachage représentant tous les appels GetXXX() et SetXXX().
+                  Par exemple :
+                    SetTest(foo=&gt;&quot;bar&quot;,
+                            bar=&gt;&quot;baz&quot;);
+                  Se traduit par :
+                    SetFoo(&quot;bar&quot;);
+                    SetBar(&quot;baz&quot;);
+                  GetTest() renverrait un hachage contenant ce que le paquet
+                  contient :
+                    { foo=&gt;&quot;bar&quot;,  bar=&gt;&quot;baz&quot; }
+         raw - Ceci insérera le XML brut que vous spécifiez directement
+               dans le Stanza à l'endroit où le chemin le spécifie.
+         scalar - Ceci définira et obtiendra une valeur scalaire. C'est le
+                  cheval de bataille principal car les attributs et CDATA sont
+                  représentés par un scalaire. C'est le réglage par défaut si
+                  vous n'en fournissez pas.
+         special - Le type spécial est unique en ce sens qu'au lieu d'une
+                   chaîne "special", vous lui donnez en fait un tableau :
+                     [ &quot;special&quot; , &lt;subtype&gt; ]
+                   Cela permet à Net::XMPP de gérer l'appel SetXXXX() d'une
+                   manière spéciale selon votre choix. Actuellement, ceci est
+                   principalement utilisé par jabber:iq:time pour définir
+                   automatiquement les informations de temps dans le bon format,
+                   et par jabber:iq:version pour définir le système d'exploitation
+                   de la machine et ajouter la version de Net::Jabber au paquet
+                   de retour. Vous n'aurez probablement PAS besoin d'utiliser
+                   ceci, mais je voulais le mentionner.
+         timestamp - Si vous appelez SetXXX() mais que vous ne lui passez rien,
+                    </pre>
+</section>
+
+</div>
+</section>
+
+            </article>
+            <aside id="content-right">
+                <nav id="toc">
+    <h2>Table des matières</h2>
+    <ul>
+        <li><a href="#NAME">NOM</a></li>
+        <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        <li><a href="#DESCRIPTION">DESCRIPTION</a>
+            <ul>
+                <li><a href="#Vue_d_ensemble">Vue d'ensemble</a></li>
+                <li><a href="#Espaces_de_noms_privés_Net::XMPP">Espaces de noms privés Net::XMPP</a></li>
+                <li><a href="#add_ns()">add_ns()</a></li>
+            </ul>
+        </li>
+    </ul>
+</nav>
+
+            </aside>
+        </main>
+        <footer>
+            <div id="footer">
+                <p>
+                    Page traduite par : &lt;translate&gt;
+                </p>
+            </div>
+        </footer>
+    </body>
+</html>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <title>Net::XMPP::Namespaces(3pm)</title>
+        <link rel="stylesheet" type="text/css" href="../../css/reset.css" />
+        <link rel="stylesheet" type="text/css" href="../../css/common.css" />
+        <link rel="stylesheet" type="text/css" href="../../css/developer.css" />
+        <link rel="stylesheet" type="text/css" href="../../css/man.css" />
+        <link rel="stylesheet" type="text/css" href="../../css/package.css" />
+        <link rel="stylesheet" type="text/css" href="../../css/search.css" />
+        <link rel="stylesheet" type="text/css" href="../../css/sidebar.css" />
+        <link rel="stylesheet" type="text/css" href="../../css/footer.css" />
+        <link rel="stylesheet" type="text/css" href="../../css/header.css" />
+        <link rel="stylesheet" type="text/css" href="../../css/icons.css" />
+        <link rel="stylesheet" type="text/css" href="../../css/navigation.css" />
+        <script type="text/javascript" src="../../js/jquery-3.6.0.min.js"></script>
+        <script type="text/javascript" src="../../js/search.js"></script>
+        <script type="text/javascript" src="../../js/man.js"></script>
+        <script type="text/javascript" src="../../js/package.js"></script>
+        <script type="text/javascript" src="../../js/sidebar.js"></script>
+    </head>
+    <body>
+        
+        <main class="container">
+            <article>
+                <div class="man-content">
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NAME</a></h1>
+<p class="Pp"><code class="Nm">Net::XMPP::Namespaces</code> - A module for adding new XMPP Namespaces</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>  use Net::XMPP::Namespaces;
+
+  # Register a new namespace
+  &add_ns(
+      ns    =&gt; 'mynamespace',
+      tag   =&gt; 'mytag',
+      xpath =&gt; {
+                JID       =&gt; { type=&gt;'jid', path =&gt; '@jid' },
+                Username  =&gt; { path =&gt; 'username/text()' },
+                Test      =&gt; { type =&gt; 'master' }
+               }
+  );
+
+  # Instantiate a new XMPP object with our custom namespace
+  my $xmpp = Net::XMPP-&gt;new( ... );
+  $xmpp-&gt;register_namespace( 'mynamespace' );
+
+  # Use the generated API calls
+  $xmpp-&gt;SetJID( 'user@example.com' );
+  print $xmpp-&gt;GetJID();
+
+  $xmpp-&gt;SetUsername( 'myusername' );
+  print $xmpp-&gt;GetUsername();
+
+  $xmpp-&gt;SetTest( 'some value' );
+  print $xmpp-&gt;GetTest();</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">The <code class="Nm">Net::XMPP::Namespaces</code> module allows you to
+    define and register custom XMPP namespaces for use with the
+    <code class="Nm">Net::XMPP</code> module. This is useful if you are implementing
+    an XMPP client or server that uses custom stanzas or extensions not defined
+    in the standard XMPP specifications.</p>
+<p class="Pp">The core function is <code class="Ix">add_ns()</code>, which takes a hash
+    of arguments to define a new namespace and its associated elements and
+    attributes.</p>
+<p class="Pp">The arguments to <code class="Ix">add_ns()</code> are:</p>
+<dl class="Bl-tag">
+<dt id="ns"><a class='permalink' href='#ns'>ns</a></dt>
+<dd>This is the namespace URI that you want to register. This can be a standard
+        XMPP namespace (e.g., <code class="Li">jabber:iq:roster</code>) or a custom
+        namespace defined by your application (e.g.,
+        <code class="Li">http://example.com/myapp</code>).</dd>
+<dt id="tag"><a class='permalink' href='#tag'>tag</a></dt>
+<dd>This is the primary tag name for the XML stanza associated with this
+        namespace. For example, if you are defining the roster namespace,
+        the tag would be <code class="Li">iq</code>.</dd>
+<dt id="xpath"><a class='permalink' href='#xpath'>xpath</a></dt>
+<dd>This is a hash reference that defines how data within the XML stanza is
+        accessed and manipulated. Each key in this hash corresponds to an API
+        call that will be generated. The value for each key is another hash
+        reference with the following options:</dd>
+</dl>
+<dl class="Bl-tag">
+<dt id="type"><a class='permalink' href='#type'>type</a></dt>
+<dd>This specifies the data type for the element or attribute. Possible values
+          include:
+          <ul class="Bl-bullet">
+          <li id="jid"><a class='permalink' href='#jid'>jid</a> - For XMPP
+              JID (Jabber ID) values.</li>
+          <li id="master"><a class='permalink' href='#master'>master</a> - A
+              generic type, often used for the main element of a stanza.</li>
+          <li id="any"><a class='permalink' href='#any'>any</a> - A catch-all
+              type.</li>
+          </ul>
+          If not specified, it defaults to <code class="Li">any</code>.</dd>
+<dt id="path"><a class='permalink' href='#path'>path</a></dt>
+<dd>This is the XPath expression to locate the data within the XML stanza.
+          It's a relative path, starting from the context of the stanza's
+          root element. For example, <code class="Li">@jid</code> refers to the
+          `jid` attribute of the current element, while
+          <code class="Li">username/text()</code> refers to the text content
+          of the <code class="Li">username</code> child element.</dd>
+<dt id="timestamp"><a class='permalink' href='#timestamp'>timestamp</a></dt>
+<dd>If set to an empty string <code class="Li">&quot;&quot;</code>,
+            Net::XMPP will automatically insert a timestamp at the specified
+            XPath location.</dd>
+</dl>
+<p class="Pp">The <code class="Ix">add_ns()</code> function generates corresponding
+    API methods for getting, setting, and checking the existence of the data at
+    the specified XPath locations. For example, if you define an XPath for
+    <code class="Li">JID</code>, it will generate <code class="Li">GetJID()</code>,
+    <code class="Li">SetJID()</code>, and <code class="Li">DefinedJID()</code> methods.</p>
+<p class="Pp">The <code class="Nm">Net::XMPP::Namespaces</code> module also provides
+    support for defining how child objects or stanzas are handled within a
+    namespace. This is done through the <code class="Ix">child</code> argument, which
+    is a hash reference containing options like:</p>
+<dl class="Bl-tag">
+<dt id="ns-child"><a class='permalink' href='#ns-child'>ns</a></dt>
+<dd>The namespace URI for the child object.</dd>
+<dt id="skip_xmlns"><a class='permalink' href='#skip_xmlns'>skip_xmlns</a> <code class="Li">=&gt; 1</code></dt>
+<dd>Prevents Net::XMPP from adding an <code class="Li">xmlns=''</code> attribute
+            to the child object's XML.</dd>
+<dt id="specify_name"><a class='permalink' href='#specify_name'>specify_name</a> <code class="Li">=&gt; 1</code></dt>
+<dd>Allows specifying the tag name for the child object dynamically. This is
+            generally discouraged as it can lead to less predictable XML
+            structures.</dd>
+<dt id="tag-child"><a class='permalink' href='#tag-child'>tag</a></dt>
+<dd>The default tag name to use for the child object if
+            <code class="Ix">specify_name</code> is enabled.</dd>
+</dl>
+<p class="Pp">The <code class="Ix">calls</code> argument is an array reference that
+    explicitly defines the methods to be generated for a given namespace element.
+    Commonly generated calls include <code class="Li">Get</code>, <code class="Li">Set</code>,
+    <code class="Li">Defined</code>, and <code class="Li">Remove</code>. For child types, you
+    can customize the available methods based on how you want your API to
+    interact with these child objects (e.g., <code class="Li">[&quot;Get&quot;,&quot;Add&quot;]</code>).</p>
+<p class="Pp">Here's an example breakdown of how <code class="Ix">add_ns()</code>
+    generates API calls:</p>
+<pre>
+  &amp;add_ns(ns    =&gt; &quot;mynamespace&quot;,
+          tag   =&gt; &quot;mytag&quot;,
+          xpath =&gt; {
+                    JID       =&gt; { type=&gt;'jid', path =&gt; '@jid' },
+                    Username  =&gt; { path =&gt; 'username/text()' },
+                    Test      =&gt; { type =&gt; 'master' }
+                   }
+         );
+</pre>
+<p class="Pp">This definition will result in the following API methods being
+    available:</p>
+<pre>
+  GetJID()
+  SetJID()
+  DefinedJID()
+  RemoveJID()
+  GetUsername()
+  SetUsername()
+  DefinedUsername()
+  RemoveUsername()
+  GetTest()
+  SetTest()
+  DefinedTest()
+  RemoveTest()</pre>
+<p class="Pp">For elements that are not explicitly defined with a type, or when
+    using the <code class="Li">master</code> type, <code class="Nm">Net::XMPP</code>
+    will generally handle them as strings. If you need to store binary data, you
+    can use a specific type or handle it as CDATA. If you pass an empty string
+    <code class="Li">&quot;&quot;</code> for the <code class="Ix">path</code> or
+    timestamp, then Net::XMPP will place a timestamp in the xpath location.</p>
+<p class="Pp">The <code class="Ix">path</code> argument is a simplified form of XPath,
+    relative to the stanza's root element. It doesn't require a fully rooted
+    path. For instance, if your stanza's tag is <code class="Li">&quot;foo&quot;</code>
+    and the path is <code class="Li">&quot;bar/text()&quot;</code>, the effective
+    XPath will be rooted within the <code class="Li">&lt;foo/&gt;</code> packet,
+    targeting the CDATA of <code class="Li">&lt;bar&gt;</code>:
+    <code class="Li">&lt;foo&gt;&lt;bar&gt;xxxxx&lt;/bar&gt;&lt;/foo&gt;</code>.</p>
+<p class="Pp">For a flag and a child type, simply specify the child element.
+    Refer to the source code of this file for more examples and clarifications. It
+    is also recommended to familiarize yourself with XPath if you are not already
+    acquainted with it.</p>
+<p class="Pp">The <code class="Ix">child</code> hash reference is used by Net::XMPP to
+    manage adding and retrieving child objects. The keys for this hash are:</p>
+<dl class="Bl-tag">
+<dt id="ns-child-key"><a class='permalink' href='#ns-child-key'>ns</a></dt>
+<dd>The actual or custom namespace (e.g., <code class="Li">__netxmpp__</code>)
+            to be used for the child packet.</dd>
+<dt id="skip_xmlns-key"><a class='permalink' href='#skip_xmlns-key'>skip_xmlns</a> <code class="Li">=&gt; 1</code></dt>
+<dd>Instructs Net::XMPP not to add an <code class="Li">xmlns=''</code> attribute
+            to the XML for the child object.</dd>
+<dt id="specify_name-key"><a class='permalink' href='#specify_name-key'>specify_name</a> <code class="Li">=&gt; 1</code></dt>
+<dd>Enables specifying the tag name when calling <code class="Li">NewChild(&quot;ns&quot;,&quot;tag&quot;)</code>.
+            The author considers this bad practice, suggesting that the tag of
+            a child object should be known and that attributes or CDATA
+            should be used to modify stanza types instead. It is strongly
+            advised not to use this option.</dd>
+<dt id="tag-key"><a class='permalink' href='#tag-key'>tag</a></dt>
+<dd>If <code class="Ix">specify_name</code> is used, this option defines the default
+            tag name. It is also advised not to use this.</dd>
+</dl>
+<p class="Pp">The <code class="Ix">calls</code> argument is an array reference that
+    specifies which functions should be generated for this name. For most types
+    above, you will get <code class="Li">Get</code>, <code class="Li">Set</code>,
+    <code class="Li">Defined</code>, and <code class="Li">Remove</code>. For child types, you
+    need to decide how your API should look and specify them yourself, for
+    example:</p>
+<pre>
+  [&quot;Get&quot;,&quot;Defined&quot;]
+  [&quot;Add&quot;]
+  [&quot;Get&quot;,&quot;Add&quot;,&quot;Defined&quot;]
+</pre>
+<p class="Pp">This choice depends on the desired API design.</p>
+<p class="Pp">Once more... The following:</p>
+<pre>
+  &amp;add_ns(ns    =&gt; &quot;mynamespace&quot;,
+          tag   =&gt; &quot;mytag&quot;,
+          xpath =&gt; {
+                    JID       =&gt; { type=&gt;'jid', path =&gt; '@jid' },
+                    Username  =&gt; { path =&gt; 'username/text()' },
+                    Test      =&gt; { type =&gt; 'master' }
+                   }
+         );
+</pre>
+<p class="Pp">generates the following API calls:</p>
+<pre>
+  GetJID()
+  SetJID()
+  DefinedJID()
+  RemoveJID()
+  GetUsername()
+  SetUsername()
+  DefinedUsername()
+  RemoveUsername()
+  GetTest()
+  SetTest()
+  DefinedTest()
+  RemoveTest()</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Wrap_Up'><a class='permalink' href='#Wrap_Up'>Wrap Up</a></h1>
+<p class="Pp">Hopefully, this documentation has not deterred you from writing a
+    custom namespace for your application and utilizing Net::XMPP. Please refer to
+    the <code class="Nm">Net::XMPP::Protocol</code> manpage for an example of how to
+    use the <code class="Ix">add_ns()</code> function to register your custom
+    namespace, enabling Net::XMPP to handle it correctly.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTHOR</a></h1>
+<p class="Pp">Originally authored by Ryan Eatmon.</p>
+<p class="Pp">Previously maintained by Eric Hacker.</p>
+<p class="Pp">Currently maintained by Darian Anthony Patrick.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT'><a class='permalink' href='#COPYRIGHT'>COPYRIGHT</a></h1>
+<p class="Pp">This module is free software, you can redistribute it and/or
+    modify it under the LGPL 2.1.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Package information:</p>
+    <dl>
+        <dt>Package name:</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-net-xmpp/">extra/perl-net-xmpp</a></dd>
+        <dt>Version:</dt>
+        <dd>1.05-12</dd>
+        <dt>Upstream:</dt>
+        <dd><a href="https://search.cpan.org/dist/Net-XMPP">https://search.cpan.org/dist/Net-XMPP</a></dd>
+        <dt>Licenses:</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuals:</dt>
+        <dd><a href="/listing/extra/perl-net-xmpp/">/listing/extra/perl-net-xmpp/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table of contents</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NAME</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#AUTHOR">AUTHOR</a></li>
+        
+            <li><a href="#COPYRIGHT">COPYRIGHT</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Other formats:
+        
+            <a href="/man/Net::XMPP::Namespaces.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/Net::XMPP::Namespaces.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>The website is available under the terms of the <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               license, except for the contents of the manual pages, which have their own license
+               specified in the corresponding Arch Linux package.
+            </p>
+        </footer>
+    </body>
+</html>

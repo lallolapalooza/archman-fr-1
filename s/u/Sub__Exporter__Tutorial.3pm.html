@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Sub::Exporter::Tutorial(3pm) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Sub__Exporter__Tutorial(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-sub-exporter/">perl-sub-exporter</a></p>
+<p class="lic">Licences: PerlArtistic, GPL</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Sub::Exporter::Tutorial(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">Sub::Exporter::Tutorial(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Sub::Exporter::Tutorial - un guide convivial pour exporter avec
+    Sub::Exporter</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VERSION'><a class='permalink' href='#VERSION'>VERSION</a></h1>
+<p class="Pp">version 0.991</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='Qu&apos;est-ce_qu&apos;un_Exporter_?_(Qu&apos;est-ce_qu&apos;un_exportateur_?)'><a class='permalink' href='#Qu&apos;est-ce_qu&apos;un_Exporter_?_(Qu&apos;est-ce_qu&apos;un_exportateur_?)'>Qu'est-ce qu'un Exporter ?</a></h2>
+<p class="Pp">Lorsque vous <span class="Li">&quot;utilisez&quot;</span> un module,
+    il est d'abord requis, puis sa méthode <span class="Li">&quot;import&quot;</span>
+    est appelée. La documentation Perl nous indique que les deux lignes suivantes
+    sont équivalentes :</p>
+<pre>use Module LIST;
+BEGIN { require Module; Module-&gt;import(LIST); }</pre>
+<p class="Pp">La méthode nommée <span class="Li">&quot;import&quot;</span> est
+    l'<span class="Li">&quot;exporter&quot;</span> du module, elle exporte des
+    fonctions et des variables dans l'espace de noms de son appelant.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Les_bases_de_Sub::Exporter'><a class='permalink' href='#Les_bases_de_Sub::Exporter'>Les bases de Sub::Exporter</a></h2>
+<p class="Pp">Sub::Exporter construit un exportateur personnalisé qui peut ensuite
+    être installé dans votre module. Il construit cette méthode basée sur la
+    configuration passée à sa méthode <span class="Li">&quot;setup_exporter&quot;</span>.</p>
+<p class="Pp">Un cas d'utilisation très basique pourrait ressembler à ceci :</p>
+<pre>package Addition;
+use Sub::Exporter;
+Sub::Exporter::setup_exporter({ exports =&gt; [ qw(plus) ]});
+sub plus { my ($x, $y) = @_; return $x + $y; }</pre>
+<p class="Pp">Cela signifierait que lorsque quelqu'un utilise votre module
+    Addition, il pourrait avoir sa routine <span class="Li">&quot;plus&quot;</span>
+    importée dans son propre package :</p>
+<pre>use Addition qw(plus);
+my $z = plus(2, 2); # cela fonctionne, car plus est maintenant dans le package principal</pre>
+<p class="Pp">La syntaxe pour configurer l'exportateur, ci-dessus, est un peu
+    verbeuse, donc pour le cas simple de simplement nommer quelques exportations,
+    vous pouvez écrire ceci :</p>
+<pre>use Sub::Exporter -setup =&gt; { exports =&gt; [ qw(plus) ] };</pre>
+<p class="Pp">...ce qui est identique à l'exemple original -- sauf que maintenant
+    l'exportateur est construit et installé au moment de la compilation. Eh bien,
+    et vous avez tapé moins.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Utilisation_des_groupes_d&apos;exportation'><a class='permalink' href='#Utilisation_des_groupes_d&apos;exportation'>Utilisation des groupes d'exportation</a></h2>
+<p class="Pp">Vous pouvez spécifier des groupes entiers d'éléments qui devraient
+    être exportables ensemble. Ce sont des groupes. L'exportateur les appelle des
+    tags. Pour spécifier des groupes, vous passez simplement une clé
+    <span class="Li">&quot;groups&quot;</span> dans la configuration de votre
+    exportateur :</p>
+<pre>package Food;
+use Sub::Exporter -setup =&gt; {
+  exports =&gt; [ qw(apple banana beef fluff lox rabbit) ],
+  groups  =&gt; {
+    fauna  =&gt; [ qw(beef lox rabbit) ],
+    flora  =&gt; [ qw(apple banana) ],
+  }
+};</pre>
+<p class="Pp">Maintenant, pour importer toute cette délicieuse viande étrangère,
+    votre consommateur n'a qu'à écrire :</p>
+<pre>use Food qw(:fauna);
+use Food qw(-fauna);</pre>
+<p class="Pp">L'une ou l'autre des options ci-dessus est acceptable. Un deux-points
+    est plus traditionnel, mais les barewords avec un deux-points initial ne peuvent
+    pas être mis entre guillemets par une flèche grasse. Nous verrons pourquoi
+    cela est important plus tard.</p>
+<p class="Pp">Les groupes peuvent contenir d'autres groupes. Si vous incluez un
+    nom de groupe (avec le trait d'union ou les deux-points initial) dans une
+    définition de groupe, il sera développé récursivement lorsque l'exportateur
+    sera appelé. L'exportateur ne récursera pas dans le même groupe deux fois
+    lors de l'expansion des groupes.</p>
+<p class="Pp">Il existe deux groupes spéciaux : <span class="Li">&quot;all&quot;</span>
+    et <span class="Li">&quot;default&quot;</span>. Le groupe
+    <span class="Li">&quot;all&quot;</span> est défini pour vous et contient toutes
+    les sous-routines exportables. Vous pouvez le redéfinir, si vous souhaitez
+    exporter seulement un sous-ensemble lorsque toutes les exportations sont
+    demandées. Le groupe <span class="Li">&quot;default&quot;</span> est
+    l'ensemble des routines à exporter lorsque rien de spécifique n'est demandé.
+    Par défaut, il n'y a pas de groupe <span class="Li">&quot;default&quot;</span>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Renommer_vos_importations'><a class='permalink' href='#Renommer_vos_importations'>Renommer vos importations</a></h2>
+<p class="Pp">Parfois, vous voulez importer quelque chose, mais vous n'aimez pas le
+    nom sous lequel il est importé. Sub::Exporter peut renommer vos importations
+    pour vous. Si vous vouliez importer <span class="Li">&quot;lox&quot;</span>
+    du package Food, mais que vous n'aimiez pas le nom, vous pourriez écrire ceci
+    :</p>
+<pre>use Food lox =&gt; { -as =&gt; 'salmon' };</pre>
+<p class="Pp">Maintenant, vous obtiendriez la routine <span class="Li">&quot;lox&quot;</span>,
+    mais elle serait appelée <span class="Li">salmon</span> dans votre package. Vous
+    pouvez également renommer des groupes entiers en utilisant l'option
+    <span class="Li">&quot;prefix&quot;</span> :</p>
+<pre>use Food -fauna =&gt; { -prefix =&gt; 'cute_little_' };</pre>
+<p class="Pp">Maintenant, vous pouvez appeler votre routine
+    <span class="Li">&quot;cute_little_rabbit&quot;</span>. (Vous pouvez aussi
+    appeler <span class="Li">&quot;cute_little_beef&quot;</span>, mais cela semble
+    à peine aussi attrayant.)</p>
+<p class="Pp">Lorsque vous définissez des groupes, vous pouvez inclure le renommage.</p>
+<pre>use Sub::Exporter -setup =&gt; {
+  exports =&gt; [ qw(apple banana beef fluff lox rabbit) ],
+  groups  =&gt; {
+    fauna  =&gt; [ qw(beef lox), rabbit =&gt; { -as =&gt; 'coney' } ],
+  }
+};</pre>
+<p class="Pp">Un préfixe sur un groupe comme celui-ci fait ce qu'il faut. C'est là
+    qu'il est utile d'utiliser un trait d'union au lieu de deux-points pour indiquer
+    un groupe : vous pouvez placer une flèche grasse entre le groupe et ses
+    arguments, alors.</p>
+<pre>use Food -fauna =&gt; { -prefix =&gt; 'lovely_' };
+eat( lovely_coney ); # cela fonctionne</pre>
+<p class="Pp">Les préfixes s'appliquent également récursivement. Cela signifie que ce
+    code fonctionne :</p>
+<pre>use Sub::Exporter -setup =&gt; {
+  exports =&gt; [ qw(apple banana beef fluff lox rabbit) ],
+  groups  =&gt; {
+    fauna   =&gt; [ qw(beef lox), rabbit =&gt; { -as =&gt; 'coney' } ],
+    allowed =&gt; [ -fauna =&gt; { -prefix =&gt; 'willing_' }, 'banana' ],
+  }
+};
+...
+use Food -allowed =&gt; { -prefix =&gt; 'any_' };
+$dinner = any_willing_coney; # miam !</pre>
+<p class="Pp">Les groupes peuvent également recevoir un argument
+    <span class="Li">&quot;-suffix&quot;</span>.</p>
+<p class="Pp">Enfin, si l'argument <span class="Li">&quot;-as&quot;</span>
+    pour une routine exportée est une référence à un scalaire, une référence à la
+    routine sera placée dans ce scalaire.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Construire_des_sous-routines_à_la_demande'><a class='permalink' href='#Construire_des_sous-routines_à_la_demande'>Construire des sous-routines à la demande</a></h2>
+<p class="Pp">Parfois, vous voulez exporter des choses que vous n'avez pas sous la
+    main. Vous pourriez vouloir offrir des routines personnalisées construites
+    selon les spécifications de votre consommateur ; c'est juste une bonne
+    gestion ! Avec Sub::Exporter, c'est facile.</p>
+<p class="Pp">Pour offrir des sous-routines à la demande, vous devez fournir un
+    générateur lorsque vous configurez votre exportateur. Un générateur est juste
+    une routine qui retourne une nouvelle routine. perlref parle de ceux-ci
+    lorsqu'il discute des fermetures et des modèles de fonction. L'exemple canonique
+    d'un générateur construit un incrémenteur unique ; voici comment vous feriez
+    cela avec Sub::Exporter ;</p>
+<pre>package Package::Counter;
+use Sub::Exporter -setup =&gt; {
+  exports =&gt; [ counter =&gt; sub { my $i = 0; sub { $i++ } } ],
+  groups  =&gt; { default =&gt; [ qw(counter) ] },
+};</pre>
+<p class="Pp">Maintenant, n'importe qui peut utiliser votre module
+    Package::Counter et il recevra un <span class="Li">&quot;counter&quot;</span>
+    dans son package. Il comptera jusqu'à un, et n'interférera jamais avec le
+    compteur de quiconque.</p>
+<p class="Pp">Ce n'est cependant pas très utile, à moins que le consommateur ne
+    puisse expliquer ce qu'il veut. Ceci est fait, en partie, en fournissant des
+    arguments lors de l'importation. L'exemple suivant montre comment un générateur
+    peut prendre et utiliser des arguments :</p>
+<pre>package Package::Counter;
+sub _build_counter {
+  my ($class, $name, $arg) = @_;
+  $arg ||= {};
+  my $i = $arg-&gt;{start} || 0;
+  return sub { $i++ };
+}
+use Sub::Exporter -setup =&gt; {
+  exports =&gt; [ counter =&gt; \'_build_counter' ],
+  groups  =&gt; { default =&gt; [ qw(counter) ] },
+};</pre>
+<p class="Pp">Maintenant, le consommateur peut (s'il le souhaite) spécifier une
+    valeur de départ pour son compteur :</p>
+<pre>use Package::Counter counter =&gt; { start =&gt; 10 };</pre>
+<p class="Pp">Les arguments d'un groupe sont transmis aux générateurs des routines
+    de ce groupe, mais les arguments de Sub::Exporter -- tout ce qui commence par un
+    trait d'union -- ne sont jamais transmis. Lorsque les groupes sont imbriqués,
+    les arguments sont fusionnés lorsque les groupes sont développés.</p>
+<p class="Pp">Remarquez également que dans l'exemple ci-dessus, nous avons donné
+    une référence à un *nom* de méthode plutôt qu'à une *implémentation* de
+    méthode. En donnant le nom plutôt que la sous-routine, nous permettons aux
+    sous-classes de notre module &quot;Package::Counter&quot; de remplacer la
+    méthode <span class="Li">&quot;_build_counter&quot;</span>.</p>
+<p class="Pp">Lorsqu'un générateur est appelé, il reçoit quatre paramètres :</p>
+<ul class="Bl-bullet">
+  <li>l'invocant sur lequel l'exportateur a été appelé</li>
+  <li>le nom de l'exportation en cours de génération (pas le nom sous lequel elle
+      est installée)</li>
+  <li>les arguments fournis pour la routine</li>
+  <li>la collection d'arguments génériques</li>
+</ul>
+<p class="Pp">Le quatrième élément est la dernière caractéristique majeure qui n'a
+    pas été abordée.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Collecteurs_d&apos;arguments'><a class='permalink' href='#Collecteurs_d&apos;arguments'>Collecteurs d'arguments</a></h2>
+<p class="Pp">Les collecteurs d'arguments sont des routines qui prennent les arguments
+    qui leur sont passés, et qui les retournent dans un format qui leur convient.
+    Ils sont particulièrement utiles lorsque vous avez affaire à des générateurs,
+    car ils vous permettent de spécifier des arguments qui seront ensuite passés
+    au générateur.</p>
+<p class="Pp">Voici comment vous pourriez créer un générateur qui construit un
+    compteur, mais qui permet à l'utilisateur de spécifier à la fois la valeur de
+    départ et l'incrément :</p>
+<pre>package Package::Counter;
+sub _build_counter {
+  my ($class, $name, $args) = @_;
+  $args ||= {};
+  my $start = $args-&gt;{start} || 0;
+  my $step  = $args-&gt;{step}  || 1;
+  return sub {
+    my $current = $start;
+    $start += $step;
+    return $current;
+  };
+}
+sub _collect_args {
+  my ($class, $name, @args) = @_;
+  my $hashref;
+  if (@args == 1 &amp;&amp; ref $args[0] eq 'HASH') {
+    $hashref = $args[0];
+  } else {
+    $hashref = { map { $_ =&gt; 1 } @args };
+  }
+  return $hashref;
+}
+use Sub::Exporter -setup =&gt; {
+  exports =&gt; [
+    counter =&gt; {
+      generator =&gt; \'_build_counter',
+      collector =&gt; \'_collect_args',
+    },
+  ],
+  groups =&gt; { default =&gt; [ qw(counter) ] },
+};</pre>
+<p class="Pp">Maintenant, l'utilisateur peut spécifier l'incrément :</p>
+<pre>use Package::Counter counter =&gt; { start =&gt; 10, step =&gt; 3 };
+my @nums = map { counter() } 1 .. 5; # (10, 13, 16, 19, 22)</pre>
+<p class="Pp">Le collecteur d'arguments est également appelé lorsque des groupes
+    sont utilisés. Si vous avez un groupe qui utilise des arguments, ces arguments
+    sont d'abord passés au collecteur d'arguments du groupe, puis transmis au
+    collecteur d'arguments de chaque routine du groupe.</p>
+<p class="Pp">Les arguments génériques sont également collectés. Ceux-ci sont
+    stockés dans la quatrième clé de l'argument, et sont transmis aux générateurs
+    des routines.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Arguments_génériques'><a class='permalink' href='#Arguments_génériques'>Arguments génériques</a></h2>
+<p class="Pp">Les arguments génériques sont des arguments qui ne sont pas destinés à
+    une routine spécifique, mais à l'exportateur dans son ensemble. Ils sont
+    identifiés par un trait d'union initial, et ils sont collectés avant que les
+    arguments destinés à des routines spécifiques ne soient traités.</p>
+<p class="Pp">Voici un exemple :</p>
+<pre>package MyExporter;
+use Sub::Exporter -setup =&gt; {
+  exports =&gt; [
+    foo =&gt; sub { print "foo\n" },
+    bar =&gt; sub { print "bar\n" },
+  ],
+  groups =&gt; {
+    all =&gt; [ qw(foo bar) ],
+    default =&gt; [ qw(foo) ],
+  },
+};
+</pre>
+<p class="Pp">Dans cet exemple, vous pouvez importer
+    <span class="Li">&quot;foo&quot;</span> et
+    <span class="Li">&quot;bar&quot;</span> comme ceci :</p>
+<pre>use MyExporter qw(:all);</pre>
+<p class="Pp">Ou simplement <span class="Li">&quot;foo&quot;</span> :</p>
+<pre>use MyExporter;</pre>
+<p class="Pp">Les arguments génériques sont particulièrement utiles lorsque vous
+    utilisez des groupes imbriqués. Par exemple, si vous aviez un groupe appelé
+    <span class="Li">&quot;utils&quot;</span> qui incluait
+    <span class="Li">&quot;foo&quot;</span> et
+    <span class="Li">&quot;bar&quot;</span>, vous pourriez les importer tous les deux
+    comme ceci :</p>
+<pre>use MyExporter -utils =&gt; { -prefix =&gt; 'my_' };</pre>
+<p class="Pp">Les arguments génériques sont transmis aux générateurs des routines
+    via le quatrième argument. Dans l'exemple ci-dessus, le générateur de
+    <span class="Li">&quot;foo&quot;</span> recevrait les arguments génériques
+    <span class="Li">(-prefix =&gt; 'my_')</span>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXPORTS_AND_GROUPS'><a class='permalink' href='#EXPORTS_AND_GROUPS'>EXPORTATIONS ET GROUPES</a></h1>
+<p class="Pp">Voir la section DESCRIPTION.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTEUR</a></h1>
+<p class="Pp">Adam Kennedy &lt;adamk@cpan.org&gt;</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT_AND_LICENSE'><a class='permalink' href='#COPYRIGHT_AND_LICENSE'>DROITS D'AUTEUR ET LICENCE</a></h1>
+<p class="Pp">Ce module est distribué sous la licence Artistic License, la même
+    licence que Perl lui-même.</p>
+</section>
+</div>
+</section>
+                
+            </article>
+        </main>
+        <footer>
+            
+        </footer>
+    </body>
+</html>
+' href='#Argument_Collectors'>Collecteurs d'arguments</a></h2>
+<p class="Pp">Parfois, vous voudrez accepter des arguments une fois qu'ils pourront
+    être disponibles pour n'importe quelle sous-routine que vous allez exporter. Pour ce faire, vous
+    spécifiez des collecteurs, comme suit :</p>
+<pre>package Menu::Airline
+use Sub::Exporter -setup =&gt; {
+  exports =&gt;  ... ,
+  groups  =&gt;  ... ,
+  collectors =&gt; [ qw(allergies ethics) ],
+};</pre>
+<p class="Pp">Les collecteurs ressemblent à des exportations normales dans l'appel d'importation, mais ils
+    ne font rien d'autre que de collecter des données qui peuvent plus tard être transmises aux générateurs.
+    Si le module était utilisé comme suit :</p>
+<pre>use Menu::Airline allergies =&gt; [ qw(peanuts) ], ethics =&gt; [ qw(vegan) ];</pre>
+<p class="Pp">... le consommateur obtiendrait une salade. De plus, tous les générateurs seraient
+    transmis, en tant que quatrième argument, quelque chose comme ceci :</p>
+<pre>{ allerges =&gt; [ qw(peanuts) ], ethics =&gt; [ qw(vegan) ] }</pre>
+<p class="Pp">Les générateurs peuvent également avoir des arguments dans leur définition. Ceux-ci
+    doivent être des refs de code qui effectuent la validation des valeurs collectées. Ils sont
+    transmis la valeur de collecte et peuvent retourner vrai ou faux. S'ils retournent
+    faux, l'exportateur lèvera une exception.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Générer_de_nombreuses_routines_dans_une_seule_portée'><a class='permalink' href='#Générer_de_nombreuses_routines_dans_une_seule_portée'>Générer   de nombreuses routines dans une seule portée</a></h2>
+<p class="Pp">Parfois, il est utile d'avoir plusieurs routines générées dans une seule
+    portée. De cette façon, elles peuvent partager des données lexicales qui sont autrement inaccessibles.
+    Pour ce faire, vous pouvez fournir un générateur pour un groupe qui renvoie un hashref
+    de noms et de références de code. Ce générateur reçoit toutes les données habituelles,
+    et le groupe peut recevoir les arguments habituels
+    <span class="Li">&quot;-prefix&quot;</span> ou
+    <span class="Li">&quot;-suffix&quot;</span>.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Version_de_Perl'><a class='permalink' href='#Version_de_Perl'>Version   de Perl</a></h1>
+<p class="Pp">Cette bibliothèque devrait fonctionner sur les perls publiés même il y a longtemps. Elle
+    devrait fonctionner sur n'importe quelle version de perl publiée au cours des cinq dernières années.</p>
+<p class="Pp">Bien qu'elle puisse fonctionner sur des versions plus anciennes de perl, aucune garantie n'est faite que la version minimale requise ne sera pas augmentée. La version
+    peut être augmentée pour quelque raison que ce soit, et rien ne garantit que les correctifs seront
+    acceptés pour abaisser la version minimale requise de perl.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Voir_aussi'><a class='permalink' href='#Voir_aussi'>Voir   aussi</a></h1>
+<dl class="Bl-tag">
+  <dt>&#x2022;</dt>
+  <dd>Sub::Exporter pour une documentation complète et des références à d'autres
+    exportateurs</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Auteur'><a class='permalink' href='#Auteur'>Auteur</a></h1>
+<p class="Pp">Ricardo Signes &lt;cpan@semiotic.systems&gt;</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Copyright_et_licence'><a class='permalink' href='#Copyright_et_licence'>Copyright   et licence</a></h1>
+<p class="Pp">Ce logiciel est copyright (c) 2007 par Ricardo Signes.</p>
+<p class="Pp">C'est un logiciel libre ; vous pouvez le redistribuer et/ou le modifier
+    selon les mêmes termes que le système du langage de programmation Perl 5 lui-même.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page man" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-sub-exporter/">extra/perl-sub-exporter</a></dd>
+        <dt>Version :</dt>
+        <dd>0.991-3</dd>
+        <dt>En amont :</dt>
+        <dd><a href="https://metacpan.org/release/Sub-Exporter">https://metacpan.org/release/Sub-Exporter</a></dd>
+        <dt>Licences :</dt>
+        <dd>PerlArtistic, GPL</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-sub-exporter/">/listing/extra/perl-sub-exporter/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#VERSION">VERSION</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#Version_de_Perl">VERSION DE PERL</a></li>
+        
+            <li><a href="#Voir_aussi">VOIR AUSSI</a></li>
+        
+            <li><a href="#Auteur">AUTEUR</a></li>
+        
+            <li><a href="#Copyright_et_licence">COPYRIGHT ET LICENCE</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Sub::Exporter::Tutorial.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/Sub::Exporter::Tutorial.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

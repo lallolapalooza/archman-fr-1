@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Template::Manual::Internals(3pm) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Template__Manual__Internals(3pm)</h1>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Template::Manual::Internals(3)</td>
+    <td class="head-vol">Documentation des paquets contribués Perl</td>
+    <td class="head-rtitle">Template::Manual::Internals(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>Nom</a></h1>
+<p class="Pp">Template::Manual::Internals - Internes de Template Toolkit</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Introduction'><a class='permalink' href='#Introduction'>Introduction</a></h1>
+<p class="Pp">Cette section de la documentation est destinée aux développeurs qui souhaitent en savoir plus sur le fonctionnement interne de Template Toolkit afin de l'étendre ou de l'adapter à leurs besoins.</p>
+<p class="Pp">Si cela ne vous concerne pas, vous n'avez probablement pas besoin de lire ceci. Il n'y a pas de test après.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Outside_Looking_In'><a class='permalink' href='#Outside_Looking_In'>De l'extérieur vers l'intérieur</a></h1>
+<p class="Pp">Le module Template est simplement un module de façade qui crée et utilise un objet Template::Service et envoie le résultat là où vous le souhaitez (par défaut, &quot;STDOUT&quot; ou peut-être un fichier, une variable, etc.). Le module Apache::Template (disponible séparément sur CPAN) est une autre façade. Il crée un objet Template::Service::Apache, appelle les fonctions nécessaires et envoie le résultat à un objet Apache::Request correspondant.</p>
+<p class="Pp">Ces modules de façade servent en réalité uniquement à gérer les spécificités de l'environnement dans lequel ils sont utilisés. Le module Apache::Template, par exemple, gère les spécificités d'Apache::Request et la configuration via le fichier httpd.conf. Le module de façade régulier de Template gère le &quot;STDOUT&quot;, les références de variables, etc. Pour le reste, c'est Template::Service (ou une de ses dérivées) qui fait le travail.</p>
+<p class="Pp">Le module Template::Service offre un service de livraison de modèles de haute qualité, avec des fonctionnalités, un accord de niveau de service et une garantie de remboursement de 30 jours sans conditions. &quot;Passez un bon moment, tout le temps&quot;, telle est notre devise.</p>
+<p class="Pp">Au niveau inférieur de Template Toolkit, il y a beaucoup de détails complexes dont nous n'avons pas à nous soucier la plupart du temps. Des choses comme les modèles introuvables, les erreurs d'analyse, les exceptions non interceptées, les modules de plugins manquants ou les dépendances, etc. Le module Template::Service cache tout cela et donne une impression de simplicité de l'extérieur. Il offre des fonctionnalités supplémentaires telles que &quot;PRE_PROCESS&quot;, &quot;PROCESS&quot; et &quot;POST_PROCESS&quot;, ainsi que le mécanisme de gestion des erreurs via &quot;ERROR&quot;. Vous demandez au module de traiter un modèle, et il s'occupe de tout pour vous. Le module Template::Service::Apache va un peu plus loin, ajoutant quelques en-têtes supplémentaires à un objet Apache::Request, définissant quelques variables de modèle supplémentaires, et ainsi de suite.</p>
+<p class="Pp">En général, le travail d'un service est simplement une question de planification et d'attribution. Il reçoit une requête sous la forme d'un appel à sa méthode <b>process()</b> et planifie le modèle nommé spécifié comme argument, et potentiellement plusieurs autres modèles (<span class="Li">&quot;PRE_PROCESS&quot;</span>, etc.) à traiter dans l'ordre. Il ne traite pas réellement les modèles, mais appelle plutôt la méthode <b>process()</b> sur un objet Template::Context.</p>
+<p class="Pp">Template::Context est le moteur d'exécution de Template Toolkit - le module qui rassemble tout au niveau inférieur de Template Toolkit et qui effectue la majeure partie du travail, bien que par délégation créative à divers modules d'aide conviviaux.</p>
+<p class="Pp">Étant donné un nom de modèle (ou peut-être une référence à un scalaire ou un descripteur de fichier), la méthode <b>process()</b> du contexte doit charger et compiler, ou obtenir une copie mise en cache d'un modèle précédemment compilé, correspondant à ce nom. Il le fait en appelant une liste d'un ou plusieurs objets Template::Provider (les <span class="Li">&quot;LOAD_TEMPLATES&quot;</span> de la famille) qui peuvent s'engager avec un objet Template::Parser pour convertir les fichiers source en code Perl exécutable (mais nous y reviendrons plus tard).</p>
+<p class="Pp">Heureusement, toute cette complexité est cachée derrière une simple méthode <b>template()</b>. Vous l'appelez en passant un nom de modèle comme argument, et il renvoie un modèle compilé sous la forme d'un objet Template::Document, ou lance une exception.</p>
+<p class="Pp">Un Template::Document est un objet enveloppant léger autour d'une sous-routine Perl compilée d'un modèle. La classe implémente une méthode <b>process()</b> qui effectue un peu de nettoyage, puis appelle la sous-routine du modèle. Elle définit également les métadonnées du modèle (définies dans les directives <span class="Li">&quot;[% META</span> <span class="Li">... %]&quot;</span>) et possède une méthode <b>block()</b> qui renvoie une table de hachage de toute définition de <span class="Li">&quot;[% BLOCK xxxx %]&quot;</span> trouvée dans le code source du modèle.</p>
+<p class="Pp">Ainsi, le contexte obtient un modèle compilé via sa propre méthode <b>template()</b> et se prépare à le traiter. Il met d'abord à jour le stash (l'endroit où les variables de modèle sont définies - nous y reviendrons bientôt) pour définir toute définition de variable de modèle spécifiée comme deuxième argument par une référence à un tableau associatif. Il appelle ensuite la méthode <b>process()</b> du document, en passant une référence à lui-même, l'objet contexte, comme argument. Ce faisant, il se fournit lui-même comme un objet sur lequel les fonctions de code de modèle peuvent faire des rappels pour accéder aux ressources d'exécution et aux fonctionnalités de Template Toolkit.</p>
+<p class="Pp">Ce que nous voulons dire ici, c'est que non seulement vous recevez des appels de l'extérieur, c'est-à-dire ceux provenant du code utilisateur appelant la méthode <b>process()</b> sur un objet Template, mais aussi des appels de l'intérieur, c'est-à-dire ceux provenant des directives de modèle de la forme <span class="Li">&quot;[%
+PROCESS template %]&quot;</span>.</p>
+<p class="Pp">Avant de passer à cela, voici un diagramme simple de la structure des niveaux inférieurs de Template Toolkit, avec des annotations pseudo-code montrant une séquence d'invocation typique.</p>
+<pre> ,--------.
+ | Demandeur|     use Template;
+ `--------'     my $tt = Template-&gt;new( ... );
+      |         $tt-&gt;process($template, \%vars);
+      |                                                     Extérieur
+- - - | - - - - - - - - - - - - - - - - - - - - - - - - - - - - T T
+      |         package Template;                            Intérieur
+      V
++----------+    sub process($template, \%vars) {
+| Template |        $out = $self-&gt;SERVICE-&gt;process($template, $vars);
++----------+        print $out or send it to $self-&gt;OUTPUT;
+      |         }
+      |
+      |         package Template::Service;
+      |
+      |         sub process($template, \%vars) {
+      |             try {
++----------+            foreach $p in @self-&gt;PRE_PROCESS
+| Service  |                $self-&gt;CONTEXT-&gt;process($p, $vars);
++----------+
+      |                 $self-&gt;CONTEXT-&gt;process($template, $vars);
+      |
+      |                 foreach $p @self-&gt;POST_PROCESS
+      |                     $self-&gt;CONTEXT-&gt;process($p, $vars);
+      |             }
+      |             catch {
+      |                 $self-&gt;CONTEXT-&gt;process($self-&gt;ERROR);
+      |             }
+      |         }
+      |
+      V         package Template::Context;
++----------+
+| Contexte  |    sub process($template, \%vars) {
++----------+        # fetch compiled template
+      |             $template = $self-&gt;template($template)
+      |             # update stash
+      |             $self-&gt;STASH-&gt;update($vars);
+      |             # process template
+      |             $template-&gt;process($self)
+      |         }
+      V
++----------+    package Template::Document;
+| Document  |
++----------+    sub process($context) {
+                    $output = &amp;{ $self-&gt;BLOCK }($context);
+                }</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Inside_Looking_Out'><a class='permalink' href='#Inside_Looking_Out'>De l'intérieur vers l'extérieur</a></h1>
+<p class="Pp">Pour mieux comprendre ce qui se passe à ces niveaux inférieurs, nous devons examiner à quoi ressemble un modèle compilé. En fait, un modèle compilé n'est qu'une sous-routine Perl ordinaire. Voici un exemple très simple.</p>
+<pre>sub my_compiled_template {
+    return &quot;This is a compiled template.\n&quot;;
+}</pre>
+<p class="Pp">Vous ne le verrez pas ainsi à moins de l'avoir écrit vous-même, mais c'est tout à fait valide. Toutes les sous-routines d'un modèle ne doivent faire qu'une seule chose : renvoyer une sortie (qui peut être vide, bien sûr). Si, pour une raison quelconque, elles ne peuvent pas le faire, elles devraient lever une exception via la méthode <span class="Li">die()</span>.</p>
+<pre>sub my_todo_template {
+    die &quot;This template not yet implemented\n&quot;;
+}</pre>
+<p class="Pp">Si vous voulez être plus créatif, vous pouvez lever une exception sous la forme d'un objet <span class="Li">Template::Exception</span>. Un objet d'exception est en fait un conteneur de calcul pour les champs <span class="Li">&quot;type&quot;</span> et <span class="Li">&quot;info&quot;</span>.</p>
+<pre>sub my_soliloquy_template {
+    die (Template::Exception-&gt;new('yorrick', 'Fellow of infinite jest'));
+}</pre>
+</section>
+</div>
+</section>
+
+            </article>
+            
+        </main>
+        
+    </body>
+</html>
+<section class="Sh">
+<h1 class="Sh" id='Template_Toolkit_Oversight'><a class='permalink' href='#Template_Toolkit_Oversight'>Supervision du Template Toolkit</a></h1>
+<p class="Pp">Vous êtes encouragé à apporter des modifications au Template Toolkit. Si vous trouvez un bug qui nécessite une correction, si vous avez une idée pour une fonctionnalité manquante ou si vous souhaitez traiter un élément de la liste TODO, n'hésitez pas à le faire !</p>
+<p class="Pp">Si vous envisagez quelque chose de non trivial, il est conseillé de soulever la question sur la liste de diffusion afin de comprendre l'état actuel des choses, de vérifier si quelqu'un y travaille déjà, et ainsi de suite.</p>
+<p class="Pp">Le référentiel de code du Template Toolkit est hébergé sur GitHub.</p>
+<a href='https://github.com/abw/Template2'>https://github.com/abw/Template2</a>
+<p class="Pp">Clonez le référentiel, apportez vos modifications, commitez-les, puis soumettez une demande de tirage (pull request).</p>
+<p class="Pp">Une fois que vous avez apporté vos modifications, n'oubliez pas de mettre à jour la suite de tests en ajoutant des tests supplémentaires à l'un des scripts existants dans le sous-répertoire <span class="Li">&quot;t&quot;</span>, ou en ajoutant un nouveau script de test. Et bien sûr, exécutez <span class="Li">&quot;make test&quot;</span> pour vous assurer que tous les tests passent avec votre nouveau code.</p>
+<p class="Pp">N'oubliez pas que tout fichier que vous ajoutez doit également figurer dans le MANIFEST. L'exécution de <span class="Li">&quot;make manifest&quot;</span> s'en chargera pour vous, mais vous devez vous assurer qu'aucun fichier temporaire n'y est également ajouté.</p>
+<p class="Pp">La documentation est souvent négligée, mais elle est aussi importante que le code. Si vous ajoutez un nouveau module, par exemple un module de plugin, il est acceptable d'inclure la documentation POD avec le module, mais <i>s'il vous plaît</i> écrivez-la dans un seul bloc à la fin du fichier, <i>après</i> le code (voir n'importe quel module <span class="Li">&quot;Template::*&quot;</span> pour un exemple). C'est un sujet religieux, bien que je sache que j'ai une forte aversion pour la documentation POD intercalée dans le code. À mon humble avis, cela rend à la fois le code et la documentation plus difficiles à lire (le même problème que l'inclusion de Perl dans du HTML).</p>
+<p class="Pp">Ensuite, ajoutez une ligne au fichier Changes décrivant brièvement ce que vous avez fait. Il n'est pas nécessaire d'entrer dans les détails ici (sauf pour le message de commit, les commentaires dans le code ou la documentation le cas échéant).</p>
+<p class="Pp">Vous devez également vous assurer d'ajouter votre nom au fichier <span class="Li">&quot;lib/Template/Manual/Credits.pod&quot;</span> (s'il n'y est pas déjà).</p>
+<p class="Pp">Ensuite, faites votre commit et soumettez une demande de tirage.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+<!DOCTYPE html>
+<html lang="fr">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Template::Manual::Internals - Template Toolkit Manual</title>
+        <link rel="stylesheet" href="/styles/main.css">
+        <link rel="stylesheet" href="/styles/man.css">
+    </head>
+    <body>
+        
+        <main>
+            <aside>
+                <details>
+    <summary>Contenu</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#Introduction">Introduction</a></li>
+        
+            <li><a href="#De_l_extérieur_vers_l_intérieur">De l'extérieur vers l'intérieur</a></li>
+        
+            <li><a href="#De_l_intérieur_vers_l_extérieur">De l'intérieur vers l'extérieur</a></li>
+        
+            <li><a href="#Hacking_sur_le_Template_Toolkit">Hacking sur le Template Toolkit</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats:
+        
+            <a href="/man/Template::Manual::Internals.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/Template::Manual::Internals.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+            <article>
+
+<h2 id="NOM">NOM</h2>
+<p>Template::Manual::Internals - Détails internes du Template Toolkit</p>
+
+<h2 id="Introduction">Introduction</h2>
+<p>Ce document décrit certaines des structures de données et des mécanismes internes utilisés par le Template Toolkit.</p>
+<p>Il est destiné aux programmeurs qui souhaitent étendre le comportement du moteur ou comprendre comment il fonctionne en interne.</p>
+
+<h2 id="De_l_extérieur_vers_l_intérieur">De l'extérieur vers l'intérieur</h2>
+<p>La plupart des interactions avec le Template Toolkit se font via l'objet <code class="inline">Template</code>.</p>
+<p>Les objets <code class="inline">Template::Context</code> sont utilisés pour stocker les configurations, les filtres, les variables, etc. Ils sont généralement créés et gérés par l'objet <code class="inline">Template</code>.</p>
+<p>Les objets <code class="inline">Template::Parser</code> sont responsables de l'analyse du code de template en une structure interne d'opérations ou de « blocs ».</p>
+<p>Les objets <code class="inline">Template::Provider</code> sont utilisés pour localiser et récupérer les fichiers de templates.</p>
+<p>Les objets <code class="inline">Template::Grammar</code> définissent la syntaxe du langage de template.</p>
+
+<h2 id="De_l_intérieur_vers_l_extérieur">De l'intérieur vers l'extérieur</h2>
+<p>Lorsqu'une directive <code class="inline">PROCESS</code> est rencontrée, l'objet <code class="inline">Template::Context</code> est responsable de l'invocation du bloc de code approprié.</p>
+<p>Le moteur utilise une approche basée sur des blocs pour le rendu. Les blocs peuvent être imbriqués les uns dans les autres.</p>
+<p>Les variables sont gérées dans des piles, ce qui permet un comportement de portée local.</p>
+
+<h2 id="Hacking_sur_le_Template_Toolkit">Hacking sur le Template Toolkit</h2>
+<p>Pour modifier le comportement du Template Toolkit, vous pouvez créer de nouveaux filtres, des variables, des fournisseurs, des analyseurs, des grammaires ou des blocs.</p>
+<p>Les nouveaux blocs peuvent être implémentés en tant que sous-classes de <code class="inline">Template::Block</code>.</p>
+<p>Les filtres peuvent être implémentés en tant que sous-classes de <code class="inline">Template::Filter</code>.</p>
+<p>Pour ajouter un nouveau fournisseur, vous devez implémenter la méthode <code class="inline">fetch()</code>.</p>
+<p>Consultez la documentation spécifique pour chaque composant pour plus de détails.</p>
+
+            </article>
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

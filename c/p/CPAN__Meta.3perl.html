@@ -1,0 +1,490 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>CPAN::Meta(3perl) — Pages manuelles d'Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">CPAN__Meta.3perl</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/core/x86_64/perl/">perl</a></p>
+<p class="lic">Licences: Artistic-1.0-Perl OR GPL-1.0-or-later</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">CPAN::Meta(3perl)</td>
+    <td class="head-vol">Guide de référence des programmeurs Perl</td>
+    <td class="head-rtitle">CPAN::Meta(3perl)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">CPAN::Meta - les métadonnées de distribution pour une dist CPAN</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VERSION'><a class='permalink' href='#VERSION'>VERSION</a></h1>
+<p class="Pp">version 2.150010</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>use v5.10;
+use strict;
+use warnings;
+use CPAN::Meta;
+use Module::Load;
+my $meta = CPAN::Meta-&gt;load_file('META.json');
+printf "testing requirements for %s version %s\n",
+$meta-&gt;name,
+$meta-&gt;version;
+my $prereqs = $meta-&gt;effective_prereqs;
+for my $phase ( qw/configure runtime build test/ ) {
+    say "Requirements for $phase:";
+    my $reqs = $prereqs-&gt;requirements_for($phase, "requires");
+    for my $module ( sort $reqs-&gt;required_modules ) {
+        my $status;
+        if ( eval { load $module unless $module eq 'perl'; 1 } ) {
+            my $version = $module eq 'perl' ? $] : $module-&gt;VERSION;
+            $status = $reqs-&gt;accepts_module($module, $version)
+                    ? "$version ok" : "$version not ok";
+        } else {
+            $status = "missing"
+        };
+        say "  $module ($status)";
+    }
+}</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Les distributions logicielles publiées sur le CPAN incluent un
+    <i>META.json</i> ou, pour les distributions plus anciennes, <i>META.yml</i>, qui
+    décrit la distribution, son contenu et les prérequis pour construire
+    et installer la distribution. La structure de données stockée dans le fichier
+    <i>META.json</i> est décrite dans CPAN::Meta::Spec.</p>
+<p class="Pp">CPAN::Meta fournit une classe simple pour représenter ces métadonnées
+    de distribution (ou <i>distmeta</i>), ainsi que quelques méthodes utiles pour
+    interroger ces données.</p>
+<p class="Pp">La documentation ci-dessous ne concerne que les méthodes de l'objet CPAN::Meta.
+    Pour des informations sur la signification des champs individuels, consultez la spécification.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='METHODS'><a class='permalink' href='#METHODS'>MÉTHODES</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='new'><a class='permalink' href='#new'>new</a></h2>
+<pre>my $meta = CPAN::Meta-&gt;new($distmeta_struct, \%options);</pre>
+<p class="Pp">Renvoie un objet CPAN::Meta valide ou meurt si la référence de hachage de métadonnées
+    fournie ne parvient pas à se valider. Les métadonnées au format plus ancien seront converties
+    en version 2 si elles se valident par rapport à la spécification originale déclarée.</p>
+<p class="Pp">Elle prend une référence de hachage facultative d'options. Les options valides
+  incluent :</p>
+<dl class="Bl-tag">
+  <dt>•</dt>
+  <dd>lazy_validation -- si vrai, new tentera de convertir les métadonnées données
+      en version 2 avant de tenter de les valider. Cela signifie que toute erreur corrigeable
+      sera gérée par CPAN::Meta::Converter avant la validation. (Notez
+      que cela peut entraîner la suppression silencieuse de données optionnelles invalides.)
+      La valeur par défaut est faux.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='create'><a class='permalink' href='#create'>create</a></h2>
+<pre>my $meta = CPAN::Meta-&gt;create($distmeta_struct, \%options);</pre>
+<p class="Pp">C'est la même chose que <span class="Li">new()</span>, sauf que les champs
+    <span class="Li">"generated_by"</span> et
+    <span class="Li">"meta-spec"</span> seront générés s'ils ne sont pas
+    fournis. Cela signifie que la structure de métadonnées est supposée suivre
+    par ailleurs la dernière version de CPAN::Meta::Spec.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='load_file'><a class='permalink' href='#load_file'>load_file</a></h2>
+<pre>my $meta = CPAN::Meta-&gt;load_file($distmeta_file, \%options);</pre>
+<p class="Pp">Étant donné un chemin vers un fichier contenant des métadonnées, cette méthode désérialise
+    le fichier selon son suffixe et construit un nouvel objet
+    <span class="Li">"CPAN::Meta"</span> , tout comme
+    <span class="Li">new()</span>. Elle meurt si la version désérialisée ne parvient pas
+    à se valider par rapport à sa version de spécification déclarée.</p>
+<p class="Pp">Elle prend les mêmes options que <span class="Li">new()</span> mais
+    <span class="Li">"lazy_validation"</span> vaut vrai par défaut.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='load_yaml_string'><a class='permalink' href='#load_yaml_string'>load_yaml_string</a></h2>
+<pre>my $meta = CPAN::Meta-&gt;load_yaml_string($yaml, \%options);</pre>
+<p class="Pp">Cette méthode renvoie un nouvel objet CPAN::Meta en utilisant le premier
+    document de la chaîne YAML donnée. À tous autres égards, elle est identique à
+    <span class="Li">load_file()</span>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='load_json_string'><a class='permalink' href='#load_json_string'>load_json_string</a></h2>
+<pre>my $meta = CPAN::Meta-&gt;load_json_string($json, \%options);</pre>
+<p class="Pp">Cette méthode renvoie un nouvel objet CPAN::Meta en utilisant la structure
+    représentée par la chaîne JSON donnée. À tous autres égards, elle est identique à
+    <span class="Li">load_file()</span>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='load_string'><a class='permalink' href='#load_string'>load_string</a></h2>
+<pre>my $meta = CPAN::Meta-&gt;load_string($string, \%options);</pre>
+<p class="Pp">Si vous ne savez pas si une chaîne contient du YAML ou du JSON, cette méthode
+    utilisera Parse::CPAN::Meta pour deviner. À tous autres égards, elle est identique à
+    <span class="Li">load_file()</span>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='save'><a class='permalink' href='#save'>save</a></h2>
+<pre>$meta-&gt;save($distmeta_file, \%options);</pre>
+<p class="Pp">Sérialise l'objet en JSON et l'écrit dans le fichier donné. La
+    seule option valide est <span class="Li">"version"</span>, qui
+    vaut '2' par défaut. Sur Perl 5.8.1 ou ultérieur, le fichier est enregistré avec l'encodage
+    UTF-8.</p>
+<p class="Pp">Pour <span class="Li">"version"</span> 2 (ou supérieure), le nom de fichier
+    doit se terminer par '.json'. JSON::PP est le backend JSON par défaut. Utiliser
+    un autre backend JSON nécessite JSON 2.5 ou ultérieur et vous devez définir
+    <span class="Li">$ENV{PERL_JSON_BACKEND}</span> sur un backend alternatif pris en charge
+    comme JSON::XS.</p>
+<p class="Pp">Pour <span class="Li">"version"</span> inférieure à 2, le nom de fichier
+    doit se terminer par '.yml'. CPAN::Meta::Converter est utilisé pour générer une
+    structure de métadonnées plus ancienne, qui est sérialisée en YAML. CPAN::Meta::YAML est
+    le backend YAML par défaut. Vous pouvez définir
+    <span class="Li">$ENV{PERL_YAML_BACKEND}</span> sur un backend alternatif pris en charge,
+    bien que cela ne soit pas recommandé en raison d'incompatibilités subtiles
+    entre les analyseurs YAML sur le CPAN.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='meta_spec_version'><a class='permalink' href='#meta_spec_version'>meta_spec_version</a></h2>
+<p class="Pp">Cette méthode renvoie la partie version de l'entrée
+    <span class="Li">"meta_spec"</span> dans la structure distmeta.
+    Elle est équivalente à :</p>
+<pre>$meta-&gt;meta_spec-&gt;{version};</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='effective_prereqs'><a class='permalink' href='#effective_prereqs'>effective_prereqs</a></h2>
+<pre>my $prereqs = $meta-&gt;effective_prereqs;
+my $prereqs = $meta-&gt;effective_prereqs( \@feature_identifiers );</pre>
+<p class="Pp">Cette méthode renvoie un objet CPAN::Meta::Prereqs décrivant tous
+    les prérequis de la distribution. Si une référence de tableau d'identifiants de fonctionnalités est
+    donnée, les prérequis des fonctionnalités identifiées sont fusionnés avec les
+    prérequis principaux de la distribution avant que l'objet CPAN::Meta::Prereqs ne soit
+    renvoyé.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='should_index_file'><a class='permalink' href='#should_index_file'>should_index_file</a></h2>
+<pre>... if $meta-&gt;should_index_file( $filename );</pre>
+<p class="Pp">Cette méthode renvoie vrai si le fichier donné doit être indexé. Elle
+    décide cela en vérifiant les clés <span class="Li">"file"</span> et
+    <span class="Li">"directory"</span> dans la propriété
+    <span class="Li">"no_index"</span> de la structure distmeta.
+    Notez que ni le format de version ni
+    <span class="Li">"release_status"</span> ne sont pris en compte.</p>
+<p class="Pp"><span class="Li">$filename</span> doit être donné au format unix.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='should_index_package'><a class='permalink' href='#should_index_package'>should_index_package</a></h2>
+<pre>... if $meta-&gt;should_index_package( $package );</pre>
+<p class="Pp">Cette méthode renvoie vrai si le paquet donné doit être indexé.
+    Elle décide cela en vérifiant les clés <span class="Li">"package"</span>
+    et <span class="Li">"namespace"</span> dans la propriété
+    <span class="Li">"no_index"</span> de la structure distmeta.
+    Notez que ni le format de version ni
+    <span class="Li">"release_status"</span> ne sont pris en compte.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='features'><a class='permalink' href='#features'>features</a></h2>
+<pre>my @feature_objects = $meta-&gt;features;</pre>
+<p class="Pp">Cette méthode renvoie une liste d'objets CPAN::Meta::Feature, un pour
+    chaque fonctionnalité optionnelle décrite par les métadonnées de la distribution.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='feature'><a class='permalink' href='#feature'>feature</a></h2>
+<pre>my $feature_object = $meta-&gt;feature( $identifier );</pre>
+<p class="Pp">Cette méthode renvoie un objet CPAN::Meta::Feature pour la fonctionnalité
+    optionnelle avec l'identifiant donné. Si aucune fonctionnalité avec cet identifiant
+    n'existe, une une exception sera levée.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='as_struct'><a class='permalink' href='#as_struct'>as_struct</a></h2>
+<pre>my $copy = $meta-&gt;as_struct( \%options );</pre>
+<p class="Pp">Cette méthode retourne une copie profonde des métadonnées de l'objet sous
+    forme d'une référence de hachage non bénie. Elle prend une référence de hachage
+    optionnelle d'options. Si la référence de hachage contient un <span class="Li">"version"</span> argument, les métadonnées copiées seront converties vers la version de la
+    spécification et retournées. Par exemple :</p>
+<pre>my $old_spec = $meta-&gt;as_struct( {version =&gt; "1.4"} );</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='as_string'><a class='permalink' href='#as_string'>as_string</a></h2>
+<pre>my $string = $meta-&gt;as_string( \%options );</pre>
+<p class="Pp">Cette méthode retourne une copie sérialisée des métadonnées de l'objet sous
+    forme d'une chaîne de caractères. (Les chaînes ne sont <b>pas</b> encodées en UTF-8.) Elle prend une référence de hachage
+    optionnelle d'options. Si la référence de hachage contient un
+    <span class="Li">"version"</span> argument, les métadonnées copiées seront converties vers la version de la
+    spécification et retournées. Par exemple :</p>
+<pre>my $string = $meta-&gt;as_string( {version =&gt; "1.4"} );</pre>
+<p class="Pp">Pour une <span class="Li">"version"</span> supérieure ou égale à 2, la chaîne sera sérialisée en JSON. Pour une
+    <span class="Li">"version"</span> inférieure à 2, la chaîne sera sérialisée en YAML. Dans les deux cas, les
+    mêmes règles sont suivies que dans la
+    <span class="Li">save()</span> méthode pour choisir un
+  backend de sérialisation.</p>
+<p class="Pp">La structure sérialisée inclura une entrée
+    <span class="Li">"x_serialization_backend"</span> donnant le
+    paquet et la version utilisés pour la sérialisation. Toute clé existante dans
+    l'objet
+    <span class="Li">$meta</span> donné sera écrasée.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='STRING_DATA'><a class='permalink' href='#STRING_DATA'>DONNÉES   DE   TYPE   CHAÎNE</a></h1>
+<p class="Pp">Les méthodes suivantes retournent une valeur unique, qui est la valeur
+    pour l'entrée correspondante dans la structure distmeta. Les valeurs doivent
+    être soit undef soit des chaînes.</p>
+<ul class="Bl-bullet">
+  <li>abstract</li>
+  <li>description</li>
+  <li>dynamic_config</li>
+  <li>generated_by</li>
+  <li>name</li>
+  <li>release_status</li>
+  <li>version</li>
+</ul>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='LIST_DATA'><a class='permalink' href='#LIST_DATA'>DONNÉES   DE   TYPE   LISTE</a></h1>
+<p class="Pp">Ces méthodes retournent des listes de valeurs de chaînes, qui peuvent être
+    représentées dans la structure distmeta comme des références de tableau ou des
+    scalaires :</p>
+<ul class="Bl-bullet">
+  <li>authors</li>
+  <li>keywords</li>
+  <li>licenses</li>
+</ul>
+<p class="Pp">Les méthodes <span class="Li">"authors"</span> et
+    <span class="Li">"licenses"</span> peuvent aussi être appelées comme
+    <span class="Li">"author"</span> et
+    <span class="Li">"license"</span>, respectivement, pour correspondre au
+    nom de champ dans la structure distmeta.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MAP_DATA'><a class='permalink' href='#MAP_DATA'>DONNÉES   DE   TYPE   TABLE   DE   HACHAGE</a></h1>
+<p class="Pp">Ces accesseurs retournent des références de hachage de structures de
+    données arbitraires non bénies, chacune décrite plus en détail dans la
+    spécification :</p>
+<ul class="Bl-bullet">
+  <li>meta_spec</li>
+  <li>resources</li>
+  <li>provides</li>
+  <li>no_index</li>
+  <li>prereqs</li>
+  <li>optional_features</li>
+</ul>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CUSTOM_DATA'><a class='permalink' href='#CUSTOM_DATA'>DONNÉES   PERSONNALISÉES</a></h1>
+<p class="Pp">Une liste de clés personnalisées est disponible via la méthode
+    <span class="Li">"custom_keys"</span> et des clés particulières
+    peuvent être récupérées avec la <span class="Li">"custom"</span>
+  méthode.</p>
+<pre>say $meta-&gt;custom($_) for $meta-&gt;custom_keys;</pre>
+<p class="Pp">Si une clé personnalisée fait référence à une structure de données, une
+    copie profonde est retournée.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BUGS'><a class='permalink' href='#BUGS'>BOGUES</a></h1>
+<p class="Pp">Veuillez signaler tout bogue ou fonctionnalité via le CPAN Request Tracker.
+    Les bogues peuvent être soumis via l'interface web à
+    <a href='http://rt.cpan.org/Dist/Display.html?Queue=CPAN-Meta'>http://rt.cpan.org/Dist/Display.html?Queue=CPAN-Meta</a></p>
+<p class="Pp">Lors de la soumission d'un bogue ou d'une demande, veuillez inclure un fichier
+    de test ou un correctif à un fichier de test existant qui illustre le bogue ou
+  la fonctionnalité souhaitée.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR   AUSSI</a></h1>
+<ul class="Bl-bullet">
+  <li>CPAN::Meta::Converter</li>
+  <li>CPAN::Meta::Validator</li>
+</ul>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SUPPORT'><a class='permalink' href='#SUPPORT'>SUPPORT</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='Bugs_/_Feature_Requests'><a class='permalink' href='#Bugs_/_Feature_Requests'>Bogues   /   Demandes   de   fonctionnalités</a></h2>
+<p class="Pp">Veuillez signaler tout bogue ou demande de fonctionnalités via le suivi des
+    problèmes à <a href='https://github.com/Perl-Toolchain-Gang/CPAN-Meta/issues'>https://github.com/Perl-Toolchain-Gang/CPAN-Meta/issues</a>.
+    Vous serez notifié automatiquement de toute progression sur votre problème.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Source_Code'><a class='permalink' href='#Source_Code'>Code   source</a></h2>
+<p class="Pp">Ceci est un logiciel libre. Le dépôt de code est disponible pour
+    examen public et contribution selon les termes de la licence.</p>
+<p class="Pp"><a href='https://github.com/Perl-Toolchain-Gang/CPAN-Meta'>https://github.com/Perl-Toolchain-Gang/CPAN-Meta</a></p>
+<pre>git clone https://github.com/Perl-Toolchain-Gang/CPAN-Meta.git</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHORS'><a class='permalink' href='#AUTHORS'>AUTEURS</a></h1>
+<ul class="Bl-bullet">
+  <li>David Golden &lt;dagolden@cpan.org&gt;</li>
+  <li>Ricardo Signes &lt;rjbs@cpan.org&gt;</li>
+  <li>Adam Kennedy &lt;adamk@cpan.org&gt;</li>
+</ul>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CONTRIBUTORS'><a class='permalink' href='#CONTRIBUTORS'>CONTRIBUTEURS</a></h1>
+<ul class="Bl-bullet">
+  <li>Ansgar Burchardt &lt;ansgar@cpan.org&gt;</li>
+  <li>Avar Arnfjord Bjarmason &lt;avar@cpan.org&gt;</li>
+  <li>Benjamin Noggle &lt;agwind@users.noreply.github.com&gt;</li>
+  <li>Christopher J. Madsen &lt;cjm@cpan.org&gt;</li>
+  <li>Chuck Adams &lt;cja987@gmail.com&gt;</li>
+  <li>Cory G Watson &lt;gphat@cpan.org&gt;</li>
+  <li>Damyan Ivanov &lt;dam@cpan.org&gt;</li>
+  <li>David Golden &lt;xdg@xdg.me&gt;</li>
+  <li>Eric Wilhelm &lt;ewilhelm@cpan.org&gt;</li>
+  <li>Graham Knop &lt;haarg@haarg.org&gt;</li>
+  <li>Gregor Hermann &lt;gregoa@debian.org&gt;</li>
+  <li>Karen Etheridge &lt;ether@cpan.org&gt;</li>
+  <li>Kenichi Ishigaki &lt;ishigaki@cpan.org&gt;</li>
+  <li>Kent Fredric &lt;kentfredric@gmail.com&gt;</li>
+  <li>Ken Williams &lt;kwilliams@cpan.org&gt;</li>
+  <li>Lars Dieckow &lt;daxim@cpan.org&gt;</li>
+  <li>Leon Timmermans &lt;leont@cpan.org&gt;</li>
+  <li>majensen &lt;maj@fortinbras.us&gt;</li>
+  <li>Mark Fowler &lt;markf@cpan.org&gt;</li>
+  <li>Matt S Trout &lt;mst@shadowcat.co.uk&gt;</li>
+  <li>Michael G. Schwern &lt;mschwern@cpan.org&gt;</li>
+  <li>Mohammad S Anwar &lt;mohammad.anwar@yahoo.com&gt;</li>
+  <li>mohawk2 &lt;mohawk2@users.noreply.github.com&gt;</li>
+  <li>moznion &lt;moznion@gmail.com&gt;</li>
+  <li>Niko Tyni &lt;ntyni@debian.org&gt;</li>
+  <li>Olaf Alders &lt;olaf@wundersolutions.com&gt;</li>
+  <li>Olivier Mengué &lt;dolmen@cpan.org&gt;</li>
+  <li>Randy Sims &lt;randys@thepierianspring.org&gt;</li>
+  <li>Tomohiro Hosaka &lt;bokutin@bokut.in&gt;</li>
+</ul>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT_AND_LICENSE'><a class='permalink' href='#COPYRIGHT_AND_LICENSE'>DROITS   D'AUTEUR   ET   LICENCE</a></h1>
+<p class="Pp">Ce logiciel est copyright (c) 2010 par David Golden, Ricardo
+    Signes, Adam Kennedy et les contributeurs.</p>
+<p class="Pp">Ceci est un logiciel libre ; vous pouvez le redistribuer et/ou le modifier
+    selon les mêmes termes que le système de langage de programmation Perl 5 lui-même.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-13</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/core/x86_64/perl/">core/perl</a></dd>
+        <dt>Version :</dt>
+        <dd>5.42.0-1</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://www.perl.org">https://www.perl.org</a></dd>
+        <dt>Licences :</dt>
+        <dd>Artistic-1.0-Perl OR GPL-1.0-or-later</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/core/perl/">/listing/core/perl/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#VERSION">VERSION</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#METHODS">MÉTHODES</a></li>
+        
+            <li><a href="#STRING_DATA">DONNÉES DE TYPE CHAÎNE</a></li>
+        
+            <li><a href="#LIST_DATA">DONNÉES DE TYPE LISTE</a></li>
+        
+            <li><a href="#MAP_DATA">DONNÉES DE TYPE TABLE DE HACHAGE</a></li>
+        
+            <li><a href="#CUSTOM_DATA">DONNÉES PERSONNALISÉES</a></li>
+        
+            <li><a href="#BUGS">BOGUES</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+            <li><a href="#SUPPORT">SUPPORT</a></li>
+        
+            <li><a href="#AUTHORS">AUTEURS</a></li>
+        
+            <li><a href="#CONTRIBUTORS">CONTRIBUTEURS</a></li>
+        
+            <li><a href="#COPYRIGHT_AND_LICENSE">DROITS D'AUTEUR ET LICENCE</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/CPAN::Meta.3perl.en.txt">txt</a>, 
+        
+            <a href="/man/CPAN::Meta.3perl.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible selon les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               , sauf pour le contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

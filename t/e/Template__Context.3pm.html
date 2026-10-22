@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Template::Context(3) — Pages man d'Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Template__Context(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/perl-template-toolkit/">perl-template-toolkit</a></p>
+<p class="lic">Licences: PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Template::Context(3)</td>
+    <td class="head-vol">Documentation soumise par les utilisateurs de Perl</td>
+    <td class="head-rtitle">Template::Context(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">Template::Context - Contexte en temps réel dans lequel les modèles sont traités</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPIS</a></h1>
+<pre>use Template::Context;
+# constructeur
+$context = Template::Context-&gt;new(\%config)
+    || die $Template::Context::ERROR;
+# récupérer (charger et compiler) un modèle
+$template = $context-&gt;template($template_name);
+# récupérer (charger et instancier) un objet plugin
+$plugin = $context-&gt;plugin($name, \@args);
+# récupérer (retourner ou créer) une sous-routine de filtre
+$filter = $context-&gt;filter($name, \@args, $alias);
+# traiter/inclure un modèle, les erreurs sont lancées via die()
+$output = $context-&gt;process($template, \%vars);
+$output = $context-&gt;include($template, \%vars);
+# lancer une exception via die()
+$context-&gt;throw($error_type, $error_message, \$output_buffer);
+# attraper une exception, la nettoyer et corriger le tampon de sortie
+$exception = $context-&gt;catch($exception, \$output_buffer);
+# sauvegarder/restaurer le stash pour effectuer la localisation des variables
+$new_stash = $context-&gt;localise(\%vars);
+$old_stash = $context-&gt;delocalise();
+# ajouter de nouvelles définitions BLOCK ou FILTER
+$context-&gt;define_block($name, $block);
+$context-&gt;define_filter($name, \&amp;filtersub, $is_dynamic);
+# réinitialiser le contexte, en effaçant toutes les définitions BLOCK importées
+$context-&gt;reset();
+# méthodes pour accéder aux éléments internes
+$stash     = $context-&gt;stash();
+$tflag     = $context-&gt;trim();
+$epflag    = $context-&gt;eval_perl();
+$providers = $context-&gt;templates();
+$providers = $context-&gt;plugins();
+$providers = $context-&gt;filters();
+...</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Le module Template::Context définit une classe d'objets pour représenter un contexte en temps réel dans lequel les modèles sont traités. Il fournit une interface aux opérations fondamentales du moteur de traitement de modèles Template Toolkit, par laquelle les modèles compilés (c'est-à-dire le code Perl construit à partir du code source du modèle) peuvent être traités, les plugins et filtres chargés, les exceptions lancées, etc.</p>
+<p class="Pp">Un objet Template::Context par défaut est créé via le module Template. Toute option de Template::Context peut être transmise au constructeur <b>new()</b> du module Template et sera transmise à la classe du constructeur Template::Context.</p>
+<pre>use Template;
+my $template = Template-&gt;new({
+    TRIM      =&gt; 1,
+    EVAL_PERL =&gt; 1,
+    BLOCKS    =&gt; {
+        header =&gt; 'Ceci est l\'en-tête',
+        footer =&gt; 'Ceci est le pied de page',
+    },
+});</pre>
+<p class="Pp">De même, le constructeur Template::Context transmettra tous les paramètres de configuration à d'autres objets par défaut (par exemple, Template::Provider, Template::Plugins, Template::Filters, etc.) qu'il peut instancier.</p>
+<pre>$context = Template::Context-&gt;new({
+    INCLUDE_PATH =&gt; '/home/abw/templates', # option du fournisseur
+    TAG_STYLE    =&gt; 'html',                # option de l'analyseur
+});</pre>
+<p class="Pp">Un objet Template::Context (ou son héritage) peut être instancié explicitement et transmis au constructeur <b>new()</b> du module Template comme paramètre <span class="Li">CONTEXT</span>.</p>
+<pre>use Template;
+use Template::Context;
+my $context  = Template::Context-&gt;new({ TRIM =&gt; 1 });
+my $template = Template-&gt;new({ CONTEXT =&gt; $context });</pre>
+<p class="Pp">Le module Template utilise la méthode usine <b>context()</b> du module Template::Config pour créer un objet contexte par défaut lorsqu'il en a besoin. Le paramètre de variable <span class="Li">$Template::Config::CONTEXT</span> peut être spécifié pour désigner un module de contexte alternatif. Ce module sera chargé automatiquement et le constructeur <b>new()</b> du module sera appelé pour <b>context()</b> lorsqu'un objet contexte par défaut est nécessaire.</p>
+<pre>use Template;
+$Template::Config::CONTEXT = 'MyOrg::Template::Context';
+my $template = Template-&gt;new({
+    EVAL_PERL   =&gt; 1,
+    EXTRA_MAGIC =&gt; 'red hot',  # vos éléments de configuration supplémentaires
+    ...
+});</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='METHODS'><a class='permalink' href='#METHODS'>MÉTHODES</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='new(\%params)'><a class='permalink' href='#new(\%params)'>new(\%params)</a></h2>
+<p class="Pp">La méthode constructeur <span class="Li">new()</span> est appelée pour instancier un objet Template::Context. Les paramètres de configuration peuvent être spécifiés sous forme de référence HASH ou de liste de paires <span class="Li">&quot;nom =&gt; valeur&quot;</span>.</p>
+<pre>my $context = Template::Context-&gt;new({
+    INCLUDE_PATH =&gt; 'header',
+    POST_PROCESS =&gt; 'footer',
+});
+my $context = Template::Context-&gt;new( EVAL_PERL =&gt; 1 );</pre>
+<p class="Pp">La méthode <span class="Li">new()</span> retourne un objet Template::Context ou <span class="Li">&quot;undef&quot;</span> en cas d'erreur. Dans ce dernier cas, un message d'erreur pertinent peut être récupéré via la méthode <b>error()</b> du module ou directement à partir de la variable <span class="Li">$Template::Context::ERROR</span>.</p>
+<pre>my $context = Template::Context-&gt;new(\%config)
+    || die Template::Context-&gt;error();
+my $context = Template::Context-&gt;new(\%config)
+    || die $Template::Context::ERROR;</pre>
+<p class="Pp">Les paramètres de configuration suivants peuvent être spécifiés. Veuillez consulter Template::Manual::Config pour plus de détails.</p>
+<p class="Pp"><i>VARIABLES</i></p>
+<p class="Pp">Le paramètre VARIABLES peut être utilisé pour spécifier un tableau de hachages de variables de modèle.</p>
+<pre>my $context = Template::Context-&gt;new({
+    VARIABLES =&gt; {
+        title   =&gt; 'Une page de démonstration',
+        author  =&gt; 'Joe Bidon',
+        version =&gt; 3.14,
+    },
+});</pre>
+<p class="Pp"><i>BLOCKS</i></p>
+<p class="Pp">Le paramètre BLOCKS peut être utilisé pour pré-définir un ensemble de blocs de modèles par défaut.</p>
+<pre>my $context = Template::Context-&gt;new({
+    BLOCKS =&gt; {
+        header  =&gt; 'L\'en-tête. [% title %]',
+        footer  =&gt; sub { return $some_output_text },
+        another =&gt; Template::Document-&gt;new({ ... }),
+    },
+});</pre>
+<p class="Pp"><i>VIEWS</i></p>
+<p class="Pp">Le paramètre VIEWS peut être utilisé pour pré-définir un ou plusieurs objets Template::View.</p>
+<pre>my $context = Template::Context-&gt;new({
+    VIEWS =&gt; [
+        bottom =&gt; { prefix =&gt; 'bottom/' },
+        middle =&gt; { prefix =&gt; 'middle/', base =&gt; 'bottom' },
+        top    =&gt; { prefix =&gt; 'top/',    base =&gt; 'middle' },
+    ],
+});</pre>
+<p class="Pp"><i>TRIM</i></p>
+<p class="Pp">Le paramètre TRIM peut être utilisé pour supprimer les espaces blancs de début et de fin de tous les résultats de fichiers modèles et de <span class="Li">&quot;BLOCK&quot;</span>.</p>
+<p class="Pp">exemple:</p>
+<pre>[% BLOCK foo %]
+Ligne 1 de foo
+[% END %]
+avant
+[% INCLUDE foo %]
+après</pre>
+<p class="Pp">sortie:</p>
+<pre>avant
+Ligne 1 de foo
+après</pre>
+<p class="Pp"><i>EVAL_PERL</i></p>
+<p class="Pp">Le paramètre EVAL_PERL est utilisé pour indiquer si les blocs <span class="Li">&quot;PERL&quot;</span> et/ou <span class="Li">&quot;RAWPERL&quot;</span> doivent être évalués. Il est désactivé par défaut.</p>
+<p class="Pp"><i>RECURSION</i></p>
+<p class="Pp">Le paramètre RECURSION peut être utilisé pour permettre aux modèles de se traiter récursivement, directement (par exemple, le modèle <span class="Li">&quot;foo&quot;</span> appelle <span class="Li">&quot;INCLUDE foo&quot;</span>) ou indirectement (par exemple, le modèle <span class="Li">&quot;foo&quot;</span> appelle <span class="Li">&quot;INCLUDE bar&quot;</span> qui appelle <span class="Li">&quot;INCLUDE foo&quot;</span>).</p>
+<p class="Pp"><i>LOAD_TEMPLATES</i></p>
+<p class="Pp">Le paramètre LOAD_TEMPLATES peut être utilisé pour spécifier une référence à une liste d'objets Template::Provider ou de leurs sous-classes qui sont responsables du chargement et de la compilation des modèles.</p>
+<pre>my $context = Template::Context-&gt;new({
+    LOAD_TEMPLATES =&gt; [
+        MyOrg::Template::Provider-&gt;new({ ... }),
+        Template::Provider-&gt;new({ ... }),
+    ],
+});</pre>
+<p class="Pp"><i>LOAD_PLUGINS</i></p>
+<p class="Pp">Le paramètre LOAD_PLUGINS peut être utilisé pour spécifier une liste d'objets fournisseurs responsables du chargement et de l'instanciation des objets plugins de modèle.</p>
+<pre>my $context = Template::Context-&gt;new({
+    LOAD_PLUGINS =&gt; [
+        MyOrg::Template::Plugins-&gt;new({ ... }),
+        Template::Plugins-&gt;new({ ... }),
+    ],
+});</pre>
+<p class="Pp"><i>LOAD_FILTERS</i></p>
+<p class="Pp">Le paramètre LOAD_FILTERS peut être utilisé pour spécifier une liste d'objets fournisseurs responsables de retourner et/ou de créer des fonctions de filtre.</p>
+<pre>my $context = Template::Context-&gt;new({
+    LOAD_FILTERS =&gt; [
+        MyTemplate::Filters-&gt;new(),
+        Template::Filters-&gt;new(),
+    ],
+});</pre>
+<p class="Pp"><i>STASH</i></p>
+<p class="Pp">Le paramètre STASH peut être utilisé pour spécifier un objet Template::Stash ou sa sous-classe qui est responsable de la gestion des variables de modèle.</p>
+<pre>my $stash = MyOrg::Template::Stash-&gt;new({ ... });
+my $context = Template::Context-&gt;new({
+    STASH =&gt; $stash,
+});</pre>
+<p class="Pp"><i>DEBUG</i></p>
+<p class="Pp">Le paramètre DEBUG peut être utilisé pour activer diverses fonctionnalités de débogage du module Template::Context.</p>
+``` 
+
+</section>
+</main>
+</body>
+</html>
+use Template::Constants qw( :debug );
+my $template = Template-&gt;new({
+    DEBUG =&gt; DEBUG_CONTEXT | DEBUG_DIRS,
+});</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='template($name)'><a class='permalink' href='#template($name)'>template($name)</a></h2>
+<p class="Pp">Retourne un modèle compilé en interrogeant chaque fournisseur de LOAD_TEMPLATES
+    (instances de Template::Provider, ou sous-classe) à tour de rôle.</p>
+<pre>$template = $context-&gt;template('header');</pre>
+<p class="Pp">En cas d'erreur, un objet Template::Exception de type
+    '<span class="Li">&quot;file&quot;</span>' est levé via
+    <span class="Li">die()</span>. Ceci peut être intercepté en entourant l'appel à
+    <span class="Li">template()</span> dans un bloc
+    <span class="Li">&quot;eval&quot;</span> et en examinant
+    <span class="Li">$@</span>.</p>
+<pre>eval { $template = $context-&gt;template('header') };
+if ($@) {
+    print &quot;échec de récupération du modèle : $@\n&quot;;
+}</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='plugin($name,_\@args)'><a class='permalink' href='#plugin($name,_\@args)'>plugin($name,   \@args)</a></h2>
+<p class="Pp">Instancie un objet plugin en interrogeant chaque fournisseur de LOAD_PLUGINS.
+    Le fournisseur par défaut pour LOAD_PLUGINS est un objet Template::Plugins qui tente
+    de charger des modules plugins, conformément aux divers éléments de configuration tels que PLUGIN_BASE,
+    LOAD_PERL, etc., puis instancie un objet via <b>new()</b>. Une référence à une liste d'arguments de constructeur peut
+    être passée comme deuxième paramètre. Ceux-ci sont transmis au constructeur du plugin.</p>
+<p class="Pp">Retourne une référence vers un plugin (qui est généralement un objet, mais pas nécessairement).
+    Les erreurs sont levées sous forme d'objets Template::Exception avec le type défini à '<span class="Li">&quot;plugin&quot;</span>'.</p>
+<pre>$plugin = $context-&gt;plugin('DBI', 'dbi:msql:mydbname');</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='filter($name,_\@args,_$alias)'><a class='permalink' href='#filter($name,_\@args,_$alias)'>filter($name,   \@args, $alias)</a></h2>
+<p class="Pp">Instancie une sous-routine de filtre en interrogeant les fournisseurs de LOAD_FILTERS.
+    Le fournisseur par défaut pour LOAD_FILTERS est un objet Template::Filters.</p>
+<p class="Pp">Des arguments supplémentaires peuvent être passés par référence de liste ainsi qu'un alias optionnel
+    sous lequel le filtre sera mis en cache pour une utilisation ultérieure. Le filtre est mis en cache sous son propre
+    <span class="Li">$name</span> si <span class="Li">$alias</span> est indéfini. Les appels ultérieurs à
+    <span class="Li">filter($name)</span> retourneront l'entrée mise en cache, si elle est définie. La spécification d'arguments contourne le mécanisme de mise en cache et crée toujours un nouveau filtre. Les erreurs sont levées sous forme d'objets Template::Exception avec le type défini à '<span class="Li">&quot;filter&quot;</span>'.</p>
+<pre># filtre statique (aucun argument)
+$filter = $context-&gt;filter('html');
+# filtre dynamique (arguments) aliasé en 'padright'
+$filter = $context-&gt;filter('format', '%60s', 'padright');
+# récupère le filtre précédent via l'alias 'padright'
+$filter = $context-&gt;filter('padright');</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='process($template,_\%vars)'><a class='permalink' href='#process($template,_\%vars)'>process($template,   \%vars)</a></h2>
+<p class="Pp">Traite un modèle nommé ou référencé par le premier paramètre et retourne la sortie générée.
+    Une référence optionnelle à un tableau associatif peut être passée comme deuxième paramètre, contenant des définitions de variables qui seront définies avant le traitement du modèle. Le modèle est traité dans le contexte actuel, sans aucune localisation de variables effectuée. Les erreurs sont levées sous forme d'objets Template::Exception via <span class="Li">die()</span>.</p>
+<pre>$output = $context-&gt;process('header', { title =&gt; 'Hello World' });</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='include($template,_\%vars)'><a class='permalink' href='#include($template,_\%vars)'>include($template,   \%vars)</a></h2>
+<p class="Pp">Similaire à <b>process()</b>, mais utilise des variables localisées.
+    Les modifications apportées aux variables ne persisteront que jusqu'à ce que la méthode
+    <span class="Li">include()</span> soit terminée.</p>
+<pre>$output = $context-&gt;include('header', { title =&gt; 'Hello World' });</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='insert($template)'><a class='permalink' href='#insert($template)'>insert($template)</a></h2>
+<p class="Pp">Cette méthode retourne le contenu source d'un fichier modèle sans effectuer d'évaluation.
+    Elle est utilisée pour implémenter la directive
+    <span class="Li">&quot;INSERT&quot;</span>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='throw($error_type,_$error_message,_\$output)'><a class='permalink' href='#throw($error_type,_$error_message,_\$output)'>throw($error_type,   $error_message, \$output)</a></h2>
+<p class="Pp">Lève une exception sous la forme d'un objet Template::Exception en appelant
+    <span class="Li">die()</span>. Cette méthode peut recevoir une référence à un objet Template::Exception existant ; une seule valeur contenant un message d'erreur utilisée pour instancier un Template::Exception de type
+    '<span class="Li">&quot;undef&quot;</span>' ; ou une paire de valeurs
+    représentant le <span class="Li">&quot;type&quot;</span> et l'<span class="Li">&quot;info&quot;</span> de l'exception à partir desquels un objet Template::Exception est instancié. Par exemple :</p>
+<pre>$context-&gt;throw($exception);
+$context-&gt;throw(&quot;Je suis désolé Dave, je ne peux pas faire ça&quot;);
+$context-&gt;throw('denied', &quot;Je suis désolé Dave, je ne peux pas faire ça&quot;);</pre>
+<p class="Pp">Le troisième paramètre optionnel peut être une référence vers le tampon de sortie actuel.
+    Celui-ci est ensuite stocké dans l'objet exception lors de sa création, permettant au capteur d'examiner et d'utiliser la sortie jusqu'au point où l'exception a été levée.</p>
+<pre>$output .= 'blah blah blah';
+$output .= 'more rhubarb';
+$context-&gt;throw('yack', 'Trop de bavardages', \$output);</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='catch($exception,_\$output)'><a class='permalink' href='#catch($exception,_\$output)'>catch($exception,   \$output)</a></h2>
+<p class="Pp">Intercepte une exception levée, soit comme une référence à un objet Template::Exception,
+    soit comme une autre valeur. Dans ce dernier cas, la chaîne d'erreur est promue en objet Template::Exception de type
+    '<span class="Li">&quot;undef&quot;</span>'. Cette méthode accepte également une référence vers le tampon de sortie actuel qui est passée au constructeur Template::Exception, ou est ajoutée au tampon de sortie stocké dans un objet Template::Exception existant, si unique (c'est-à-dire pas la même référence). Par ce processus, l'état correct du tampon de sortie peut être reconstruit pour des lancements simples ou imbriqués.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='define_block($name,_$block)'><a class='permalink' href='#define_block($name,_$block)'>define_block($name,   $block)</a></h2>
+<p class="Pp">Ajoute une nouvelle définition de bloc au cache interne BLOCKS. Le premier argument doit contenir
+    le nom du bloc et le second une référence à un objet Template::Document ou une sous-routine de modèle, ou du texte de modèle qui est automatiquement compilé en une sous-routine de modèle.</p>
+<p class="Pp">Retourne une valeur vraie (la sous-routine ou la référence Template::Document) en cas de succès ou undef en cas d'échec. Le message d'erreur pertinent peut être récupéré en appelant la méthode <b>error()</b>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='define_filter($name,_\&amp;amp;filter,_$is_dynamic)'><a class='permalink' href='#define_filter($name,_\&amp;amp;filter,_$is_dynamic)'>define_filter($name,   \&amp;filter, $is_dynamic)</a></h2>
+<p class="Pp">Ajoute une nouvelle définition de filtre en appelant la méthode <b>store()</b> sur chaque fournisseur LOAD_FILTERS jusqu'à acceptation (dans le cas habituel, elle est acceptée immédiatement par le seul fournisseur Template::Filters). Le premier argument doit contenir le nom du filtre et le second une référence à une sous-routine de filtre. Le troisième argument optionnel peut être défini à toute valeur vraie pour indiquer que la sous-routine est une fabrique de filtre dynamique.</p>
+<p class="Pp">Retourne une valeur vraie ou lève une exception
+    '<span class="Li">&quot;filter&quot;</span>' en cas d'erreur.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='define_vmethod($type,_$name,_$code)'><a class='permalink' href='#define_vmethod($type,_$name,_$code)'>define_vmethod($type,   $name, $code)</a></h2>
+<p class="Pp">Cette méthode est un wrapper autour de la méthode <b>define_vmethod()</b> de Template::Stash. Elle peut être utilisée pour définir de nouvelles méthodes virtuelles.</p>
+<pre># définir une nouvelle méthode virtuelle scalaire (item)
+$context-&gt;define_vmethod(
+    item =&gt; ucfirst =&gt; sub {
+        my $text = shift;
+        return ucfirst $text;
+    }
+)</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='define_view($name,_\%params)'><a class='permalink' href='#define_view($name,_\%params)'>define_view($name,   \%params)</a></h2>
+<p class="Pp">Cette méthode vous permet de définir une vue nommée.</p>
+<pre>$context-&gt;define_view(
+    my_view =&gt; {
+        prefix =&gt; 'my_templates/'
+    }
+);</pre>
+<p class="Pp">La vue est ensuite accessible en tant que variable de modèle.</p>
+<pre>[% my_view.print(some_data) %]</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='define_views($views)'><a class='permalink' href='#define_views($views)'>define_views($views)</a></h2>
+<p class="Pp">Cette méthode vous permet de définir plusieurs vues nommées. Une référence à un tableau associatif ou une référence de liste doit être passée comme argument.</p>
+<pre>$context-&gt;define_view({     # référence de tableau associatif
+    my_view_one =&gt; {
+        prefix =&gt; 'my_templates_one/'
+    },
+    my_view_two =&gt; {
+        prefix =&gt; 'my_templates_two/'
+    }
+});</pre>
+<p class="Pp">Si vous définissez plusieurs vues dont une ou plusieurs sont basées sur d'autres vues de la même définition, vous devriez les passer comme une référence de liste. Cela garantit qu'elles seront créées dans le bon ordre (Perl ne préserve pas l'ordre des éléments définis dans une référence de tableau associatif, vous ne pouvez donc pas garantir que votre classe de base de vue sera définie avant votre classe dérivée de vue).</p>
+<pre>$context-&gt;define_view([     # référence de liste
+    my_view_one =&gt; {
+        prefix =&gt; 'my_templates_one/'
+    },
+    my_view_two =&gt; {
+        prefix =&gt; 'my_templates_two/' ,
+        base   =&gt; 'my_view_one',
+    }
+]);</pre>
+<p class="Pp">Les vues sont ensuite accessibles en tant que variables de modèle.</p>
+<pre>[% my_view_one.print(some_data) %]
+[% my_view_two.print(some_data) %]</pre>
+<p class="Pp">Voir aussi l'option VIEWS.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>stash()</b></h2>
+<p class="Pp">Cette méthode retourne l'objet Template::Stash utilisé en interne pour gérer les variables de modèle.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='localise(\%vars)'><a class='permalink' href='#localise(\%vars)'>localise(\%vars)</a></h2>
+<p class="Pp">Clone le stash pour créer un contexte avec des variables localisées.
+    Retourne une référence vers le nouvel objet stash cloné qui est également stocké en interne.</p>
+<pre>$stash = $context-&gt;localise();</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>delocalise()</b></h2>
+<p class="Pp">Restaure le stash à son état antérieur à la localisation.</p>
+<pre>$stash = $context-&gt;delocalise();</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='visit(\%blocks)'><a class='permalink' href='#visit(\%blocks)'>visit(\%blocks)</a></h2>
+<p class="Pp">Cette méthode est appelée par les objets Template::Document immédiatement avant qu'ils ne traitent leur contenu. Elle est appelée pour enregistrer toutes les définitions locales de
+    <span class="Li">&quot;BLOCK&quot;</span> auprès de l'objet contexte afin qu'elles puissent être ultérieurement fournies sur demande.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>leave()</b></h2>
+<p class="Pp">Complément de la méthode <b>visit()</b>. Appelée par T</p>
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Template::Context(3pm)</title>
+    <meta name="generator" content="mandoc 1.30.0">
+    <meta name="robots" content="noindex">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    
+    <main>
+        <article>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NAME</a></h1>
+<p class="Pp">Template::Context - Context object for Template Toolkit</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>    use Template::Context;
+
+    # Create a context object
+    my $context = Template::Context-&gt;new(%config);
+
+    # Access configuration items
+    my $stash = $context-&gt;stash;
+    my $provider = $context-&gt;provider;
+    my $filters = $context-&gt;filters;
+
+    # Process a template
+    my $output = $template-&gt;process($filename, \%variables, $output_handle);
+
+    # Get a view object
+    my $view = $context-&gt;view();</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">The <span class="Li">Template::Context</span> object holds the
+    configuration and state information for the Template Toolkit processor. It is
+    passed around to all other objects involved in the processing of a template,
+    including the <span class="Li">Template::Stash</span>,
+    <span class="Li">Template::Provider</span>, <span class="Li">Template::Filters</span>
+    and <span class="Li">Template::Plugins</span> objects.</p>
+<p class="Pp">It is also responsible for managing the context-specific view,
+    which is typically a <span class="Li">Template::View</span> object.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='METHODS'><a class='permalink' href='#METHODS'>METHODS</a></h1>
+<section class="Ss">
+<h2 class="Ss"><b>new(%config)</b></h2>
+<p class="Pp">Creates a new <span class="Li">Template::Context</span> object.
+    The optional <span class="Li">%config</span> hash can contain any of the
+    configuration items supported by the constituent objects:</p>
+<dl class="Bl-tag">
+<dt><span class="Li">stash</span></dt>
+<dd>A <span class="Li">Template::Stash</span> object or configuration hash.</dd>
+<dt><span class="Li">provider</span></dt>
+<dd>A <span class="Li">Template::Provider</span> object or configuration hash.</dd>
+<dt><span class="Li">filters</span></dt>
+<dd>A <span class="Li">Template::Filters</span> object or configuration hash.</dd>
+<dt><span class="Li">plugins</span></dt>
+<dd>A <span class="Li">Template::Plugins</span> object or configuration hash.</dd>
+<dt><span class="Li">error</span></dt>
+<dd>A <span class="Li">Template::Exception</span> object to handle errors.</dd>
+<dt><span class="Li">virtual</span></dt>
+<dd>A flag to indicate if the context is virtual (i.e. not associated with a
+      real service).</dd>
+<dt><span class="Li">blocks</span></dt>
+<dd>A hash reference defining default <span class="Li">BLOCK</span> directives
+      to be compiled and stored internally.</dd>
+<dt><span class="Li">encoding</span></dt>
+<dd>The default output encoding.</dd>
+<dt><span class="Li">debug</span></dt>
+<dd>The debugging level (0-3).</dd>
+<dt><span class="Li">compat</span></dt>
+<dd>A hash reference of compatibility flags.</dd>
+<dt><span class="Li">loops</span></dt>
+<dd>A hash reference of loop variables.</dd>
+<dt><span class="Li">stack</span></dt>
+<dd>A stack object for managing template include/block calls.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>stash()</b></h2>
+<p class="Pp">Returns the <span class="Li">Template::Stash</span> object associated
+    with this context.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>provider()</b></h2>
+<p class="Pp">Returns the <span class="Li">Template::Provider</span> object
+    associated with this context.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>filters()</b></h2>
+<p class="Pp">Returns the <span class="Li">Template::Filters</span> object
+    associated with this context.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>plugins()</b></h2>
+<p class="Pp">Returns the <span class="Li">Template::Plugins</span> object
+    associated with this context.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>error()</b></h2>
+<p class="Pp">Returns the <span class="Li">Template::Exception</span> object
+    associated with this context.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>debug([$level])</b></h2>
+<p class="Pp">Gets or sets the debugging level for the context. The level can be
+    an integer from 0 (off) to 3 (verbose).</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>encoding([$encoding])</b></h2>
+<p class="Pp">Gets or sets the default output encoding for the context.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>compat( $flag, [@args] )</b></h2>
+<p class="Pp">Accesses compatibility flags. The behavior depends on the
+    <span class="Li">$flag</span> argument:</p>
+<dl class="Bl-tag">
+<dt><span class="Li">&quot;get&quot;</span></dt>
+<dd>Returns the value of the specified compatibility flag.</dd>
+<dt><span class="Li">&quot;set&quot;</span></dt>
+<dd>Sets the value of the specified compatibility flag.</dd>
+<dt><span class="Li">&quot;hash&quot;</span></dt>
+<dd>Returns a reference to the hash containing all compatibility flags.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>view()</b></h2>
+<p class="Pp">This method creates a Template::View object bound to the
+    context.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>reset()</b></h2>
+<p class="Pp">Clears the local BLOCKS cache of any
+    <span class="Li">&quot;BLOCK&quot;</span> definitions. Any initial set of
+    BLOCKS specified as a configuration item to the constructor will be
+    reinstated.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='debugging($flag,_@args)'><a class='permalink' href='#debugging($flag,_@args)'>debugging($flag,   @args)</a></h2>
+<p class="Pp">This method is used to control debugging output. It is used to
+    implement the DEBUG directive.</p>
+<p class="Pp">The first argument can be <span class="Li">&quot;on&quot;</span>
+    or <span class="Li">&quot;off&quot;</span> to enable or disable debugging
+    respectively. The numerical values <span class="Li">0</span> and
+    <span class="Li">1</span> can also be used if you prefer.</p>
+<pre>$context-&gt;debugging('on');</pre>
+<p class="Pp">Alternately, the first argument can be
+    <span class="Li">&quot;format&quot;</span> to define a new debug message
+    format. The second argument should be the format string which can contain
+    any of the <span class="Li">$file</span>, <span class="Li">$line</span> or
+    <span class="Li">$text</span> symbols to indicate where the relevant values
+    should be inserted.</p>
+<pre># note single quotes to prevent interpolated of variables
+$context-&gt;debugging( format =&gt; '## $file line $line: $text' );</pre>
+<p class="Pp">The final use of this method is to generate debugging messages
+    themselves. The first argument should be
+    <span class="Li">&quot;msg&quot;</span>, followed by a reference to a hash
+    array of value to insert into the debugging format string.</p>
+<pre>$context-&gt;debugging(
+    msg =&gt; {
+        line =&gt; 20,
+        file =&gt; 'example.tt',
+        text =&gt; 'Trampoline! Trampoline!',
+    }
+);</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='AUTOLOAD'><a class='permalink' href='#AUTOLOAD'>AUTOLOAD</a></h2>
+<p class="Pp">An <span class="Li">&quot;AUTOLOAD&quot;</span> method provides
+    access to context configuration items.</p>
+<pre>$stash     = $context-&gt;stash();
+$tflag     = $context-&gt;trim();
+$epflag    = $context-&gt;eval_perl();
+...</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTHOR</a></h1>
+<p class="Pp">Andy Wardley &lt;abw@wardley.org&gt;
+  <a href='http://wardley.org/'>http://wardley.org/</a></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT'><a class='permalink' href='#COPYRIGHT'>COPYRIGHT</a></h1>
+<p class="Pp">Copyright (C) 1996-2022 Andy Wardley. All Rights Reserved.</p>
+<p class="Pp">This module is free software; you can redistribute it and/or
+    modify it under the same terms as Perl itself.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>SEE   ALSO</a></h1>
+<p class="Pp">Template, Template::Document, Template::Exception,
+    Template::Filters, Template::Plugins, Template::Provider, Template::Service,
+    Template::Stash</p>
+</section>
+</article>
+<aside id="sidebar">
+
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Package information:</p>
+    <dl>
+        <dt>Package name:</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/perl-template-toolkit/">extra/perl-template-toolkit</a></dd>
+        <dt>Version:</dt>
+        <dd>3.102-3</dd>
+        <dt>Upstream:</dt>
+        <dd><a href="https://search.cpan.org/dist/Template-Toolkit/">https://search.cpan.org/dist/Template-Toolkit/</a></dd>
+        <dt>Licenses:</dt>
+        <dd>PerlArtistic</dd>
+        <dt>Manuals:</dt>
+        <dd><a href="/listing/extra/perl-template-toolkit/">/listing/extra/perl-template-toolkit/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table of contents</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NAME</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#METHODS">METHODS</a></li>
+        
+            <li><a href="#AUTHOR">AUTHOR</a></li>
+        
+            <li><a href="#COPYRIGHT">COPYRIGHT</a></li>
+        
+            <li><a href="#SEE_ALSO">SEE ALSO</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Other formats:
+        
+            <a href="/man/Template::Context.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/Template::Context.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+</aside>
+    </main>
+    <footer>
+        
+        <p>The website is available under the terms of the <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+           license, except for the contents of the manual pages, which have their own license
+           specified in the corresponding Arch Linux package.
+        </p>
+    </footer>
+</body>
+</html>

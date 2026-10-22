@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Type::Tiny::Manual::UsingWithOther(3pm) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Type__Tiny__Manual__UsingWithOther(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-type-tiny/">perl-type-tiny</a></p>
+<p class="lic">Licences: PerlArtistic, GPL</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Type::Tiny::Manual::UsingWithOther(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">Type::Tiny::Manual::UsingWithOther(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Type::Tiny::Manual::UsingWithOther - utiliser Type::Tiny avec
+    Class::InsideOut, Params::Check et Object::Accessor.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MANUEL'><a class='permalink' href='#MANUEL'>MANUEL</a></h1>
+<p class="Pp">L'équipe des antlers n'est pas la seule à proposer des boîtes à outils
+    de programmation orientée objet en Perl. Bien que Type::Tiny ait peut-être été
+    conçu avec Moose, Mouse et Moo à l'esprit, il peut être utilisé avec d'autres
+    boîtes à outils.</p>
+<p class="Pp">Ces boîtes à outils sont... eh bien... hmm... d'accord... elles
+    existent.</p>
+<p class="Pp">Si vous démarrez un nouveau projet, il y a très peu de raisons de ne
+    pas utiliser Class::Tiny, Moo ou Moose. Vous pouvez donc probablement sauter
+    cette partie de la documentation et passer directement à
+    Type::Tiny::Manual::UsingWithTestMore.</p>
+<section class="Ss">
+<h2 class="Ss" id='Class::InsideOut'><a class='permalink' href='#Class::InsideOut'>Class::InsideOut</a></h2>
+<p class="Pp">Vous avez besoin de Class::InsideOut 1.13 ou supérieur, qui prend en
+    charge les objets bénis et surchargés (y compris les contraintes de type
+    Type::Tiny) pour les options <span class="Li">&quot;get_hook&quot;</span> et
+    <span class="Li">&quot;set_hook&quot;</span>.</p>
+<pre>package Person {
+  use Class::InsideOut qw( public );
+  use Types::Standard qw( Str Int );
+  use Types::Common::Numeric qw( PositiveInt );
+  use Type::Params qw( signature_for );
+
+  # Les vérifications de type sont très faciles.
+  # Fournissez simplement le type comme hook de définition.
+  public name =&gt; my %_name, {
+    set_hook =&gt; Str,
+  };
+
+  # Définir un type qui convertit silencieusement les valeurs négatives
+  # en valeurs positives. C'est bête, mais ça fonctionne comme exemple !
+  my $Years = PositiveInt-&gt;plus_coercions(Int, q{ abs($_) });
+
+  # Les coercitions sont plus ennuyeuses, mais possibles.
+  public age =&gt; my %_age, {
+    set_hook =&gt; sub { $_ = $Years-&gt;assert_coerce($_) },
+  };
+
+  # La vérification des paramètres pour les méthodes est conforme aux attentes.
+  signature_for get_older =&gt; ( method =&gt; 1, positional =&gt; [ $Years ] );
+
+  sub get_older ( $self, $years ) {
+    $self-&gt;_set_age( $self-&gt;age + $years );
+  }
+}</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Params::Check_et_Object::Accessor'><a class='permalink' href='#Params::Check_et_Object::Accessor'>Params::Check et Object::Accessor</a></h2>
+<p class="Pp">La fonction <span class="Li">allow()</span> de Params::Check,
+    l'option <span class="Li">&quot;allow&quot;</span> de la fonction
+    <span class="Li">check()</span> de Params::Check, et le mécanisme de validation
+    des entrées pour Object::Accessor fonctionnent tous de la même manière, qui
+    est essentiellement une implémentation limitée en pur Perl de l'opérateur
+    de correspondance intelligente (smart match). Bien que cela ne prenne pas en
+    charge directement les contraintes de type Type::Tiny, cela prend en charge
+    les coderefs. Vous pouvez utiliser la méthode
+    <span class="Li">&quot;compiled_check&quot;</span> de Type::Tiny pour obtenir
+    un coderef approprié.</p>
+<p class="Pp">Exemple Param::Check :</p>
+<pre>my $tmpl = {
+  name =&gt; { allow =&gt; Str-&gt;compiled_check },
+  age  =&gt; { allow =&gt; Int-&gt;compiled_check },
+};
+check($tmpl, { name =&gt; &quot;Bob&quot;, age =&gt; 32 })
+  or die Params::Check::last_error();</pre>
+<p class="Pp">Exemple Object::Accessor :</p>
+<pre>my $obj = Object::Accessor-&gt;new;
+$obj-&gt;mk_accessors(
+  { name =&gt; Str-&gt;compiled_check },
+  { age  =&gt; Int-&gt;compiled_check },
+);</pre>
+<p class="Pp"><i>Mise en garde :</i> Object::Accessor ne déclenche pas d'erreur
+    lorsqu'une valeur ne respecte pas sa contrainte de type ; il affiche plutôt un
+    avertissement sur STDERR. Ce comportement peut être modifié en réglant
+    <span class="Li">&quot;$Object::Accessor::FATAL = 1&quot;</span>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Class::Struct'><a class='permalink' href='#Class::Struct'>Class::Struct</a></h2>
+<p class="Pp">C'est une preuve de concept sur la façon dont Type::Tiny peut être utilisé
+    pour contraindre les attributs de Class::Struct. Il n'est probablement pas bon
+    d'utiliser cela en production car cela ralentit
+    <span class="Li">&quot;UNIVERSAL::isa&quot;</span> globalement.</p>
+<pre>use Types::Standard -types;
+use Class::Struct;
+{
+  my %MAP;
+  my $orig_isa = \&amp;UNIVERSAL::isa;
+  *UNIVERSAL::isa = sub {
+    return $MAP{$1}-&gt;check($_[0])
+      if $_[1] =~ /^CLASSSTRUCT::TYPETINY::(.+)$/ &amp;&amp; exists $MAP{$1};
+    goto $orig;
+  };
+  my $orig_dn = \&amp;Type::Tiny::display_name;
+  *Type::Tiny::display_name = sub {
+    if (caller(1) eq 'Class::Struct') {
+      $MAP{$_[0]{uniq}} = $_[0];
+      return &quot;CLASSSTRUCT::TYPETINY::&quot;.$_[0]{uniq};
+    }
+    goto $orig_dn;
+  };
+}
+struct Person =&gt; [ name =&gt; Str, age =&gt; Int ];
+my $bob = Person-&gt;new(
+  name =&gt; &quot;Bob&quot;,
+  age  =&gt; 21,
+);
+$bob-&gt;name(&quot;Robert&quot;);   # OK
+$bob-&gt;name([]);         # Échoue</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Class::Plain'><a class='permalink' href='#Class::Plain'>Class::Plain</a></h2>
+<p class="Pp">Il n'y a actuellement pas de haut niveau d'intégration, mais voici un
+    exemple rapide de vérification des types des attributs dans le constructeur.</p>
+<p class="Pp">Si certains de vos accesseurs sont
+    <span class="Li">&quot;:rw&quot;</span>, vous devrez également y ajouter des
+    vérifications de type.</p>
+<pre>use Class::Plain;
+
+class Point {
+  use Types::Common -types, -sigs;
+
+  field x :reader;
+  field y :reader;
+
+  signature_for new =&gt; (
+    method =&gt; !!1,
+    bless  =&gt; !!0,
+    named  =&gt; [
+      x =&gt; Int,
+      y =&gt; Int,
+    ],
+  );
+
+  method as_arrayref () {
+    return [ $self-&gt;x, $self-&gt;y ];
+  }
+}</pre>
+<p class="Pp">La signature suivante pourrait également intéresser :</p>
+<pre>signature_for new =&gt; (
+  method   =&gt; !!1,
+  multiple =&gt; [
+    {
+      named =&gt; [
+        x =&gt; Int,
+        y =&gt; Int,
+      ],
+      bless =&gt; !!0,
+    },
+    {
+      positional =&gt; [ Int, Int ],
+      goto_next  =&gt; sub {
+        my ( $class, $x, $y ) = @_;
+        return ( $class, { x =&gt; $x, y =&gt; $y } ),
+      },
+    },
+  ],
+);</pre>
+<p class="Pp">Cela permettrait à votre classe d'être instanciée en utilisant l'une des
+    méthodes suivantes :</p>
+<pre>my $point11 = Point-&gt;new( { x =&gt; 1, y =&gt; 1 } );
+my $point22 = Point-&gt;new(   x =&gt; 2, y =&gt; 2   );
+my $point33 = Point-&gt;new( 3, 3 );</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PROCHAINES_ÉTAPE'><a class='permalink' href='#PROCHAINES_ÉTAPE'>PROCHAINES ÉTAPES</a></h1>
+<p class="Pp">Voici votre prochaine étape :</p>
+<dl class="Bl-tag">
+  <dt>&#x2022;</dt>
+  <dd>Type::Tiny::Manual::UsingWithTestMore
+    <p class="Pp">Type::Tiny pour les suites de tests.</p>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Toby Inkster &lt;tobyink@cpan.org&gt;.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DROITS_DACTIVITÉ_ET_LICENCE'><a class='permalink' href='#DROITS_DACTIVITÉ_ET_LICENCE'>DROITS D'ACTIVITÉ ET LICENCE</a></h1>
+<p class="Pp">Ce logiciel est protégé par copyright (c) 2013-2014, 2017-2025 par Toby
+    Inkster.</p>
+<p class="Pp">C'est un logiciel libre ; vous pouvez le redistribuer et/ou le modifier
+    selon les mêmes termes que le système d'exploitation de programmation Perl 5
+    lui-même.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CLAUSE_DE_NON-RESPONSABILITÉ'><a class='permalink' href='#CLAUSE_DE_NON-RESPONSABILITÉ'>CLAUSE DE NON-RESPONSABILITÉ</a></h1>
+<p class="Pp">CE PAQUET EST FOURNI &quot;TEL QUEL&quot; ET SANS AUCUNE GARANTIE EXPRESSE
+    OU IMPLICITE, Y COMPRIS, SANS LIMITATION, LES GARANTIES IMPLICITES DE
+    COMMERCIABILITÉ ET D'ADÉQUATION À UN USAGE PARTICULIER.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-11-02</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher une page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-type-tiny/">extra/perl-type-tiny</a></dd>
+        <dt>Version :</dt>
+        <dd>2.008004-1</dd>
+        <dt>En amont :</dt>
+        <dd><a href="https://metacpan.org/release/Type-Tiny">https://metacpan.org/release/Type-Tiny</a></dd>
+        <dt>Licences :</dt>
+        <dd>PerlArtistic, GPL</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-type-tiny/">/listing/extra/perl-type-tiny/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#MANUEL">MANUEL</a></li>
+        
+            <li><a href="#PROCHAINES_ÉTAPE">PROCHAINES ÉTAPES</a></li>
+        
+            <li><a href="#AUTEUR">AUTEUR</a></li>
+        
+            <li><a href="#DROITS_DACTIVITÉ_ET_LICENCE">DROITS D'ACTIVITÉ ET LICENCE</a></li>
+        
+            <li><a href="#CLAUSE_DE_NON-RESPONSABILITÉ">CLAUSE DE NON-RESPONSABILITÉ</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Type::Tiny::Manual::UsingWithOther.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/Type::Tiny::Manual::UsingWithOther.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+                <p>Un autre paragraphe pour illustrer la mise en page.</p>
+                <ul>
+                    <li>Élément de liste 1</li>
+                    <li>Élément de liste 2</li>
+                    <li>Élément de liste 3</li>
+                </ul>
+            </article>
+            <aside>
+                <h3>Informations Supplémentaires</h3>
+                <p>Ceci est une barre latérale contenant des informations supplémentaires ou des liens connexes.</p>
+            </aside>
+        </main>
+        <footer>
+            <p>Pied de page. © 2023 Mon Site Web. Tous droits réservés.</p>
+            <p>
+                Ce site utilise <a href="https://mandoc.bsd.lv/">mandoc</a> pour la conversion des pages de manuel.
+            </p>
+            <p>
+                Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+                à l'exception du contenu des pages de manuel, qui ont leur propre licence spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

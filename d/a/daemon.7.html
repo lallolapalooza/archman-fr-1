@@ -1,0 +1,692 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>daemon(7) — Pages manuelles </title>d'Arch
+        
+        
+        
+        
+        
+    
+    
+        <link rel="alternate" href="/man/daemon.7.de" hreflang="de">
+    
+        <link rel="alternate" href="/man/daemon.7.zh_CN" hreflang="zh_CN">
+    
+        <link rel="alternate" href="/man/daemon.7.zh_TW" hreflang="zh_TW">
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">daemon(7)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/core/x86_64/systemd/">systemd</a></p>
+<p class="lic">Licences: LGPL-2.1-or-later, CC0-1.0, GPL-2.0-or-later, MIT-0</p>
+
+        nt
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">DAEMON</td>(7)
+    <td class="head-vol">dae</td>mon
+    <td class="head-rtitle">DA</td>EM</tr>ON(</table>7)
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NO</a></h1>M
+<p class="Pp">daemon - Écriture</p> et empaquetage </section>de démons système
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTIO</a></h1>N
+<p class="Pp">Un démon est un processus de service qui s'exécute en arrière-plan et
+    supervise le système ou fournit des fonctionnalités à d'autres processus.
+    Traditionnellement, les démons sont implémentés en suivant un schéma
+    originaire de SysV Unix. Les démons modernes devraient suivre un schéma
+    plus simple mais plus puissant (ici appelé « démons de nouveau style »),
+    comme implémenté par
+    <a href='/man/systemd.1.en'>systemd(1).</a> Cette page de manuel couvre les deux schémas, et inclut en
+    particulier des recommandations pour les démons qui doivent être inclus
+    dans le système d'init </p>systemd.
+<section class="Ss">
+<h2 class="Ss" id='SysV_Daemons'><a class='permalink' href='#SysV_Daemons'>Démons </a></h2>SysV
+<p class="Pp">Lorsqu'un démon SysV traditionnel démarre, il devrait exécuter les
+    étapes suivantes dans le cadre de l'initialisation. Notez que ces étapes
+    sont inutiles pour les démons de nouveau style (voir ci-dessous), et ne
+    devraient être implémentées que si la compatibilité avec SysV est
+    </p>essentielle.
+<div class="Bd-indent"> 1.Fermer tous les descripteurs de fichiers ouverts à l'exception de
+  l'entrée standard, de la sortie standard et de l'erreur standard (c'est-à-dire
+  les trois premiers descripteurs de fichiers 0, 1, 2). Cela garantit qu'aucun
+  descripteur de fichier passé accidentellement ne reste dans le processus
+  démon. Sur Linux, cela est mieux implémenté en itérant à travers
+  /proc/self/fd, avec comme solution de repli l'itération à partir du
+  descripteur de fichier 3 jusqu'à la valeur retournée par <b>getrlimit()</b> pour <b>RLIMIT_NOFIL</b>E</div>.
+<div class="Bd-indent"> 2.Réinitialiser tous les gestionnaires de signaux à leur valeur par
+  défaut. Cela se fait mieux en itérant à travers les signaux disponibles
+  jusqu'à la limite de
+  <b>_NSIG </b>et en les réinitialisant à <b>SIG_DF</b>L</div>.
+<div class="Bd-indent"> 3.Réinitialiser le masque de signal en utilisant
+  <b>sigpr</b>ocma</div>sk().
+<div class="Bd-indent"> 4.Assainir le bloc d'environnement, en supprimant ou réinitialisant les
+  variables d'environnement qui pourraient avoir un impact négatif sur
+  l'exécution du </div>démon.
+<div class="Bd-indent"> 5.Appeler <b>fork(),</b> pour créer un processus en
+  </div>arrière-plan.
+<div class="Bd-indent"> 6.Dans l'enfant, appeler <b>setsid() </b>pour se détacher de
+  tout terminal et créer une session </div>indépendante.
+<div class="Bd-indent"> 7.Dans l'enfant, appeler <b>fork()</b> à nouveau, pour garantir
+  que le démon ne peut jamais réacquérir un terminal. (Cela est pertinent si le
+  programme — et toutes ses dépendances — ne spécifie pas soigneusement
+  `O_NOCTTY` sur chaque appel `open()` qui pourrait potentiellement ouvrir un
+  nœud de périphérique TTY.</div>)
+<div class="Bd-indent"> 8.Appeler <b>exit()</b> dans le premier enfant, de
+  sorte que seul le deuxième enfant (le processus démon réel) reste. Cela
+  garantit que le processus démon est ré-adopté par init/PID 1, comme tous les
+  démons devraient </div>l'être.
+<div class="Bd-indent"> 9.Dans le processus démon, connecter /dev/null à l'entrée standard, à la
+  sortie standard et à l'erreur </div>standard.
+<div class="Bd-indent">10.Dans le processus démon, réinitialiser le umask à 0, de sorte que les
+  modes de fichiers passés à <b>open()</b>, <b>mkdir()</b> et similaires contrôlent
+  directement le mode d'accès des fichiers et répertoires </div>créés.
+<div class="Bd-indent">11.Dans le processus démon, changer le répertoire courant pour le
+  répertoire racine (/), afin d'éviter que le démon ne bloque involontairement
+  le démontage des points de </div>montage.
+<div class="Bd-indent">12.Dans le processus démon, écrire le PID du démon (tel que retourné par <b>getpid())</b> dans un fichier PID, par exemple /run/foobar.pid (pour un démon
+  hypothétique « foobar ») pour garantir que le démon ne puisse pas être
+  démarré plus d'une fois. Cela doit être implémenté de manière exempte de
+  conditions de course afin que le fichier PID ne soit mis à jour que lorsqu'il
+  est vérifié en même temps que le PID précédemment stocké dans le fichier PID
+  n'existe plus ou n'appartient pas à un processus </div>étranger.
+<div class="Bd-indent">13.Dans le processus démon, abandonner les privilèges, si possible et
+  </div>applicable.
+<div class="Bd-indent">14.Depuis le processus démon, notifier le processus d'origine
+  démarré que l'initialisation est terminée. Cela peut être implémenté via un
+  tube anonyme ou un canal de communication similaire qui est créé avant le
+  premier
+  <b>fork() </b>et donc disponible à la fois dans le processus d'origine et le
+  processus </div>démon.
+<div class="Bd-indent">15.Appeler <b>exit() </b>dans le processus
+  d'origine. Le processus qui a invoqué le démon doit pouvoir compter sur le
+  fait que cette
+  <b>exit() </b>se produit après que l'initialisation est terminée et que tous
+  les canaux de communication externes sont établis et </div>accessibles.
+<p class="Pp">La fonction <b>daemon() </b>du BSD ne devrait pas être utilisée, car elle n'implémente
+    qu'un sous-ensemble de ces </p>étapes.
+<p class="Pp">Un démon qui doit fournir la compatibilité avec les systèmes SysV
+    devrait implémenter le schéma indiqué ci-dessus.</p> Cependant, il est
+    recommandé de rendre ce comportement optionnel et configurable via un
+    argument de ligne de</section> commande afin de faciliter le débogage ainsi que de
+    simplifier l'intégration dans les systèmes utilisant systemd.
+<section class="Ss">
+<h2 class="Ss" id='New-Style_Daemons'><a class='permalink' href='#New-Style_Daemons'>Démons de nouveau </a></h2>style
+<p class="Pp">Les services modernes pour Linux devraient être implémentés comme des
+    démons de nouveau style. Cela facilite leur supervision et leur contrôle à
+    l'exécution et simplifie leur </p>implémentation.
+<p class="Pp">Pour développer un démon de nouveau style, aucune des étapes
+    d'initialisation recommandées pour les démons SysV n'a besoin d'être
+    implémentée. Les systèmes d'init de nouveau style comme systemd rendent
+    toutes ces étapes redondantes. De plus, comme certaines de ces étapes
+    interfèrent avec la surveillance des processus, le passage de descripteurs
+    de fichiers et d'autres fonctionnalités du gestionnaire de services, il est
+    recommandé de ne pas les exécuter lorsqu'il est exécuté comme service de
+    nouveau </p>style.
+<p class="Pp">Notez que les systèmes d'init de nouveau style garantissent l'exécution
+    des processus démons dans un contexte de processus propre : il est garanti
+    que le bloc d'environnement est assaini, que les gestionnaires de signaux
+    et le masque sont réinitialisés et qu'aucun descripteur de fichier restant
+    n'est passé. Les démons seront exécutés dans leur propre session, avec
+    l'entrée standard connectée à /dev/null et la sortie standard/erreur
+    connectée au <a href='/man/systemd-journald.service.8.en'>service de journalisation </a>systemd-journald.service(8), sauf configuration
+    contraire. Le umask est </p>réinitialisé.
+<p class="Pp">Il est recommandé pour les démons de nouveau style d'implémenter ce qui
+    suit </p>:
+<div class="Bd-indent"> 1.Si applicable, le démon devrait notifier le gestionnaire de services
+  de la fin du démarrage ou des mises à jour d'état via l' <a href='/man/sd_notify.3.en'>interface </a>sd_notify(3), en particulier <i>READY=1 </i>et <i>STATUS=..</i>.</div>.
+<div class="Bd-indent"> 2.Si <b>SIGTERM </b>est reçu, arrêter le démon
+  et quitter proprement. Une notification <i>STOPPING=1 </i>devrait être envoyée via
+  <a href='/man/sd_notify.3.en'>sd_n</a>otify</div>(3).
+<div class="Bd-indent"> 3.Si <b>SIGHUP </b>est reçu, recharger les
+  fichiers de configuration, si cela s'applique. Cela devrait être combiné
+  avec des notifications via
+  <a href='/man/sd_notify.3.en'>sd_notify(3)</a> : <i>RELOADING=1 </i>et <i>READY=</i>1</div>.
+<div class="Bd-indent"> 4.Fournir un code de sortie correct du processus démon principal, car
+  celui-ci est utilisé par le gestionnaire de services pour détecter les
+  erreurs et problèmes de service. Il est recommandé de suivre le schéma de
+  code de sortie tel que défini dans les
+  <b>recommandations LSB pour les scripts d'init </b>SysV[1]</div>.
+<div class="Bd-indent"> 5.Si possible et applicable, exposer l'interface de contrôle du démon
+  via le système IPC D-Bus et acquérir un nom de bus comme dernière étape de
+  l'initialisation</div>.
+<div class="Bd-indent"> 6.Pour l'intégration dans systemd, fournir un fichier d'unité .service
+  qui contient des informations sur le démarrage, l'arrêt et la maintenance
+  autre du démon. Voir <a href='/man/systemd.service.5.en'>systemd.service(5) </a>pour les </div>détails.
+<div class="Bd-indent"> 7.Dans la mesure du possible, s'appuyer sur les fonctionnalités du
+  gestionnaire de services pour limiter l'accès du démon aux fichiers, aux
+  services et à d'autres ressources, c'est-à-dire dans le cas de systemd,
+  s'appuyer sur le contrôle des limites de ressources de systemd au lieu
+  d'implémenter le vôtre, s'appuyer sur le code d'abandon de privilèges de
+  systemd au lieu de l'implémenter dans le démon, et ainsi de suite. Voir
+  <a href='/man/systemd.exec.5.en'>systemd.exec(5) </a>pour les contrôles </div>disponibles.
+<div class="Bd-indent"> 8.Si D-Bus est utilisé, rendez votre démon activable par le bus en
+  fournissant un fichier de configuration d'activation de service D-Bus. Cela
+  présente plusieurs avantages : votre démon peut être démarré paresseusement à
+  la demande ; il peut être démarré en parallèle avec d'autres démons qui en
+  ont besoin — ce qui maximise la parallélisation et la vitesse de démarrage ;
+  votre démon peut être redémarré en cas d'échec sans perdre de requêtes de
+  bus, car le bus met en file d'attente les requêtes pour les services
+  activables. Voir ci-dessous pour les </div>détails.
+<div class="Bd-indent"> 9.Si votre démon fournit des services à d'autres processus locaux ou à
+  des clients distants via un socket, il devrait être rendu activable par socket
+  en suivant le schéma indiqué ci-dessous. Comme l'activation D-Bus, cela
+  permet le démarrage à la demande des services ainsi qu'une meilleure
+  parallélisation du démarrage des services. De plus, pour les protocoles sans
+  état (comme syslog, DNS), un démon implémentant l'activation basée sur socket
+  peut être redémarré sans perdre une seule requête. Voir ci-dessous pour les
+  </div>détails.
+<div class="Bd-indent">10.Si le service ouvre des sockets ou d'autres fichiers de son propre
+  chef, et que ces descripteurs de fichiers doivent survivre à un redémarrage,
+  le démon devrait les stocker dans le gestionnaire de servicesvia <a href='/man/sd_notify.3.en'>sd_notify(3) avec
+</a>FDSTORE=1.
+  <i>11. </i>Au </div>lieu
+<div class="Bd-indent">d'utiliser l'appel
+  syslog() <b>pour </b>journaliser
+  directement auprès du service syslog du système, un démon de nouveau style peut choisir de simplement
+  journaliser vers l'erreur <b>standard </b>via
+fprintf(), qui est ensuite transmis à syslog.
+  Si des niveaux de journalisation sont nécessaires, ceux-ci peuvent être encodés en préfixant les lignes de journalisation individuelles
+  par des chaînes comme "&lt;4&gt;" (pour le niveau de journalisation 4
+  "WARNING" dans le schéma de priorité syslog), en <b>suivant un </b>style
+  similaire à celui du système de
+  <a href='/man/sd-daemon.3.en'>niveaux
+printk()</a> du <a href='/man/systemd.exec.5.en'>noyau </a>Linux</div>. Pour
+<div class="Bd-indent">plus de détails, voir
+sd-daemon(3) et
+systemd.exec(5).
+12. Comme les démons de nouveau style sont invoqués sans
+  TTY de contrôle (mais en tant que chefs de leur
+  <b>propre </b>session), <a href='/man/open.2.en'>il convient </a>de toujours spécifier
+O_NOCTTY lors des
+  appels open(2) qui peuvent référencer un nœud de
+  périphérique TTY, afin </div>qu'un
+<p class="Pp">TTY de contrôle ne soit pas acquis accidentellement.
+Ces recommandations
+    <b>sont sim</b>ilaires </p>mais pa</section>s identi</section>ques aux
+<section class="Sh">
+<h1 class="Sh" id='ACTIVATION'><a class='permalink' href='#ACTIVATION'>Apple MacOS </a></h1>X
+<p class="Pp">Daemon Requirements[2].
+ACTIVATION
+Les systèmes d'init de nouveau style fournissent plusieurs mécanismes supplémentaires pour
+    activer les services, comme détaillé ci-dessous. Il est courant que des services soient
+    configurés pour être activés via plus d'un mécanisme à la fois. Un
+    exemple pour systemd : bluetoothd.service pourrait être activé soit
+    lorsque le matériel Bluetooth est branché, soit lorsqu'une application accède à ses
+    interfaces de programmation via D-Bus. Ou, un démon de serveur d'impression pourrait être
+    activé lorsque du trafic arrive sur un port IPP, ou lorsqu'une imprimante est branchée,
+    ou lorsqu'un fichier est mis en file d'attente dans le répertoire de spool de l'imprimante. Même pour
+    des services destinés à être démarrés au démarrage du système de manière inconditionnelle,
+    c'est une bonne idée d'implémenter certains des divers schémas d'activation
+    décrits ci-dessous, afin de maximiser la parallélisation. Si un démon implémente
+    un service D-Bus ou un socket d'écoute, l'implémentation du schéma complet d'activation par bus et socket
+    permet de démarrer le démon avec ses clients en parallèle
+    (ce qui accélère le démarrage), puisque tous ses canaux de communication sont
+    déjà établis, et aucune requête n'est perdue car les requêtes des clients seront
+    mises en file d'attente par le système de bus (dans le cas de D-Bus) ou par le
+    noyau (dans le cas des sockets) jusqu'à ce </p>que
+<section class="Ss">
+<h2 class="Ss" id='Activation_on_Boot'><a class='permalink' href='#Activation_on_Boot'>l'activation soit </a></h2>terminée.
+<p class="Pp">Activation   au démarrage
+Les démons de vieux style sont généralement activés exclusivement au démarrage (et
+    manuellement par l'administrateur) via des scripts d'init SysV,
+    <b>comme détaillé dans la
+    LSB Linux Standard Base </b>Core Specification[1]. Cette méthode d'
+    activation est prise en charge de manière ubiquitaire sur les systèmes d'init Linux, tant les systèmes de
+    vieux style que de nouveau style. Entre autres problèmes, les scripts d'init SysV ont
+    l'inconvénient d'impliquer des scripts shell dans le processus de démarrage. Les systèmes d'init de
+    nouveau style utilisent généralement des versions mises à jour de l'activation, tant lors du démarrage
+    qu'en </p>cours
+<p class="Pp">d'exécution, et utilisent des fichiers de description de service plus minimaux.
+Dans systemd, si le développeur ou l'administrateur veut s'assurer
+    qu'un service ou une autre unité est activé automatiquement au démarrage, il est
+    recommandé de placer un lien symbolique vers le fichier d'unité dans le répertoire .wants/ de
+    multi-user.target ou de graphical.target, qui sont normalement <a href='/man/systemd.unit.5.en'>utilisés comme
+  </a>  cibles de démarrage au démarrage du système. Voir
+systemd. <a href='/man/systemd.special.7.en'>unit(5) pour plus </a>de détails sur les</p>
+    répertoires .w</section>ants/, et
+systemd.
+<section class="Ss">
+<h2 class="Ss" id='Socket-Based_Activation'><a class='permalink' href='#Socket-Based_Activation'>special(7) pour plus de </a></h2>détails
+<p class="Pp">sur les
+    deux cibles de démarrage.
+Activation   basée sur les sockets
+Afin de maximiser la parallélisation et la robustesse possibles
+    et de simplifier la configuration et le développement, il est recommandé pour tous les
+    démons de nouveau style qui communiquent via des sockets d'écoute d'utiliser l'activation basée sur les sockets.
+    Dans un schéma d'activation basé sur les sockets, la création et la liaison du
+    socket d'écoute en tant que canal de communication principal des démons vers des clients
+    locaux (et parfois distants) sont déplacées hors du code du démon et vers le
+    gestionnaire de services. Sur la base de la configuration de chaque démon, le gestionnaire de
+    services installe les sockets puis les transmet au processus généré dès
+    que le démon respectif doit être démarré. En option, l'activation du
+    service peut être retardée jusqu'à l'arrivée du premier trafic entrant sur le socket
+    pour implémenter l'activation à la demande des démons. Cependant, le principal avantage
+    de ce schéma est que tous les fournisseurs et tous les consommateurs des sockets peuvent être
+    démarrés en parallèle dès que tous les sockets sont établis. En plus de cela,
+    les démons peuvent être redémarrés en ne perdant qu'un nombre minimal de
+    transactions client, ou même aucune requête client (ce dernier est particulièrement
+    vrai pour les protocoles sans état, tels que DNS ou syslog), car le socket
+    reste lié et accessible pendant le redémarrage, et toutes les requêtes sont mises en file d'attente
+    pendant que le démon ne peut pas les </p>traiter.
+<p class="Pp">Les démons de nouveau style qui prennent en charge l'activation par socket doivent être capables de
+    recevoir leurs sockets du gestionnaire de services au lieu de les créer et
+    les lier eux-mêmes. Pour plus de détails sur les interfaces de programmation pour
+    ce schéma fournies par systemd, <a href='/man/sd_listen_fds.3.en'>voir
+sd_listen_fds(3)</a> et
+    <a href='/man/sd-daemon.3.en'>sd-daemon(3). </a>Pour plus de détails sur le portage de démons existants vers
+    l'activation basée sur les sockets, voir ci-dessous. Avec un effort minimal, il est possible
+    d'implémenter l'activation basée sur les sockets en plus de la création interne traditionnelle des
+    sockets dans la même base de code afin de prendre en charge à la fois les systèmes d'init de
+    nouveau style et de vieux style </p>depuis
+<p class="Pp">le même binaire de démon.
+systemd implémente l'activation basée sur les sockets via des unités .socket, <a href='/man/systemd.socket.5.en'>qui sont décrites </a>dans
+systemd.socket(5). Lors de la configuration d'unités socket
+    pour l'activation basée sur les sockets, il est essentiel que tous les sockets
+    d'écoute soient inclus par l'unité cible spéciale sockets.target. Il est <i>recommandé de placer une
+</i>directive WantedBy=sockets.target dans la
+    section [Install] pour ajouter automatiquement une telle dépendance lors de l'installation
+    d'une unité <i>socket. Sauf si
+</i>DefaultDependencies=no est défini, les dépendances d'ordonnancement nécessaires sont implicitement créées pour toutes les unités socket. Pour plus
+    d'informations sur sockets. <a href='/man/systemd.special.7.en'>target, voir
+systemd.special(7). Il n'est pas
+    nécessaire n</a>i recommandé de placer des dépendances supplémentaires sur les</p> unités socket
+    (par exemple depuis multi-user.target ou si</section>milaire) lorsqu'elles sont installées
+    dans sockets.target.
+<section class="Ss">
+<h2 class="Ss" id='Bus-Based_Activation'><a class='permalink' href='#Bus-Based_Activation'>Activation   basée sur </a></h2>le
+<p class="Pp">bus
+Lorsque le système IPC D-Bus est utilisé pour la communication avec les clients,
+    les démons de nouveau style devraient utiliser l'activation par bus afin qu'ils soient automatiquement
+    activés lorsqu'une application client accède à leurs interfaces IPC. Ceci est
+    configuré dans les fichiers de service D-Bus (à ne pas confondre avec les fichiers d'unité de service systemd !). Pour
+    s'assurer que D-Bus utilise systemd pour démarrer et maintenir le <i>démon, utiliser </i>la
+directive SystemdService= dans ces fichiers de service pour
+    configurer le service systemd correspondant pour un service D-Bus. p. ex. : Pour un
+    service D-Bus dont le fichier d'activation D-Bus est nommé
+    org.freedesktop.RealtimeKit.service, s'assurer de
+    <i>définir
+SystemdService=rtkit-daemon.service dans ce fichier pour le lier a</i>u
+    service systemd rtkit-daemon.service. Ceci est nécessaire pour s'ass</p>urer que le
+    démon est démarré de manière sans course lorsqu'il est act</section>ivé via plusieurs
+    mécanismes simultanément.
+Activation   basée sur les
+<section class="Ss">
+<h2 class="Ss" id='Device-Based_Activation'><a class='permalink' href='#Device-Based_Activation'>périphériques
+Souvent, les </a></h2>démons
+<p class="Pp">qui gèrent un type particulier de matériel devraient être
+    activés uniquement lorsque le matériel du type respectif est branché ou
+    devient autrement disponible. Dans un système d'init de nouveau style, il est possible de
+    lier l'activation aux événements de branchement/débranchement du matériel. Dans systemd, les
+    périphériques du noyau apparaissant dans l'arborescence de périphériques sysfs/udev peuvent être exposés en tant qu'unités s'ils sont
+    étiquetés avec la chaîne "systemd". Comme tout autre type d'unité,
+    ils peuvent alors inclure d'autres unités lorsqu'ils sont activés (c.-à-d. branchés) et ainsi
+    implémenter l'activation basée sur les périphériques. Les dépendances systemd peuvent être encodées dans <i>la base de </i>données udev via la
+    <a href='/man/systemd.device.5.en'>propriété SYSTEMD_WANTS=.</a> Voir
+systemd.device(5) pour plus de détails. Souvent, il est préférable d'inclure des services
+    depuis des périphériques uniquement indirectement via des cibles dédiées. Exemple : Au lieu
+    d'inclure bluetoothd.service depuis les divers dongles Bluetooth et
+    autre matériel disponible, inclure bluetooth.target depuis ceux-ci et
+    bluetoothd.service depuis cette cible. Cela fournit une meilleure abstraction et
+    donne aux administrateurs la possibilité d'activer bluetoothd.service via le contrôle
+    d'un lien bluetooth.target.wants/ de manière uniforme avec une commande comme
+    <b>enable </b>de <a href='/man/systemctl.1.en'>systemctl(1) au lie</a>u de manipuler l'en</p>semble de règles
+ </section>   udev.
+Activation
+<section class="Ss">
+<h2 class="Ss" id='Path-Based_Activation'><a class='permalink' href='#Path-Based_Activation'>basée sur les </a></h2>chemins
+<p class="Pp">Souvent, l'exécution des démons traitant des fichiers ou répertoires de spool
+    (comme un système d'impression) peut être retardée jusqu'à ce que ces objets du système de fichiers
+    changent d'état, ou deviennent non vides. Les systèmes d'init de nouveau style fournissent un moyen de
+    lier l'activation du service aux changements du système de fichiers. systemd implémente ce
+    schéma via l'activation basée sur les chemins configurée
+    <a href='/man/systemd.path.5.en'>dans l</a>es un</p>ités </section>.path,
+<section class="Ss">
+<h2 class="Ss" id='Timer-Based_Activation'><a class='permalink' href='#Timer-Based_Activation'>comme décrit dans
+</a></h2>systemd.
+<p class="Pp">path(5).
+Activation   basée sur les minuteurs
+Certains démons qui implémentent des tâches de nettoyage destinées à être
+    exécutées à intervalles réguliers bénéficient de l'activation basée sur les minuteurs. Dans
+    systemd, ceci est implémenté
+    <a href='/man/systemd.timer.5.en'>via de</a>s uni</p>tés .</section>timer,
+<section class="Ss">
+<h2 class="Ss" id='Other_Forms_of_Activation'><a class='permalink' href='#Other_Forms_of_Activation'>comme décrit dans
+systemd.</a></h2>timer(5)
+<p class="Pp">.
+Autres   formes d'activation
+D'autres formes d'activation ont été suggérées et implémentées dans
+    certains systèmes. Cependant, il y a souvent des alternatives plus simples ou meilleures, ou
+    elles peuvent être composées de combinaisons des schémas ci-dessus. Exemple :
+    Parfois, il semble utile de démarrer des démons ou des unités .socket lorsqu'une
+    adresse IP spécifique est configurée sur une interface réseau, car les sockets réseau
+    doivent être liés à l'adresse. Cependant, une alternative pour implémenter
+    ceci est d'utiliser l'option de <b>socket </b>Linux<b>IP_FREEBIND/
+</b>IPV6_FREEBIND
+    telle qu'accessible via <i>FreeBind=yes </i>dans les fichiers de socket systemd
+    (voir <a href='/man/systemd.socket.5.en'>systemd.socket(5) </a>pour plus de détails). Cette option, lorsqu'elle est activée,
+    permet aux sockets d'être liés à une adresse IP non locale, non configurée, et
+    permet donc des liaisons à une adresse IP particulière avant qu'elle ne devienne
+    réellement disponible, rendant une telle dépendance explicite à l'adresse configurée
+    redondante. Un autre déclencheur souvent suggéré pour l'activation des services est une faible
+    charge système. Cependant, ici aussi, une approche plus convaincante pourrait être de rendre leutilisation des fonctionnalités du système d'exploitation, en particulier l'ordonnanceur CPU ou E/S de Linux. Au lieu d'ordonnancer les tâches depuis l'espace utilisateur en surveillant l'ordonnanceur du système d'exploitation, il est conseillé de laisser l'ordonnancement des processus à l'ordonnanceur du système d'exploitation lui-même. systemd fournit un accès fin à l'ordonnanceur CPU et E/S. Si un processus exécuté par le gestionnaire de services ne doit pas impacter négativement la quantité de bande passante CPU ou E/S disponible pour les autres processus, il devrait être configuré avec
+    <i>CPUSchedulingPolicy=idle </i>et/ou <i>IOSchedulingClass=idle.
+    En option, cela peut êtr</i>e combiné avec une activation basée sur des minuteu</p>rs pour planifier les tâches d'arrière-plan pendant </section>l'exécution et avec un impact minimal sur le systèm</section>e, et le retirer de la phase de démarrage elle-même.
+<section class="Sh">
+<h1 class="Sh" id='INTEGRATION_WITH_SYSTEMD'><a class='permalink' href='#INTEGRATION_WITH_SYSTEMD'>INTÉGRATION   AVEC </a></h1>SYSTEMD
+<section class="Ss">
+<h2 class="Ss" id='Writing_systemd_Unit_Files'><a class='permalink' href='#Writing_systemd_Unit_Files'>Écriture   des fichiers unités </a></h2>systemd
+<p class="Pp">Lors de l'écriture de fichiers unités systemd, il est recommandé de prendre en compte les suggestions suivantes </p>:
+<div class="Bd-indent"> 1.Si possible, n'utilisez pas le paramètre <i>Type=forking
+  </i>dans les fichiers de service. Mais si vous le faites, assurez-vous de définir le chemin du fichier PID en utilisant <i>PIDFile=.</i> Voir <a href='/man/systemd.service.5.en'>systemd.service(5) pour </a>plus de </div>détails.
+<div class="Bd-indent"> 2.Si votre démon enregistre un nom D-Bus sur le bus, assurez-vous d'utiliser <i>Type=dbus </i>dans le fichier de service si </div>possible.
+<div class="Bd-indent"> 3.Assurez-vous de définir une bonne description lisible par l'homme avec <i>Description</i>=</div>.
+<div class="Bd-indent"> 4.Ne désactivez pas <i>DefaultDependencies=, sauf </i>si vous savez vraiment ce que vous faites et que votre unité est impliquée dans le démarrage précoce ou l'arrêt tardif du </div>système.
+<div class="Bd-indent"> 5.Normalement, peu ou pas de dépendances devraient avoir besoin d'être définies explicitement. Cependant, si vous configurez des dépendances explicites, référez-vous uniquement aux noms d'unités listés dans <a href='/man/systemd.special.7.en'>systemd.special(7) ou </a>aux noms introduits par votre propre paquet pour garder le fichier d'unité indépendant du système </div>d'exploitation.
+<div class="Bd-indent"> 6.Assurez-vous d'inclure une section [Install] incluant les informations d'installation pour le fichier d'unité. Voir <a href='/man/systemd.unit.5.en'>systemd.unit(5) pour </a>plus de détails. Pour activer votre service au démarrage, assurez-vous d'ajouter une directive
+  <i>WantedBy=multi-user.target </i>ou <i>WantedBy=graphical.target
+</i>  . Pour activer votre socket au démarrage, assurez-vous d'ajouter
+  <i>WantedBy=sockets.target.</i> Habituellement, vous voudrez aussi vous assurer que lorsque votre service est installé, votre socket l'est aussi, ajoutez donc
+  <i>Also=foo.socket dans vot</i>re fichier de service f</div>oo.service, pour un pro</section>gramme hypothétique foo.
+<section class="Ss">
+<h2 class="Ss" id='Installing_systemd_Service_Files'><a class='permalink' href='#Installing_systemd_Service_Files'>Installation   des fichiers de service </a></h2>systemd
+<p class="Pp">Au moment de l'installation de la compilation (par exemple <b>make install </b>pendant la construction du paquet), il est recommandé aux paquets d'installer leurs fichiers unités systemd dans le répertoire retourné par <b>pkg-config systemd
+    --variable=systemdsystemunitdir </b>(pour les services système) ou <b>pkg-config
+    systemd --variable=systemduserunitdir (pour </b>les services utilisateur). Cela rendra les services disponibles dans le système sur demande explicite mais ne les activera pas automatiquement pendant le démarrage. En option, pendant l'installation du paquet (par exemple <b>rpm -i </b>par l'administrateur), des liens symboliques devraient être créés dans les répertoires de configuration de systemd via la commande <b>enable
+</b>    de l'outil <a href='/man/systemctl.1.en'>systemctl(1)</a> pour les activer automatiquement au </p>démarrage.
+<p class="Pp">Les paquets utilisant <a href='/man/autoconf.1.en'>autoconf(1) </a>sont invités à utiliser un extrait de script configure comme celui suivant pour déterminer le chemin d'installation des unités lors de la configuration des sources </p>:
+<div class="Bd-indent">
+<pre>PKG_PROG_PKG_CONFIG()
+AC_ARG_WITH([systemdsystemunitdir],
+     [AS_HELP_STRING([--with-systemdsystemunitdir=DIR], [Directory for systemd service files])],,
+     [with_systemdsystemunitdir=auto])
+AS_IF([test "x$with_systemdsystemunitdir" = "xyes" -o "x$with_systemdsystemunitdir" = "xauto"], [
+  </pre>   def_systemdsystemunitdir=$($PKG_CONFIG --variable=systemdsystemunitdir systemd)
+     AS_IF([test "x$def_systemdsystemunitdir" = "x"],
+   [AS_IF([test "x$with_systemdsystemunitdir" = "xyes"],
+    [AC_MSG_ERROR([systemd support requested but pkg-config unable to query systemd package])])
+    </div>with_systemdsystemunitdir=no],
+   [with_systemdsystemunitdir="$def_systemdsystemunitdir"])])
+AS_IF([test "x$with_systemdsystemunitdir" != "xno"],
+      [AC_SUBST([systemdsystemunitdir], [$with_systemdsystemunitdir])])
+AM_CONDITIONAL([HAVE_SYSTEMD], [test "x$with_systemdsystemunitdir" != "xno"])
+<p class="Pp">Cet extrait permet l'installation automatique des fichiers d'unités sur les machines systemd, et permet optionnellement leur installation même sur les machines dépourvues de systemd. (La modification de cet extrait pour le répertoire des unités utilisateur est laissée comme exercice au lecteur.</p>)
+<p class="Pp">De plus, pour garantir que <b>make distcheck </b>continue de
+    fonctionner, il est recommandé d'ajouter ce qui suit au fichier Makefile.am de haut niveau dans les projets basés sur <a href='/man/automake.1.en'>automake(1)</a> </p>:
+<div class="Bd-indent">
+<pre>AM_DISTCHECK_CONFIGURE_FLAGS = \
+  --with-systemdsystemunitdir=$$dc_install_base/$(systemdsystemunitdi</pre>r</div>)
+<p class="Pp">Enfin, les fichiers d'unités devraient être installés dans le système avec un extrait automake comme celui suivant </p>:
+<div class="Bd-indent">
+<pre>if HAVE_SYSTEMD
+systemdsyste</pre>munit_DATA = \
+  foobar.soc</div>ket \
+  foobar.service
+endif
+<p class="Pp">Dans le fichier <a href='/man/rpm.8.en'>rpm(8)</a> .spec, utilisez des extraits comme celui suivant pour activer/désactiver le service pendant l'installation/désinstallation. Cela utilise les macros RPM fournies avec systemd. Consultez les directives d'empaquetage de votre distribution pour plus de détails et l'équivalent pour d'autres gestionnaires de </p>paquets.
+<p class="Pp">En haut du fichier </p>:
+<div class="Bd-indent">
+<pre>BuildRequires: systemd
+%{?systemd_require</pre>s</div>}
+<p class="Pp">Et en tant que scriptlets, plus bas </p>:
+<div class="Bd-indent">
+<pre>%post
+%systemd_post foobar.service foobar</pre>.socket
+%preun
+%systemd_preun foobar.serv</div>ice foobar.socket
+%postun
+%systemd_postun
+<p class="Pp">Si le service doit être redémarré pendant les mises à niveau, remplacez le scriptlet "%postun" ci-dessus par ce qui suit </p>:
+<div class="Bd-indent">
+<pre>%postun
+%systemd_</pre>postun_with_resta</div>rt foobar.service
+<p class="Pp">Notez que "%systemd_post" et "%systemd_preun" attendent les noms de toutes les unités installées/enlevées comme arguments, séparés par des espaces. "%systemd_postun" n'attend aucun argument. "%systemd_postun_with_restart" attend les unités à redémarrer comme </p>arguments.
+<p class="Pp">Pour faciliter les mises à niveau d'une version de paquet qui ne fournissait que des scripts d'init SysV vers une version de paquet qui fournit à la fois un script d'init SysV et un fichier de service systemd natif, utilisez un fragment comme celui suivant </p>:
+<div class="Bd-indent">
+<pre>%triggerun -- foobar &lt; 0.47.11-1
+if /sbin/chkconfig --l</pre>evel 5 foobar ; then
+  /bin/systemctl --no-reload enab</div>le foobar.service foobar.socket &gt;/dev/null 2&gt;&amp;1 || :
+fi
+<p class="Pp">Où 0.47.11-1 est la première version de paquet qui inclut le fichier d'unité natif. Ce fragment garantira que la première fois que le fichier d'unité est installé, il sera activé si et seulement si le script d'init SysV est activé, assurant ainsi que le statut d'activation n'est pas modifié. Notez que
+    <b>chkconfig est une commande spécifique à F</b>edora qui peut être utilisée pour vérifi</p>er si un script d'init SysV est activé. L</section>es autres systèmes d'exploitation devron</section>t utiliser des commandes différentes ici.
+<section class="Sh">
+<h1 class="Sh" id='PORTING_EXISTING_DAEMONS'><a class='permalink' href='#PORTING_EXISTING_DAEMONS'>PORTAGE   DES DÉMONS </a></h1>EXISTANTS
+<p class="Pp">Puisque les systèmes d'init de nouveau style comme systemd sont compatibles avec les systèmes d'init SysV traditionnels, il n'est pas strictement nécessaire de porter les démons existants vers le nouveau style. Cependant, le faire offre des fonctionnalités supplémentaires aux démons ainsi qu'une simplification de l'intégration dans les systèmes d'init de nouveau </p>style.
+<p class="Pp">Pour porter un démon existant compatible SysV, les étapes suivantes sont recommandées </p>:
+<div class="Bd-indent"> 1.Si ce n'est pas déjà fait, ajoutez une option de ligne de commande facultative au démon pour désactiver la mise en démon. Cela est utile non seulement pour utiliser le démon dans les systèmes d'init de nouveau style, mais aussi pour faciliter le </div>débogage.
+<div class="Bd-indent"> 2.Si le démon propose des interfaces à d'autres logiciels exécutés sur le système local via des <b>AF_UNIX </b>locaux, envisagez d'implémenter l'activation basée sur les sockets (voir ci-dessus). Habituellement, un correctif minimal est suffisant pour implémenter cela : étendez la création de socket dans le code du démon pour que <a href='/man/sd_listen_fds.3.en'>sd_listen_fds(3) </a>soit d'abord vérifié pour les sockets déjà transmis. Si des sockets sont transmis (c'est-à-dire quand <b>sd_listen_fds() </b>renvoie une valeur positive), ignorez l'étape de création de socket et utilisez les sockets transmis. Deuxièmement, assurez-vous que les nœuds de socket du système de fichiers pour les <b>AF_UNIX </b>locaux utilisés dans l'activation basée sur les sockets ne soient pas supprimés quand le démon s'arrête, si des sockets ont été transmis. Troisièmement, si le démon ferme normalement tous les descripteurs de fichiers restants ouverts dans le cadre de son initialisation, les sockets transmis par le gestionnaire de services doivent être épargnés. Puisque les systèmes d'init de nouveau style garantissent qu'aucun descripteur de fichier résiduel n'est transmis aux processus exécutés, il pourrait être bon de simplement ignorer la fermeture de tous les descripteurs de fichiers restants ouverts si des sockets sont </div>transmis.
+<div class="Bd-indent"> 3.Écrivez et installez un fichier d'unité systemd pour le service (et les sockets si l'activation basée sur les sockets est utilisée, ainsi qu'un fichier d'unité path, si le démon traite un répertoire de spool), voir ci-dessus pour plus de </div>détails.
+<div class="Bd-indent"> 4.Si le démon expose des interfaces via D-Bus, écr</div>ivez et installez un fichier d'activation D-Bus pou</section>r le service, voir ci-dessus pour plus de détails.
+<section class="Sh">
+<h1 class="Sh" id='PLACING_DAEMON_DATA'><a class='permalink' href='#PLACING_DAEMON_DATA'>PLACEMENT   DES DONNÉES DES </a></h1>DÉMONS
+<p class="Pp">Il est recommandé de suivre les directives générales pour le placement des fichiers de paquet, comme discuté dans <a href='/man/file-hierarchy.7.en'>file</a>-hier</p>archy</section>(7).
+<section class="Sh">
+<h1 class="Sh" id='NOTES'><a class='permalink' href='#NOTES'>NOTE</a></h1>S
+<p class="Pp">Tous les codes d'exemple de cette pag</p>e sont sous licence "MIT No Attributi</section>on" (SPDX-License-Identifier: MIT-0).
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR   </a></h1>AUSSI
+<p class="Pp"><a href='/man/systemd.1.en'>systemd(1)</a>, <a href='/man/sd-daemon.3.en'>sd-daemon(3)</a>, <a href='/man/sd_listen_fds.3.en'>sd_listen_fds(3)</a>,
+    <a href='/man/sd_notify.3.en'>sd_notify(3)</a>, <a href='/man/daemon.3.en'>daemon(3)</a>, <a href='/man/systemd.service.5.en'>systemd.service(5)</a>,
+    <a href='/man/file-hierarchy.7.en'>file-hierarchy(</a></p>7</section>)
+<section class="Sh">
+<h1 class="Sh" id='NOTES_2'><a class='permalink' href='#NOTES_2'>NOTE</a></h1>S
+<dl class="Bl-tag">
+  <dt> 1</dt>.
+  <dd>Recommandations </dd>LSB pour les scr</dl>ipts d'init SysV
+<div class="Bd-indent"><a href='http://refspecs.linuxbase.org/<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <title>daemon(7) — systemd 258.2</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link rel="stylesheet" href="/style.css" />
+    </head>
+    <body>
+        
+        <main>
+            <article>
+                <h1>daemon(7)</h1>
+                <p>
+    <a href="/man/daemon.7.en">daemon(7)</a>
+    
+        - Démarrage d'un programme en tant que démon
+    
+</p>
+
+<p>
+    2024-03-14        <em>systemd</em>        <a href="/man/daemon.7.en">daemon(7)</a>
+</p>
+
+<section class="Sh">
+    <h2>NAME</h2>
+    <p>daemon — Démarrage d'un programme en tant que démon</p>
+</section>
+
+<section class="Sh">
+    <h2>DESCRIPTION</h2>
+    <p>Un programme d'arrière-plan, également appelé démon, est un processus qui s'exécute en arrière-plan, généralement sans interaction directe avec l'utilisateur. Les démons sont souvent utilisés pour gérer des tâches système, telles que la gestion des services réseau ou des périphériques.</p>
+    <p>systemd, le système d'initialisation et gestionnaire de services pour Linux, offre un moyen standardisé et efficace de gérer les démons. La configuration des démons pour systemd est généralement réalisée à l'aide de fichiers d'unité dans le répertoire <code class="Li">/etc/systemd/system/</code> ou <code class="Li">/usr/lib/systemd/system/</code>.</p>
+</section>
+
+<section class="Sh">
+    <h2>ACTIVATION</h2>
+    <p>Les démons peuvent être activés de différentes manières, notamment :</p>
+    <dl class="Bl-tag">
+        <dt> 1.</dt>
+        <dd>Via des timers systemd : Les démons peuvent être démarrés à intervalles réguliers ou à des moments spécifiques définis dans des fichiers d'unité timer.</dd>
+        <dt> 2.</dt>
+        <dd>Via des sockets : Les démons peuvent être activés à la demande lorsqu'une requête arrive sur un socket réseau particulier.</dd>
+        <dt> 3.</dt>
+        <dd>Via des chemins : Les démons peuvent être activés lorsque des événements se produisent dans le système de fichiers, tels que la création ou la modification de fichiers.</dd>
+    </dl>
+</section>
+
+<section class="Sh">
+    <h2>INTÉGRATION AVEC SYSTEMD</h2>
+    <p>Pour intégrer un démon existant avec systemd, vous devez créer un fichier d'unité de service (par exemple, <code class="Li">mon-daemon.service</code>) qui décrit comment démarrer, arrêter et gérer le démon. Ce fichier d'unité doit spécifier les commandes à exécuter pour démarrer et arrêter le service, ainsi que les dépendances et les autres configurations nécessaires.</p>
+</section>
+
+<section class="Sh">
+    <h2>PORTAGE DES DÉMONS EXISTANTS</h2>
+    <p>Le portage d'un démon existant vers systemd implique généralement la création d'un fichier d'unité de service qui spécifie le comportement du démon. Les démons qui ont déjà été conçus pour suivre les standards UNIX des démons (comme le détachement du terminal et la gestion des signaux) sont plus faciles à intégrer.</p>
+    <p>Il est recommandé de consulter les standards LSB (Linux Standard Base) et les directives d'Apple pour le développement de démons afin de garantir la compatibilité et les bonnes pratiques.</p>
+    <dl class="Bl-tag">
+        <dt> 1.</dt>
+        <dd>Conformité LSB 3.1.1 pour les scripts d'initialisation :</dd>
+    </dl>
+    <div class="Bd-indent"><a href='http://refspecs.linuxbase.org/LSB_3.1.1/LSB-Core-generic/LSB-Core-generic/iniscrptact.html'>http://refspecs.linuxbase.org/LSB_3.1.1/LSB-Core-generic/LSB-Core-generic/iniscrptact.html</a></div>
+    <dl class="Bl-tag">
+        <dt> 2.</dt>
+        <dd>Exigences relatives aux démons Apple MacOS X :</dd>
+    </dl>
+    <div class="Bd-indent"><a href='https://developer.apple.com/library/mac/documentation/MacOSX/Conceptual/BPSystemStartup/Chapters/CreatingLaunchdJobs.html'>https://developer.apple.com/library/mac/documentation/MacOSX/Conceptual/BPSystemStartup/Chapters/CreatingLaunchdJobs.html</a></div>
+</section>
+
+<section class="Sh">
+    <h2>PLACEMENT DES DONNÉES DE DÉMON</h2>
+    <p>Les fichiers de configuration et les données associés à un démon doivent généralement être placés dans des répertoires standardisés tels que <code class="Li">/etc/</code> pour la configuration et <code class="Li">/var/lib/</code> ou <code class="Li">/var/cache/</code> pour les données.</p>
+</section>
+
+<section class="Sh">
+    <h2>NOTES</h2>
+    <p>Ce manuel est une introduction générale à la gestion des démons avec systemd. Pour des détails spécifiques sur la création de fichiers d'unité et la configuration avancée, veuillez consulter les pages de manuel pertinentes de systemd, telles que <code class="Li">systemd.service(5)</code> et <code class="Li">systemd.timer(5)</code>.</p>
+</section>
+
+<section class="Sh">
+    <h2>VOIR AUSSI</h2>
+    <p><a href="/man/systemd.html">systemd(1)</a>, <a href="/man/systemd.service.html">systemd.service(5)</a>, <a href="/man/systemd.timer.html">systemd.timer(5)</a>, <a href="/man/systemd.socket.html">systemd.socket(5)</a></p>
+</section>
+
+<section class="Sh">
+    <h2>NOTES</h2>
+    <p>Cette section fournit des notes supplémentaires qui peuvent ne pas correspondre directement aux autres sections.</p>
+</section>
+
+<table class="foot">
+    <tr>
+        <td class="foot-date"></td>
+        <td class="foot-os">systemd 258.2</td>
+    </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/core/x86_64/systemd/">core/systemd</a></dd>
+        <dt>Version :</dt>
+        <dd>258.2-2</dd>
+        <dt>En amont :</dt>
+        <dd><a href="https://www.github.com/systemd/systemd">https://www.github.com/systemd/systemd</a></dd>
+        <dt>Licences :</dt>
+        <dd>LGPL-2.1-or-later, CC0-1.0, GPL-2.0-or-later, MIT-0</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/core/systemd/">/listing/core/systemd/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#ACTIVATION">ACTIVATION</a></li>
+        
+            <li><a href="#INTEGRATION_WITH_SYSTEMD">INTÉGRATION AVEC SYSTEMD</a></li>
+        
+            <li><a href="#PORTING_EXISTING_DAEMONS">PORTAGE DES DÉMONS EXISTANTS</a></li>
+        
+            <li><a href="#PLACING_DAEMON_DATA">PLACEMENT DES DONNÉES DE DÉMON</a></li>
+        
+            <li><a href="#NOTES">NOTES</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+            <li><a href="#NOTES_2">NOTES</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+<nav class="other-languages">
+    <p>Dans d'autres langues :</p>
+    <ul>
+    
+        <li><a href="/man/daemon.7.de">de</a></li>
+    
+        <li><a href="/man/daemon.7.zh_CN">zh_CN</a></li>
+    
+        <li><a href="/man/daemon.7.zh_TW">zh_TW</a></li>
+    
+    </ul>
+</nav>
+
+
+
+<nav class="other-sections">
+    <p>Dans d'autres sections :</p>
+    <ul>
+    
+        <li><a href="/man/daemon.3.en">daemon(3)</a></li>
+    
+    </ul>
+</nav>
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/daemon.7.en.txt">txt</a>, 
+        
+            <a href="/man/daemon.7.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui a sa propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

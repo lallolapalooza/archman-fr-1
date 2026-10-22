@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>CURLOPT_SSH_KEYFUNCTION(3) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">CURLOPT_SSH_KEYFUNCTION(3)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/core/x86_64/curl/">curl</a></p>
+<p class="lic">Licences: MIT</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">CURLOPT_SSH_KEYFUNCTION(3)</td>
+    <td class="head-vol">Manuel des fonctions de bibliothèque</td>
+    <td class="head-rtitle">CURLOPT_SSH_KEYFUNCTION(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">CURLOPT_SSH_KEYFUNCTION - rappel pour la logique de correspondance des hôtes connus</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<pre>#include &lt;curl/curl.h&gt;
+enum curl_khstat {
+  CURLKHSTAT_FINE_ADD_TO_FILE,
+  CURLKHSTAT_FINE,
+  CURLKHSTAT_REJECT, /* rejeter la connexion, retourner une erreur */
+  CURLKHSTAT_DEFER,  /* ne pas l'accepter, mais nous ne pouvons pas répondre tout de suite. Provoque une erreur CURLE_PEER_FAILED_VERIFICATION mais la connexion reste intacte */
+  CURLKHSTAT_FINE_REPLACE
+};
+enum curl_khmatch {
+  CURLKHMATCH_OK,       /* correspondance */
+  CURLKHMATCH_MISMATCH, /* hôte trouvé, clé non correspondante */
+  CURLKHMATCH_MISSING,  /* aucune correspondance hôte/clé trouvée */
+};
+struct curl_khkey {
+  const char *key; /* pointe vers une chaîne terminée par null encodée en
+                      base64 si len est zéro, sinon vers les données "brutes" */
+  size_t len;
+  enum curl_khtype keytype;
+};
+int ssh_keycallback(CURL *easy,
+                    const struct curl_khkey *knownkey,
+                    const struct curl_khkey *foundkey,
+                    enum curl_khmatch match,
+                    void *clientp);
+CURLcode curl_easy_setopt(CURL *handle, CURLOPT_SSH_KEYFUNCTION,
+                          ssh_keycallback);</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Passez un pointeur vers votre fonction de rappel, qui doit correspondre au prototype indiqué ci-dessus.</p>
+<p class="Pp">Elle est appelée lorsque la correspondance des hôtes connus a été effectuée, pour permettre à l'application d'agir et de décider pour libcurl comment procéder. La fonction de rappel n'est appelée que si <a href='/man/CURLOPT_SSH_KNOWNHOSTS.3.fr'>CURLOPT_SSH_KNOWNHOSTS(3)</a> est également défini.</p>
+<p class="Pp">Cette fonction de rappel reçoit le descripteur curl, la clé du fichier known_hosts <i>knownkey</i>, la clé du site distant <i>foundkey</i>, des informations de libcurl sur l'état de la correspondance et un pointeur personnalisé (défini avec <a href='/man/CURLOPT_SSH_KEYDATA.3.fr'>CURLOPT_SSH_KEYDATA(3)</a>). Elle doit retourner l'un des codes de retour suivants pour indiquer à libcurl comment agir :</p>
+<dl class="Bl-tag">
+  <dt id="CURLKHSTAT_FINE_REPLACE"><a class="permalink" href="#CURLKHSTAT_FINE_REPLACE">CURLKHSTAT_FINE_REPLACE</a></dt>
+  <dd>Le nouvel hôte+clé est accepté et libcurl remplace l'ancien hôte+clé dans le fichier known_hosts avant de continuer la connexion. Cela ajoute également la nouvelle combinaison hôte+clé au pool known_host conservé en mémoire si elle n'était pas déjà présente. L'ajout de données au fichier se fait en remplaçant complètement le fichier par une nouvelle copie, les permissions du fichier doivent donc l'autoriser. (Ajouté dans 7.73.0)</dd>
+  <dt id="CURLKHSTAT_FINE_ADD_TO_FILE"><a class="permalink" href="#CURLKHSTAT_FINE_ADD_TO_FILE">CURLKHSTAT_FINE_ADD_TO_FILE</a></dt>
+  <dd>L'hôte+clé est accepté et libcurl l'ajoute à la fin du fichier known_hosts avant de continuer la connexion. Cela ajoute également la combinaison hôte+clé au pool known_host conservé en mémoire si elle n'était pas déjà présente. L'ajout de données au fichier se fait en remplaçant complètement le fichier par une nouvelle copie, les permissions du fichier doivent donc l'autoriser.</dd>
+  <dt id="CURLKHSTAT_FINE"><a class="permalink" href="#CURLKHSTAT_FINE">CURLKHSTAT_FINE</a></dt>
+  <dd>L'hôte+clé est accepté et libcurl continue la connexion. Cela ajoute également la combinaison hôte+clé au pool known_host conservé en mémoire si elle n'était pas déjà présente.</dd>
+  <dt id="CURLKHSTAT_REJECT"><a class="permalink" href="#CURLKHSTAT_REJECT">CURLKHSTAT_REJECT</a></dt>
+  <dd>L'hôte+clé est rejeté. libcurl refuse que la connexion continue et elle est fermée.</dd>
+  <dt id="CURLKHSTAT_DEFER"><a class="permalink" href="#CURLKHSTAT_DEFER">CURLKHSTAT_DEFER</a></dt>
+  <dd>L'hôte+clé est rejeté, mais la connexion SSH est demandée pour être maintenue active. Cette fonctionnalité pourrait être utilisée lorsque l'application souhaite revenir et agir sur la situation hôte+clé, puis réessayer sans avoir besoin de la surcharge de la configurer à nouveau à partir de zéro.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DEFAUT'><a class='permalink' href='#DEFAUT'>DEFAUT</a></h1>
+<p class="Pp">NULL</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PROTOCOLES'><a class='permalink' href='#PROTOCOLES'>PROTOCOLES</a></h1>
+<p class="Pp">Cette fonctionnalité affecte scp et sftp</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXEMPLE'><a class='permalink' href='#EXEMPLE'>EXEMPLE</a></h1>
+<pre>struct mine {
+  void *custom;
+};
+static int keycb(CURL *easy,
+                 const struct curl_khkey *knownkey,
+                 const struct curl_khkey *foundkey,
+                 enum curl_khmatch match,
+                 void *clientp)
+{
+  /* 'clientp' pointe vers la structure callback_data */
+  /* examiner la situation et retourner la valeur correcte */
+  return CURLKHSTAT_FINE_ADD_TO_FILE;
+}
+int main(void)
+{
+  CURL *curl = curl_easy_init();
+  if(curl) {
+    struct mine callback_data;
+    curl_easy_setopt(curl, CURLOPT_URL, &quot;sftp://example.com/thisfile.txt&quot;);
+    curl_easy_setopt(curl, CURLOPT_SSH_KEYFUNCTION, keycb);
+    curl_easy_setopt(curl, CURLOPT_SSH_KEYDATA, &amp;callback_data);
+    curl_easy_setopt(curl, CURLOPT_SSH_KNOWNHOSTS, &quot;/home/user/known_hosts&quot;);
+    curl_easy_perform(curl);
+}
+}</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DISPONIBILITE'><a class='permalink' href='#DISPONIBILITE'>DISPONIBILITE</a></h1>
+<p class="Pp">Ajouté dans curl 7.19.6</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VALEUR_DE_RETOUR'><a class='permalink' href='#VALEUR_DE_RETOUR'>VALEUR DE RETOUR</a></h1>
+<p class="Pp"><a href='/man/curl_easy_setopt.3.fr'>curl_easy_setopt(3)</a> retourne un code CURLcode indiquant le succès
+    ou une erreur.</p>
+<p class="Pp">CURLE_OK (0) signifie que tout s'est bien passé, une valeur non nulle indique une erreur, voir <a href='/man/libcurl-errors.3.fr'>libcurl-errors(3)</a>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR AUSSI</a></h1>
+<p class="Pp"><a href='/man/CURLOPT_SSH_KEYDATA.3.fr'>CURLOPT_SSH_KEYDATA(3)</a>,
+  <a href='/man/CURLOPT_SSH_KNOWNHOSTS.3.fr'>CURLOPT_SSH_KNOWNHOSTS(3)</a></p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-11-13</td>
+    <td class="foot-os">libcurl</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/core/x86_64/curl/">core/curl</a></dd>
+        <dt>Version :</dt>
+        <dd>8.17.0-2</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://curl.se/">https://curl.se/</a></dd>
+        <dt>Licences :</dt>
+        <dd>MIT</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/core/curl/">/listing/core/curl/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#SYNTAXE">SYNTAXE</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#DEFAUT">DEFAUT</a></li>
+        
+            <li><a href="#PROTOCOLES">PROTOCOLES</a></li>
+        
+            <li><a href="#EXEMPLE">EXEMPLE</a></li>
+        
+            <li><a href="#DISPONIBILITE">DISPONIBILITE</a></li>
+        
+            <li><a href="#VALEUR_DE_RETOUR">VALEUR DE RETOUR</a></li>
+        
+            <li><a href="#VOIR_AUSSI">VOIR AUSSI</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/CURLOPT_SSH_KEYFUNCTION.3.fr.txt">txt</a>, 
+        
+            <a href="/man/CURLOPT_SSH_KEYFUNCTION.3.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>LOCK(7) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">LOCK(7)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/postgresql/">postgresql</a></p>
+<p class="lic">Licences: PostgreSQL</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">LOCK(7)</td>
+    <td class="head-vol">Documentation PostgreSQL 18.1</td>
+    <td class="head-rtitle">LOCK(7)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">LOCK - verrouiller une table</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<pre>LOCK [ TABLE ] [ ONLY ] <i>nom</i> [ * ] [, ...] [ IN <i>mode_verrou</i> MODE ] [ NOWAIT ]
+où <i>mode_verrou</i> est l'un des suivants :
+    ACCESS SHARE | ROW SHARE | ROW EXCLUSIVE | SHARE UPDATE EXCLUSIVE
+    | SHARE | SHARE ROW EXCLUSIVE | EXCLUSIVE | ACCESS EXCLUSIVE</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp"><b>LOCK TABLE</b> obtient un verrouillage au niveau de la table,
+    attendant si nécessaire que tout verrouillage conflictuel soit libéré. Si
+    NOWAIT est spécifié, <b>LOCK TABLE</b> n'attend pas pour acquérir le verrou
+    désiré : s'il ne peut être acquis immédiatement, la commande est annulée et
+    une erreur est générée. Une fois obtenu, le verrou est conservé pour le reste
+    de la transaction courante. (Il n'existe pas de commande <b>UNLOCK TABLE</b> ;
+    les verrous sont toujours libérés à la fin de la transaction.)</p>
+<p class="Pp">Lorsqu'une vue est verrouillée, toutes les relations apparaissant
+    dans la requête de définition de la vue sont également verrouillées de manière
+    récursive avec le même mode de verrouillage.</p>
+<p class="Pp">Lors de l'acquisition automatique des verrous pour les commandes
+    qui référencent des tables, PostgreSQL utilise toujours le mode de verrouillage
+    le moins restrictif possible. <b>LOCK TABLE</b> est utile dans les cas où vous
+    pourriez avoir besoin d'un verrouillage plus restrictif. Par exemple, supposons
+    qu'une application exécute une transaction avec le niveau d'isolation READ
+    COMMITTED et qu'elle doive s'assurer que les données d'une table restent
+    stables pendant la durée de la transaction. Pour y parvenir, vous pourriez
+    obtenir un verrouillage SHARE sur la table avant d'interroger. Cela empêchera
+    les modifications concurrentes des données et garantira que les lectures
+    ultérieures de la table voient une vue stable des données validées, car le
+    mode de verrouillage SHARE entre en conflit avec le verrouillage ROW EXCLUSIVE
+    acquis par les rédacteurs, et votre instruction <b>LOCK TABLE</b> <i>nom</i>
+    <b>IN SHARE MODE</b> attendra jusqu'à ce que tout détenteur concurrent de
+    verrouillage en mode ROW EXCLUSIVE valide ou annule sa transaction. Ainsi,
+    une fois que vous avez obtenu le verrou, il n'y a aucune écriture non validée
+    en suspens ; de plus, aucune ne peut commencer tant que vous n'avez pas libéré
+    le verrou.</p>
+<p class="Pp">Pour obtenir un effet similaire lors de l'exécution d'une
+    transaction aux niveaux d'isolation REPEATABLE READ ou SERIALIZABLE, vous
+    devez exécuter l'instruction <b>LOCK TABLE</b> avant d'exécuter toute
+    instruction <b>SELECT</b> ou de modification de données. La vue des données
+    d'une transaction REPEATABLE READ ou SERIALIZABLE sera figée au début de sa
+    première instruction <b>SELECT</b> ou de modification de données. Un
+    <b>LOCK TABLE</b> ultérieur dans la transaction empêchera toujours les
+    écritures concurrentes – mais il ne garantira pas que ce que la transaction
+    lit correspond aux dernières valeurs validées.</p>
+<p class="Pp">Si une transaction de ce type doit modifier les données de la
+    table, elle doit utiliser le mode de verrouillage SHARE ROW EXCLUSIVE au lieu
+    du mode SHARE. Cela garantit qu'une seule transaction de ce type s'exécute à
+    la fois. Sans cela, une interdiction (deadlock) est possible : deux
+    transactions pourraient toutes deux acquérir le mode SHARE, puis être
+    incapables d'acquérir également le mode ROW EXCLUSIVE pour effectuer leurs
+    mises à jour. (Notez que les verrous d'une transaction n'entrent jamais en
+    conflit, donc une transaction peut acquérir le mode ROW EXCLUSIVE lorsqu'elle
+    détient le mode SHARE – mais pas si quelqu'un d'autre détient le mode SHARE.)
+    Pour éviter les interdictions, assurez-vous que toutes les transactions
+    acquièrent des verrous sur les mêmes objets dans le même ordre, et si plusieurs
+    modes de verrouillage sont impliqués pour un seul objet, alors les transactions
+    doivent toujours acquérir le mode le plus restrictif en premier.</p>
+<p class="Pp">Plus d'informations sur les modes de verrouillage et les stratégies
+    de verrouillage sont disponibles dans la Section&#x00A0;13.3.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PARAMETRES'><a class='permalink' href='#PARAMETRES'>PARAMÈTRES</a></h1>
+<p class="Pp"><i>nom</i></p>
+<div class="Bd-indent">Le nom (éventuellement qualifié par un schéma) d'une table
+  existante à verrouiller. Si ONLY est spécifié avant le nom de la table, seule
+  cette table est verrouillée. Si ONLY n'est pas spécifié, la table et toutes ses
+  tables descendantes (le cas échéant) sont verrouillées. Optionnellement, * peut
+  être spécifié après le nom de la table pour indiquer explicitement que les tables
+  descendantes sont incluses.
+<p class="Pp">La commande LOCK TABLE a, b ; est équivalente à LOCK TABLE a ; LOCK
+    TABLE b ;. Les tables sont verrouillées une par une dans l'ordre spécifié dans
+    la commande <b>LOCK TABLE</b>.</p>
+</div>
+<p class="Pp"><i>mode_verrou</i></p>
+<div class="Bd-indent">Le mode de verrouillage spécifie avec quels verrous ce
+  verrouillage est en conflit. Les modes de verrouillage sont décrits dans la
+  Section&#x00A0;13.3.
+<p class="Pp">Si aucun mode de verrouillage n'est spécifié, alors ACCESS
+    EXCLUSIVE, le mode le plus restrictif, est utilisé.</p>
+</div>
+<p class="Pp">NOWAIT</p>
+<div class="Bd-indent">Spécifie que <b>LOCK TABLE</b> ne doit pas attendre que
+  des verrous conflictuels soient libérés : si les verrous spécifiés ne peuvent pas
+  être acquis immédiatement sans attendre, la transaction est annulée.</div>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='NOTES'><a class='permalink' href='#NOTES'>NOTES</a></h1>
+<p class="Pp">Pour verrouiller une table, l'utilisateur doit avoir le privilège
+    requis pour le <i>mode_verrou</i> spécifié. Si l'utilisateur a les privilèges
+    MAINTAIN, UPDATE, DELETE ou TRUNCATE sur la table, tout <i>mode_verrou</i>
+    est autorisé. Si l'utilisateur a le privilège INSERT sur la table, ROW EXCLUSIVE
+    MODE (ou un mode moins conflictuel comme décrit dans la Section&#x00A0;13.3)
+    est autorisé. Si un utilisateur a le privilège SELECT sur la table, ACCESS
+    SHARE MODE est autorisé.</p>
+<p class="Pp">L'utilisateur effectuant le verrouillage sur une vue doit avoir le
+    privilège correspondant sur la vue. De plus, par défaut, le propriétaire de la
+    vue doit avoir les privilèges pertinents sur les relations de base sous-jacentes,
+    tandis que l'utilisateur effectuant le verrouillage n'a besoin d'aucune
+    permission sur les relations de base sous-jacentes. Cependant, si la vue est
+    définie avec security_invoker sur true (voir <b>CREATE VIEW</b>), l'utilisateur
+    effectuant le verrouillage, plutôt que le propriétaire de la vue, doit avoir
+    les privilèges pertinents sur les relations de base sous-jacentes.</p>
+<p class="Pp"><b>LOCK TABLE</b> est inutile en dehors d'un bloc de transaction :
+    le verrou serait conservé uniquement jusqu'à la fin de l'instruction. Par
+    conséquent, PostgreSQL signale une erreur si <b>LOCK</b> est utilisé en dehors
+    d'un bloc de transaction. Utilisez <b>BEGIN</b> et <b>COMMIT</b> (ou
+    <b>ROLLBACK</b>) pour définir un bloc de transaction.</p>
+<p class="Pp"><b>LOCK TABLE</b> ne traite que les verrous au niveau de la table,
+    et donc les noms de modes impliquant ROW sont tous des mésusages. Ces noms de
+    modes doivent généralement être lus comme indiquant l'intention de l'utilisateur
+    d'acquérir des verrous au niveau des lignes au sein de la table verrouillée. De
+    même, le mode ROW EXCLUSIVE est un verrouillage de table partageable. Gardez à
+    l'esprit que tous les modes de verrouillage ont des sémantiques identiques en
+    ce qui concerne <b>LOCK TABLE</b>, ne différant que par les règles sur les
+    modes qui entrent en conflit avec lesquels. Pour des informations sur la façon
+    d'acquérir un verrouillage de ligne réel, voir la Section&#x00A0;13.3.2 et La
+    clause de verrouillage dans la documentation de <a href='/man/SELECT.7.fr'>SELECT(7)</a>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXEMPLES'><a class='permalink' href='#EXEMPLES'>EXEMPLES</a></h1>
+<p class="Pp">Obtenir un verrouillage SHARE sur une table de clé primaire lors de
+    l'exécution d'insertions dans une table de clé étrangère :</p>
+<div class="Bd-indent">
+<pre>BEGIN WORK;
+LOCK TABLE films IN SHARE MODE;
+SELECT id FROM films
+    WHERE name = 'Star Wars: Episode I - La Menace Fantôme';
+-- Faire ROLLBACK si l'enregistrement n'a pas été renvoyé
+INSERT INTO films_user_comments VALUES
+    (_id_, 'SUPER ! Je l''attendais depuis si longtemps !');
+COMMIT WORK;</pre>
+</div>
+<p class="Pp">Prendre un verrouillage SHARE ROW EXCLUSIVE sur une table de clé
+    primaire lors de l'exécution d'une opération de suppression :</p>
+<div class="Bd-indent">
+<pre>BEGIN WORK;
+LOCK TABLE films IN SHARE ROW EXCLUSIVE MODE;
+DELETE FROM films_user_comments WHERE id IN
+    (SELECT id FROM films WHERE rating &lt; 5);
+DELETE FROM films WHERE rating &lt; 5;
+COMMIT WORK;</pre>
+</div>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COMPATIBILITE'><a class='permalink' href='#COMPATIBILITE'>COMPATIBILITÉ</a></h1>
+<p class="Pp">Il n'y a pas de <b>LOCK TABLE</b> dans la norme SQL, qui utilise
+    plutôt <b>SET TRANSACTION</b> pour spécifier les niveaux de concurrence des
+    transactions. PostgreSQL prend également en charge cela ; voir SET TRANSACTION
+    (<a href='/man/SET_TRANSACTION.7.fr'>SET_TRANSACTION(7)</a>) pour les
+    détails.</p>
+<p class="Pp">À l'exception des modes de verrouillage ACCESS SHARE, ACCESS
+    EXCLUSIVE et SHARE UPDATE EXCLUSIVE, les modes de verrouillage PostgreSQL et la
+    syntaxe <b>LOCK TABLE</b> sont compatibles avec ceux d'Oracle.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025</td>
+    <td class="foot-os">PostgreSQL 18.1</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page man" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/postgresql/">extra/postgresql</a></dd>
+        <dt>Version :</dt>
+        <dd>18.1-1</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://www.postgresql.org/">https://www.postgresql.org/</a></dd>
+        <dt>Licences :</dt>
+        <dd>PostgreSQL</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/postgresql/">/listin</dd>
+    </dl>
+</section>
+
+            </aside>
+        </main>
+    </body>
+</html>
+<details>
+    <summary>Index</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNTAXE</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#PARAMETERS">PARAMÈTRES</a></li>
+        
+            <li><a href="#NOTES">NOTES</a></li>
+        
+            <li><a href="#EXAMPLES">EXEMPLES</a></li>
+        
+            <li><a href="#COMPATIBILITY">COMPATIBILITÉ</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/LOCK.7.en.txt">txt</a>, 
+        
+            <a href="/man/LOCK.7.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence GPL-3.0, à l'exception du contenu des pages de manuel, qui a sa propre licence spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

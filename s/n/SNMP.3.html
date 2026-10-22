@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>SNMP(3) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">SNMP(3)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/net-snmp/">net-snmp</a></p>
+<p class="lic">Licences: BSD</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">SNMP(3)</td>
+    <td class="head-vol">Documentation contribuée par Perl pour la bibliothèque Net-SNMP</td>
+    <td class="head-rtitle">SNMP(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NAME</a></h1>
+<p class="Pp">SNMP - L'extension Perl5 "SNMP" pour la bibliothèque Net-SNMP du protocole SNMP.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>use SNMP;
+...
+$sess = new SNMP::Session(DestHost =&gt; localhost, Community =&gt; public);
+$val = $sess-&gt;get('sysDescr.0');
+...
+$vars = new SNMP::VarList([sysDescr,0], [sysContact,0], [sysLocation,0]);
+@vals = $sess-&gt;get($vars);
+...
+$vb = new SNMP::Varbind();
+do {
+   $val = $sess-&gt;getnext($vb);
+   print &quot;@{$vb}\n&quot;;
+} until ($sess-&gt;{ErrorNum});
+...
+$SNMP::save_descriptions = 1;
+SNMP::initMib(); # en supposant que le mib n'est pas déjà chargé
+print &quot;$SNMP::MIB{sysDescr}{description}\n&quot;;</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Note : Le module Perl5 SNMP qui accompagne Net-SNMP 5.0 et les versions ultérieures est différent des versions antérieures à plusieurs égards. Premièrement, son comportement est similaire à celui d'un programme SNMP réel et appelle correctement init_snmp, ce qui signifie qu'il lira les fichiers de configuration et utilisera les valeurs par défaut de manière appropriée, analysera les fichiers MIB, etc. Cela peut affecter vos applications Perl si vous avez des valeurs par défaut configurées dans votre fichier snmp.conf (car le module Perl utilisera désormais ces valeurs par défaut). Cependant, la documentation n'a pas encore été mise à jour (sauf cette note), et l'implémentation par défaut de read_config n'est pas entièrement terminée.</p>
+<p class="Pp">Les opérations de base du protocole SNMP sont fournies par ce module via une interface orientée objet pour la modularité et la facilité d'utilisation. La classe principale est SNMP::Session qui encapsule les aspects persistants d'une connexion entre le gestionnaire et l'agent géré. En interne, la classe est implémentée comme une référence de hachage bidirectionnelle. Cette classe fournit des appels de méthode tels que get, getnext, set, fget et fgetnext. Les arguments d'entrée sont divers et prennent en charge les opérations synchrones et asynchrones via une API polymorphique (c'est-à-dire que le comportement des méthodes varie en fonction des arguments passés - voir ci-dessous).</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SNMP::Session'><a class='permalink' href='#SNMP::Session'>SNMP::Session</a></h1>
+<p class="Pp"><span class="Li">$sess</span> = new SNMP::Session(DestHost =&gt; 'localhost', ...)</p>
+<p class="Pp">Les arguments suivants peuvent être passés sous forme de hachage lors de la création.</p>
+<section class="Ss">
+<h2 class="Ss" id='Basic_Options'><a class='permalink' href='#Basic_Options'>Options de base</a></h2>
+<dl class="Bl-tag">
+  <dt id="DestHost"><a class="permalink" href="#DestHost">DestHost</a></dt>
+  <dd>L'hôte ou l'adresse IP de l'agent SNMP auquel vous souhaitez communiquer. Il est spécifié dans les adresses d'agent Net-SNMP formatées. Ces adresses ressemblent généralement à l'une des suivantes :
+        <pre>localhost
+tcp:localhost
+tls:localhost
+tls:localhost:9876
+udp6:[::1]:9876
+unix:/some/path/to/file/socket</pre>
+    <p class="Pp">La valeur par défaut est 'localhost'.</p>
+  </dd>
+  <dt id="Version"><a class="permalink" href="#Version">Version</a></dt>
+  <dd>La version SNMP à utiliser.
+    <p class="Pp">La valeur par défaut est tirée de la configuration de la bibliothèque - probablement 3 [1, 2 (identique à 2c), 2c, 3].</p>
+  </dd>
+  <dt id="Timeout"><a class="permalink" href="#Timeout">Timeout</a></dt>
+  <dd>Le nombre de microsecondes à attendre avant de renvoyer une requête.
+    <p class="Pp">La valeur par défaut est '1000000'</p>
+  </dd>
+  <dt id="Retries"><a class="permalink" href="#Retries">Retries</a></dt>
+  <dd>Le nombre de fois où une requête doit être tentée.
+    <p class="Pp">La valeur par défaut est '5'</p>
+  </dd>
+  <dt id="RetryNoSuch"><a class="permalink" href="#RetryNoSuch">RetryNoSuch</a></dt>
+  <dd>Si activé, les erreurs NOSUCH dans les PDU 'get' seront corrigées, supprimant le varbind en erreur et renvoyant - undef sera retourné pour tous les varbinds NOSUCH, lorsque défini sur '0', cette fonction est désactivée et toute la requête get échouera à toute erreur NOSUCH (s'applique uniquement à v1).
+    <p class="Pp">La valeur par défaut est '0'.</p>
+  </dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='SNMPv3/TLS_Options'><a class='permalink' href='#SNMPv3/TLS_Options'>Options SNMPv3/TLS</a></h2>
+<dl class="Bl-tag">
+  <dt id="OurIdentity"><a class="permalink" href="#OurIdentity">OurIdentity</a></dt>
+  <dd>Notre identité X.509 à utiliser, qui doit être une empreinte digitale ou le nom du fichier qui stocke la certification.</dd>
+  <dt id="TheirIdentity"><a class="permalink" href="#TheirIdentity">TheirIdentity</a></dt>
+  <dd>L'identité du serveur distant auquel se connecter, spécifiée comme une empreinte digitale ou un nom de fichier. Ceci doit être spécifié, ou le nom d'hôte ci-dessous et une ancre de confiance.</dd>
+  <dt id="TheirHostname"><a class="permalink" href="#TheirHostname">TheirHostname</a></dt>
+  <dd>Le nom d'hôte du serveur distant attendu. Si le certificat présenté par le serveur a été signé par un CA, le nom d'hôte dans le certificat doit correspondre à cette valeur, sinon la connexion échouera (pour éviter les attaques de type man-in-the-middle).</dd>
+  <dt id="TrustCert"><a class="permalink" href="#TrustCert">TrustCert</a></dt>
+  <dd>Une certification de confiance à utiliser comme ancre de confiance (comme une certification de CA) pour vérifier le certificat du serveur distant. Si une certification de CA est utilisée pour valider un certificat, TheirHostname doit également être spécifié pour garantir que le nom d'hôte présenté dans le certificat correspond.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='SNMPv3/USM_Options'><a class='permalink' href='#SNMPv3/USM_Options'>Options SNMPv3/USM</a></h2>
+<dl class="Bl-tag">
+  <dt id="SecName"><a class="permalink" href="#SecName">SecName</a></dt>
+  <dd>Le nom de sécurité SNMPv3 à utiliser (le plus courant en SNMPv3 avec USM).
+    <p class="Pp">La valeur par défaut est 'initial'.</p>
+  </dd>
+  <dt id="SecLevel"><a class="permalink" href="#SecLevel">SecLevel</a></dt>
+  <dd>Le niveau de sécurité SNMPv3 à utiliser [noAuthNoPriv, authNoPriv, authPriv] (v3)
+    <p class="Pp">La valeur par défaut est 'noAuthNoPriv'.</p>
+  </dd>
+  <dt id="SecEngineId"><a class="permalink" href="#SecEngineId">SecEngineId</a></dt>
+  <dd>L'identifiant du moteur de sécurité SNMPv3 à utiliser (si nécessaire pour le modèle SNMPv3). Le format est une chaîne sans le préfixe '0x'. Par exemple, si snmptrapd.conf contient <span class="Li">&quot;-e
+      0x8000000001020304&quot;</span>, utilisez <span class="Li">SecEngineId =&gt;</span> <span class="Li">'8000000001020304'</span>.
+    <p class="Pp">La valeur par défaut est &lt;aucun&gt;, et tentera de découvrir si elle n'est pas spécifiée (v3).</p>
+  </dd>
+  <dt id="ContextEngineId"><a class="permalink" href="#ContextEngineId">ContextEngineId</a></dt>
+  <dd>L'identifiant du moteur de contexte SNMPv3 à utiliser.
+    <p class="Pp">La valeur par défaut est &lt;aucun&gt; et sera définie sur la valeur de SecEngineId si elle est spécifiée, ou découverte par d'autres moyens si TLS est utilisé (découverte basée sur RFC5343).</p>
+  </dd>
+  <dt id="Context"><a class="permalink" href="#Context">Context</a></dt>
+  <dd>Le nom de contexte SNMPv3 à utiliser.
+    <p class="Pp">La valeur par défaut est une chaîne vide ('')</p>
+  </dd>
+  <dt id="AuthProto"><a class="permalink" href="#AuthProto">AuthProto</a></dt>
+  <dd>Le protocole d'authentification SNMPv3/USM à utiliser [MD5, SHA].
+    <p class="Pp">La valeur par défaut est 'MD5'.</p>
+  </dd>
+  <dt id="AuthPass"><a class="permalink" href="#AuthPass">AuthPass</a></dt>
+  <dd>Le mot de passe d'authentification SNMPv3/USM à utiliser.
+    <p class="Pp">La valeur par défaut est &lt;aucun&gt;, le mot de passe d'authentification.</p>
+  </dd>
+  <dt id="PrivProto"><a class="permalink" href="#PrivProto">PrivProto</a></dt>
+  <dd>Le protocole de confidentialité SNMPv3/USM à utiliser [DES, AES].
+    <p class="Pp">La valeur par défaut est 'DES'.</p>
+  </dd>
+  <dt id="PrivPass"><a class="permalink" href="#PrivPass">PrivPass</a></dt>
+  <dd>Le mot de passe de confidentialité SNMPv3/USM à utiliser.
+    <p class="Pp">La valeur par défaut est &lt;aucun&gt;, le mot de passe de confidentialité (v3).</p>
+  </dd>
+  <dt id="AuthMasterKey"><a class="permalink" href="#AuthMasterKey">AuthMasterKey</a></dt>
+  <dd></dd>
+  <dt id="PrivMasterKey"><a class="permalink" href="#PrivMasterKey">PrivMasterKey</a></dt>
+  <dd></dd>
+  <dt id="AuthLocalizedKey"><a class="permalink" href="#AuthLocalizedKey">AuthLocalizedKey</a></dt>
+  <dd></dd>
+  <dt id="PrivLocalizedKey"><a class="permalink" href="#PrivLocalizedKey">PrivLocalizedKey</a></dt>
+  <dd>Les clés directement spécifiées de SNMPv3 USM (utilisées si vous souhaitez spécifier les clés plutôt que de les dériver d'un mot de passe comme auparavant).</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='SNMPv1_and_SNMPv2c_Options'><a class='permalink' href='#SNMPv1_and_SNMPv2c_Options'>Options SNMPv1 et SNMPv2c</a></h2>
+<dl class="Bl-tag">
+  <dt id="Community"><a class="permalink" href="#Community">Community</a></dt>
+  <dd>Pour SNMPv1 et SNMPv2c, le nom de communauté en clair à utiliser.
+    <p class="Pp">La valeur par défaut est 'public'.</p>
+  </dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Other_Configuration_Options'><a class='permalink' href='#Other_Configuration_Options'>Autres options de configuration</a></h2>
+<dl class="Bl-tag">
+  <dt id="VarFormats"><a class="permalink" href="#VarFormats">VarFormats</a></dt>
+  <dd>par défaut 'undef', utilisé par 'fget[next]', contient une référence de hachage des formats de valeurs de sortie, (ex. {&lt;obj&gt; =&gt; &lt;sub-ref&gt;}, &lt;obj&gt; doit correspondre au &lt;obj&gt; et au format utilisé dans l'opération de get. Un &lt;obj&gt; spécial, '*', peut être utilisé pour s'appliquer à tous les &lt;obj&gt;, le sub sera appelé pour traduire la valeur dans un nouveau format. Le sub est appelé en passant le Varbind</dd>
+</dl>
+</section>
+</section>
+</article>
+</main>
+</body>
+</html>as la arg</dd>
+  <dt id="TypeFormats"><a class="permalink" href="#TypeFormats">TypeFormats</a></dt>
+  <dd>par défaut 'undef', utilisé par 'fget[next]', contient une référence de hachage des formateurs
+      de valeur de sortie, (par exemple, {&lt;type&gt; =&gt; &lt;sous-référence&gt;, ... }, la
+      sous-référence fournie est appelée pour traduire la valeur dans un nouveau format,
+      sauf si un VarFormat correspond en premier (par exemple,
+      <span class="Li">$sess</span>-&gt;{TypeFormats}{INTEGER} =
+      \&amp;<b>mapEnum()</b>; bien que cela puisse être fait plus efficacement en activant
+      <span class="Li">$SNMP::use_enums</span> ou le paramètre de création de session 'UseEnums')</dd>
+  <dt id="UseLongNames"><a class="permalink" href="#UseLongNames">UseLongNames</a></dt>
+  <dd>par défaut à la valeur de SNMP::use_long_names au moment de la création de la session.
+      défini sur non nul pour que les &lt;balises&gt; pour les méthodes 'getnext' soient générées
+      en privilégiant la convention de nom MIB plus longue (par exemple, system.sysDescr vs juste
+      sysDescr)</dd>
+  <dt id="UseSprintValue"><a class="permalink" href="#UseSprintValue">UseSprintValue</a></dt>
+  <dd>par défaut à la valeur de SNMP::use_sprint_value au moment de la création de la session.
+      défini sur non nul pour que les valeurs de retour pour les méthodes 'get' et 'getnext'
+      soient formatées avec la fonction snprint_value de la bibliothèque. Cela
+      résultera en certains types de données retournés dans un format non canonique. Note :
+      les valeurs retournées avec cette option activée peuvent ne pas être appropriées pour les opérations
+      'set' (voir la discussion sur les formats de valeur dans la section de description de &lt;vars&gt;)</dd>
+  <dt id="UseEnums"><a class="permalink" href="#UseEnums">UseEnums</a></dt>
+  <dd>par défaut à la valeur de SNMP::use_enums au moment de la création de la session. Défini
+      sur non nul pour que les valeurs d'entier retournées soient converties en identificateurs
+      d'énumération si possible. Ces valeurs seront également acceptables lorsqu'elles sont
+      fournies aux opérations 'set'.</dd>
+  <dt id="UseNumeric"><a class="permalink" href="#UseNumeric">UseNumeric</a></dt>
+  <dd>par défaut à la valeur de SNMP::use_numeric au moment de la création de la session.
+      défini sur non nul pour que les &lt;balises&gt; pour les méthodes get soient retournées comme des OID numériques
+      plutôt que des descriptions. UseLongNames sera défini de manière à ce que l'OID complet
+      soit retourné à l'appelant.</dd>
+  <dt id="BestGuess"><a class="permalink" href="#BestGuess">BestGuess</a></dt>
+  <dd>par défaut à la valeur de SNMP::best_guess au moment de la création de la session.
+      Ce réglage contrôle comment les &lt;balises&gt; sont analysées. Le réglage à 0 provoque une recherche
+      régulière. Le réglage à 1 provoque une correspondance d'expression régulière (définie comme
+      -Ib dans snmpcmd) et le réglage à 2 provoque une recherche aléatoire (définie comme
+      -IR dans snmpcmd).</dd>
+  <dt id="NonIncreasing"><a class="permalink" href="#NonIncreasing">NonIncreasing</a></dt>
+  <dd>par défaut à la valeur de SNMP::non_increasing au moment de la création de la session.
+      Ce réglage contrôle si un OID non croissant pendant un bulkwalk provoque une erreur. Le réglage
+      à 0 provoque le comportement par défaut (qui peut, sur des agents très peu performants, résulter
+      en une boucle sans fin). Le réglage à 1 provoque une erreur (OID non croissant) lorsque cette
+      erreur se produit.</dd>
+  <dt id="ErrorStr"><a class="permalink" href="#ErrorStr">ErrorStr</a></dt>
+  <dd>lecture seule, contient le message d'erreur associé à la dernière requête</dd>
+  <dt id="ErrorNum"><a class="permalink" href="#ErrorNum">ErrorNum</a></dt>
+  <dd>lecture seule, contient le snmp_err ou le statut de la dernière requête</dd>
+  <dt id="ErrorInd"><a class="permalink" href="#ErrorInd">ErrorInd</a></dt>
+  <dd>lecture seule, contient l'indice snmp_err lorsque approprié</dd>
+</dl>
+<p class="Pp">Variables privées :</p>
+<dl class="Bl-tag">
+  <dt id="DestAddr"><a class="permalink" href="#DestAddr">DestAddr</a></dt>
+  <dd>champ interne utilisé pour contenir le champ DestHost traduit</dd>
+  <dt id="SessPtr"><a class="permalink" href="#SessPtr">SessPtr</a></dt>
+  <dd>champ interne utilisé pour mettre en cache une structure de session créée</dd>
+  <dt id="RemotePort"><a class="permalink" href="#RemotePort">RemotePort</a></dt>
+  <dd>Obsolète. Veuillez utiliser le spécificateur DestHost pour indiquer la combinaison nom d'hôte et port au lieu de ce paramètre.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='SNMP::Session_methods'><a class='permalink' href='#SNMP::Session_methods'>Méthodes SNMP::Session</a></h2>
+<dl class="Bl-tag">
+  <dt>$sess-&gt;update(&lt;fields&gt;)</dt>
+  <dd>Met à jour l'objet SNMP::Session avec les valeurs des champs passés sous forme de liste de hachage (similaire à new(&lt;fields&gt;)) <b>(ATTENTION ! pas entièrement implémenté)</b></dd>
+  <dt>$sess-&gt;get(&lt;vars&gt; [,&lt;callback&gt;])</dt>
+  <dd>effectue une requête SNMP GET, plusieurs formats de &lt;vars&gt; sont acceptés. Pour une opération synchrone, &lt;vars&gt; sera mis à jour avec la ou les valeurs et le ou les types, et retournera également la ou les valeurs récupérées. Si un &lt;callback&gt; est fourni, la méthode fonctionnera de manière asynchrone.</dd>
+  <dt>$sess-&gt;fget(&lt;vars&gt; [,&lt;callback&gt;])</dt>
+  <dd>effectue une requête SNMP GET comme 'get' et formate les valeurs selon les gestionnaires spécifiés dans <span class="Li">$sess</span>-&gt;{VarFormats} et <span class="Li">$sess</span>-&gt;{TypeFormats}.</dd>
+  <dt>$sess-&gt;getnext(&lt;vars&gt; [,&lt;callback&gt;])</dt>
+  <dd>effectue une requête SNMP GETNEXT, plusieurs formats de &lt;vars&gt; sont acceptés, retourne la ou les valeurs récupérées. Les &lt;vars&gt; passés en arguments sont mis à jour pour indiquer le prochain &lt;obj&gt;, &lt;iid&gt;, &lt;val&gt;, et &lt;type&gt; lexicographiques.
+    <p class="Pp">Note : le format simple de chaînes &lt;vars&gt; (par exemple, 'sysDescr.0') n'est pas mis à jour. Si un &lt;callback&gt; est fourni, la méthode fonctionnera de manière asynchrone.</p>
+  </dd>
+  <dt>$sess-&gt;fgetnext(&lt;vars&gt; [,&lt;callback&gt;])</dt>
+  <dd>effectue une requête SNMP GETNEXT comme getnext et formate les valeurs selon les gestionnaires spécifiés dans <span class="Li">$sess</span>-&gt;{VarFormats} et <span class="Li">$sess</span>-&gt;{TypeFormats}.</dd>
+  <dt>$sess-&gt;set(&lt;vars&gt; [,&lt;callback&gt;])</dt>
+  <dd>effectue une requête SNMP SET, plusieurs formats de &lt;vars&gt; sont acceptés. La valeur dans tous les formats de &lt;vars&gt; doit être dans un format canonique (c'est-à-dire, un format bien connu) pour assurer une traduction sans ambiguïté en valeur de données MIB SNMP (voir la discussion sur le format de valeur canonique dans la section de description de &lt;vars&gt;), retourne snmp_errno. Si un &lt;callback&gt; est fourni, la méthode fonctionnera de manière asynchrone.</dd>
+  <dt>$sess-&gt;getbulk(&lt;non-repeaters&gt;, &lt;max-repeaters&gt;,
+    &lt;vars&gt;)</dt>
+  <dd>effectue un SNMP GETBULK. À partir de la liste de Varbinds, la prochaine instance lexicographique unique est récupérée pour les n premières Varbinds définies par &lt;non-repeaters&gt;. Pour les Varbinds restantes, m instances lexicographiques sont récupérées pour chacune des Varbinds restantes, où m est &lt;max-repeaters&gt;.</dd>
+  <dt>$sess-&gt;bulkwalk(&lt;non-repeaters&gt;, &lt;max-repeaters&gt;,
+    &lt;vars&gt; [,&lt;callback&gt;])</dt>
+  <dd>Effectue un "bulkwalk" de la liste de Varbinds. Ceci est fait en envoyant une requête GETBULK (voir <b>getbulk()</b> ci-dessus) pour les Varbinds. Pour chaque variable demandée, la réponse est examinée pour voir si la prochaine instance lexicographique a quitté le sous-arbre demandé. Toutes les instances supplémentaires retournées pour cette variable sont ignorées, et la recherche pour ce sous-arbre est considérée comme terminée.
+    <p class="Pp">Si des sous-arbres n'ont pas été complétés lorsque la fin des réponses est atteinte, une autre requête est composée, consistant en les variables restantes. Ce processus est répété jusqu'à ce que tous les sous-arbres aient été complétés, ou que trop de paquets aient été échangés (pour éviter les boucles).</p>
+    <p class="Pp">La méthode <b>bulkwalk()</b> retourne un tableau contenant un tableau de Varbinds, un pour chaque variable demandée, dans l'ordre des demandes de variables. En cas d'erreur, <b>bulkwalk()</b> retourne undef et définit <span class="Li">$sess</span>-&gt;ErrorStr et <span class="Li">$sess</span>-&gt;ErrorNum. Si un callback est fourni, <b>bulkwalk()</b> retourne l'identifiant de la requête SNMP et retourne immédiatement. Le callback sera appelé avec la liste d'arguments fournie et la liste des variables retournées.</p>
+    <p class="Pp">Note : Parce que le client doit "découvrir" que l'arbre est complet en comparant les variables retournées avec celles qui ont été demandées, il y a un "piège" potentiel lors de l'utilisation de la valeur max-repeaters. Considérez le code suivant pour afficher une liste d'interfaces et de nombres d'octets :</p>
+        <pre>$numInts = $sess-&gt;get('ifNumber.0');
+($desc, $in, $out) = $sess-&gt;bulkwalk(0, $numInts,
+              [['ifDescr'], ['ifInOctets'], ['ifOutOctets']]);
+for $i (0..($numInts - 1)) {
+    printf &quot;Interface %4s: %s inOctets, %s outOctets\n&quot;,
+              $$desc[$i]-&gt;val, $$in[$i]-&gt;val, $$out[$i]-&gt;val;
+}
+</pre>
+    <p class="Pp">Ce code effectuera *deux* requêtes à l'agent -- la première pour obtenir les valeurs d'interface, et la seconde pour découvrir que toutes les informations étaient dans le premier paquet. Pour contourner cela, utilisez '$numInts + 1' pour la valeur max_repeaters. Cela demande à l'agent d'inclure une variable supplémentaire (sans rapport) qui signale la fin du sous-arbre, permettant à <b>bulkwalk()</b> de déterminer que la requête est terminée.</p>
+  </dd>
+  <dt>$results = $sess-&gt;gettable(&lt;OID_TABLE&gt;, &lt;OPTIONS&gt;)</dt>
+  <dd>Ceci récupérera une table entière de données et retournera une référence de hachage vers ces données. La référence de hachage retournée aura des index des suffixes d'OID pour les données d'index comme clé. La valeur pour chaque entrée sera une autre hachage contenant les données pour une ligne donnée. Les clés de ce hachage seront les noms des colonnes, et les valeurs seront les données.
+    <p class="Pp">Exemple :</p>
+        <pre>#!/usr/bin/perl
+use SNMP;
+use Data::Dumper;
+my $s = new SNMP::Session(DestHost =&gt; 'localhost');
+print Dumper($s-&gt;gettable('ifTable'));
+</pre>
+    <p class="Pp">Sur ma machine produit :</p>
+        <pre>$VAR1 = {
+          '6' =&gt; {
+                   'ifMtu' =&gt; '1500',
+                   'ifPhysAddress' =&gt; 'PV',
+                   # ...
+                   'ifInUnknownProtos' =&gt; '0'
+                 },
+          '4' =&gt; {
+                   'ifMtu' =&gt; '1480',
+                   'ifPhysAddress' =&gt; '',
+                   # ...
+                   'ifInUnknownProtos' =&gt; '0'
+                 },
+          # ...
+         };
+</pre>
+    <p class="Pp">Par défaut, il essaiera de faire une récupération aussi optimisée que possible. Il demandera plusieurs colonnes à la fois et utilisera GETBULK si possible. Quelques options peuvent être spécifiées en passant un hachage d'<i>OPTIONS</i> contenant divers paramètres :</p>
+  </dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="noindexes"><a class="permalink" href="#noindexes">noindexes =&gt;
+    1</a></dt>
+  <dd>Indique au code de ne pas analyser les index et de placer les résultats dans le second hachage. Si vous n'avez pas besoin des données d'index, ce sera plus rapide.</dd>
+  <dt id="columns"><a class="permalink" href="#columns">columns =&gt; [
+    colname1, ... ]</a></dt>
+  <dd>Ceci spécifie quelles colonnes collecter. Par défaut, il essaiera de collecter toutes les colonnes définies dans la table MIB.</dd>
+  <dt id="repeat"><a class="permalink" href="#repeat">repeat =&gt;
+    <i>COUNT</i></a></dt>
+  <dd>Spécifie un compte de répétition GETBULK <i>COUNT</i>. C'est-à-dire qu'il demandera ce nombre de varbinds par colonne lors de l'utilisation de l'opération GETBULK. Réduire cela signifie des paquets plus petits, ce qui peut aider à traverser certains systèmes. Par défaut, cette valeur est calculée et tente de deviner ce qui contiendra tous les résultats dans 1000 octets. Ce calcul est assez sûr, espérons-le, mais vous pouvez augmenter ou diminuer le nombre en utilisant cette option si vous le souhaitez. Sur les réseaux peu fiables, vous voulez vous assurer que les paquets ne sont pas fragmentés et réduire cette valeur est un moyen d'y aider.</dd>
+  <dt id="nogetbulk"><a cla
+ss="permalink" href="#nogetbulk">nogetbulk =&gt;
+    1</a></dt>
+  <dd>Force l'utilisation de GETNEXT au lieu de GETBULK. (toujours vrai pour SNMPv1, car
+      il n'a pas de GETBULK de toute façon). Certains agents sont d'excellents implémenteurs de
+      GETBULK et cela vous permet de forcer l'utilisation des opérations GETNEXT
+      à la place.</dd>
+  <dt id="callback"><a class="permalink" href="#callback">callback =&gt;
+    \&amp;sous-routine</a></dt>
+  <dd></dd>
+  <dt id="callback~2"><a class="permalink" href="#callback~2">callback =&gt;
+    [\&amp;sous-routine, optarg1, optarg2, ...]</a></dt>
+  <dd>Si une fonction de rappel est spécifiée, gettable renverra rapidement sans renvoyer
+      de résultats. Lorsque les résultats seront finalement récupérés, la sous-routine de rappel
+      sera appelée (voir les autres sections définissant le comportement de rappel et comment
+      utiliser SNMP::MainLoop, qui est requis pour que cela fonctionne). Un
+      argument supplémentaire du hachage de résultat normal sera ajouté aux
+      arguments de la sous-routine de rappel.
+    <p class="Pp">Note 1 : en interne, la fonction gettable utilise ses propres
+        fonctions de rappel qui sont transmises à getnext/getbulk selon le cas.</p>
+    <p class="Pp">Note 2 : la prise en charge des fonctions de rappel n'est disponible que dans le module SNMP
+        version 5.04 et supérieure. Pour tester cela dans un code destiné à prendre en charge
+        à la fois les versions antérieures à 5.04 et les versions 5.04 et supérieures, le code suivant devrait
+      fonctionner :</p>
+        <pre>if ($response = $sess-&gt;gettable('ifTable', callback =&gt; \&amp;my_sub)) {
+    # réponse obtenue, gettable ne prend pas en charge le rappel
+    my_sub($response);
+    $no_mainloop = 1;
+}
+</pre>
+    <p class="Pp">La décision d'utiliser ou non SNMP::MainLoop est laissée comme exercice au lecteur, car elle dépend de l'utilisation par votre code d'autres fonctions de rappel.</p>
+  </dd>
+</dl>
+</div>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SNMP::TrapSession'><a class='permalink' href='#SNMP::TrapSession'>SNMP::TrapSession</a></h1>
+<p class="Pp"><span class="Li">$sess</span> = new SNMP::Session(DestHost =&gt;
+    'host', ...)</p>
+<p class="Pp">prend en charge tous les champs applicables de SNMP::Session (voir ci-dessus)</p>
+<section class="Ss">
+<h2 class="Ss" id='SNMP::TrapSession_methods'><a class='permalink' href='#SNMP::TrapSession_methods'>Méthodes de SNMP::TrapSession</a></h2>
+<dl class="Bl-tag">
+  <dt>$sess-&gt;trap(enterprise, agent, generic, specific, uptime,
+    &lt;vars&gt;)</dt>
+  <dd>
+    <pre>$sess-&gt;trap(enterprise=&gt;'.1.3.6.1.4.1.2021', # ou 'ucdavis' [défaut]
+            agent =&gt; '127.0.0.1', # ou 'localhost', [défaut : 1ère intf sur l'hôte]
+            generic =&gt; specific,  # peut être omis si 'specific' est fourni
+            specific =&gt; 5,        # peut être omis si 'generic' est fourni
+            uptime =&gt; 1234,       # défaut à l'uptime de localhost (0 sur win32)
+            [[ifIndex, 1, 1],[sysLocation, 0, &quot;ici&quot;]]); # variables optionnelles
+                                                         # toujours à la fin
+</pre>
+  </dd>
+  <dt id="trap(oid,"><a class="permalink" href="#trap(oid,">trap(oid, uptime,
+    &lt;vars&gt;) - format v2</a></dt>
+  <dd>
+    <pre>$sess-&gt;trap(oid =&gt; 'snmpRisingAlarm',
+            uptime =&gt; 1234,
+            [[ifIndex, 1, 1],[sysLocation, 0, &quot;ici&quot;]]); # variables optionnelles
+                                                         # toujours à la fin
+</pre>
+  </dd>
+</dl>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Formats_de_variables_acceptables:'><a class='permalink' href='#Formats_de_variables_acceptables:'>Formats de variables acceptables :</a></h1>
+<p class="Pp">&lt;vars&gt; peut être l'une des formes suivantes :</p>
+<dl class="Bl-tag">
+  <dt id="SNMP::VarList"><a class="permalink" href="#SNMP::VarList">SNMP::VarList</a></dt>
+  <dd>représente un tableau d'objets MIB à obtenir ou à définir, implémenté comme une référence bénie à un tableau de SNMP::Varbinds (par exemple, [&lt;varbind1&gt;,
+      &lt;varbind2&gt;, ...])</dd>
+  <dt id="SNMP::Varbind"><a class="permalink" href="#SNMP::Varbind">SNMP::Varbind</a></dt>
+  <dd>représente un seul objet MIB à obtenir ou à définir, implémenté comme une référence bénie à un tableau de 4 éléments ; [&lt;obj&gt;, &lt;iid&gt;, &lt;val&gt;,
+      &lt;type&gt;].</dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt>&lt;obj&gt;</dt>
+  <dd>l'une des formes suivantes :</dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt>1)</dt>
+  <dd>identifiant de feuille (par exemple, 'sysDescr') supposé être unique à des fins pratiques</dd>
+  <dt>2)</dt>
+  <dd>identifiant qualifié complet (par exemple,
+      '.iso.org.dod.internet.mgmt.mib-2.system.sysDescr')</dd>
+  <dt>3)</dt>
+  <dd>OID numérique qualifié complet en notation décimale pointée (par exemple,
+    '.1.3.6.1.2.1.1.1')</dd>
+</dl>
+</div>
+<dl class="Bl-tag">
+  <dt>&lt;iid&gt;</dt>
+  <dd>l'identifiant d'instance en notation décimale pointée. Pour les objets MIB scalaires, utilisez
+    '0'</dd>
+  <dt>&lt;val&gt;</dt>
+  <dd>la valeur de données SNMP récupérée ou définie dans la MIB de l'agent. Pour
+      les opérations (f)get(next), &lt;val&gt; peut avoir une variété de formats déterminés par les paramètres de session et de package. Cependant, pour les opérations set,
+      le format &lt;val&gt; doit être canonique pour garantir une traduction sans ambiguïté.
+      Les formes canoniques sont les suivantes :</dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="OBJECTID"><a class="permalink" href="#OBJECTID">OBJECTID</a></dt>
+  <dd>décimale pointée (par exemple, .1.3.6.1.2.1.1.1)</dd>
+  <dt id="OCTETSTR"><a class="permalink" href="#OCTETSTR">OCTETSTR</a></dt>
+  <dd>scalaire Perl contenant des octets</dd>
+  <dt id="INTEGER"><a class="permalink" href="#INTEGER">INTEGER</a></dt>
+  <dd>entier signé décimal (ou énuméré)</dd>
+  <dt id="NETADDR"><a class="permalink" href="#NETADDR">NETADDR</a></dt>
+  <dd>décimale pointée</dd>
+  <dt id="IPADDR"><a class="permalink" href="#IPADDR">IPADDR</a></dt>
+  <dd>décimale pointée</dd>
+  <dt id="COUNTER"><a class="permalink" href="#COUNTER">COUNTER</a></dt>
+  <dd>entier décimal non signé</dd>
+  <dt id="COUNTER64"><a class="permalink" href="#COUNTER64">COUNTER64</a></dt>
+  <dd>entier décimal non signé</dd>
+  <dt id="GAUGE"><a class="permalink" href="#GAUGE">GAUGE</a></dt>
+  <dd>entier décimal non signé</dd>
+  <dt id="UINTEGER"><a class="permalink" href="#UINTEGER">UINTEGER</a></dt>
+  <dd>entier décimal non signé</dd>
+  <dt id="TICKS"><a class="permalink" href="#TICKS">TICKS</a></dt>
+  <dd>entier décimal non signé</dd>
+  <dt id="OPAQUE"><a class="permalink" href="#OPAQUE">OPAQUE</a></dt>
+  <dd>scalaire Perl contenant des octets</dd>
+  <dt id="NULL"><a class="permalink" href="#NULL">NULL</a></dt>
+  <dd>scalaire Perl ne contenant rien</dd>
+</dl>
+</div>
+<dl class="Bl-tag">
+  <dt>&lt;type&gt;</dt>
+  <dd>type de données SNMP (voir la liste ci-dessus), ce champ est renseigné par les opérations 'get' et
+      'getnext'. Dans certains cas, le programmeur doit renseigner ce champ lors de la transmission à une opération 'set'. ce champ n'a pas besoin d'être fourni lorsque l'attribut indiqué par &lt;tag&gt; est déjà décrit par des modules MIB chargés. pour les 'set', si un OID numérique est utilisé et que l'objet n'est pas actuellement dans la MIB chargée, le champ &lt;type&gt; doit être fourni</dd>
+</dl>
+</div>
+<dl class="Bl-tag">
+  <dt id="simple"><a class="permalink" href="#simple">chaîne simple</a></dt>
+  <dd>forme légère de &lt;var&gt; utilisée pour 'set' ou 'get' un seul attribut sans construire un SNMP::Varbind. stocké dans un scalaire Perl, a la forme '&lt;tag&gt;.&lt;iid&gt;', (par exemple, 'sysDescr.0'). pour les opérations 'set', la valeur est passée comme second argument. Note : ce format d'argument n'est pas mis à jour dans les opérations get[next] comme le sont les autres formes.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Formats_de_rappel_acceptables'><a class='permalink' href='#Formats_de_rappel_acceptables'>Formats de rappel acceptables</a></h1>
+<p class="Pp">&lt;callback&gt; peut être l'une des formes suivantes :</p>
+<dl class="Bl-tag">
+  <dt id="without"><a class="permalink" href="#without">sans
+    arguments</a></dt>
+  <dd></dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt>\&amp;nom_sous-routine</dt>
+  <dd></dd>
+  <dt id="sub"><a class="permalink" href="#sub">sous { ... }</a></dt>
+  <dd></dd>
+</dl>
+</div>
+<dl class="Bl-tag">
+  <dt id="or"><a class="permalink" href="#or">ou avec arguments</a></dt>
+  <dd></dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt>[ \&amp;nom_sous-routine, $arg1, ... ]</dt>
+  <dd></dd>
+  <dt>[ sous { ... }, $arg1, ... ]</dt>
+  <dd></dd>
+  <dt>[ &quot;méthode&quot;, $obj, $arg1, ... ]</dt>
+  <dd></dd>
+</dl>
+</div>
+<p class="Pp">La fonction de rappel sera appelée lorsque la réponse sera reçue ou en cas de délai d'attente. Le dernier argument passé à la fonction de rappel sera une référence SNMP::VarList. En cas de délai d'attente, le dernier argument sera undef.</p>
+<dl class="Bl-tag">
+  <dt>&amp;SNMP::MainLoop([&lt;timeout&gt;, [&lt;callback&gt;]])</dt>
+  <dd>à utiliser avec les appels asynchrones SNMP::Session. MainLoop doit être appelé après les appels asynchrones initiaux afin que les paquets de retour de l'agent soient traités. Si aucun argument n'est fourni, cette fonction entre dans une boucle infinie, le programme doit donc être quitté dans une fonction de rappel ou interrompu extérieurement. Si &lt;timeout (sic)</dd>
+  <dt>&amp;<b>SNMP::finish()</b></dt>
+  <dd>Cette fonction, lorsqu'elle est appelée à partir d'une fonction de rappel <b>SNMP::MainLoop()</b>, provoquera le retour de <b>SNMP::MainLoop()</b> actuel après l'achèvement de la fonction de rappel. <b>finish()</b> peut être utilisé pour terminer une MainLoop autrement infinie. Une nouvelle instance de <b>MainLoop()</b> peut alors être démarrée pour gérer les requêtes ultérieures.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Variables_et_fonctions_du_package_SNMP'><a class='permalink' href='#Variables_et_fonctions_du_package_SNMP'>Variables et fonctions du package SNMP</a></h1>
+<dl class="Bl-tag">
+  <dt>$SNMP::VERSION</dt>
+  <dd>le spécificateur de version actuel (par exemple, 3.1.0)</dd>
+  <dt>$SNMP::auto_init_mib</dt>
+  <dd>par défaut '1', mis à 0 pour désactiver la lecture automatique de la MIB lors de la création de la session. mis à une valeur non nulle pour appeler initMib lors de la création de la session, ce qui entraînera le chargement de la MIB selon les variables d'environnement Net-SNMP (voir man mib_api)</dd>
+  <dt>$SNMP::verbose</dt>
+  <dd>par défaut '0', contrôle la sortie des avertissements/informations du module SNMP, 0 =&gt; aucune sortie, 1 =&gt; active la sortie des avertissements/informations du module SNMP lui-même (est également contrôlé par SNMP::debugging - voir ci-dessous)</dd>
+  <dt>$SNMP::use_long_names</dt>
+  <dd>par défaut '0', mis à une valeur non nulle pour activer l'utilisation d'identifiants MIB plus longs.
+      voir translateObj. influencera également le formatage de &lt;tag&gt; dans les varbinds renvoyés par les opérations 'getnext'. Peut être défini par session (UseLongNames)</dd>
+  <dt>$SNMP::use_sprint_value</dt>
+  <dd>par défaut '0', mis à une valeur non nulle pour activer le formatage des valeurs de réponse à l'aide de la fonction snprint_value des bibliothèques snmp. peut également être défini par session (voir UseSprintValue) Note : les valeurs renvoyées peuvent ne pas convenir aux opérations 'set'</dd>
+  <dt>$SNMP::use_enums</dt>
+  <dd>par défaut '0', mis à une valeur non nulle pour renvoyer les valeurs sous forme d'énumérés et permettre les définitions utilisant des énumérés le cas échéant. les entiers seront toujours acceptés pour les opérations de définition. peut également être défini par session (voir UseEnums)</dd>
+  <dt>$SNMP::use_numeric</dt>
+  <dd>par défaut '0', mis à une valeur non nulle pour que les &lt;tags&gt; des méthodes 'get' soient renvoyés sous forme d'OID numériques plutôt que de descriptions. UseLongNames sera défini de manière à ce que l'OID complet soit renvoyé. Défini par session (voir UseNumeric).</dd>
+  <dt>$SNMP::best_guess</dt>
+  <dd>par défaut '0'. Ce paramètre contrôle la façon dont les &lt;tags&gt; sont analysés. Le réglage à 0 provoque une recherche normale. Le réglage à 1 provoque une correspondance d'expression régulière (définie comme -Ib dans snmpcmd) et le réglage à 2 provoque une recherche à accès aléatoire (définie comme -IR dans snmpcmd). Peut également être défini par session (voir BestGuess)</dd>
+  <dt>$SNMP::save_descriptions</dt>
+  <dd>par défaut '0', mis à une valeur non nulle pour que l'analyseur MIB enregistre les descriptions d'attributs.
+      doit être défini avant l'initialisation de la MIB</dd>
+  <dt>$SNMP::debugging</dt>
+</dl>
+>
+  <dd>par défaut '0', contrôle le niveau de sortie de débogage dans le module SNMP et
+      libsnmp</dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt>1.</dt>
+  <dd>active 'SNMP::verbose' (voir ci-dessus)</dd>
+  <dt>2.</dt>
+  <dd>niveau 1 plus <a href='/man/snmp_set_do_debugging.1.en'>snmp_set_do_debugging(1)</a></dd>
+  <dt>3.</dt>
+  <dd>niveau 2 plus <a href='/man/snmp_set_dump_packet.1.en'>snmp_set_dump_packet(1)</a></dd>
+</dl>
+</div>
+<dl class="Bl-tag">
+  <dt>$SNMP::dump_packet</dt>
+  <dd>par défaut '0', définir à 'non-zéro' pour définir indépendamment
+      <b>snmp_set_dump_packet()</b></dd>
+  <dt id="SNMP::register_debug_tokens()"><a class="permalink" href="#SNMP::register_debug_tokens()"><b>SNMP::register_debug_tokens()</b></a></dt>
+  <dd>Permet d'enregistrer un ou plusieurs jetons de débogage, tout comme l'option -D de
+      snmpd. Chaque jeton de débogage active un groupe d'instructions de débogage. Un exemple:
+      SNMP::register_debug_tokens(&quot;tdomain,netsnmp_unix&quot;);</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='%SNMP::MIB'><a class='permalink' href='#%SNMP::MIB'>%SNMP::MIB</a></h1>
+<p class="Pp">une table liée pour accéder aux informations MIB analysées. Après que la MIB a
+    été chargée, cette table permet d'accéder aux métadonnées MIB analysées (la
+    structure de la MIB (c'est-à-dire le schéma)). La table renvoie des références bénies à des
+    objets SNMP::MIB::NODE qui représentent un seul attribut MIB. Les nœuds
+    peuvent être récupérés à l'aide de plusieurs formats de 'clé' - le nom de feuille (par exemple, sysDescr)
+    ou un nom entièrement/partiellement qualifié (par exemple, system.sysDescr) ou un OID numérique entièrement qualifié. L'objet nœud renvoyé prend en charge les champs suivants:</p>
+<dl class="Bl-tag">
+  <dt id="objectID"><a class="permalink" href="#objectID">objectID</a></dt>
+  <dd>OID entièrement qualifié en décimal pointé</dd>
+  <dt id="label"><a class="permalink" href="#label">label</a></dt>
+  <dd>identifiant textuel de feuille (par exemple, 'sysDescr')</dd>
+  <dt id="subID"><a class="permalink" href="#subID">subID</a></dt>
+  <dd>composant OID numérique de feuille d'objectID (par exemple, '1')</dd>
+  <dt id="moduleID"><a class="permalink" href="#moduleID">moduleID</a></dt>
+  <dd>identifiant textuel du module (par exemple, 'RFC1213-MIB')</dd>
+  <dt id="parent"><a class="permalink" href="#parent">parent</a></dt>
+  <dd>nœud parent</dd>
+  <dt id="children"><a class="permalink" href="#children">children</a></dt>
+  <dd>référence de tableau des nœuds enfants</dd>
+  <dt id="nextNode"><a class="permalink" href="#nextNode">nextNode</a></dt>
+  <dd>prochain nœud lexicographique <b>(BUG! ne renvoie pas dans l'ordre lexicographique)</b></dd>
+  <dt id="type"><a class="permalink" href="#type">type</a></dt>
+  <dd>renvoie le type d'application (voir getType pour les valeurs)</dd>
+  <dt id="access"><a class="permalink" href="#access">access</a></dt>
+  <dd>renvoie ACCESS (ReadOnly, ReadWrite, WriteOnly, NoAccess, Notify,
+    Create)</dd>
+  <dt id="status"><a class="permalink" href="#status">status</a></dt>
+  <dd>renvoie STATUS (Mandatory, Optional, Obsolete, Deprecated)</dd>
+  <dt id="syntax"><a class="permalink" href="#syntax">syntax</a></dt>
+  <dd>renvoie 'textualConvention' si défini, sinon 'type'</dd>
+  <dt id="textualConvention"><a class="permalink" href="#textualConvention">textualConvention</a></dt>
+  <dd>renvoie TEXTUAL-CONVENTION</dd>
+  <dt id="TCDescription"><a class="permalink" href="#TCDescription">TCDescription</a></dt>
+  <dd>renvoie le champ DESCRIPTION de TEXTUAL-CONVENTION.</dd>
+  <dt id="units"><a class="permalink" href="#units">units</a></dt>
+  <dd>renvoie UNITS</dd>
+  <dt id="hint"><a class="permalink" href="#hint">hint</a></dt>
+  <dd>renvoie HINT</dd>
+  <dt id="enums"><a class="permalink" href="#enums">enums</a></dt>
+  <dd>renvoie une référence de table {tag =&gt; num, ...}</dd>
+  <dt id="ranges"><a class="permalink" href="#ranges">ranges</a></dt>
+  <dd>renvoie une référence de tableau de références de table [{low =&gt; num, high =&gt; num}, ...]</dd>
+  <dt id="description"><a class="permalink" href="#description">description</a></dt>
+  <dd>renvoie DESCRIPTION ($SNMP::save_descriptions doit être défini avant l'initialisation/l'analyse MIB)</dd>
+  <dt id="reference"><a class="permalink" href="#reference">reference</a></dt>
+  <dd>renvoie la clause REFERENCE</dd>
+  <dt id="indexes"><a class="permalink" href="#indexes">indexes</a></dt>
+  <dd>renvoie les objets de la clause INDEX</dd>
+  <dt id="implied"><a class="permalink" href="#implied">implied</a></dt>
+  <dd>renvoie vrai si le dernier objet de l'INDEX est IMPLIED</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MIB_Functions'><a class='permalink' href='#MIB_Functions'> Fonctions   MIB</a></h1>
+<dl class="Bl-tag">
+  <dt>&amp;SNMP::setMib(&lt;fichier&gt;)</dt>
+  <dd>permet l'analyse dynamique de la mib et la spécification explicite du fichier mib
+      indépendamment des variables d'environnement. appelé sans argument agit comme
+      initMib, chargeant les MIBs indiquées par les variables d'environnement (voir la documentation
+      de l'API mib de Net-SNMP). passer un argument second non nul force la libération et le remplacement de la mib précédente
+      <b>(Note : le second argument ne fonctionne pas car la libération de la Mib précédente</b>
+      <b>est plus complexe qu'auparavant)</b>.</dd>
+  <dt>&amp;<b>SNMP::initMib()</b></dt>
+  <dd>appelle la fonction init_mib de la bibliothèque si la Mib n'est pas déjà chargée - ne fait rien
+      si la Mib est déjà chargée. analysera les répertoires et chargera les modules selon les variables d'environnement décrites dans la documentation Net-SNMP. (voir man
+      mib_api, MIBDIRS, MIBS, MIBFILE(S), etc.)</dd>
+  <dt>&amp;SNMP::addMibDirs(&lt;dir&gt;,...)</dt>
+  <dd>appelle add_mibdir de la bibliothèque pour chaque répertoire fourni. provoquera l'ajout du(des) répertoire(s) à la liste interne et leur mise à disposition pour la recherche
+      dans les appels loadModules ultérieurs</dd>
+  <dt>&amp;SNMP::addMibFiles(&lt;fichier&gt;,...)</dt>
+  <dd>appelle la fonction read_mib de la bibliothèque. Le(s) fichier(s) fourni(s) sera(ont) lu(s) et toutes les
+      définitions de modules Mib qu'il(s) contient(ont) seront ajoutées à la structure d'arbre mib interne</dd>
+  <dt>&amp;SNMP::loadModules(&lt;mod&gt;,...)</dt>
+  <dd>appelle la fonction read_module de la bibliothèque. Le(s) module(s) fourni(s) sera(ont) recherché(s) dans les mibdirs actuels et ajouté(s) à la structure d'arbre mib interne. Passer le module spécial &lt;mod&gt;, 'ALL', provoquera le chargement de tous les modules connus.</dd>
+  <dt>&amp;SNMP::unloadModules(&lt;mod&gt;,...)</dt>
+  <dd><b>*Non implémenté*</b></dd>
+  <dt>&amp;SNMP::translateObj(&lt;var&gt;[,arg,[arg]])</dt>
+  <dd>convertira une étiquette d'objet texte en OID et vice-versa. Tout suffixe iid est conservé numériquement. Le comportement par défaut lors de la conversion d'un OID numérique en forme texte est de renvoyer uniquement l'identifiant de feuille (par exemple, 'sysDescr'), mais lorsque
+      <span class="Li">$SNMP::use_long_names</span> est non nul ou qu'un second argument non nul est fourni, il renverra un identifiant textuel plus long. Un troisième argument optionnel non nul provoquera l'ajout du nom du module au début du nom texte (par exemple, 'SNMPv2-MIB::sysDescr'). Lors de la conversion d'un objet texte,
+      l'option <span class="Li">$SNMP::best_guess</span> est utilisée.
+      Si aucune Mib n'est chargée lors de l'appel et que
+      <span class="Li">$SNMP::auto_init_mib</span> est activé, la Mib sera chargée. Renverra 'undef' en cas d'échec.</dd>
+  <dt>&amp;SNMP::getType(&lt;var&gt;)</dt>
+  <dd>renvoie le type de données SNMP pour l'identifiant textuel donné OBJECTID, OCTETSTR,
+      INTEGER, NETADDR, IPADDR, COUNTER GAUGE, TIMETICKS, OPAQUE, ou undef</dd>
+  <dt>&amp;SNMP::mapEnum(&lt;var&gt;)</dt>
+  <dd>convertit une valeur entière en étiquette d'énumération définie dans la Mib ou convertit l'étiquette en entier
+      en fonction de l'entrée. la fonction renverra la valeur entière correspondante
+      *ou* l'étiquette pour un attribut MIB et une valeur donnés. La fonction
+      détectera la direction de la conversion. Divers formats d'arguments
+      sont pris en charge</dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt>$val = SNMP::mapEnum($varbind);</dt>
+  <dd>où <span class="Li">$varbind</span> est SNMP::Varbind ou équivalent. note:
+      <span class="Li">$varbind</span> sera mis à jour</dd>
+  <dt>$val = SNMP::mapEnum('ipForwarding', 'forwarding');</dt>
+  <dd></dd>
+  <dt>$val = SNMP::mapEnum('ipForwarding', 1);</dt>
+  <dd></dd>
+</dl>
+</div>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Exported_SNMP_utility_functions'><a class='permalink' href='#Exported_SNMP_utility_functions'> Fonctions   utilitaires SNMP exportées</a></h1>
+<p class="Pp">Note: les fonctions utilitaires ne prennent pas encore en charge les opérations asynchrones.</p>
+<dl class="Bl-tag">
+  <dt>&amp;<b>snmp_get()</b></dt>
+  <dd>prend les arguments de SNMP::Session::new suivis de ceux de
+    SNMP::Session::get</dd>
+  <dt>&amp;<b>snmp_getnext()</b></dt>
+  <dd>prend les arguments de SNMP::Session::new suivis de ceux de
+      SNMP::Session::getnext</dd>
+  <dt>&amp;<b>snmp_set()</b></dt>
+  <dd>prend les arguments de SNMP::Session::new suivis de ceux de
+    SNMP::Session::set</dd>
+  <dt>&amp;<b>snmp_trap()</b></dt>
+  <dd>prend les arguments de SNMP::TrapSession::new suivis de ceux de
+      SNMP::TrapSession::trap</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Trouble_Shooting'><a class='permalink' href='#Trouble_Shooting'> Dépannage</a></h1>
+<p class="Pp">Si des problèmes surviennent, il y a plusieurs domaines à examiner pour réduire les
+    possibilités.</p>
+<p class="Pp">La première étape devrait être de tester l'installation Net-SNMP indépendamment de l'interface Perl5 SNMP.</p>
+<p class=" Pp">Essayez d'exécuter les applications de la distribution Net-SNMP.</p>
+<p class="Pp">Assurez-vous que votre agent (snmpd) est en cours d'exécution et correctement configuré
+    avec un accès en lecture/écriture pour la communauté que vous utilisez.</p>
+<p class="Pp">Assurez-vous que vos MIBs sont installées et que les variables d'environnement sont
+    définies correctement (voir man mib_api)</p>
+<p class="Pp">Soyez sûr de supprimer les anciennes installations net-snmp et de vous assurer que les en-têtes
+    et les bibliothèques des anciennes installations CMU ne sont pas utilisées par erreur.</p>
+<p class="Pp">Si le problème survient lors de la compilation/liaison, vérifiez que la
+    bibliothèque snmp utilisée pour la liaison est bien la bibliothèque Net-SNMP (il y a eu des conflits de noms avec les bibliothèques snmp existantes).</p>
+<p class="Pp">Vérifiez également que les fichiers d'en-tête sont corrects et à jour.</p>
+<p class="Pp">Parfois, la compilation de la bibliothèque Net-SNMP avec
+    'code indépendant de la position' activé est nécessaire (HP-UX spécifiquement).</p>
+<p class="Pp">Si vous ne parvenez pas à résoudre le problème, vous pouvez poster sur
+    comp.lang.perl.modules ou
+    net-snmp-users@net-snmp-users@lists.sourceforge.net</p>
+<p class="Pp">veuillez fournir suffisamment d'informations pour analyser le problème (type de système d'exploitation, versions du système d'exploitation/Perl/Net-SNMP/compilateur, sortie d'erreur complète,
+  etc.)</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Acknowledgements'><a class='permalink' href='#Acknowledgements'>Remerciements</a></h1>
+<p class="Pp">Un grand merci à tous ceux qui ont fourni des correctifs, des suggestions et des retours.</p>
+<pre>Joe Marzot (l'auteur original)
+Wes Hardaker et les développeurs de net-snmp
+Dave Perkins
+Marcel Wiget
+David Blackburn
+John Stofell
+Gary Hayward
+Claire Harrison
+Achim Bohnet
+Doug Kingston
+Jacques Vidrine
+Carl Jacobsen
+Wayne Marquette
+Scott Schumate
+Michael Slifcak
+Srivathsan Srinivasagopalan
+Bill Fenner
+Jef Peeraer
+Daniel Hagerty
+Karl &quot;Rat&quot; Schilke et Electric Lightwave, Inc.
+Les développeurs de Perl5
+Alex Burger</pre>
+<p class="Pp">Nos excuses à tous ceux dont le correctif/la fonctionnalité/la demande n'a pas été mentionné(e) ou inclus(e) - il est fort probable qu'il ait été perdu lorsque le travail rémunéré a empiété sur mon plaisir.
+    Veuillez réessayer si vous ne voyez pas la fonctionnalité désirée. Ce paquet pourrait finalement devenir un paquet décent avec une aide aussi excellente et le fait que j'aie plus de temps pour y travailler qu'auparavant.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTEUR</a></h1>
+<p class="Pp">bugs, commentaires, questions à
+  net-snmp-users@lists.sourceforge.net</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Copyright'><a class='permalink' href='#Copyright'>Copyright</a></h1>
+<pre>Copyright (c) 1995-2000 G. S. Marzot. Tous droits réservés.
+Ce programme est un logiciel libre ; vous pouvez le redistribuer et/ou
+le modifier selon les mêmes termes que Perl lui-même.
+Copyright (c) 2001-2002 Networks Assoc</pre>
+<section class="foot">
+  <tr>
+    <td class="foot-date">2025-07-13</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher une page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Aller" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/net-snmp/">extra/net-snmp</a></dd>
+        <dt>Version :</dt>
+        <dd>5.9.4-7</dd>
+        <dt>Amont :</dt>
+        <dd><a href="http://www.net-snmp.org/">http://www.net-snmp.org/</a></dd>
+        <dt>Licences :</dt>
+        <dd>BSD</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/net-snmp/">/listing/extra/net-snmp/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NAME</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#SNMP::Session">SNMP::Session</a></li>
+        
+            <li><a href="#SNMP::TrapSession">SNMP::TrapSession</a></li>
+        
+            <li><a href="#Acceptable_variable_formats:">Acceptable variable formats:</a></li>
+        
+            <li><a href="#Acceptable_callback_formats">Acceptable callback formats</a></li>
+        
+            <li><a href="#SNMP_package_variables_and_functions">SNMP package variables and functions</a></li>
+        
+            <li><a href="#%SNMP::MIB">%SNMP::MIB</a></li>
+        
+            <li><a href="#MIB_Functions">MIB Functions</a></li>
+        
+            <li><a href="#Exported_SNMP_utility_functions">Exported SNMP utility functions</a></li>
+        
+            <li><a href="#Trouble_Shooting">Trouble Shooting</a></li>
+        
+            <li><a href="#Acknowledgements">Acknowledgements</a></li>
+        
+            <li><a href="#AUTHOR">AUTHOR</a></li>
+        
+            <li><a href="#Copyright">Copyright</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/SNMP.3.en.txt">txt</a>, 
+        
+            <a href="/man/SNMP.3.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

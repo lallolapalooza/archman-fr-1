@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Test::MockModule(3pm) — Pages man d'Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Test__MockModule(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-test-mockmodule/">perl-test-mockmodule</a></p>
+<p class="lic">Licences: PerlArtistic, GPL</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Test::MockModule(3pm)</td>
+    <td class="head-vol">Documentation contributive Perl</td>
+    <td class="head-rtitle">Test::MockModule(3pm)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">Test::MockModule - Remplacer des fonctions dans un module pour les tests unitaires</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPIS</a></h1>
+<pre>    use Module::Name;
+    use Test::MockModule;
+    {
+            my $module = Test::MockModule-&gt;new('Module::Name');
+            $module-&gt;mock('subroutine', sub { ... });
+            Module::Name::subroutine(@args); # mocké
+            # Même effet, mais cela provoquera une erreur si other_subroutine()
+            # n'existe pas déjà, ce qui est souvent souhaitable.
+            $module-&gt;redefine('other_subroutine', sub { ... });
+            # Cela provoquera une erreur si another_subroutine() est défini.
+            $module-&gt;define('another_subroutine', sub { ... });
+    }
+    {
+            # vous pouvez aussi chaîner new/mock/redefine/define
+            Test::MockModule-&gt;new('Module::Name')
+            -&gt;mock( one_subroutine =&gt; sub { ... })
+            -&gt;redefine( other_subroutine =&gt; sub { ... } )
+            -&gt;define( a_new_sub =&gt; 1234 );
+    }
+    Module::Name::subroutine(@args); # subroutine originale
+    # Travailler avec des objets
+    use Foo;
+    use Test::MockModule;
+    {
+            my $mock = Test::MockModule-&gt;new('Foo');
+            $mock-&gt;mock(foo =&gt; sub { print &quot;Foo!\n&quot;; });
+            my $foo = Foo-&gt;new();
+            $foo-&gt;foo(); # imprime &quot;Foo!\n&quot;
+    }
+# Si vous voulez empêcher noop et mock de fonctionner, vous pouvez
+# charger Test::MockModule en mode strict.
+use Test::MockModule qw/strict/;
+my $module = Test::MockModule-&gt;new('Module::Name');
+# Redéfini other_subroutine ou échoue si elle n'est pas là.
+$module-&gt;redefine('other_subroutine', sub { ... });
+# Échoue car vous avez spécifié que vous vouliez le mode strict.
+$module-&gt;mock('subroutine', sub { ... });
+# Désactiver la strictness dans cette portée lexicale
+{
+    use Test::MockModule 'nostrict';
+    # ->mock() fonctionne maintenant
+    $module-&gt;mock('subroutine', sub { ... });
+}
+# De retour dans la portée stricte, donc mock() échoue ici
+$module-&gt;mock('subroutine', sub { ... });</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp"><span class="Li">&quot;Test::MockModule&quot;</span> permet de remplacer des fonctions dans des modules à des fins de tests unitaires.</p>
+<p class="Pp">Un objet <span class="Li">&quot;Test::MockModule&quot;</span> est configuré pour mocker des fonctions dans un module donné. L'objet se souvient de la fonction originale afin de pouvoir la restaurer facilement. Ce processus se produit automatiquement lorsque tous les objets MockModule pour le module donné sortent de portée, ou lorsque <span class="Li">unmock()</span> est appelé.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='STRICT_MODE'><a class='permalink' href='#STRICT_MODE'>MODE STRICT</a></h1>
+<p class="Pp">L'une des faiblesses des tests utilisant des mocks est que l'implémentation de l'interface que vous mockez peut changer, tandis que vos mocks restent inchangés. Vous ne mockez plus ce que vous pensiez mocker, et vos mocks peuvent maintenant masquer des bugs qui ne seront visibles qu'en production. Pour vous aider à prévenir cela, vous pouvez charger Test::MockModule en mode <span class="Li">strict</span> :</p>
+<pre>use Test::MockModule qw(strict);</pre>
+<p class="Pp">Cela désactivera l'utilisation de la méthode <span class="Li">mock()</span>, la transformant en une erreur d'exécution. Vous devriez définir les mocks en utilisant <span class="Li">redefine()</span>, qui ne mockera que les choses qui existent déjà et vous donnera une erreur si vous essayez de redéfinir quelque chose qui n'existe pas.</p>
+<p class="Pp">La strictness est scopée lexicalement, vous pouvez donc faire ceci dans un fichier :</p>
+<pre>use Test::MockModule qw(strict);
+
+...-&gt;redefine(...);</pre>
+<p class="Pp">et dans un autre :</p>
+<pre>use Test::MockModule; # le défaut est nostrict
+...-&gt;mock(...);</pre>
+<p class="Pp">Vous pouvez également mélanger la strictness à différents endroits d'un même fichier, comme ceci :</p>
+<pre>use Test::MockModule qw(strict);
+# ici mock() échoue
+{
+    use Test::MockModule qw(nostrict);
+    # ici mock() fonctionne
+}
+# ici mock() échoue à nouveau
+use Test::MockModule qw(nostrict);
+# et à partir d'ici mock() fonctionne à nouveau</pre>
+<p class="Pp">Note : la strictness doit être définie au moment de la compilation et définie à l'aide de <span class="Li">&quot;use&quot;</span>. Si vous pensez que vous allez essayer d'être malin en appelant la méthode <span class="Li">import()</span> de Test::MockModule au moment de l'exécution, il se passe des choses indéfinies, avec des résultats différents selon la version de Perl. Qu'apprendre !</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='METHODS'><a class='permalink' href='#METHODS'>MÉTHODES</a></h1>
+<dl class="Bl-tag">
+  <dt id="new($package_,"><a class="permalink" href="#new($package_,">new($package[,
+    %options])</a></dt>
+  <dd>Retourne un objet qui mockerra les fonctions dans le module spécifié <span class="Li">$package</span>.
+    <p class="Pp">Si <span class="Li">$VERSION</span> n'est pas défini dans <span class="Li">$package</span>, le module sera chargé automatiquement. Vous pouvez modifier ce comportement en utilisant l'option <span class="Li">&quot;no_auto&quot;</span> :</p>
+        <pre>my $mock = Test::MockModule-&gt;new('Module::Name', no_auto =&gt; 1);
+</pre>
+  </dd>
+  <dt id="get_package()"><a class="permalink" href="#get_package()"><b>get_package()</b></a></dt>
+  <dd>Retourne le nom du module dont les fonctions sont mockées</dd>
+  <dt id="is_mocked($subroutine)"><a class="permalink" href="#is_mocked($subroutine)">is_mocked($subroutine)</a></dt>
+  <dd>Retourne une valeur booléenne indiquant si la fonction <span class="Li">$subroutine</span> est actuellement mockée ou non</dd>
+  <dt id="mock($subroutine"><a class="permalink" href="#mock($subroutine">mock($subroutine
+    =&gt; \&amp;coderef)</a></dt>
+  <dd>Remplace une ou plusieurs fonctions dans le module qui est mocké. Une fonction peut être mockée avec une référence à une fonction ou avec une valeur scalaire. Une valeur scalaire sera convertie en une fonction qui retourne la valeur scalaire.
+    <p class="Pp">Retourne l'objet <span class="Li">&quot;Test::MockModule&quot;</span> actuel, vous permettant ainsi de chaîner <span class="Li">new</span> avec <span class="Li">mock</span>.</p>
+        <pre>my $mock = Test::MockModule-&gt;new-&gt;(...)-&gt;mock(...);
+</pre>
+    <p class="Pp">Les instructions suivantes sont équivalentes :</p>
+        <pre>$module-&gt;mock(purge =&gt; 'purged');
+$module-&gt;mock(purge =&gt; sub { return 'purged'});
+</pre>
+    <p class="Pp">Lorsqu'il s'agit de références, les comportements sont légèrement différents. Les instructions suivantes ne sont pas équivalentes :</p>
+        <pre># Retourne le même arrayref à chaque fois, avec le localtime() au moment du mock
+$module-&gt;mock(updated =&gt; [localtime()]);
+# Retourne un nouvel arrayref à chaque fois, avec la valeur de localtime() mise à jour
+$module-&gt;mock(updated =&gt; sub { return [localtime()]});
+</pre>
+    <p class="Pp">Les instructions suivantes sont en fait équivalentes :</p>
+        <pre>my $array_ref = [localtime()]
+$module-&gt;mock(updated =&gt; $array_ref)
+$module-&gt;mock(updated =&gt; sub { return $array_ref });
+</pre>
+    <p class="Pp">Cependant, <span class="Li">&quot;undef&quot;</span> est un cas spécial. Si vous mockez une fonction avec <span class="Li">&quot;undef&quot;</span>, vous installerez une fonction vide :</p>
+        <pre>$module-&gt;mock(purge =&gt; undef);
+$module-&gt;mock(purge =&gt; sub { });
+</pre>
+    <p class="Pp">au lieu d'une fonction qui retourne <span class="Li">&quot;undef&quot;</span> :</p>
+        <pre>$module-&gt;mock(purge =&gt; sub { undef });
+</pre>
+    <p class="Pp">Vous pouvez appeler <span class="Li">mock()</span> pour la même fonction plusieurs fois, mais lorsque vous appelez <span class="Li">unmock()</span>, la fonction originale sera restaurée (pas le dernier instancié).</p>
+    <p class="Pp"><b>MOCKING + EXPORT</b></p>
+    <p class="Pp">Si vous essayez de mocker une fonction exportée d'un autre module, cela ne se comportera pas comme vous l'attendiez initialement, car Test::MockModule ne mocke que dans le module cible, pas dans tout module qui importe ce module. Si vous mockez le paquet local ou utilisez un nom de fonction entièrement qualifié, vous obtiendrez le comportement souhaité :</p>
+        <pre>use Test::MockModule;
+use Test::More;
+use POSIX qw/strftime/;
+my $posix = Test::MockModule-&gt;new(&quot;POSIX&quot;);
+$posix-&gt;mock(&quot;strftime&quot;, &quot;Yesterday&quot;);
+is strftime(&quot;%D&quot;, localtime(time)), &quot;Yesterday&quot;, &quot;`strftime` was mocked successfully&quot;; # Fails
+is POSIX::strftime(&quot;%D&quot;, localtime(time)), &quot;Yesterday&quot;, &quot;`strftime` was mocked successfully&quot;; # Succeeds
+my $main = Test::MockModule-&gt;new(&quot;main&quot;, no_auto =&gt; 1);
+$main-&gt;mock(&quot;strftime&quot;, &quot;today&quot;);
+is strftime(&quot;%D&quot;, localtime(time)), &quot;today&quot;, &quot;`strftime` was mocked successfully&quot;; # Succeeds
+</pre>
+    <p class="Pp">Si vous essayez de mocker une fonction qui a été exportée vers un module que vous testez, au lieu de mocker la fonction dans son module d'origine, vous pouvez la mocker dans le module que vous testez :</p>
+        <pre>package MyModule;
+use POSIX qw/strftime/;
+sub minus_twentyfour
+{
+        return strftime(&quot;%a, %b %d, %Y&quot;, localtime(time - 86400));
+}
+package main;
+use Test::More;
+use Test::MockModule;
+my $posix = Test::MockModule-&gt;new(&quot;POSIX&quot;);
+$posix-&gt;mock(&quot;strftime&quot;, &quot;Yesterday&quot;);
+is MyModule::minus_twentyfour(), &quot;Yesterday&quot;, &quot;`minus-twentyfour` got mocked&quot;; # fails
+my $mymodule = T
+</pre>
+</section>
+</div>
+</section>
+
+            </article>
+            
+        </main>
+        <footer>
+            
+        </footer>
+    </body>
+</html>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Test::MockModule - Stubbing out Perl modules</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPIS'><a class='permalink' href='#SYNOPIS'>SYNOPIS</a></h1>
+<pre>    use Test::MockModule;
+    my $module = Test::MockModule-&gt;new("MyModule");
+    $module-&gt;mock("some_subroutine", "some_return_value");
+    is MyModule::some_subroutine(), "some_return_value", "some_subroutine mocked";
+    
+    # mock a subroutine to return a specific value
+    $module-&gt;mock("subname", $return_value);
+    
+    # mock a subroutine to return the result of a block
+    $module-&gt;mock("subname", sub {
+        my $self = shift;
+        my ($arg1, $arg2) = @_;
+        # ... return value ...
+    });
+    
+    # mock a subroutine to be a specific subroutine
+    $module-&gt;mock("subname", \&other_subroutine);
+    
+    # mock a subroutine to be a specific method (prepending the package name)
+    $module-&gt;mock("subname", \&MyModule::other_subroutine);
+    
+    # mock a subroutine to be a specific method (automatically prepending the package name)
+    $module-&gt;mock("subname", 'other_subroutine');
+    
+    # mock a subroutine to be a specific method
+    $module-&gt;mock("method_name", "return_value");
+    
+    # mock a subroutine to die
+    $module-&gt;mock("subname", \&Test::MockModule::die_stub);
+    
+    # Mock a method that requires the object to be passed
+    $module-&gt;mock('method_that_takes_self', sub {
+        my $self = shift;
+        # ...
+    });
+    
+    # Mock a method and check it gets called
+    $module-&gt;mock('method_that_gets_called', sub {
+        my $self = shift;
+        # ...
+    });
+    Test::MockModule::Expect->new($module, 'method_that_gets_called')-&gt;once();
+    
+    # Mock a method with arguments
+    $module-&gt;mock('method_with_args', sub {
+        my $self = shift;
+        my ($arg1, $arg2) = @_;
+        # ...
+    });
+    Test::MockModule::Expect->new($module, 'method_with_args')-&gt;with($val1, $val2)-&gt;once();
+    
+    # Mock a method with arguments (and check them with a code ref)
+    $module-&gt;mock('method_with_args', sub {
+        my $self = shift;
+        my ($arg1, $arg2) = @_;
+        # ...
+    });
+    Test::MockModule::Expect->new($module, 'method_with_args')-&gt;with(qr/regex/, sub {
+        my $arg2 = shift;
+        return $arg2 == 42;
+    })-&gt;once();
+    
+    # Mock a method and expect it to be called with a certain value
+    $module-&gt;mock('method_with_args', sub {
+        my $self = shift;
+        my ($arg1, $arg2) = @_;
+        # ...
+    });
+    Test::MockModule::Expect->new($module, 'method_with_args')-&gt;with('bar', 42)-&gt;once();
+    
+    # Mock a method and expect it to be called with a certain value
+    $module-&gt;mock('method_with_args', sub {
+        my $self = shift;
+        my ($arg1, $arg2) = @_;
+        # ...
+    });
+    Test::MockModule::Expect->new($module, 'method_with_args')-&gt;with( 'bar', Test::MockModule::Any()-&gt;new() )-&gt;once();
+    
+    # mock a function that is not part of the module
+    my $other = Test::MockModule-&gt;new("OtherModule");
+    $other-&gt;mock("some_function", "some_value");
+    
+    # mock a function with a default value
+    my $module = Test::MockModule-&gt;new("MyModule");
+    $module-&gt;mock("get_time", "12:00 PM");
+    
+    # Example usage with different values
+    my $mymodule = Test::MockModule-&gt;new("MyModule");
+    $mymodule-&gt;mock("strftime", "Yesterday");
+    is MyModule::minus_twentyfour(), "Yesterday", "`minus-twentyfour` got mocked"; # succeeds
+    
+</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Test::MockModule allows you to mock out Perl modules and subroutines
+    within those modules. This is useful for unit testing, where you want to
+    isolate the code you are testing from its dependencies.</p>
+<p class="Pp">When you create a Test::MockModule object, it takes over the
+    specified package and replaces the subroutines you mock with your specified
+    behavior.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='STRICT_MODE'><a class='permalink' href='#STRICT_MODE'>STRICT MODE</a></h1>
+<p class="Pp">Test::MockModule respects <code class="Nm">use strict;</code> and
+    <code class="Nm">use warnings;</code>. This means that mocked subroutines will
+    be checked for existence and strictures will be enforced.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='METHODS'><a class='permalink' href='#METHODS'>METHODS</a></h1>
+<dl class="Bl-tag">
+  <dt id="new($package_name, %args)"><a class="permalink" href="#new($package_name, %args)">new($package_name, %args)</a></dt>
+  <dd>Creates a new Test::MockModule object for the given <code class="Li">$package_name</code>.
+      The <code class="Li">%args</code> are optional.</dd>
+  <dt id="no_auto"></dt>
+  <dd>By default, Test::MockModule will attempt to load the target module if it
+      is not already loaded. Setting <code class="Li">no_auto =&gt; 1</code> will
+      prevent this automatic loading.</dd>
+  <dt id="mock($subroutine, $replacement)" markdown="1">mock($subroutine, $replacement)</dt>
+  <dd>Mocks the subroutine named <code class="Li">$subroutine</code> in the mocked
+      package. The <code class="Li">$replacement</code> can be one of the
+      following:
+    <ul class="Bl-bullet">
+      <li>A scalar value: The subroutine will always return this value.</li>
+      <li>A subroutine reference: The subroutine will execute this subroutine.
+          The subroutine will be called with the same arguments as the original
+          subroutine. If the original subroutine was a method, the first argument
+          will be the package name.</li>
+      <li>A subroutine name (string): The subroutine will be replaced with the
+          subroutine of the same name in the current package.</li>
+    </ul>
+    <p class="Pp">Example:</p>
+    <pre>    my $module = Test::MockModule-&gt;new("MyModule");
+    $module-&gt;mock("constant_value", 42);
+    $module-&gt;mock("dynamic_value", sub { return time() });
+    $module-&gt;mock("method_call", "MyModule::real_method");
+    $module-&gt;mock("another_method", "another_real_method");
+</pre>
+  </dd>
+  <dt id="redefine($subroutine)"><a class="permalink" href="#redefine($subroutine)">redefine($subroutine)</a></dt>
+  <dd>Has the same behavior as <span class="Li">mock()</span>, but it will
+      preemptively check to ensure that all passed subroutines actually exist.
+      This is useful to ensure that if a mocked module's interface changes, the
+      test doesn't continue to test a code path that no longer behaves
+      consistently with the mocked behavior.
+    <p class="Pp">Note that redefine also checks if a parent provides the sub
+        and will not die if it is available in the chain.</p>
+    <p class="Pp">Returns the current
+        <span class="Li">&quot;Test::MockModule&quot;</span> object, so you can
+        chain new with redefine.</p>
+        <pre>my $mock = Test::MockModule-&gt;new-&gt;(...)-&gt;redefine(...);
+</pre>
+  </dd>
+  <dt id="define($subroutine)"><a class="permalink" href="#define($subroutine)">define($subroutine)</a></dt>
+  <dd>The reverse of redefine, this will fail if the passed subroutine exists.
+      While this use case is rare, there are times when the Perl code you are
+      testing inspects a package, and adding a missing subroutine is actually
+      what you want to do.
+    <p class="Pp">By using define, you are asserting that the subroutine you want
+        to be mocked should not exist in advance.</p>
+    <p class="Pp">Note: define does not check for inheritance like redefine.</p>
+    <p class="Pp">Returns the current
+        <span class="Li">&quot;Test::MockModule&quot;</span> object, so you can
+        chain new with define.</p>
+        <pre>my $mock = Test::MockModule-&gt;new-&gt;(...)-&gt;define(...);
+</pre>
+  </dd>
+  <dt id="original($subroutine)"><a class="permalink" href="#original($subroutine)">original($subroutine)</a></dt>
+  <dd>Returns the original (unmocked) subroutine.
+    <p class="Pp">Here is a sample of how to wrap a function with custom arguments
+        using the original subroutine. This is useful when you cannot (or do not)
+        want to alter the original code to abstract a hardcoded argument pass
+        to a function.</p>
+        <pre>package MyModule;
+sub sample {
+        return get_path_for(&quot;/a/b/c/d&quot;);
+}
+sub get_path_for {
+        ... # anything goes there...
+}
+package main;
+use Test::MockModule;
+my $mock = Test::MockModule-&gt;new(&quot;MyModule&quot;);
+# replace all calls to get_path_for using a different argument
+$mock-&gt;redefine(&quot;get_path_for&quot;, sub {
+        return $mock-&gt;original(&quot;get_path_for&quot;)-&gt;(&quot;/my/custom/path&quot;);
+});
+# or
+$mock-&gt;redefine(&quot;get_path_for&quot;, sub {
+        my $path = shift;
+        if ( $path &amp;&amp; $path eq &quot;/a/b/c/d&quot; ) {
+                # only alter calls with path set to &quot;/a/b/c/d&quot;
+                return $mock-&gt;original(&quot;get_path_for&quot;)-&gt;(&quot;/my/custom/path&quot;);
+        } else { # preserve the original arguments
+                return $mock-&gt;original(&quot;get_path_for&quot;)-&gt;($path, @_);
+        }
+});
+</pre>
+  </dd>
+  <dt id="unmock($subroutine"><a class="permalink" href="#unmock($subroutine">unmock($subroutine
+    [, ...])</a></dt>
+  <dd>Restores the original <span class="Li">$subroutine</span>. You can specify
+      a list of subroutines to <span class="Li">unmock()</span> at once.</dd>
+  <dt id="unmock_all()"><a class="permalink" href="#unmock_all()"><b>unmock_all()</b></a></dt>
+  <dd>Restores all the subroutines in the package that were mocked. This is
+      automatically called when all
+      <span class="Li">&quot;Test::MockObject&quot;</span> objects for the given
+      package go out of scope.</dd>
+  <dt id="noop($subroutine"><a class="permalink" href="#noop($subroutine">noop($subroutine
+    [, ...])</a></dt>
+  <dd>Given a list of subroutine names, mocks each of them with a no-op
+      subroutine. Handy for mocking methods you want to ignore!
+        <pre># Neuter a list of methods in one go
+$module-&gt;noop('purge', 'updated');
+</pre>
+  </dd>
+  <dt id="TRACE"><a class="permalink" href="#TRACE">TRACE</a></dt>
+  <dd>A stub for Log::Trace</dd>
+  <dt id="DUMP"><a class="permalink" href="#DUMP">DUMP</a></dt>
+  <dd>A stub for Log::Trace</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR AUSSI</a></h1>
+<p class="Pp">Test::MockObject::Extends</p>
+<p class="Pp">Sub::Override</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEURS'><a class='permalink' href='#AUTEURS'>AUTEURS</a></h1>
+<p class="Pp">Current Maintainer: Geoff Franks &lt;gfranks@cpan.org&gt;</p>
+<p class="Pp">Original Author: Simon Flack &lt;simonflk _AT_ cpan.org&gt;</p>
+<p class="Pp">Lexical scoping of strictness: David Cantrell
+    &lt;david@cantrell.org.uk&gt;</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT'><a class='permalink' href='#COPYRIGHT'>COPYRIGHT</a></h1>
+<p class="Pp">Copyright 2004 Simon Flack &lt;simonflk _AT_ cpan.org&gt;. All
+    rights reserved</p>
+<p class="Pp">You may distribute under the terms of either the GNU General
+    Public License or the Artistic License, as specified in the Perl README
+    file.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-09-27</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Package information:</p>
+    <dl>
+        <dt>Package name:</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-test-mockmodule/">extra/perl-test-mockmodule</a></dd>
+        <dt>Version:</dt>
+        <dd>0.180.0-1</dd>
+        <dt>Upstream:</dt>
+        <dd><a href="https://search.cpan.org/dist/Test-MockModule">https://search.cpan.org/dist/Test-MockModule</a></dd>
+        <dt>Licenses:</dt>
+        <dd>PerlArtistic, GPL</dd>
+        <dt>Manuals:</dt>
+        <dd><a href="/listing/extra/perl-test-mockmodule/">/listing/extra/perl-test-mockmodule/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table of contents</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#SYNOPIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#STRICT_MODE">STRICT MODE</a></li>
+        
+            <li><a href="#METHODS">METHODS</a></li>
+        
+            <li><a href="#VOIR_AUSSI">VOIR AUSSI</a></li>
+        
+            <li><a href="#AUTEURS">AUTEURS</a></li>
+        
+            <li><a href="#COPYRIGHT">COPYRIGHT</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Other formats:
+        
+            <a href="/man/Test::MockModule.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/Test::MockModule.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>The website is available under the terms of the <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               license, except for the contents of the manual pages, which have their own license
+               specified in the corresponding Arch Linux package.
+            </p>
+        </footer>
+    </body>
+</html>

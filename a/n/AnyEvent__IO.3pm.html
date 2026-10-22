@@ -1,0 +1,550 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>AnyEvent::IO(3pm) — Pages manuelles </title>d'Arch
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">AnyEvent__IO(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-anyevent/">perl-anyevent</a></p>
+
+        nt
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">AnyEvent::</td>IO(3)
+    <td class="head-vol">Documentation Perl contribuée par les </td>utilisateurs
+    <td class="head-rtitle">AnyE</td>vent</tr>::I</table>O(3)
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NO</a></h1>M
+<p class="Pp">AnyEvent::IO - le DB</p>I des implémentatio</section>ns d'E/S asynchrones
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSI</a></h1>S
+<pre>use AnyEvent::IO;
+# charger /etc/passwd, appeler le callback avec les données du fichier une fois terminé.
+aio_load "/etc/passwd", sub {
+   my ($data) = @_
+      or return AE::log error =&gt; "/etc/passwd: $!";
+   warn "/etc/passwd contient ", ($data =~ y/://) , " deux-points.\n";
+};
+# le reste du SYNOPSIS fait la même chose, mais avec des appels d'E/S individuels
+# importe aussi les drapeaux O_XXX
+use AnyEvent::IO qw(:DEFAULT :flags);
+</pre>my $filedata = AE::cv;
+# d'abord ouvrir le fichier
+aio_open "/etc/passwd", O_RDONLY, 0, sub {
+   my ($fh) = @_
+      or return AE::log error =&gt; "/etc/passwd: $!";
+   # maintenant faire un stat sur le fichier pour obtenir la taille
+   aio_stat $fh, sub {
+      @_
+         or return AE::log error =&gt; "/etc/passwd: $!";
+      my $size = -s _;
+      # maintenant lire toutes les données du fichier
+      aio_read $fh, $size, sub {
+        </section> my ($data) = @_
+            or return AE::log error =&gt; "/etc/passwd: $!";
+         $size == length $data
+            or return AE::log error =&gt; "/etc/passwd: lecture courte, le fichier a changé ?";
+         # essentiellement la même chose que aio_load, ci-dessus - $data contient
+         # maintenant le contenu du fichier.
+         $filedata-&gt;($data);
+      };
+   };
+};
+my $passwd = $filedata-&gt;recv;
+warn length $passwd, " octets.\n";
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTIO</a></h1>N
+<p class="Pp">Ce module fournit des fonctions qui effectuent des E/S de manière
+    asynchrone. C'est pour les E/S ce qu'AnyEvent est pour les bibliothèques
+    d'événements - il se contente de
+    <i>s'interfacer </i>avec d'autres implémentations ou avec une implémentation
+    portable en perl pur (qui ne fait cependant pas d'E/S asynchrones)</p>.
+<p class="Pp">La seule autre implémentation qui est prise en charge (ou même connue de
+    l'auteur) est IO::AIO, qui est utilisée automatiquement lorsqu'elle peut être
+    chargée (via AnyEvent::AIO, qui doit aussi être installé). Si elle n'est pas
+    disponible, alors AnyEvent::IO revient à son implémentation synchrone en perl </p>pur.
+<p class="Pp">Contrairement à AnyEvent, le modèle à utiliser est actuellement décidé au
+    moment du chargement du module, et non à la première utilisation. Les versions
+    futures pourraient changer </p>cela.
+<section class="Ss">
+<h2 class="Ss" id='RATIONALE'><a class='permalink' href='#RATIONALE'>JUSTIFICATIO</a></h2>N
+<p class="Pp">Bien que les E/S sur disque semblent souvent « instantanées » comparées, par
+    exemple, aux E/S sur socket, il y a de nombreuses situations où votre programme
+    peut se bloquer pendant de longues périodes lors d'E/S sur disque. Par exemple,
+    vous accédez à un disque sur un serveur NFS et celui-ci a disparu - cela peut
+    prendre une éternité avant qu'il ne réponde à nouveau, si jamais il le fait. Ou
+    votre système est extrêmement occupé car il crée ou restaure une sauvegarde -
+    la lecture de données depuis le disque peut alors prendre des secondes. Ou vous
+    utilisez Linux, qui pendant tant d'années a eu un sous-système VM/E/S quasi
+    cassé qui peut souvent induire des retards de minutes ou plus pour les E/S sur
+    disque, même sous ce que je considérerais comme des charges d'E/S </p>légères.
+<p class="Pp">Quelle que soit la situation, certains programmes ne peuvent tout simplement
+    pas se permettre de bloquer longtemps (disons, une demi-seconde ou plus), car
+    ils doivent répondre aussi rapidement que </p>possible.
+<p class="Pp">Pour ces cas, vous avez besoin d'E/S </p>asynchrones.
+<p class="Pp">Le problème est qu'AnyEvent lui-même lit parfois des fichiers sur disque (par
+    exemple, lorsqu'il consulte <i>/etc/hosts)</i>, et dans les situations ci-dessus,
+    cela peut mettre votre programme en arrêt complet même si votre programme
+    prend par ailleurs soin de n'utiliser que des E/S asynchrones pour tout (par
+    exemple en utilisant IO::AIO)</p>.
+<p class="Pp">D'un autre côté, exiger IO::AIO pour AnyEvent est clairement
+    impossible, car AnyEvent promet de rester en perl pur, et le surcoût de
+    IO::AIO pour les petits programmes serait énorme, surtout lorsque les E/S
+    asynchrones ne sont même pas </p>nécessaires.
+<p class="Pp">Clairement, cela nécessite une couche d'</p>abstraction, et c'est ce que vous
+    êt</section>es en train de regarder en ce moment :-)
+<section class="Ss">
+<h2 class="Ss" id='ASYNCHRONOUS_VS._NON-BLOCKING'><a class='permalink' href='#ASYNCHRONOUS_VS._NON-BLOCKING'>E/S ASYNCHRONES   VS. </a></h2>NON-BLOQUANTES
+<p class="Pp">Beaucoup de gens sont continuellement confus quant à la différence entre
+    les E/S asynchrones et les E/S non bloquantes. En fait, ces deux termes ne
+    sont pas bien définis, ce qui rend souvent difficile le fait de parler de la
+    différence. Voici une brève ligne directrice qui devrait vous aider à être
+    moins confus. Elle ne parle que des opérations de lecture, mais le raisonnement
+    fonctionne aussi avec d'autres opérations </p>d'E/S.
+<p class="Pp">Les E/S non bloquantes signifient que les données sont fournies par un moyen
+    externe, automatiquement - c'est-à-dire que quelque chose <i>pousse </i>les données vers votre
+    descripteur de fichier, sans que vous ayez à faire quoi que ce soit. Non bloquant
+    signifie que si votre système d'exploitation n'a actuellement aucune donnée (ou
+    EOF, ou une erreur) disponible pour vous, il n'attendra pas (« bloquera ») comme
+    il le ferait normalement, mais retournera immédiatement avec une erreur (par
+    exemple
+    <span class="Li">"EWOULDBLOCK" </span>- « J'aurais bloqué, mais vous l'avez interdit »)</p>.
+<p class="Pp">Votre programme peut alors attendre l'arrivée des données par d'autres moyens,
+    par exemple un observateur d'E/S qui vous dit quand réessayer la lecture, après
+    quoi il peut essayer de lire à nouveau, et ainsi de </p>suite.
+<p class="Pp">Souvent, vous vous attendriez à ce que cela fonctionne aussi pour les fichiers
+    sur disque - si les données ne sont pas déjà en mémoire, on voudrait peut-être
+    attendre puis réessayer la lecture par exemple. Bien que ce soit un raisonnement
+    juste, l'API POSIX ne le supporte pas, car les disques durs et les systèmes de
+    fichiers n'envoient pas les données « de leur propre initiative », et de plus,
+    le système d'exploitation sait déjà que les données y sont, il n'a pas besoin
+    d'« attendre » qu'elles arrivent d'une entité externe, il a seulement besoin
+    de transférer les données du disque vers votre tampon </p>mémoire.
+<p class="Pp">Donc fondamentalement, bien que le concept soit juste, les API existantes du
+    système d'exploitation ne le supportent pas. Par conséquent, cela n'a aucun sens
+    de passer un descripteur de fichier sur disque en mode non bloquant - il se
+    comportera exactement de la même manière qu'en mode bloquant, à savoir qu'il
+    bloquera jusqu'à ce que les données aient été lues depuis le </p>disque.
+<p class="Pp">L'alternative aux E/S non bloquantes qui fonctionne réellement avec les
+    fichiers sur disque est généralement appelée <i>E/S asynchrone. </i>Asynchrone, car
+    l'E/S réelle est effectuée pendant que votre programme fait autre chose : il n'y
+    a pas besoin d'appeler la fonction de lecture pour voir si des données sont
+    présentes, vous ordonnez la lecture une seule fois, et elle vous notifiera
+    lorsque la lecture sera terminée et que les données seront dans votre
+    tampon - tout le travail est fait en </p>arrière-plan.
+<p class="Pp">Cela fonctionne avec les fichiers sur disque, et même avec les sockets et
+    d'autres sources. C'est cependant pas très efficace lorsqu'il est utilisé avec
+    des sources qui pourraient être pilotées de manière non bloquante, car cela a
+    généralement un surcoût plus élevé dans le système d'exploitation que les E/S
+    non bloquantes, car cela lie des tampons mémoire pendant une durée potentiellement
+    illimitée et souvent un nombre limité d'opérations peut être effectué en </p>parallèle.
+<p class="Pp">C'est pourquoi les E/S asynchrones ont le plus de sens l</p>orsqu'on est confronté
+    à des fichiers sur disque, et</section> que les E/S non bloquantes n'ont de sens qu'avec
+    l</section>es sockets, les tubes et des sources de flux similaires.
+<section class="Sh">
+<h1 class="Sh" id='IMPORT_TAGS'><a class='permalink' href='#IMPORT_TAGS'>ÉTIQUETTES   </a></h1>D'IMPORTATION
+<p class="Pp">Par défaut, ce module exporte toutes les
+    fonctions
+    <span class="Li">"aio_"xxx.</span> De plus, les
+    étiquettes d'importation suivantes peuvent être utilisées </p>:
+<pre>:aio       toutes les fonctions aio_*, identique à :DEFAULT
+:flags     les drapeaux d'ouverture fcntl (O_CREAT, O_RDONLY, ..</pre>.</section>)
+<section class="Sh">
+<h1 class="Sh" id='API_NOTES'><a class='permalink' href='#API_NOTES'>NOTES   SUR </a></h1>L'API
+<p class="Pp">Les fonctions de ce module ne sont pas destinées à être les plus
+    polyvalentes ou les plus performantes (elles ne sont pas très lentes non plus,
+    bien sûr). Elles sont principalement destinées à donner aux utilisateurs de
+    votre code la possibilité d'effectuer les E/S de manière asynchrone (en
+    installant IO::AIO et AnyEvent::AIO), sans ajouter une dépendance à ces </p>modules.
+<section class="Ss">
+<h2 class="Ss" id='NAMING'><a class='permalink' href='#NAMING'>NOMMAG</a></h2>E
+<p class="Pp">Toutes les fonctions de ce module implémentent une opération d'E/S,
+    généralement avec le même nom ou un nom similaire à la fonction intégrée Perl
+    qu'elles imitent, mais avec un <span class="Li">préfixe </span>"aio_". Si vous le souhaitez,
+    vous pouvez considérer les fonctions <span class="Li">"aio_"xxx comme des varian</span>tes
+    « AnyEvent I/O » o</p>u « E/S asynchrones » des</section> fonctions intégrées Perl.
+<section class="Ss">
+<h2 class="Ss" id='CALLING_CONVENTIONS_AND_ERROR_REPORTING'><a class='permalink' href='#CALLING_CONVENTIONS_AND_ERROR_REPORTING'>CONVENTIONS   D'APPEL ET RAPPORT </a></h2>D'ERREURS
+<p class="Pp">Chaque fonction attend un callback comme dernier argument. Le
+    callback est généralement appelé avec les données de résultat ou le code de
+    résultat. Une erreur est généralement signalée en ne passant aucun argument au
+    callback, qui est alors libre de consulter <span class="Li">$!</span> pour le code </p>d'erreur.
+<p class="Pp">Cela rend toutes les formes suivantes de vérification d'erreur valides </p>:
+<pre>aio_open ...., sub {
+   my $fh = shift   # assignation scalaire - assignera undef en cas d'erreur
+      or return AE::log error =&gt; "...";
+   my ($fh) = @_    # assignation liste - sera de 0 élément en cas d'erreur
+      or return AE::log error =&gt; "...";
+   @_               # vérifie directement le nombre d'éléments
+      or return AE::log </pre>error =</section>&gt; "...";
+<section class="Ss">
+<h2 class="Ss" id='CAVEAT:_RELATIVE_PATHS'><a class='permalink' href='#CAVEAT:_RELATIVE_PATHS'>AVERTISSEMENT : CHEMINS </a></h2>RELATIFS
+<p class="Pp">Lorsqu'un chemin est spécifié, ce chemin <i>doit être un chemin
+</i>    absolu, sauf si vous vous assurez que rien dans votre processus n'appelle
+    <span class="Li">"chdir" ou une fon</span>ction équivalente p</p>endant
+    l'exécut</section>ion de la requête.
+<section class="Ss">
+<h2 class="Ss" id='CAVEAT:_OTHER_SHARED_STATE'><a class='permalink' href='#CAVEAT:_OTHER_SHARED_STATE'>AVERTISSEMENT : AUTRES ÉTATS </a></h2>PARTAGÉS
+<p class="Pp">Modifier le <span class="Li">"umask" pendant l'exécution de requêtes qui créent des fichi</span>ers (ou qui dépendent autrement du umask courant) entraîne u</p>n comportement indéfini — de même, modifier quoi que ce soit </section>qui changerait le résultat, comme votre UID ou GID effectif.
+<section class="Ss">
+<h2 class="Ss" id='CALLBACKS_MIGHT_BE_CALLED_BEFORE_FUNCTION_RETURNS_TO_CALLER'><a class='permalink' href='#CALLBACKS_MIGHT_BE_CALLED_BEFORE_FUNCTION_RETURNS_TO_CALLER'>LES RAPPELS PEUVENT ÊTRE APPELÉS AVANT LE RETOUR DE LA FONCTION À </a></h2>L'APPELANT
+<p class="Pp">Contrairement aux autres fonctions de la famille de modules AnyEvent, ces fonctions <i>peuvent appeler votre rappel instantanémen</i>t, avant de retourner. Cela ne devrait pas </p>poser de vrai problème, car ces fonctions n</section>e retournent jamais quelque chose d'utile.
+<section class="Ss">
+<h2 class="Ss" id='BEHAVIOUR_AT_PROGRAM_EXIT'><a class='permalink' href='#BEHAVIOUR_AT_PROGRAM_EXIT'>COMPORTEMENT À LA SORTIE DU </a></h2>PROGRAMME
+<p class="Pp">Les implémentations AnyEvent::IO::Perl et AnyEvent::IO::IOAIO font en sorte que les opérations qui ont été lancées soient terminées lors d'une sortie propre du programme. Cela permet à des programmes de fonctionner lorsqu'ils lancent des opérations d'E/S puis se terminent. Par exemple, ce programme complet </p>:
+<pre>use AnyEvent::IO;
+aio_stat "path1", sub {
+   aio_stat "path2", sub {
+      warn "both stats done\n";
+   };
+}</pre>;
+<p class="Pp">Lance une opération <span class="Li">"stat" </span>puis se termine en « tombant de la fin » du programme. Néanmoins,
+    <i>les deux </i>opérations <span class="Li">"stat" </span>seront exécutées, car AnyEvent::IO attend que toutes les requêtes en attente se terminent et vous pouvez lancer de nouvelles requêtes depuis des rappels de </p>requêtes.
+<p class="Pp">En fait, puisque AnyEvent::IO::Perl est actuellement synchrone, le programme effectuera les deux stats avant de tomber de la fin, mais avec AnyEvent::IO::IOAIO, le programme tombe d'abord de la fin, puis les stats sont </p>exécutées.
+<p class="Pp">Bien que non garanti, ce comportement sera présent dans les futures versions, si raisonnablement possible (ce qui est extrêmement probable </p>:</section>)</section>.
+<section class="Sh">
+<h1 class="Sh" id='GLOBAL_VARIABLES_AND_FUNCTIONS'><a class='permalink' href='#GLOBAL_VARIABLES_AND_FUNCTIONS'>VARIABLES ET FONCTIONS </a></h1>GLOBALES
+<dl class="Bl-tag">
+  <dt>$AnyEvent::IO::</dt>MODEL
+  <dd>Contient le nom du paquet du modèle d'E/S de backend en cours d'utilisation — pour le moment, c'est généralement <span class="Li">"AnyEvent::IO::</span>Perl" ou
+      <span class="Li">"AnyEve</span>nt::IO::</dd>IOAIO".
+  <dt id="aio_load"><a class="permalink" href="#aio_load">aio_load $path,
+    $cb-&gt;</a></dt>($data)
+  <dd>Tente d'ouvrir <span class="Li">$path </span>et de lire son contenu en mémoire (évidemment, ne devrait être utilisé que sur des fichiers « suffisamment petits »), puis les transmet au rappel sous forme de chaîne.
+    <p class="Pp">Exemple : charger <i>/etc</i>/ho</p>sts.
+        <pre>aio_load "/etc/hosts", sub {
+   my ($hosts) = @_
+      or r</pre>eturn AE::log error =&gt; "/etc/hosts: $!";
+   AE::log info =</dd>&gt; "/etc/hosts contains ", ($hosts =~ y/\n/), " lines\n";
+};
+  <dt id="aio_open"><a class="permalink" href="#aio_open">aio_open $path,
+    $flags, $mode, $cb-&gt;</a></dt>($fh)
+  <dd>Tente d'ouvrir le fichier spécifié par <span class="Li">$path </span>avec les drapeaux O_XXX <span class="Li">$flags </span>(du module Fcntl, ou voir <span class="Li">ci-dessous)</span> et le mode <span class="Li">$mode (une bonne </span>valeur est 0666 pour
+      <span class="Li">"O_CREAT",</span> et
+    <p class="Pp">0 sinon)</p>.
+    <p class="Pp">Le descripteur de fichier (normal, standard, perl) associé au fichier ouvert est ensuite transmis au rappel.
+        <span class="Li">Cela fonctionne de </span>manière très similaire à </p>la fonction
+    <p class="Pp">"sysopen" de Perl. <span class="Li">Modi</span>fie</p>r le
+    <p class="Pp">"umask" pendant l'exécution de cette requête entraîne un comportement indéfini — de même, modifier quoi que ce soit qui changerait le résultat, comme votre UID ou GID effectif. <span class="Li">Afin d'éviter de devoir charger Fcntl,</span> ce module fournit des constantes pour
+        <span class="Li">"O_RDO</span>NLY",
+        <span class="Li">"O_WR</span>ONLY",
+        <span class="Li">"O_RDWR",</span> "O_CREAT",
+        <span class="Li">"O_EXCL", </span>"O_TRUNC" et
+        <span class="Li">"O_APPEND" — vous </span>pouvez y accéder directement
+        <span class="Li">("AnyEvent:</span>:IO::O_RDONLY") ou les importer en spécifiant la<span class="Li">balise </span>d'importation <span class="Li">":</span>flags" (voir SYNOPSIS)</p>.
+    <p class="Pp">Exemple : ouvrir un fichier de manière sécurisée dans <i>/var/tmp,</i> échouer s'il existe ou s'il s'agit d'un lien </p>symbolique.
+        <pre>use AnyEvent::IO qw(:flags);
+aio_open "/var/tmp/mytmp$$", O_CREAT | O_EXCL | O_RDWR, 0600, sub {
+   my ($fh) = @_
+      or return AE::log error =&gt; "$! - denial of service attack?";
+   # now we have </pre>$fh
+</dd>};
+  <dt id="aio_close"><a class="permalink" href="#aio_close">aio_close $fh,
+    $cb-&gt;</a></dt>($success)
+  <dd>Ferme le descripteur de fichier (oui, close peut bloquer votre processus indéfiniment) et transmet une valeur vraie au rappel en cas de succès.
+    <p class="Pp">En raison d'idiosyncrasies de perl, au lieu d'appeler
+        <span class="Li">"close", </span>le descripteur de fichier pourrait être fermé en faisant un <span class="Li">"dup2" </span>d'un autre descripteur de fichier par-dessus, c'est-à-dire que le <span class="Li">$fh </span>pourrait toujours être ouvert, mais peut être fermé en toute sécurité par la suite et ne doit pas être utilisé pour quoi que ce </p>soit.
+    <p class="Pp">Exemple : fermer un descripteur de fichier, et comme nous sommes négligents, ne pas même prendre la peine de vérifier </p>les erreurs.
+        <pre>aio_close $fh, sub </pre>{ </dd>};
+  <dt id="aio_read"><a class="permalink" href="#aio_read">aio_read $fh, $length,
+    $cb-&gt;</a></dt>($data)
+  <dd>Tente de lire <span class="Li">$length </span>octets depuis la position courante de <span class="Li">$fh </span>et transmet ces octets à
+      <span class="Li">$cb.</span> Sinon, la sémantique est très similaire à celle de <span class="Li">"sysread" </span>de Perl.
+    <p class="Pp">Si moins de <span class="Li">$length </span>octets ont été lus, <span class="Li">$data </span>ne contiendra que les octets effectivement lus. À la fin de fichier (EOF), <span class="Li">$data </span>sera une chaîne de longueur zéro. Si une erreur se produit, rien n'est transmis au </p>rappel.
+    <p class="Pp">Évidemment, plusieurs
+        <span class="Li">"aio_read" </span>ou
+        <span class="Li">"aio_write" </span>simultanés sur des descripteurs de fichier partageant la même description de fichier ouverte entraînent un comportement indéfini, en raison du partage de la position courante du fichier (et moins évidemment, parce que OS X n'est pas sûr pour les threads et corrompt les données lorsque vous </p>essayez).
+    <p class="Pp">Exemple : lire 128 octets d'un </p>fichier.
+        <pre>aio_read $fh, 128, sub {
+   my ($data) = @_
+      or return AE::log error "read from fh: $!";
+
+   if (length $data) {
+      print "read ", length $data, " octets.\n";
+   } else {
+      print "EOF\n";
+ </pre>  }</dd>
+};
+  <dt id="aio_seek"><a class="permalink" href="#aio_seek">aio_seek $fh, $offset,
+    $whence, $callback-&gt;</a></dt>($offs)
+  <dd>Place le descripteur de fichier à la nouvelle <span class="Li">$offset,</span> de manière similaire à <span class="Li">"sysseek" </span>de Perl. Les
+      <span class="Li">$whence </span>sont les valeurs traditionnelles<span class="Li">(0 </span>pour compter depuis le début, <span class="Li">1 </span>pour compter depuis la position courante et <span class="Li">2 </span>pour compter depuis la fin).
+    <p class="Pp">L'offset absolu résultant sera transmis au rappel en cas de </p>succès.
+    <p class="Pp">Exemple : mesurer la taille du fichier à l'ancienne en utilisant </p>seek.
+        <pre>aio_seek $fh, 0, 2, sub {
+   my ($size) = @_
+      or return AE::log error =&gt; "seek to end failed: $!";
+   # maybe we need to seek to the beginning again?
+   aio_seek $fh, 0, 0, sub {
+      # now we are hopefully at the beginning
+  </pre> };</dd>
+};
+  <dt id="aio_write"><a class="permalink" href="#aio_write">aio_write $fh,
+    $data, $cb-&gt;</a></dt>($length)
+  <dd>Tente d'écrire les octets de <span class="Li">$data </span>à la position courante de <span class="Li">$fh </span>et transmet le nombre réel d'octets écrits à <span class="Li">$cb.</span> Sinon, la sémantique est très similaire à celle de
+      <span class="Li">"syswrite" </span>de Perl.
+    <p class="Pp">Si moins de <span class="Li">"length </span>$data" octets ont été écrits, <span class="Li">$length </span>le reflétera. Si une erreur se produit, rien n'est transmis au </p>rappel.
+    <p class="Pp">Évidemment, plusieurs
+        <span class="Li">"aio_read" </span>ou
+        <span class="Li">"aio_write" </span>simultanés sur des descripteurs de fichier partageant la même description de fichier ouverte entraînent un comportement indéfini, en raison du partage de la position courante du fichier (et moins évidemment, parce que OS X n'est pas sûr pour les threads et corrompt les données lorsque vous </p>essayez)</dd>.
+  <dt id="aio_truncate"><a class="permalink" href="#aio_truncate">aio_truncate
+    $fh_or_path, $new_length, $cb-&gt;</a></dt>($success)
+  <dd>Appelle <span class="Li">"truncate" </span>sur le chemin ou le descripteur de fichier perl et transmet une valeur vraie au rappel en cas de succès.
+    <p class="Pp">Exemple : tronquer <i>/etc/passwd </i>à une longueur de zéro — cela ne fonctionne que sur les systèmes qui prennent en charge
+        <span class="Li">"truncate",</span> ne devrait pas être essayé pour des raisons évidentes et debian ouvrira probablement encore un autre bug de sécurité à propos de cet </p>exemple.
+        <pre>aio_truncate "/etc/passwd", sub {
+   @_
+      or return AE::log error =&gt; "/etc/passwd: $! - are you root enough?</pre>";</dd>
+};
+  <dt id="aio_utime"><a class="permalink" href="#aio_utime">aio_utime
+    $fh_or_path, $atime, $mtime, $cb-&gt;</a></dt>($success)
+  <dd>Appelle <span class="Li">"utime" </span>sur le chemin ou le descripteur de fichier perl et transmet une valeur vraie au rappel en cas de succès.
+    <p class="Pp">Le cas particulier où <span class="Li">$atime </span>et
+        <span class="Li">$mtime </span>sont
+        <span class="Li">"undef" </span>définit les temps à l'heure courante, sur les systèmes qui le prennent en </p>charge.
+    <p class="Pp">Exemple : tenter de toucher un <i>fi</i>c</p>hier.
+        <pre>aio_utime "fi</pre>le", undef, un</dd>def, sub { };
+  <dt id="aio_chown"><a class="permalink" href="#aio_chown">aio_chown
+    $fh_or_path, $uid, $gid, $cb-&gt;</a></dt>($success)
+  <dd>Appelle <span class="Li">"chown" </span>sur le chemin ou le descripteur de fichier perl et transmetpasse une valeur vraie au rappel en cas de succès.
+    <p class="Pp">Si <span class="Li">$uid </span>ou
+        <span class="Li">$gid </span>peuvent être spécifiés comme
+        <span class="Li">"undef",</span> auquel cas l'uid ou le gid
+        du fichier n'est pas modifié. Cela diffère du
+        <span class="Li">"chown" </span>intégré à Perl, qui attend
+        <span class="Li">-1 </span>pour </p>cela.
+    <p class="Pp">Exemple : mettre à jour le groupe du <i>fichier </i>en 0 (root), mais
+        laisser le propriétaire </p>tel quel.
+        <pre>aio_chown "file", undef, 0, sub {
+   @_
+      or return AE::log error =&gt; "chown 'file': </pre>$!";</dd>
+};
+  <dt id="aio_chmod"><a class="permalink" href="#aio_chmod">aio_chmod
+    $fh_or_path, $perms, $cb-&gt;</a></dt>($success)
+  <dd>Appelle <span class="Li">"chmod" </span>sur le chemin ou le descripteur de fichier
+      perl et passe une valeur vraie au rappel en cas de succès.
+    <p class="Pp">Exemple : rendre le <i>fichier </i>lisible par l'utilisateur/groupe/monde,
+        mais laisser les autres drapeaux </p>tels quels.
+        <pre>aio_stat "file", sub {
+   @_
+      or return AE::log error =&gt; "file: $!";
+   aio_chmod "file", (stat _)[2] &amp; 07777 | 00444, sub </pre>{ };</dd>
+};
+  <dt id="aio_stat"><a class="permalink" href="#aio_stat">aio_stat $fh_or_path,
+    $cb-&gt;</a></dt>($success)
+  <dd></dd>
+  <dt id="aio_lstat"><a class="permalink" href="#aio_lstat">aio_lstat $path,
+    $cb-&gt;</a></dt>($success)
+  <dd>Appelle <span class="Li">"stat" </span>ou
+      <span class="Li">"lstat" </span>sur le chemin ou le descripteur de fichier
+      perl et passe une valeur vraie au rappel en cas de succès.
+    <p class="Pp">Les données de stat seront disponibles en faisant un
+        <span class="Li">"stat" </span>sur le
+        <span class="Li">descripteur </span>de fichier "_" (par ex.
+        <span class="Li">"-x </span>_", <span class="Li">"stat
+        _" </span>et ainsi de </p>suite).
+    <p class="Pp">Exemple : voir si nous pouvons trouver le nombre de sous-répertoires de
+        <i>/</i>e</p>tc.
+        <pre>aio_stat "/etc", sub {
+   @_
+      or return AE::log error =&gt; "/etc: $!";
+   (stat _)[3] &gt;= 2
+      or return AE::log warn =&gt; "/etc has low link count - non-POSIX filesystem?";
+   print "/etc has ", (stat _)[3] - 2, " subdirectories.</pre>\n";</dd>
+};
+  <dt id="aio_link"><a class="permalink" href="#aio_link">aio_link $oldpath,
+    $newpath, $cb-&gt;</a></dt>($success)
+  <dd>Appelle <span class="Li">"link" </span>sur les chemins et passe une
+      valeur vraie au rappel en cas de succès.
+    <p class="Pp">Exemple : créer un lien vers "<i>file" </i>en <i>file.bak,</i> puis
+        renommer <i>file.new </i>par-dessus <i>file,</i> pour le remplacer </p>atomiquement.
+        <pre>aio_link "file", "file.bak", sub {
+   @_
+      or return AE::log error =&gt; "file: $!";
+   aio_rename "file.new", "file", sub {
+      @_
+         or return AE::log error =&gt; "file.new: $!";
+      print "file atomically replaced by file.new, backup file.bak\n";
+  </pre> };</dd>
+};
+  <dt id="aio_symlink"><a class="permalink" href="#aio_symlink">aio_symlink
+    $oldpath, $newpath, $cb-&gt;</a></dt>($success)
+  <dd>Appelle <span class="Li">"symlink" </span>sur les chemins et passe
+      une valeur vraie au rappel en cas de succès.
+    <p class="Pp">Exemple : créer un lien symbolique "<i>slink" </i>contenant
+        "random </p>data".
+        <pre>aio_symlink "random data", "slink", sub {
+   @_
+      or return AE::log error =&gt; "slink: </pre>$!";</dd>
+};
+  <dt id="aio_readlink"><a class="permalink" href="#aio_readlink">aio_readlink
+    $path, $cb-&gt;</a></dt>($target)
+  <dd>Appelle <span class="Li">"readlink" </span>sur les chemins et passe
+      la chaîne de la cible du lien au rappel.
+    <p class="Pp">Exemple : lire le lien symbolique nommé Fyslink&gt; et vérifier qu'il
+        contient "random </p>data".
+        <pre>aio_readlink "slink", sub {
+   my ($target) = @_
+      or return AE::log error =&gt; "slink: $!";
+   $target eq "random data"
+      or AE::log critical =&gt; "omg, the world will end!</pre>";</dd>
+};
+  <dt id="aio_rename"><a class="permalink" href="#aio_rename">aio_rename
+    $oldpath, $newpath, $cb-&gt;</a></dt>($success)
+  <dd>Appelle <span class="Li">"rename" </span>sur les chemins et passe une
+      valeur vraie au rappel en cas de succès.
+    <p class="Pp">Voir <span class="Li">"aio_link</span>" pour un</p>
+       </dd> exemple.
+  <dt id="aio_unlink"><a class="permalink" href="#aio_unlink">aio_unlink $path,
+    $cb-&gt;</a></dt>($success)
+  <dd>Tente de supprimer le lien vers l'objet situé à <span class="Li">$path </span>et passe une
+      valeur vraie au rappel en cas de succès.
+    <p class="Pp">Exemple : essayer de supprimer le fichier <i>tmpf</i>ile.d</p>at~.
+        <pre>aio_unlink "</pre>tmpfile.dat</dd>~", sub { };
+  <dt id="aio_mkdir"><a class="permalink" href="#aio_mkdir">aio_mkdir $path,
+    $perms, $cb-&gt;</a></dt>($success)
+  <dd>Appelle <span class="Li">"mkdir" </span>sur le chemin avec les permissions
+      données <span class="Li">$perms </span>(dans le doute,
+      <span class="Li">0777 </span>est une bonne valeur) et passe une valeur vraie à
+      le rappel en cas de succès.
+    <p class="Pp">Exemple : essayer de créer le répertoire <i>subdir </i>et laisser
+        à quiconque vient après nous le soin de vérifier si cela a </p>fonctionné.
+        <pre>aio_mkdir "subdir", 0777, sub </pre>{ </dd>};
+  <dt id="aio_rmdir"><a class="permalink" href="#aio_rmdir">aio_rmdir $path,
+    $cb-&gt;</a></dt>($success)
+  <dd>Tente de supprimer le répertoire situé à <span class="Li">$path </span>et passe
+      une valeur vraie au rappel en cas de succès.
+    <p class="Pp">Exemple : essayer de supprimer le répertoire <i>subdir </i>et s'en
+        moquer si cela </p>échoue.
+        <pre>aio_rmdir "subdir", sub </pre>{ </dd>};
+  <dt id="aio_readdir"><a class="permalink" href="#aio_readdir">aio_readdir
+    $path, $cb-&gt;</a></dt>(\@names)
+  <dd>Lit tous les noms de fichiers du répertoire spécifié par
+      <span class="Li">$path </span>et les passe au rappel, sous forme de référence
+      de tableau avec les noms (sans préfixe de chemin). Les noms <i>.</i> et
+      <i>.</i>. seront d'abord filtrés.
+    <p class="Pp">L'ordre des noms de fichiers est indéfini - les backends qui en
+        sont capables (par ex. IO::AIO) renverront l'ordre qui est le plus
+        susceptible d'être le plus rapide pour faire un <span class="Li">"stat",</span> et de plus mettront en premier dans le
+        tableau les entrées qui sont probablement des </p>répertoires.
+    <p class="Pp">Si vous avez besoin des meilleures performances pour une traversée récursive
+        des répertoires ou lors de l'examen de très grands répertoires, il est conseillé d'utiliser
+        IO::AIO directement, en particulier les fonctions
+        <span class="Li">"aio_readdirx" </span>et
+        <span class="Li">"aio_scandir",</span> qui ont
+        plus d'options pour régler les </p>performances.
+    <p class="Pp">Exemple : scanner récursivement une hiérarchie de répertoires, ignorer silencieusement
+        les répertoires que nous n'avons pas pu lire et imprimer tous </p>les autres.
+        <pre>sub scan($); # visibility-in-next statement is not so useful these days
+s</pre>ub scan($) {
+   my ($path) = @_;
+   aio_readdir $path, sub {
+      my ($n</dd>ames) = @_
+         or return;
+      print "$path\n";
+      for my $name (</dl>@$names) {
+         aio_lstat "$path/$name", sub {
+            scan "$pat</section>h/$name"
+               if -d _;
+         };
+      }
+   };
+}
+scan "/etc";
+<section class="Sh">
+<h1 class="Sh" id='ENVIRONMENT_VARIABLES'><a class='permalink' href='#ENVIRONMENT_VARIABLES'>VARIABLES </a></h1>D'ENVIRONNEMENT
+<p class="Pp">Voir la description de
+    <span class="Li">"PERL_ANYEVENT</span>_IO_MODEL" dan</p>s la page man</section>
+    AnyEvent.
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTEU</a></h1>R
+<pre>Marc Lehmann &lt;s</pre>chmorp@schmorp.</section>de&gt;
+http://anye</div>vent.schmorp.de
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07</td>-13
+    <td class="foot-os">pe</td>rl</tr> v</table>5.</section>42</article>.0
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le </p>paquet :
+    <dl>
+        <dt>Nom du </dt>paquet :
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-anyevent/">extra/perl-an</a></dd>yevent
+        <dt>Version </dt>:
+        <dd>4:7.</dd>17-9
+        <dt>Amont </dt>:
+        <dd><a href="https://metacpan.org/release/AnyEvent">https://metacpan.</a></dd>org/release/AnyEvent
+        <dt>Licences </dt>:
+        <dd>PerlArtistic,</dd> GPL
+        <dt>Manuels </dt>:
+        <dd><a href="/listing/extra/perl-anyevent/">/listin</a></dd>g/extra</dl>/perl-an</section>yevent/
+
+<details>
+    <summary>Table des </summary>matières
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">N</a></li>OM
+        
+            <li><a href="#SYNOPSIS">SY</a></li>NOPSIS
+        
+            <li><a href="#DESCRIPTION">DESC</a></li>RIPTION
+        
+            <li><a href="#IMPORT_TAGS">BALISES </a></li>D'IMPORTATION
+        
+            <li><a href="#API_NOTES">NOTES </a></li>SUR L'API
+        
+            <li><a href="#GLOBAL_VARIABLES_AND_FUNCTIONS">VARIABLES ET </a></li>FONCTIONS GLOBALES
+        
+            <li><a href="#ENVIRONMENT_VARIABLES">VARIABLES </a></li>D'ENVIRONNEMENT
+        
+            <li><a href="#AUTHOR">A</a></li>U</ul>TE</nav>U</details>R
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/AnyEvent::IO.3pm.en.txt">t</a>xt, 
+        
+            <a href="/man/AnyEvent::IO.3pm.en.raw">b</a></p>r</nav>u</aside></main>t
+        <footer>
+            de manuel.
+            <p>Le site web est disponible selon les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0
+               , à </a>l'exception du contenu des p</p>ages de manuel, qui ont leu</footer>r propre licence
+          </body>     spécifiée dans le paque</html>t Arch Linux correspondant.

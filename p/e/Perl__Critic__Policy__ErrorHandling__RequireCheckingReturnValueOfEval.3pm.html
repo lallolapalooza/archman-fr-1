@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Perl::Critic::Policy::ErrorHandling::RequireCheckingReturnValueOfEval(3pm) — Pages man Archlinux</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Perl__Critic__Policy__ErrorHandling__RequireCheckingReturnValueOfEval(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-perl-critic/">perl-perl-critic</a></p>
+<p class="lic">Licences: PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Perl::Critic::Policy::ErrorHandling::RequireCheckingReturnValueOfEval(3pm)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">Perl::Critic::Policy::ErrorHandling::RequireCheckingReturnValueOfEval(3pm)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Perl::Critic::Policy::ErrorHandling::RequireCheckingReturnValueOfEval
+    - Vous ne pouvez pas dépendre de la valeur de &quot;$@&quot;/&quot;$EVAL_ERROR&quot;
+    pour savoir si un &quot;eval&quot; a échoué.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AFFILIATION'><a class='permalink' href='#AFFILIATION'>AFFILIATION</a></h1>
+<p class="Pp">Cette politique fait partie de la distribution principale de Perl::Critic.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Un idiome courant en perl pour gérer les erreurs possibles est d'utiliser
+    <span class="Li">&quot;eval&quot;</span> suivi d'une vérification de
+    <span class="Li">$@</span>/<span class="Li">$EVAL_ERROR</span> :</p>
+<pre>eval {
+    ...
+};
+if ($EVAL_ERROR) {
+    ...
+}</pre>
+<p class="Pp">Il y a un problème avec ceci : la valeur de
+    <span class="Li">$EVAL_ERROR</span> peut changer entre la fin de
+    <span class="Li">&quot;eval&quot;</span> et l'instruction
+    <span class="Li">&quot;if&quot;</span>. Le problème réside dans les
+    destructeurs d'objets :</p>
+<pre>package Foo;
+...
+sub DESTROY {
+    ...
+    eval { ... };
+    ...
+}
+package main;
+eval {
+    my $foo = Foo-&gt;new();
+    ...
+};
+if ($EVAL_ERROR) {
+    ...
+}</pre>
+<p class="Pp">En supposant qu'il n'y ait pas d'autres références à
+    <span class="Li">$foo</span> créées, lorsque le bloc
+    <span class="Li">&quot;eval&quot;</span> dans
+    <span class="Li">&quot;main&quot;</span> est quitté,
+    <span class="Li">Foo::DESTROY()</span> sera appelé, que
+    <span class="Li">&quot;eval&quot;</span> ait terminé normalement ou non.
+    Si l'&quot;eval&quot; dans <span class="Li">&quot;main&quot;</span> échoue,
+    mais que l'&quot;eval&quot; dans <span class="Li">Foo::DESTROY()</span>
+    réussit, alors <span class="Li">$EVAL_ERROR</span> sera vide au moment où le
+    <span class="Li">&quot;if&quot;</span> est exécuté. D'autres problèmes surviennent
+    si vous dépendez du contenu exact de <span class="Li">$EVAL_ERROR</span>
+    et que les deux &quot;eval&quot; échouent, car les messages des deux seront concaténés.</p>
+<p class="Pp">Même s'il n'y a pas d'&quot;eval&quot; directement dans le code
+    de la méthode <span class="Li">DESTROY()</span>, elle peut appeler du code
+    qui utilise <span class="Li">&quot;eval&quot;</span> ou affecte autrement
+    <span class="Li">$EVAL_ERROR</span>.</p>
+<p class="Pp">La solution consiste à s'assurer que, lors d'une sortie normale, un
+    <span class="Li">&quot;eval&quot;</span> renvoie une valeur vraie et à tester
+    cette valeur :</p>
+<pre># Les constructeurs ne posent pas de problème.
+my $object = eval { Class-&gt;new() };
+# Pour couvrir la possibilité qu'une opération puisse correctement renvoyer une
+# valeur fausse, terminez le bloc avec &quot;1&quot; :
+if ( eval { something(); 1 } ) {
+    ...
+}
+eval {
+    ...
+    1;
+}
+    or do {
+        # Gestion d'erreur ici
+    };</pre>
+<p class="Pp">Malheureusement, vous ne pouvez pas utiliser la fonction
+    <span class="Li">&quot;defined&quot;</span> pour tester le résultat ;
+    <span class="Li">&quot;eval&quot;</span> renvoie une chaîne vide en cas
+    d'échec.</p>
+<p class="Pp">Divers modules ont été écrits pour faciliter la localisation et la
+    vérification correctes de <span class="Li">$@</span>/<span class="Li">$EVAL_ERROR</span>.
+    Par exemple :</p>
+<pre>use Try::Tiny;
+try {
+    ...
+} catch {
+    # Gestion d'erreur ici ;
+    # L'exception est dans $_/$ARG, pas dans $@/$EVAL_ERROR.
+};  # Notez le point-virgule.</pre>
+<p class="Pp">&quot;Mais nous n'utilisons <b>DESTROY()</b> nulle part dans notre
+    code !&quot; dites-vous. C'est peut-être le cas, mais est-ce que l'un des
+    modules tiers que vous utilisez en a ? Qu'en est-il de ceux que vous pourriez
+    utiliser à l'avenir ou des versions mises à jour de ceux que vous utilisez
+    déjà ?</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CONFIGURATION'><a class='permalink' href='#CONFIGURATION'>CONFIGURATION</a></h1>
+<p class="Pp">Cette politique n'est pas configurable, sauf pour les options standard.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR AUSSI</a></h1>
+<p class="Pp">Pour une manière simple et agréable, sans magie, de gérer correctement
+    les exceptions, consultez Try::Tiny.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Elliot Shank
+    <span class="Li">&quot;&lt;perl@galumph.com&gt;&quot;</span></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT'><a class='permalink' href='#COPYRIGHT'>COPYRIGHT</a></h1>
+<p class="Pp">Copyright (c) 2008-2023 Elliot Shank.</p>
+<p class="Pp">Ce programme est un logiciel libre ; vous pouvez le redistribuer et/ou
+    le modifier sous les mêmes termes que Perl lui-même. Le texte intégral de cette
+    licence se trouve dans le fichier LICENSE inclus avec ce module.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher une page man" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-perl-critic/">extra/perl-perl-critic</a></dd>
+        <dt>Version :</dt>
+        <dd>1.156-2</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://metacpan.org/release/Perl-Critic">https://metacpan.org/release/Perl-Critic</a></dd>
+        <dt>Licences :</dt>
+        <dd>PerlArtistic</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-perl-critic/">/listing/extra/perl-perl-critic/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#AFFILIATION">AFFILIATION</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#CONFIGURATION">CONFIGURATION</a></li>
+        
+            <li><a href="#VOIR_AUSSI">VOIR AUSSI</a></li>
+        
+            <li><a href="#AUTEUR">AUTEUR</a></li>
+        
+            <li><a href="#COPYRIGHT">COPYRIGHT</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Perl::Critic::Policy::ErrorHandling::RequireCheckingReturnValueOfEval.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/Perl::Critic::Policy::ErrorHandling::RequireCheckingReturnValueOfEval.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages man, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

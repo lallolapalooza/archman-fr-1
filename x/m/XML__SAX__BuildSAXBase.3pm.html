@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>XML::SAX::BuildSAXBase(3pm) — Pages man Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">XML__SAX__BuildSAXBase(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-xml-sax-base/">perl-xml-sax-base</a></p>
+<p class="lic">Licences: GPL, PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">BuildSAXBase(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">BuildSAXBase(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">XML::SAX::Base - Classe de base pour les drivers et filtres SAX</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<pre>package MonFiltre;
+use XML::SAX::Base;
+@ISA = ('XML::SAX::Base');</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Ce module a une tâche très simple : servir de classe de base pour les
+    drivers et les filtres PerlSAX. Son comportement par défaut est de transmettre
+    l'entrée directement à la sortie sans modification. Il peut être utile d'utiliser
+    ce module comme classe de base afin de ne pas avoir, par exemple, à implémenter
+    le callback <b>characters()</b>.</p>
+<p class="Pp">Les principaux avantages qu'il procure sont la facilité de distribution
+    des événements de la bonne manière (c'est-à-dire qu'il s'occupe de vérifier que le
+    gestionnaire a implémenté cette méthode, ou a défini un AUTOLOAD), et la garantie
+    que les filtres transmettront les événements qu'ils n'implémentent pas aux
+    gestionnaires en aval qui pourraient néanmoins y être intéressés.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ECRIRE_DES_DRIVERS_ET_FILTRES_SAX'><a class='permalink' href='#ECRIRE_DES_DRIVERS_ET_FILTRES_SAX'>ÉCRIRE DES DRIVERS ET FILTRES SAX</a></h1>
+<p class="Pp">La référence de l'API Perl Sax est disponible à l'adresse :
+    <a href='http://perl-xml.sourceforge.net/perl-sax/'>http://perl-xml.sourceforge.net/perl-sax/</a>.</p>
+<p class="Pp">Écrire des filtres SAX est extrêmement facile : il suffit d'hériter de
+    ce module et de définir les événements que vous souhaitez gérer. Une explication
+    plus détaillée peut être trouvée à l'adresse :
+    <a href='http://www.xml.com/pub/a/2001/10/10/sax-filters.html'>http://www.xml.com/pub/a/2001/10/10/sax-filters.html</a>.</p>
+<p class="Pp">Écrire des drivers est tout aussi simple. La seule chose à laquelle vous
+    devez prêter attention est de <b>ne pas</b> appeler les événements vous-même
+    (ce qui s'applique aussi aux filtres). Par exemple :</p>
+<pre>package MonFiltre;
+use base qw(XML::SAX::Base);
+sub start_element {
+  my $self = shift;
+  my $data = shift;
+  # faire quelque chose
+  $self-&gt;{Handler}-&gt;start_element($data); # MAUVAIS
+}</pre>
+<p class="Pp">L'exemple ci-dessus fonctionne très bien en tant que tel : un exemple.
+    Mais il présente plusieurs défauts : 1) il ne vérifie pas si le gestionnaire
+    définit start_element. Peut-être qu'il ne souhaite pas voir cet événement, auquel
+    cas vous ne devriez pas le déclencher (sinon il mourra). 2) il ne vérifie pas
+    ContentHandler puis Handler (c'est-à-dire qu'il ne regarde pas si l'utilisateur
+    n'a pas demandé d'événements sur un gestionnaire spécifique, et sinon sur celui
+    par défaut), 3) s'il vérifiait tout cela, non seulement le code serait fastidieux
+    (voir le code source de ce module pour avoir une idée) mais il faudrait aussi
+    probablement vérifier DocumentHandler (au cas où ce serait SAX1) et les AUTOLOADs
+    potentiellement définis dans tous ces packages. Comme vous pouvez le constater, ce
+    serait assez pénible. Au lieu de cela, souvenez-vous simplement d'utiliser un code
+    similaire au suivant :</p>
+<pre>package MonFiltre;
+use base qw(XML::SAX::Base);
+sub start_element {
+  my $self = shift;
+  my $data = shift;
+  # faire quelque chose pour filtrer
+  $self-&gt;SUPER::start_element($data); # BON (et facile) !
+}</pre>
+<p class="Pp">De cette façon, une fois que vous avez fait votre travail, vous renvoyez
+    la balle à XML::SAX::Base et il s'occupe de tous ces problèmes pour vous !</p>
+<p class="Pp">Notez que l'exemple ci-dessus ne s'applique pas uniquement aux filtres,
+    les drivers bénéficieront de la même fonctionnalité exacte.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='METHODES'><a class='permalink' href='#METHODES'>MÉTHODES</a></h1>
+<p class="Pp">Un certain nombre de méthodes sont définies dans cette classe dans le
+    but d'hériter. Certaines n'ont probablement pas besoin d'être redéfinies (par
+    exemple parse_file) mais d'autres devraient clairement l'être (par exemple
+    parse). Les options pour ces méthodes sont décrites dans la spécification
+    PerlSAX2 disponible à l'adresse :
+    <a href='http://cvs.sourceforge.net/cgi-bin/viewcvs.cgi/~checkout~/perl-xml/libxml-perl/doc/sax-2.0.html?rev=HEAD'>http://cvs.sourceforge.net/cgi-bin/viewcvs.cgi/~checkout~/perl-xml/libxml-perl/doc/sax-2.0.html?rev=HEAD</a>&amp;content-type=text/html.</p>
+<ul class="Bl-bullet">
+  <li>parse
+    <p class="Pp">La méthode parse est le point d'entrée principal pour l'analyse des
+        documents. En interne, la méthode parse détectera quel type de « chose »
+        vous analysez et appellera la méthode appropriée dans votre classe d'implémentation.
+        Voici le tableau de correspondance de ce qui se trouve dans les options Source
+        (voir la spécification Perl SAX 2.0 pour la signification de ces valeurs) :</p>
+        <pre>Source Contient           parse() appelle
+===============           =============
+CharacterStream (*)       _parse_characterstream($stream, $options)
+ByteStream                _parse_bytestream($stream, $options)
+String                    _parse_string($string, $options)
+SystemId                  _parse_systemid($string, $options)
+</pre>
+    <p class="Pp">Cependant, notez que ces méthodes peuvent ne pas être pertinentes si
+        votre classe de driver n'est pas destinée à l'analyse XML. Un exemple pourrait
+        être un driver DBI qui génère du XML/SAX à partir d'une table de base de données.
+        Si tel est le cas, vous voudrez probablement écrire votre propre méthode
+        <b>parse()</b>.</p>
+    <p class="Pp">Notez également que la Source peut contenir à la fois une entrée
+        PublicId et une entrée Encoding. Pour y accéder, examinez
+        <span class="Li">$options</span>-&gt;{Source} tel que passé à votre
+      méthode.</p>
+    <p class="Pp">(*) Un CharacterStream est un descripteur de fichier qui n'a pas besoin
+        de traduction d'encodage. Ceci est implémenté comme un descripteur de fichier
+        régulier et ne fonctionne que sous Perl 5.7.2 ou supérieur en utilisant PerlIO.
+        Pour obtenir un seul caractère, ou un nombre de caractères, utilisez la fonction
+        core Perl <b>read()</b>. Pour obtenir un seul octet (ou un nombre d'octets),
+        vous pouvez utiliser <b>sysread()</b>. L'encodage du flux doit se trouver dans
+        l'entrée Encoding de la Source.</p>
+  </li>
+  <li>parse_file, parse_uri, parse_string
+    <p class="Pp">Ce sont toutes des variations pratiques de <b>parse()</b>, et en fait,
+        elles configurent simplement les options avant de l'appeler. Vous n'avez
+        probablement pas besoin de redéfinir celles-ci.</p>
+  </li>
+  <li>get_options
+    <p class="Pp">Ceci est une méthode utilitaire pour obtenir les options dans le style SAX2,
+        ou plus génériquement soit sous forme de tables associatives soit sous forme de références
+        de tables associatives (elle retourne une référence de table associative).
+        Vous voudrez probablement utiliser cette méthode dans vos propres implémentations
+        de <b>parse()</b> et de <b>new()</b>.</p>
+  </li>
+  <li>get_feature, set_feature
+    <p class="Pp">Celles-ci obtiennent et définissent simplement des fonctionnalités, et
+        lèvent les exceptions appropriées définies dans la spécification si nécessaire.</p>
+    <p class="Pp">Si votre sous-classe définit des fonctionnalités non définies ici,
+        vous devriez redéfinir ces méthodes de manière à ce qu'elles vérifient d'abord
+        vos fonctionnalités, puis appellent les méthodes de la classe de base pour
+        les fonctionnalités non définies par votre classe. Un exemple serait :</p>
+        <pre>sub get_feature {
+    my $self = shift;
+    my $feat = shift;
+    if (exists $MY_FEATURES{$feat}) {
+        # gérer la fonctionnalité de diverses manières
+    }
+    else {
+        return $self-&gt;SUPER::get_feature($feat);
+    }
+}
+</pre>
+    <p class="Pp">Actuellement, cette partie n'est pas implémentée.</p>
+  </li>
+  <li>set_handler
+    <p class="Pp">Cette méthode prend un type de gestionnaire (Handler, ContentHandler,
+        etc.) et un objet gestionnaire comme arguments, et change le gestionnaire actuel
+        pour ce type de gestionnaire, tout en s'occupant de réinitialiser l'état interne
+        qui doit être réinitialisé. Cela permet de changer un gestionnaire pendant l'analyse
+        sans rencontrer de problèmes (le changer directement sur l'objet analyseur provoquera
+        très probablement des problèmes).</p>
+  </li>
+  <li>set_document_handler, set_content_handler, set_dtd_handler,
+      set_lexical_handler, set_decl_handler, set_error_handler,
+      set_entity_resolver
+    <p class="Pp">Ce ne sont que de simples enveloppes de la méthode précédente, et elles
+        prennent un objet gestionnaire comme argument. En interne, elles appellent
+        simplement set_handler avec les arguments corrects.</p>
+  </li>
+  <li>get_handler
+    <p class="Pp">L'inverse de set_handler, cette méthode prend une chaîne optionnelle
+        contenant un type de gestionnaire (DTDHandler, ContentHandler, etc. 'Handler'
+        est utilisé si aucun type n'est passé). Elle retourne une référence à l'objet
+        qui implémente cette classe, ou undef si ce type de gestionnaire n'est pas défini
+        pour le driver/filtre actuel.</p>
+  </li>
+  <li>get_document_handler, get_content_handler, get_dtd_handler,
+      get_lexical_handler, get_decl_handler, get_error_handler,
+      get_entity_resolver
+    <p class="Pp">Ce ne sont que de simples enveloppes de la méthode <b>get_handler()</b>,
+        et elles ne prennent aucun argument. En interne, elles appellent simplement
+        get_handler avec le nom correct du type de gestionnaire.</p>
+  </li>
+</ul>
+<p class="Pp">Il serait assez inutile de décrire ici toutes les méthodes que ce module
+    implémente. Ce sont toutes les méthodes prises en charge dans SAX1 et SAX2. Au
+    cas où votre mémoire serait un peu courte, voici une liste. Les doublons apparents
+    sont là pour que les deux versions de SAX puissent être prises en charge.</p>
+<ul class="Bl-bullet">
+  <li>start_document</li>
+  <li>end_document</li>
+  <li>start_element</li>
+  <li>start_document</li>
+  <li>end_document</li>
+  <li>start_element</li>
+  <li>end_element</li>
+  <li>characters</li>
+  <li>processing_instruction</li>
+  <li>ignorable_whitespace</li>
+  <li>set_document_locator</li>
+  <li>start_prefix_mapping</li>
+  <li>end_prefix_mapping</li>
+  <li>skipped_entity</li>
+  <li>start_cdata</li>
+  <li>end_cdata</li>
+  <
+</ul>
+</div>
+</section>
+                
+            </article>
+            
+        </main>
+        <footer>
+            
+            
+        </footer>
+    </body>
+</html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>XML::SAX::BuildSAXBase - Perl module</title>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+        <link rel="stylesheet" href="/css/main.css">
+        <link rel="stylesheet" href="/css/manual.css">
+        <script src="https://kit.fontawesome.com/8365a339c4.js" crossorigin="anonymous"></script>
+    </head>
+    <body>
+        <main class="container">
+            <article class="content">
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NAME</a></h1>
+<p class="Pp">XML::SAX::BuildSAXBase - Base classes for building SAX drivers and
+    filters</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>  use XML::SAX::Base;
+  
+  package My::SAX::Driver;
+  
+  @ISA = qw(XML::SAX::Base);
+  
+  sub new {
+    my $class = shift;
+    my %params = @_;
+    my $self = $class->SUPER::new(%params);
+    # ... driver-specific initialization ...
+    return $self;
+  }
+  
+  # ... implement SAX driver methods ...
+  
+  package My::SAX::Filter;
+  
+  @ISA = qw(XML::SAX::Base);
+  
+  sub new {
+    my $class = shift;
+    my %params = @_;
+    my $self = $class->SUPER::new(%params);
+    # ... filter-specific initialization ...
+    return $self;
+  }
+  
+  # ... implement SAX filter methods ...</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">This module provides base classes for implementing both SAX
+    drivers and SAX filters. SAX drivers are responsible for parsing an XML
+    document and sending SAX events to a handler. SAX filters are themselves
+    handlers, but they also pass events along to another handler (which might be
+    another filter or the final driver).</p>
+<p class="Pp">By inheriting from <code class="Nm">XML::SAX::Base</code>, you
+    get a framework that handles the boilerplate of SAX event passing, allowing
+    you to focus on the specific logic of your driver or filter.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='WRITING_SAX_DRIVERS_AND_FILTERS'><a class='permalink' href='#WRITING_SAX_DRIVERS_AND_FILTERS'>WRITING SAX DRIVERS AND FILTERS</a></h1>
+<p class="Pp">To write a SAX driver or filter, you should:</p>
+<ul class="Bl-1">
+  <li>Make your package inherit from <code class="Nm">XML::SAX::Base</code>.</li>
+  <li>Implement the constructor (<code class="Cm">new</code>) to accept any
+      driver/filter-specific parameters and to call the parent constructor
+      (<code class="Nm">SUPER::new</code>) with the parameters intended for the
+      SAX driver/filter interface (e.g., <code class="Cm">Handler</code>,
+      <code class="Cm">Source</code>).</li>
+  <li>Implement the necessary SAX event handler methods as defined by the
+      <code class="Nm">XML::SAX::DocumentHandler</code>,
+      <code class="Nm">XML::SAX::ErrorHandler</code>,
+      <code class="Nm">XML::SAX::DTDHandler</code>, and
+      <code class="Nm">XML::SAX::DeclHandler</code> interfaces.</li>
+</ul>
+<p class="Pp">The base class <code class="Nm">XML::SAX::Base</code> provides
+    default implementations for many of the SAX event methods. These defaults
+    typically just pass the event along to the next handler in the chain (if any).
+    You only need to override the methods that your driver or filter needs to
+    process.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='METHODS'><a class='permalink' href='#METHODS'>METHODS</a></h1>
+<p class="Pp">The following SAX event methods are available. The default
+    implementation in <code class="Nm">XML::SAX::Base</code> will propagate the
+    event to the next handler in the chain, if one is set.</p>
+<ul class="Bl-1">
+  <li><code class="Cm">startDocument</code></li>
+  <li><code class="Cm">endDocument</code></li>
+  <li><code class="Cm">startElement</code></li>
+  <li><code class="Cm">endElement</code></li>
+  <li><code class="Cm">characters</code></li>
+  <li><code class="Cm">ignorableWhitespace</code></li>
+  <li><code class="Cm">processingInstruction</code></li>
+  <li><code class="Cm">setDocumentLocator</code></li>
+  <li><code class="Cm">skippedEntity</code></li>
+  <li><code class="Cm">startPrefixMapping</code></li>
+  <li><code class="Cm">endPrefixMapping</code></li>
+  <li><code class="Cm">startDTD</code></li>
+  <li><code class="Cm">endDTD</code></li>
+  <li><code class="Cm">elementDecl</code></li>
+  <li><code class="Cm">attributeDecl</code></li>
+  <li><code class="Cm">entityDecl</code></li>
+  <li><code class="Cm">notationDecl</code></li>
+  <li><code class="Cm">unparsedEntityDecl</code></li>
+  <li><code class="Cm">startCDATA</code></li>
+  <li><code class="Cm">endCDATA</code></li>
+  <li><code class="Cm">comment</code></li>
+  <li><code class="Cm">entity_reference</code></li>
+  <li><code class="Cm">notation_decl</code></li>
+  <li><code class="Cm">unparsed_entity_decl</code></li>
+  <li><code class="Cm">element_decl</code></li>
+  <li><code class="Cm">attlist_decl</code></li>
+  <li><code class="Cm">doctype_decl</code></li>
+  <li><code class="Cm">xml_decl</code></li>
+  <li><code class="Cm">entity_decl</code></li>
+  <li><code class="Cm">attribute_decl</code></li>
+  <li><code class="Cm">internal_entity_decl</code></li>
+  <li><code class="Cm">external_entity_decl</code></li>
+  <li><code class="Cm">resolve_entity</code></li>
+  <li><code class="Cm">start_dtd</code></li>
+  <li><code class="Cm">end_dtd</code></li>
+  <li><code class="Cm">start_entity</code></li>
+  <li><code class="Cm">end_entity</code></li>
+  <li><code class="Cm">warning</code></li>
+  <li><code class="Cm">error</code></li>
+  <li><code class="Cm">fatal_error</code></li>
+</ul>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='TODO'><a class='permalink' href='#TODO'>TODO</a></h1>
+<pre>- more tests
+- conform to the &quot;SAX Filters&quot; and &quot;Java and DOM compatibility&quot;
+  sections of the SAX2 document.</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTHOR</a></h1>
+<p class="Pp">Kip Hampton (khampton@totalcinema.com) did most of the work, after
+    porting it from XML::Filter::Base.</p>
+<p class="Pp">Robin Berjon (robin@knowscape.com) pitched in with patches to make
+    it usable as a base for drivers as well as filters, along with other
+    patches.</p>
+<p class="Pp">Matt Sergeant (matt@sergeant.org) wrote the original
+    XML::Filter::Base, and patched a few things here and there, and imported it
+    into the XML::SAX distribution.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>SEE   ALSO</a></h1>
+<p class="Pp">XML::SAX</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2024-07-13</td>
+    <td class="foot-os">perl v5.38.2</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Package information:</p>
+    <dl>
+        <dt>Package name:</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-xml-sax-base/">extra/perl-xml-sax-base</a></dd>
+        <dt>Version:</dt>
+        <dd>1.09-6</dd>
+        <dt>Upstream:</dt>
+        <dd><a href="https://search.cpan.org/dist/XML-SAX-Base">https://search.cpan.org/dist/XML-SAX-Base</a></dd>
+        <dt>Licenses:</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuals:</dt>
+        <dd><a href="/listing/extra/perl-xml-sax-base/">/listing/extra/perl-xml-sax-base/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table of contents</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NAME</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#WRITING_SAX_DRIVERS_AND_FILTERS">WRITING SAX DRIVERS AND FILTERS</a></li>
+        
+            <li><a href="#METHODS">METHODS</a></li>
+        
+            <li><a href="#TODO">TODO</a></li>
+        
+            <li><a href="#AUTHOR">AUTHOR</a></li>
+        
+            <li><a href="#SEE_ALSO">SEE ALSO</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Other formats:
+        
+            <a href="/man/XML::SAX::BuildSAXBase.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/XML::SAX::BuildSAXBase.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>The website is available under the terms of the <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               license, except for the contents of the manual pages, which have their own license
+               specified in the corresponding Arch Linux package.
+            </p>
+        </footer>
+    </body>
+</html>

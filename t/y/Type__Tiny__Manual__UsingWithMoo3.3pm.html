@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Type::Tiny::Manual::UsingWithMoo3(3) — Pages man d'Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Type__Tiny__Manual__UsingWithMoo3(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-type-tiny/">perl-type-tiny</a></p>
+<p class="lic">Licences: PerlArtistic, GPL</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Type::Tiny::Manual::UsingWithMoo3(3)</td>
+    <td class="head-vol">Documentation Perl contribuée par l'utilisateur</td>
+    <td class="head-rtitle">Type::Tiny::Manual::UsingWithMoo3(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Type::Tiny::Manual::UsingWithMoo3 - utilisation alternative de Type::Tiny
+    avec Moo</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MANUEL'><a class='permalink' href='#MANUEL'>MANUEL</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='Registres_de_types'><a class='permalink' href='#Registres_de_types'>Registres de types</a></h2>
+<p class="Pp">Dans tous les exemples jusqu'à présent, nous avons importé une collection
+    de contraintes de type dans chaque classe :</p>
+<pre>package Horse {
+  use Moo;
+  use Types::Standard qw( Str ArrayRef HashRef Int Any InstanceOf );
+  use Types::Common::Numeric qw( PositiveInt );
+  use Types::Common::String qw( NonEmptyStr );
+
+  has name    =&gt; ( is =&gt; 'ro', isa =&gt; Str );
+  has father  =&gt; ( is =&gt; 'ro', isa =&gt; InstanceOf[&quot;Horse&quot;] );
+  ...;
+}</pre>
+<p class="Pp">Cela crée un tas de sous-routines dans l'espace de noms Horse, une pour
+    chaque type. Nous avons utilisé namespace::autoclean pour les nettoyer plus tard.</p>
+<p class="Pp">Mais il est également possible d'éviter de charger tout cela dans l'espace
+    de noms Horse. Au lieu de cela, nous utiliserons un registre de types :</p>
+<pre>package Horse {
+  use Moo;
+  use Type::Registry qw( t );
+
+  t-&gt;add_types('-Standard');
+  t-&gt;add_types('-Common::String');
+  t-&gt;add_types('-Common::Numeric');
+
+  t-&gt;alias_type('InstanceOf[&quot;Horse&quot;]' =&gt; 'Horsey');
+
+  has name     =&gt; ( is =&gt; 'ro', isa =&gt; t('Str') );
+  has father   =&gt; ( is =&gt; 'ro', isa =&gt; t('Horsey') );
+  has mother   =&gt; ( is =&gt; 'ro', isa =&gt; t('Horsey') );
+  has children =&gt; ( is =&gt; 'ro', isa =&gt; t('ArrayRef[Horsey]') );
+  ...;
+}</pre>
+<p class="Pp">Vous n'avez même pas besoin d'importer la fonction <span class="Li">t()</span>.
+    Type::Registry peut être utilisé de manière entièrement orientée objet.</p>
+<pre>package Horse {
+  use Moo;
+  use Type::Registry;
+
+  my $reg = Type::Registry-&gt;for_me;
+
+  $reg-&gt;add_types('-Standard');
+  $reg-&gt;add_types('-Common::String');
+  $reg-&gt;add_types('-Common::Numeric');
+
+  $reg-&gt;alias_type('InstanceOf[&quot;Horse&quot;]' =&gt; 'Horsey');
+
+  has name =&gt; ( is =&gt; 'ro', isa =&gt; $reg-&gt;lookup('Str') );
+  ...;
+}</pre>
+<p class="Pp">Vous pourriez créer deux registres avec des définitions entièrement
+    différentes pour le même type nommé.</p>
+<pre>my $dracula = Aristocrat-&gt;new(name =&gt; 'Dracula');
+
+package AristocracyTracker {
+  use Type::Registry;
+
+  my $reg1 = Type::Registry-&gt;new;
+  $reg1-&gt;add_types('-Common::Numeric');
+  $reg1-&gt;alias_type('PositiveInt' =&gt; 'Count');
+
+  my $reg2 = Type::Registry-&gt;new;
+  $reg2-&gt;add_types('-Standard');
+  $reg2-&gt;alias_type('InstanceOf[&quot;Aristocrat&quot;]' =&gt; 'Count');
+
+  $reg1-&gt;lookup(&quot;Count&quot;)-&gt;assert_valid(&quot;1&quot;);
+  $reg2-&gt;lookup(&quot;Count&quot;)-&gt;assert_valid($dracula);
+}</pre>
+<p class="Pp">Type::Registry utilise <span class="Li">&quot;AUTOLOAD&quot;</span>,
+    donc des choses comme celles-ci fonctionnent :</p>
+<pre>$reg-&gt;ArrayRef-&gt;of( $reg-&gt;Int );</pre>
+<p class="Pp">Bien que vous puissiez créer autant de registres que vous le souhaitez,
+    Type::Registry créera un registre par défaut pour chaque paquet.</p>
+<pre># Créer un nouveau registre vide.
+# 
+my $reg = Type::Registry-&gt;new;
+
+# Obtenir le registre par défaut pour mon paquet.
+# Il sera pré-rempli avec tous les types que nous avons importés en utilisant `use`.
+#
+my $reg = Type::Registry-&gt;for_me;
+
+# Obtenir le registre par défaut pour un autre paquet.
+#
+my $reg = Type::Registry-&gt;for_class(&quot;Horse&quot;);</pre>
+<p class="Pp">Les registres de types sont un endroit pratique pour stocker un tas de
+    types sans polluer votre espace de noms. Ils ne sont cependant pas la même chose
+    que les bibliothèques de types. Types::Standard, Types::Common::String et
+    Types::Common::Numeric sont des bibliothèques de types ; des paquets qui exportent
+    des types pour que d'autres les utilisent. Nous verrons comment en créer une plus
+    tard.</p>
+<p class="Pp">Pour l'instant, voici la meilleure façon de penser à la différence :</p>
+<ul class="Bl-bullet">
+  <li>Registre de types
+    <p class="Pp">Organiser une collection de types à utiliser ici dans cette classe.
+        Cette collection est un détail d'implémentation.</p>
+  </li>
+  <li>Bibliothèque de types
+    <p class="Pp">Exporter une collection de types à utiliser dans plusieurs classes.
+        Cette collection fait partie de votre API.</p>
+  </li>
+</ul>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Importation_de_fonctions'><a class='permalink' href='#Importation_de_fonctions'>Importation de fonctions</a></h2>
+<p class="Pp">Nous avons vu comment, par exemple, Types::Standard exporte une sous-routine
+    appelée <span class="Li">&quot;Int&quot;</span> qui renvoie l'objet de type
+    <b>Int</b>.</p>
+<pre>use Types::Standard qw( Int );
+
+my $type = Int;
+$type-&gt;check($value) or die $type-&gt;get_message($value);</pre>
+<p class="Pp">Les bibliothèques de types sont également capables d'exporter d'autres
+    fonctions de commodité.</p>
+<p class="Pp"><span class="Li"><i>&quot;is_*&quot;</i></span><i></i></p>
+<p class="Pp">C'est un raccourci pour vérifier si une valeur satisfait une contrainte
+    de type :</p>
+<pre>use Types::Standard qw( is_Int );
+
+if ( is_Int $value ) {
+  ...;
+}</pre>
+<p class="Pp">Appeler <span class="Li">is_Int($value)</span> sera souvent marginalement
+    plus rapide que d'appeler <span class="Li">&quot;Int-&gt;check($value)&quot;</span>
+    car cela évite un appel de méthode. (Les appels de méthodes en Perl finissent
+    par être plus lents que les appels de fonctions normaux.)</p>
+<p class="Pp">Utiliser des choses comme <span class="Li">&quot;is_ArrayRef&quot;</span>
+    dans votre code pourrait être préférable à <span class="Li">&quot;ref($value)
+    eq &quot;ARRAY&quot;&quot;</span> car c'est plus propre, conduit à une vérification de
+    type plus cohérente, et pourrait même être plus rapide. (Type::Tiny peut être
+    assez rapide ; il est parfois capable d'exporter ces fonctions sous forme de
+    sous-routines XS.)</p>
+<p class="Pp">Si vous vérifiez des contraintes de type comme <span class="Li">&quot;is_ArrayRef&quot;</span>
+    ou <span class="Li">&quot;is_InstanceOf&quot;</span>, il n'y a aucun moyen de passer
+    un paramètre. <span class="Li">&quot;is_ArrayRef[Int]($value)&quot;</span> ne
+    fonctionne pas, pas plus que <span class="Li">&quot;is_ArrayRef(Int,
+    $value)&quot;</span> ni <span class="Li">&quot;is_ArrayRef($value,
+    Int)&quot;</span>. Pour certains types comme <span class="Li">&quot;is_InstanceOf&quot;</span>,
+    cela les rend assez inutiles ; sans pouvoir donner un nom de classe, cela agit
+    simplement comme <span class="Li">&quot;is_Object&quot;</span>. Voir &quot;Exportation
+    de types paramétrés&quot; pour une solution. Regardez aussi isa.</p>
+<p class="Pp">Il existe également une fonction générique <span class="Li">&quot;is&quot;</span>.</p>
+<pre>use Types::Standard qw( ArrayRef Int );
+use Type::Utils qw( is );
+
+if ( is ArrayRef[Int], \@numbers ) {
+  ...;
+}</pre>
+<p class="Pp"><span class="Li"><i>&quot;assert_*&quot;</i></span><i></i></p>
+<p class="Pp">Alors que <span class="Li">is_Int($value)</span> renvoie un booléen,
+    <span class="Li">assert_Int($value)</span> lèvera une erreur si la valeur ne
+    satisfait pas la contrainte, et renverra la valeur sinon. Vous pouvez donc
+    faire :</p>
+<pre>my $sum = assert_Int($x) + assert_Int($y);</pre>
+<p class="Pp">Et vous obtiendrez la somme des entiers <span class="Li">$x</span> et
+    <span class="Li">$y</span>, et une explosion si l'un d'eux n'est pas un entier !</p>
+<p class="Pp">Assert est utile pour des vérifications rapides de paramètres si vous
+    évitez Type::Params pour une raison étrange :</p>
+<pre>sub add_numbers {
+  my $x = assert_Num(shift);
+  my $y = assert_Num(shift);
+  return $x + $y;
+}</pre>
+<p class="Pp">Vous pouvez également utiliser une fonction générique
+    <span class="Li">&quot;assert&quot;</span>.</p>
+<pre>use Type::Utils qw( assert );
+
+sub add_numbers {
+  my $x = assert Num, shift;
+  my $y = assert Num, shift;
+  return $x + $y;
+}</pre>
+<p class="Pp"><span class="Li"><i>&quot;to_*&quot;</i></span><i></i></p>
+<p class="Pp">C'est un raccourci pour la coercition :</p>
+<pre>my $truthy = to_Bool($value);</pre>
+<p class="Pp">Cela fait confiance que la coercition a fonctionné correctement. Vous pouvez
+    la combiner avec une assertion si vous voulez être sûr.</p>
+<pre>my $truthy = assert_Bool(to_Bool($value));</pre>
+<p class="Pp"><i>Raccourcis pour exporter des fonctions</i></p>
+<p class="Pp">C'est un peu verbeux :</p>
+<pre>use Types::Standard qw( Bool is_Bool assert_Bool to_Bool );</pre>
+<p class="Pp">N'est-ce pas un peu plus agréable ?</p>
+<pre>use Types::Standard qw( +Bool );</pre>
+<p class="Pp">Le signe plus indique à une bibliothèque de types d'exporter non seulement
+    le type lui-même, mais aussi toutes les fonctions de commodité.</p>
+<p class="Pp">Vous pouvez également utiliser :</p>
+<pre>use Types::Standard -types;   # exporte Int, Bool, etc
+use Types::Standard -is;      # exporte is_Int, is_Bool, etc
+use Types::Standard -assert;  # exporte assert_Int, assert_Bool, etc
+use Types::Standard -to;      # exporte to_Bool, etc
+use Types::Standard -all;     # juste exporte tout !!!</pre>
+<p class="Pp">Donc, si vous imaginez que les fonctions exportées par Types::Standard sont
+    comme ceci :</p>
+<pre>qw(
+  Str             is_Str          assert_Str
+  Num             is_Num          assert_Num
+  Int             is_Int          assert_Int
+  Bool            is_Bool         assert_Bool     to_Bool
+  ArrayRef        is_ArrayRef     assert_ArrayRef
+);
+# ... et plus</pre>
+<p class="Pp">Alors &quot;+&quot; exporte un groupe horizontal de ceux-ci, et &quot;-&quot;
+    exporte un groupe vertical.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Exportation_de_types_paramétrés'><a class='permalink' href='#Exportation_de_types_paramétrés'>Exportation de types paramétrés</a></h2>
+<p class="Pp">Il est possible d'exporter des types paramétrables comme <b>ArrayRef</b>,
+    mais il est également possible d'exporter des types *paramétrés*.</p>
+<pre>use Types::Standard qw( ArrayRef Int );
+use Types::Stan</pre>
+</section>
+</div>
+</section>
+
+            </article>
+            
+        </main>
+        <footer>
+            
+        </footer>
+    </body>
+</html>
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="generator" content="mandoc">
+        <title>Type::Tiny::Manual::UsingWithMoo 3 - perl</title>
+        <link rel="stylesheet" href="style.css">
+    </head>
+    <body>
+        <article>
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">Type::Tiny::Manual::UsingWithMoo - How to use Type::Tiny with
+    Moose/Moo</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="MANUAL"><a class="permalink" href="#MANUAL">MANUAL</a></h1>
+<p class="Pp">This manual page explains how to use Type::Tiny with Moo and
+    Moose.</p>
+<section class="Ss">
+<h2 class="Ss" id="Types_provided_by_Types::Standard"><a class="permalink" href="#Types_provided_by_Types::Standard">Types
+    provided by Types::Standard</a></h2>
+<p class="Pp">Types::Standard provides a number of useful type constraints. You
+    can import them directly, or you can import them into your own namespace.
+    This is useful if you want to avoid name collisions.</p>
+<pre>use Types::Standard -types; # imports all types into the current namespace
+
+# Or, if you want to avoid name collisions:
+package MyTypes;
+use Types::Standard -types;
+our @ISA = qw( Types::Standard ); # Make sure all of Types::Standard types are available
+1;
+
+package main;
+use MyTypes qw( PositiveInt Str );
+assert_PositiveInt( $foo );
+assert_Str( $bar );</pre>
+<p class="Pp">The <code class="Nm">-types</code> option is equivalent to
+    <code class="Nm">-normalize</code>. This means that any type constraints that
+    are imported will be normalized. This means that any type constraints that
+    are parameterized will be parameterized with their default values. For
+    example, if you import <code class="Nm">ArrayRef</code>, it will be imported
+    as <code class="Nm">ArrayRef[Any]</code>.</p>
+<p class="Pp">If you want to import a type constraint with a specific
+    parameterization, you can do so like this:</p>
+<pre>use Types::Standard qw( IntList );
+
+# Then, you can use IntList as a type constraint.
+# Note that this is equivalent to:
+# use Types::Standard -types; # makes 'IntList' available
+# our $IntList = ArrayRef-&gt;of(Int);</pre>
+<p class="Pp">The <code class="Nm">-types</code> option is only available since
+    Type::Tiny 2.0. If you are using an older version of Type::Tiny, you will
+    need to import the types manually.</p>
+<p class="Pp">Since Type::Tiny 2.0, you can define your own parameterized types
+    like this:</p>
+<pre>use Type::Tiny;
+use Type::Tiny::Enum;
+
+my $IntList = Type::Tiny::ArrayRef-&gt;of(Int);
+my $is_IntList = $IntList-&gt;compile;
+
+# ... and then use $is_IntList wherever you need a type checker for an
+# array reference of integers.</pre>
+<p class="Pp">You can also export your own parameterized types:</p>
+<pre>use Type::Tiny;
+
+package MyTypes;
+use Type::Tiny -types; # Make sure all of Type::Tiny's types are available
+
+our $IntList = Type::Tiny::ArrayRef-&gt;of(Int);
+our $StrList = Type::Tiny::ArrayRef-&gt;of(Str);
+
+1;
+
+package main;
+use MyTypes qw( IntList StrList );
+
+my $list = [1, 2, 3];
+assert_IntList($list); # OK
+
+my $other_list = ["a", "b", "c"];
+assert_StrList($other_list); # OK</pre>
+<p class="Pp">When you export parameterized types, you can also specify a name
+    for the exported type. This is useful if you want to use a different name for
+    the type than the one that is generated by Type::Tiny.</p>
+<pre>use Type::Tiny;
+
+package MyTypes;
+use Type::Tiny -types;
+
+our 'IntList' =&gt; ( of =&gt; Int );
+
+1;
+
+package main;
+use MyTypes qw( IntList );
+
+my $list = [1, 2, 3];
+assert_IntList($list); # OK</pre>
+<p class="Pp">Using <code class="Nm">is_IntList($value)</code> should be
+    significantly faster than
+    <code class="Nm">&quot;ArrayRef-&gt;of(Int)-&gt;check($value)&quot;</code>.</p>
+<p class="Pp">This trick only works for parameterized types that have a single
+    parameter, like <b>ArrayRef</b>, <b>HashRef</b>, <b>InstanceOf</b>, etc.
+    (Sorry, <code class="Nm">&quot;Dict&quot;</code> and
+    <code class="Nm">&quot;Tuple&quot;</code>!)</p>
+<p class="Pp">Since Type::Tiny 2.8.0 there has been experimental support for a
+    different way of exporting parameterized versions of certain parameterizable
+    type constraints.</p>
+<pre>use Types::Standard -types;
+use Types::Standard::ArrayRef (
+  IntList         =&gt; { of =&gt; Int },
+  StrList         =&gt; { of =&gt; Str },
+  NonEmptyStrList =&gt; { of =&gt; Str-&gt;where( sub { length($_) &gt; 0 } ) },
+  StrNonEmptyList =&gt; { of =&gt; Str, where =&gt; sub { @$_ &gt; 0 } },
+  NEStrNEList     =&gt; {
+    of    =&gt; Str-&gt;where( sub { length($_) &gt; 0 } ),
+    where =&gt; sub { @$_ &gt; 0 },
+  },
+);
+
+assert_IntList [ 1.. 5 ];                      # doesn't die
+
+is_NonEmptyStrList [ &quot;foo&quot;, &quot;bar&quot; ];           # ==&gt; true
+is_NonEmptyStrList [ &quot;foo&quot;, &quot;&quot; ];              # ==&gt; false
+is_NonEmptyStrList [];                         # ==&gt; true
+
+is_StrNonEmptyList [ &quot;foo&quot;, &quot;bar&quot; ];           # ==&gt; true
+is_StrNonEmptyList [ &quot;foo&quot;, &quot;&quot; ];              # ==&gt; true
+is_StrNonEmptyList [];                         # ==&gt; false
+
+is_NEStrNEList [ &quot;foo&quot;, &quot;bar&quot; ];               # ==&gt; true
+is_NEStrNEList [ &quot;foo&quot;, &quot;&quot; ];                  # ==&gt; false
+is_NEStrNEList [];                             # ==&gt; false</pre>
+<p class="Pp">And of course <code class="Nm">&quot;where&quot;</code> also
+    accepts a string of Perl code.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id="Lexical_imports"><a class="permalink" href="#Lexical_imports">Lexical
+    imports</a></h2>
+<p class="Pp">Type::Tiny 2.0 combined with Perl 5.37.2+ allows lexically scoped
+    imports. So:</p>
+<pre>my $is_ok = do {
+  use Types::Standard -lexical, qw( Str ArrayRef );
+  ArrayRef-&gt;of( Str )-&gt;check( \@things );
+};
+
+# The Str and ArrayRef types aren't defined here.</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id="Do_What_I_Mean!"><a class="permalink" href="#Do_What_I_Mean!">Do
+    What I Mean!</a></h2>
+<pre>use Type::Utils qw( dwim_type );
+
+my $type = dwim_type(&quot;ArrayRef[Int]&quot;);</pre>
+<p class="Pp"><code class="Nm">&quot;dwim_type&quot;</code> will look up a type
+    constraint from a string and attempt to guess what you meant.</p>
+<p class="Pp">If it's a type constraint that you seem to have imported with
+    <code class="Nm">&quot;use&quot;</code>, then it should find it. Otherwise,
+    if you're using Moose or Mouse, it'll try asking those. Or if it's in
+    Types::Standard, it'll look there. And if it still has no idea, then it will
+    assume dwim_type(&quot;Foo&quot;) means
+    dwim_type(&quot;InstanceOf['Foo']&quot;).</p>
+<p class="Pp">It just does a big old bunch of guessing.</p>
+<p class="Pp">The <code class="Nm">&quot;is&quot;</code> function will use
+    <code class="Nm">&quot;dwim_type&quot;</code> if you pass it a string as a
+    type.</p>
+<pre>use Type::Utils qw( is );
+
+if ( is &quot;ArrayRef[Int]&quot;, \@numbers ) {
+  ...;
+}</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id="Types::Common"><a class="permalink" href="#Types::Common">Types::Common</a></h2>
+<p class="Pp">Notice that in a lot of examples we're importing one or two
+    functions each from a few different modules:</p>
+<pre>use Types::Common::Numeric qw( PositiveInt );
+use Types::Common::String qw( NonEmptyStr );
+use Types::Standard qw( ArrayRef Slurpy );
+use Type::Params qw( signature_for );</pre>
+<p class="Pp">A module called Types::Common exists which acts as a single place
+    you can use for importing most of Type::Tiny's commonly used types and
+    functions.</p>
+<pre>use Types::Common qw(
+  PositiveInt NonEmptyStr ArrayRef Slurpy
+  signature_for
+);</pre>
+<p class="Pp">Types::Common provides:</p>
+<ul class="Bl-bullet">
+  <li>All the types from Types::Standard.</li>
+  <li>All the types from Types::Common::Numeric and Types::Common::String.</li>
+  <li>All the types from Types::TypeTiny.</li>
+  <li>The <code class="Nm">&quot;-sigs&quot;</code> tag from Type::Params.</li>
+  <li>The <code class="Nm">t()</code> function from Type::Registry.</li>
+</ul>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="NEXT_STEPS"><a class="permalink" href="#NEXT_STEPS">NEXT
+    STEPS</a></h1>
+<p class="Pp">You now know pretty much everything there is to know about how to
+    use type libraries.</p>
+<p class="Pp">Here's your next step:</p>
+<dl class="Bl-tag">
+  <dt>&#x2022;</dt>
+  <dd>Type::Tiny::Manual::Libraries
+    <p class="Pp">Defining your own type libraries, including extending existing
+        libraries, defining new types, adding coercions, defining
+        parameterizable types, and the declarative style.</p>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">Toby Inkster &lt;tobyink@cpan.org&gt;.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="COPYRIGHT_AND_LICENCE"><a class="permalink" href="#COPYRIGHT_AND_LICENCE">COPYRIGHT
+    AND LICENCE</a></h1>
+<p class="Pp">This software is copyright (c) 2013-2014, 2017-2025 by Toby
+    Inkster.</p>
+<p class="Pp">This is free software; you can redistribute it and/or modify it
+    under the same terms as the Perl 5 programming language system itself.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DISCLAIMER_OF_WARRANTIES"><a class="permalink" href="#DISCLAIMER_OF_WARRANTIES">DISCLAIMER
+    OF WARRANTIES</a></h1>
+<p class="Pp">THIS PACKAGE IS PROVIDED &quot;AS IS&quot; AND WITHOUT ANY EXPRESS
+    OR IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES
+    OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.</p>
+</section>
+</article>
+<aside id="sidebar">
+<section class="search">
+<form action="/search" class="search direct-search" role="search">
+<input type="search" placeholder="Search manual page" name="q" value="">
+<input type="submit" name="go" value="Go">
+</form>
+</section>
+<section class="package-info">
+<p>Package information:</p>
+<dl>
+<dt>Package name:</dt>
+<dd><a href="https://www.archlinux.org/packages/extra/any/perl-type-tiny/">extra/perl-type-tiny</a></dd>
+<dt>Version:</dt>
+<dd>2.008004-1</dd>
+<dt>Upstream:</dt>
+<dd><a href="https://metacpan.org/release/Type-Tiny">https://metacpan.org/release/Type-Tiny</a></dd>
+<dt>Licenses:</dt>
+<dd>PerlArtistic, GPL</dd>
+<dt>Manuals:</dt>
+<dd><a href="/listing/extra/perl-type-tiny/">/listing/extra/perl-type-tiny/</a></dd>
+</dl>
+</section>
+<details>
+<summary>Table of contents</summary>
+<nav class="toc">
+<ul>
+<li><a href="#NAME">NAME</a></li>
+<li><a href="#MANUAL">MANUAL</a></li>
+<li><a href="#NEXT_STEPS">NEXT STEPS</a></li>
+<li><a href="#AUTHOR">AUTHOR</a></li>
+<li><a href="#COPYRIGHT_AND_LICENCE">COPYRIGHT AND LICENCE</a></li>
+<li><a href="#DISCLAIMER_OF_WARRANTIES">DISCLAIMER OF WARRANTIES</a></li>
+</ul>
+</nav>
+</details>
+<nav class="other-formats">
+<p>Other formats:
+<a href="/man/Type::Tiny::Manual::UsingWithMoo3.3pm.en.txt">txt</a>,
+<a href="/man/Type::Tiny::Manual::UsingWithMoo3.3pm.en.raw">raw</a>
+</p>
+</nav>
+</aside>
+<table class="foot">
+<tr>
+<td class="foot-date">2025-11-02</td>
+<td class="foot-os">perl v5.42.0</td>
+</tr>
+</table>
+        </article>
+        <footer>
+            
+            <p>The website is available under the terms of the <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               license, except for the contents of the manual pages, which have their own license
+               specified in the corresponding Arch Linux package.
+            </p>
+        </footer>
+    </body>
+</html>

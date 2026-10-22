@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>POE::Filter::Block(3pm) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">POE__Filter__Block(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-poe/">perl-poe</a></p>
+<p class="lic">Licences: GPL, PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">POE::Filter::Block(3)</td>
+    <td class="head-vol">Documentation Perl fournie par la communauté</td>
+    <td class="head-rtitle">POE::Filter::Block(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">POE::Filter::Block - traduisez des données entre des flux et des blocs</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>#!perl
+use warnings;
+use strict;
+use POE::Filter::Block;
+my $filter = POE::Filter::Block-&gt;new( BlockSize =&gt; 8 );
+# Affiche trois lignes : abcdefgh, ijklmnop, qrstuvwx.
+# Les octets &quot;y&quot; et &quot;z&quot; restent dans le tampon et attendent l'achèvement du
+# prochain bloc de 8 octets.
+$filter-&gt;get_one_start([ &quot;abcdefghijklmnopqrstuvwxyz&quot; ]);
+while (1) {
+  my $block = $filter-&gt;get_one();
+  last unless @$block;
+  print $block-&gt;[0], &quot;\n&quot;;
+}
+# Affiche une ligne : yz123456
+$filter-&gt;get_one_start([ &quot;123456&quot; ]);
+while (1) {
+  my $block = $filter-&gt;get_one();
+  last unless @$block;
+  print $block-&gt;[0], &quot;\n&quot;;
+}</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">POE::Filter::Block traduit des données entre des flux série et des
+    blocs. Il peut gérer des blocs de longueur fixe et des blocs préfixés par leur
+    longueur, et il peut être étendu pour gérer d'autres types de blocs.</p>
+<p class="Pp">Les blocs de longueur fixe sont utilisés lorsque le constructeur
+    de Block est appelé avec une valeur BlockSize. Sinon, le filtre Block utilise
+    des blocs préfixés par leur longueur.</p>
+<p class="Pp">Les utilisateurs qui spécifient des tailles de bloc inférieures à
+    un méritent ce qui leur arrive.</p>
+<p class="Pp">En mode de longueur variable, un paramètre LengthCodec peut être
+    spécifié. La valeur LengthCodec doit être une référence à une liste de deux
+    fonctions : l'encodeur de longueur et le décodeur de longueur :</p>
+<pre>LengthCodec =&gt; [ \&amp;encoder, \&amp;decoder ]</pre>
+<p class="Pp">L'encodeur prend une référence à un tampon et lui ajoute sa
+    longueur en préfixe. L'encodeur par défaut ajoute la représentation ASCII de la
+    longueur du tampon et un octet <a href='/man/chr.0.en'>chr(0)</a> pour séparer la longueur des
+    données réelles :</p>
+<pre>sub _default_encoder {
+  my $stuff = shift;
+  substr($$stuff, 0, 0) = length($$stuff) . &quot;\0&quot;;
+  return;
+}</pre>
+<p class="Pp">Le décodeur correspondant renvoie la longueur du bloc après l'avoir
+    retirée, ainsi que le séparateur, du tampon. Il ne renvoie rien si aucune longueur
+    ne peut être déterminée.</p>
+<pre>sub _default_decoder {
+  my $stuff = shift;
+  unless ($$stuff =~ s/^(\d+)\0//s) {
+    warn length($1), &quot; strange bytes removed from stream&quot;
+      if $$stuff =~ s/^(\D+)//s;
+    return;
+  }
+  return $1;
+}</pre>
+<p class="Pp">Ce filtre conserve les blocs incomplets jusqu'à ce qu'ils soient
+    complétés dans un tampon de cadrage. Pour contrôler l'utilisation de la mémoire,
+    une taille maximale de tampon de cadrage est imposée. Cette taille maximale
+    défaut à 512 Mo (512*1024*1024 octets). Vous pouvez modifier cette limite de
+    taille avec le paramètre <span class="Li">&quot;MaxBuffer&quot;</span>.</p>
+<pre>MaxBuffer =&gt; 1099511627776  # Un téraoctet !</pre>
+<p class="Pp">La taille de chaque bloc individuel est également limitée. Par
+    défaut, chaque bloc ne peut pas dépasser 64 Mo. Vous pouvez modifier cette
+    limite de taille avec le paramètre <span class="Li">&quot;MaxLength&quot;</span>.</p>
+<pre>MaxLength =&gt; 10             # petits blocs</pre>
+<p class="Pp">N'oubliez pas que MaxBuffer doit être plus grand que MaxLength. De
+    plus, il doit avoir de la place pour le préfixe de longueur.</p>
+<p class="Pp">Si la contrainte <span class="Li">&quot;MaxLength&quot;</span> ou
+    <span class="Li">&quot;MaxBuffer&quot;</span> est dépassée,
+    <span class="Li">&quot;POE::Filter::Bock&quot;</span> lèvera une
+    exception.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PUBLIC_FILTER_METHODS'><a class='permalink' href='#PUBLIC_FILTER_METHODS'>MÉTHODES PUBLIQUES DU FILTRE</a></h1>
+<p class="Pp">POE::Filter::Block n'a pas de méthodes publiques supplémentaires.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR AUSSI</a></h1>
+<p class="Pp">Veuillez consulter POE::Filter pour la documentation concernant l'interface de base.</p>
+<p class="Pp">La section SEE ALSO dans POE contient une table des matières couvrant
+    l'ensemble de la distribution POE.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BUGS'><a class='permalink' href='#BUGS'>BOGUES</a></h1>
+<p class="Pp">La méthode <b>put()</b> ne vérifie pas les tailles de bloc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHORS_&amp;amp;_COPYRIGHTS'><a class='permalink' href='#AUTHORS_&amp;amp;_COPYRIGHTS'>AUTEURS   &amp; COPYRIGHTS</a></h1>
+<p class="Pp">Le filtre Block a été contribué par Dieter Pearcey, avec des
+    modifications par Rocco Caputo.</p>
+<p class="Pp">Veuillez consulter POE pour plus d'informations sur les auteurs et
+    les contributeurs.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2024-07-13</td>
+    <td class="foot-os">perl v5.38.2</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-poe/">extra/perl-poe</a></dd>
+        <dt>Version :</dt>
+        <dd>1.370-2</dd>
+        <dt>En amont :</dt>
+        <dd><a href="https://search.cpan.org/dist/POE">https://search.cpan.org/dist/POE</a></dd>
+        <dt>Licences :</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-poe/">/listing/extra/perl-poe/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#PUBLIC_FILTER_METHODS">MÉTHODES PUBLIQUES DU FILTRE</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+            <li><a href="#BUGS">BOGUES</a></li>
+        
+            <li><a href="#AUTHORS_&amp;amp;_COPYRIGHTS">AUTEURS &amp; COPYRIGHTS</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/POE::Filter::Block.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/POE::Filter::Block.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>, à l'exception du contenu des pages de manuel, qui ont leur propre licence spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

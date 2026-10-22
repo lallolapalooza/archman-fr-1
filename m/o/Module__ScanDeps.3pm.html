@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Module::ScanDeps(3pm) — Pages man d'Arch Linux</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Module__ScanDeps(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-module-scandeps/">perl-module-scandeps</a></p>
+<p class="lic">Licences: PerlArtistic, GPL</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Nom</td>
+    <td class="head-vol">Documentation Perl contribuée par les utilisateurs</td>
+    <td class="head-rtitle">Nom</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>Nom</a></h1>
+<p class="Pp">Module::ScanDeps - Scanner le code Perl à la recherche de dépendances</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>Synopsis</a></h1>
+<p class="Pp">Via le programme de ligne de commande scandeps.pl:</p>
+<pre>% scandeps.pl *.pm          # Afficher la section PREREQ_PM pour *.pm
+% scandeps.pl -e &quot;use utf8&quot; # Lire le script depuis la ligne de commande
+% scandeps.pl -B *.pm       # Inclure les modules de base
+% scandeps.pl -V *.pm       # Afficher les fichiers d'autoload, partagés et de données</pre>
+<p class="Pp">Utilisé dans un programme:</p>
+<pre>use Module::ScanDeps;
+# Usage standard
+my $hash_ref = scan_deps(
+    files   =&gt; [ 'a.pl', 'b.pl' ],
+    recurse =&gt; 1,
+);
+# Format court ; suppose recurse == 1
+my $hash_ref = scan_deps( 'a.pl', 'b.pl' );
+# Interface compatible avec App::Packer::Frontend
+# voir App::Packer::Frontend pour le format de retour de get_files
+my $scan = Module::ScanDeps-&gt;new;
+$scan-&gt;set_file( 'a.pl' );
+$scan-&gt;set_options( add_modules =&gt; [ 'Test::More' ] );
+$scan-&gt;calculate_info;
+my $files = $scan-&gt;get_files;</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>Description</a></h1>
+<p class="Pp">Ce module analyse les modules potentiels utilisés par les programmes Perl et renvoie une référence de hash ; ses clés sont les noms des modules tels qu'ils apparaissent dans %INC (par exemple, &quot;Test/More.pm&quot;) ; les valeurs sont des références de hash avec cette structure:</p>
+<pre>{
+    file    =&gt; '/usr/local/lib/perl5/5.8.0/Test/More.pm',
+    key     =&gt; 'Test/More.pm',
+    type    =&gt; 'module',    # ou 'autoload', 'data', 'shared'
+    used_by =&gt; [ 'Test/Simple.pm', ... ],
+    uses    =&gt; [ 'Test/Other.pm', ... ],
+}</pre>
+<p class="Pp">Une fonction, &quot;scan_deps&quot;, est exportée par défaut. D'autres fonctions telles que (<span class="Li">&quot;scan_line&quot;</span>, <span class="Li">&quot;scan_chunk&quot;</span>, <span class="Li">&quot;add_deps&quot;</span>, <span class="Li">&quot;path_to_inc_name&quot;</span>) sont exportées lorsqu'elles sont demandées.</p>
+<p class="Pp">Les utilisateurs d'App::Packer peuvent également utiliser ce module comme interface frontend pour vérifier les dépendances, en ajustant leur p2e.pl comme suit:</p>
+<pre>use Module::ScanDeps;
+...
+my $packer = App::Packer-&gt;new( frontend =&gt; 'Module::ScanDeps' );
+...</pre>
+<p class="Pp">Veuillez consulter App::Packer::Frontend pour une explication détaillée du format de retour de get_files.</p>
+<section class="Ss">
+<h2 class="Ss"><b>scan_deps</b></h2>
+<pre>$rv_ref = scan_deps(
+    files      =&gt; \@files,     recurse =&gt; $recurse,
+    rv         =&gt; \%rv,        skip    =&gt; \%skip,
+    compile    =&gt; $compile,    execute =&gt; $execute,
+);
+$rv_ref = scan_deps(@files); # syntaxe courte, avec recurse == 1</pre>
+<p class="Pp">Cette fonction analyse chaque fichier dans @files, enregistrant ses dépendances dans %rv, et renvoie une référence à %rv mise à jour. La signification des clés et des valeurs est expliquée ci-dessus.</p>
+<p class="Pp">Si $recurse est vrai, scan_deps s'appelle récursivement, pour effectuer une recherche en largeur dans les fichiers texte (tel que défini par l'opérateur -T).</p>
+<p class="Pp">Si \%skip est spécifié, les fichiers qui existent comme ses clés sont ignorés. Ceci est utilisé en interne pour éviter la récursion infinie.</p>
+<p class="Pp">Si $compile ou $execute est vrai, les fichiers sont exécutés en mode compilation uniquement ou en mode normal, et leur %INC est inspecté après la fermeture pour déterminer les dépendances d'exécution supplémentaires.</p>
+<p class="Pp">Si $execute est une référence de tableau, il transmet @$execute comme arguments à chaque fichier dans @files lors de l'exécution.</p>
+<p class="Pp">Si vous vous souciez de la vitesse du processus de balayage, vous pouvez définir l'option cache_file à un nom de fichier. Les résultats de l'analyse seront stockés dans le fichier et utilisés pour accélérer l'analyse lors des exécutions futures.</p>
+<p class="Pp">De plus, une option &quot;warn_missing&quot; est reconnue. Si elle est définie à vrai, scan_deps émet un avertissement à STDERR pour chaque fichier de module dont il dépend mais qui ne peut être trouvé. Notez que cela peut également signaler de nombreux faux positifs. Par conséquent, par défaut, l'algorithme heuristique ignore silencieusement toutes les dépendances qui ne peuvent être trouvées.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>scan_deps_runtime</b></h2>
+<p class="Pp">Similaire à scan_deps, mais omet la partie analyse statique.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>scan_line</b></h2>
+<pre>@modules = scan_line($line);</pre>
+<p class="Pp">Divise une ligne en morceaux (actuellement avec des caractères de point-virgule) et renvoie l'union des appels à scan_chunk à partir d'eux.</p>
+<p class="Pp">Si la ligne est &quot;__END__&quot; ou &quot;__DATA__&quot;, un élément &quot;__END__&quot; est renvoyé pour indiquer la fin du programme.</p>
+<p class="Pp">De même, il renvoie un élément &quot;__POD__&quot; si la ligne correspond à &quot;/^=\w/&quot; ; l'appelant est responsable de sauter le nombre approprié de lignes jusqu'à &quot;=cut&quot; avant d'appeler à nouveau scan_line.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>scan_chunk</b></h2>
+<pre>$module = scan_chunk($chunk);
+@modules = scan_chunk($chunk);</pre>
+<p class="Pp">Applique diverses heuristiques à $chunk pour trouver et renvoyer le(s) nom(s) de module qu'il contient. En contexte scalaire, il renvoie uniquement le premier module ou &quot;undef&quot;.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>add_deps</b></h2>
+<pre>$rv_ref = add_deps( rv =&gt; \%rv, modules =&gt; \@modules );
+$rv_ref = add_deps( @modules ); # syntaxe courte, sans rv</pre>
+<p class="Pp">Résout une liste de noms de modules vers leur emplacement réel sur disque, en recherchant dans @INC et @Module::ScanDeps::IncludeLibs ; les modules qui ne peuvent être trouvés sont ignorés.</p>
+<p class="Pp">Cette fonction remplit le hash %rv avec des paires module/nom_de_fichier, et renvoie une référence vers celui-ci.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>path_to_inc_name</b></h2>
+<pre>$perl_name = path_to_inc_name($path, $warn)</pre>
+<p class="Pp">Suppose que $path fait référence à un fichier Perl et fait de son mieux pour renvoyer le nom tel qu'il apparaîtrait dans %INC. Renvoie undef s'il n'y a pas de correspondance et imprime un avertissement à STDERR si $warn est vrai.</p>
+<p class="Pp">Exemple : si $path = perl/site/lib/Module/ScanDeps.pm, alors $perl_name sera Module/ScanDeps.pm.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='NOTES'><a class='permalink' href='#NOTES'>Notes</a></h1>
+<section class="Ss">
+<h2 class="Ss"><b>@Module::ScanDeps::IncludeLibs</b></h2>
+<p class="Pp">Vous pouvez définir cette variable globale pour spécifier des répertoires supplémentaires dans lesquels rechercher des modules sans modifier @INC.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss"><b>$Module::ScanDeps::ScanFileRE</b></h2>
+<p class="Pp">Vous pouvez définir cette variable globale pour spécifier un motif régulier afin d'identifier quels fichiers analyser. Par défaut, il inclut tous les fichiers des types suivants : .pm, .pl, .t et .al. De plus, il prend en compte tous les fichiers sans extension.</p>
+<p class="Pp">Par exemple, si vous voulez analyser tous les fichiers, utilisez ce qui suit :</p>
+<p class="Pp"><span class="Li">&quot;$Module::ScanDeps::ScanFileRE = qr/./&quot;</span></p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CAVEATS'><a class='permalink' href='#CAVEATS'>Mises en garde</a></h1>
+<p class="Pp">Ce module ignore intentionnellement le hack BSDPAN sous FreeBSD — le répertoire supplémentaire est retiré de @INC.</p>
+<p class="Pp">L'algorithme d'analyse statique n'est probablement pas précis à 100 %, en particulier pour les modules qui chargent d'autres modules de manière dynamique.</p>
+<p class="Pp">Les blocs qui s'étendent sur plusieurs lignes ne sont pas correctement gérés. Par exemple, ceci fonctionne :</p>
+<pre>use base 'Foo::Bar';</pre>
+<p class="Pp">Mais ceci ne fonctionne pas :</p>
+<pre>use base
+    'Foo::Bar';</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>Voir également</a></h1>
+<p class="Pp">scandeps.pl est un utilitaire intégré qui écrit la section PREREQ_PM pour divers fichiers.</p>
+<p class="Pp">Une utilisation de Module::ScanDeps est de générer des exécutables à partir de scripts contenant des modules de dépendance ; ce module prend en charge deux projets de ce type : PAR et App::Packer. Veuillez consulter leur documentation respective sur CPAN pour plus d'informations.</p>
+<p class="Pp">Autres modules qui atteignent le même objectif avec une approche différente : Module::ExtractUse, Perl::PrereqScan</p>
+</section>
+</div>
+</section>
+
+            </article>
+            
+        </main>
+        <footer>
+            
+        </footer>
+    </body>
+</html>
+<div>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Module::ScanDeps</p>
+<p class="Pp">Un module Perl pour scanner les dépendances</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<p class="Pp">Utilisez ceci pour installer ce module :</p>
+<pre class="Pp">
+    cpan install Module::ScanDeps
+</pre>
+<p class="Pp">Alternativement, utilisez la commande suivante :</p>
+<pre class="Pp">
+    perl -MModule::ScanDeps -e 'Module::ScanDeps::main();'
+</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Module::ScanDeps est un module Perl qui aide à scanner les dépendances pour d'autres modules. Il fournit un moyen de découvrir quels modules sont requis pour un ensemble donné de modules.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='NOTES'><a class='permalink' href='#NOTES'>NOTES</a></h1>
+<p class="Pp">Quelques notes sur le module :</p>
+<ul class="Bl-bullet">
+  <li><b>Perl::PrereqScanner::Lite, Perl::PrereqScanner::NotQuiteLite</b></li>
+</ul>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CAVEATS'><a class='permalink' href='#CAVEATS'>CAVEATS</a></h1>
+<p class="Pp">Quelques mises en garde concernant le module :</p>
+<ul class="Bl-bullet">
+  <li><b>Perl::PrereqScanner::Lite, Perl::PrereqScanner::NotQuiteLite</b></li>
+</ul>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR AUSSI</a></h1>
+<p class="Pp">Quelques références à d'autres modules :</p>
+<ul class="Bl-bullet">
+  <li><b>Perl::PrereqScanner::Lite, Perl::PrereqScanner::NotQuiteLite</b></li>
+</ul>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHORS'><a class='permalink' href='#AUTHORS'>AUTEURS</a></h1>
+<p class="Pp">Audrey Tang &lt;cpan@audreyt.org&gt;</p>
+<p class="Pp">Dans une moindre mesure : Steffen Mueller &lt;smueller@cpan.org&gt;</p>
+<p class="Pp">Certaines heuristiques ont été déduites de :</p>
+<ul class="Bl-bullet">
+  <li><b>PerlApp</b> par ActiveState Tools Corp
+      <a href='http://www.activestate.com/'>http://www.activestate.com/</a></li>
+  <li><b>Perl2Exe</b> par IndigoStar, Inc <a href='http://www.indigostar.com/'>http://www.indigostar.com/</a></li>
+</ul>
+<p class="Pp">La fonction <b>scan_deps_runtime</b> est une contribution d'Edward S.
+    Peschko.</p>
+<p class="Pp">Vous pouvez écrire à la liste de diffusion à l'adresse &lt;par@perl.org&gt;, ou envoyer un email vide à &lt;par-subscribe@perl.org&gt; pour participer à la discussion. Les archives de la liste de diffusion sont disponibles sur
+    <a href='https://www.mail-archive.com/par@perl.org/'>https://www.mail-archive.com/par@perl.org/</a> ou
+    <a href='https://groups.google.com/g/perl.par'>https://groups.google.com/g/perl.par</a>.</p>
+<p class="Pp">Veuillez soumettre les rapports de bugs à
+    <a href='https://github.com/rschupp/Module-ScanDeps/issues'>https://github.com/rschupp/Module-ScanDeps/issues</a>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT'><a class='permalink' href='#COPYRIGHT'>COPYRIGHT</a></h1>
+<p class="Pp">Copyright 2002-2008 par Audrey Tang &lt;cpan@audreyt.org&gt;;
+    2005-2010 par Steffen Mueller &lt;smueller@cpan.org&gt;.</p>
+<p class="Pp">Ce programme est un logiciel libre ; vous pouvez le redistribuer et/ou le modifier sous les mêmes conditions que Perl lui-même.</p>
+<p class="Pp">Voir <a href='http://www.perl.com/perl/misc/Artistic.html'>http://www.perl.com/perl/misc/Artistic.html</a></p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-13</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher une page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-module-scandeps/">extra/perl-module-scandeps</a></dd>
+        <dt>Version :</dt>
+        <dd>1.37-2</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://search.cpan.org/dist/Module-ScanDeps">https://search.cpan.org/dist/Module-ScanDeps</a></dd>
+        <dt>Licences :</dt>
+        <dd>PerlArtistic, GPL</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-module-scandeps/">/listing/extra/perl-module-scandeps/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#NOTES">NOTES</a></li>
+        
+            <li><a href="#CAVEATS">CAVEATS</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+            <li><a href="#AUTHORS">AUTEURS</a></li>
+        
+            <li><a href="#COPYRIGHT">COPYRIGHT</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Module::ScanDeps.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/Module::ScanDeps.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>, à l'exception du contenu des pages de manuel, qui ont leur propre licence spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

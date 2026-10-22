@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Text::Balanced(3perl) — Pages du manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Text__Balanced.3perl</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/core/x86_64/perl/">perl</a></p>
+<p class="lic">Licences: Artistic-1.0-Perl OR GPL-1.0-or-later</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Text::Balanced(3perl)</td>
+    <td class="head-vol">Manuel du programmeur Perl</td>
+    <td class="head-rtitle">Text::Balanced(3perl)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NAME</a></h1>
+<p class="Pp">Text::Balanced - Extraire des séquences de texte délimitées à partir de chaînes.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>use Text::Balanced qw (
+    extract_delimited
+    extract_bracketed
+    extract_quotelike
+    extract_codeblock
+    extract_variable
+    extract_tagged
+    extract_multiple
+    gen_delimited_pat
+    gen_extract_tagged
+);
+# Extraire la partie initiale du texte $text qui est délimitée par deux (non échappées) occurrences du premier caractère dans $delim.
+($extracted, $remainder) = extract_delimited($text,$delim);
+# Extraire la partie initiale du texte $text qui est délimitée par un ou plusieurs délimiteurs spécifiés par $delim (où la chaîne $delim contient un ou plusieurs de '(){}[]<>').
+($extracted, $remainder) = extract_bracketed($text,$delim);
+# Extraire la partie initiale du texte $text qui est un bloc de code Perl, délimité par n'importe lequel des caractères spécifiés par $delim (où la chaîne $delim contient un ou plusieurs de '(){}[]<>').
+($extracted, $remainder) = extract_codeblock($text,$delim);
+# Extraire la partie initiale du texte $text qui est un bloc Perl, délimité par une paire <code>BEGIN</code>...<code>END</code>.
+($extracted, $remainder) = extract_tagged($text,&quot;BEGIN&quot;,&quot;END&quot;,undef,{bad=&gt;[&quot;BEGIN&quot;]});
+# Extraire la partie initiale du texte $text qui représente un opérateur de type "citation" ou similaire en Perl.
+($extracted, $remainder) = extract_quotelike($text);
+# Extraire les sous-chaînes initiales du texte $text qui seraient extraites par une ou plusieurs applications séquentielles des fonctions ou expressions spécifiées.
+@extracted = extract_multiple($text,
+                              [ \&amp;extract_bracketed,
+                                \&amp;extract_quotelike,
+                                \&amp;some_other_extractor_sub,
+                                qr/[xyz]*/,
+                                'literal',
+                              ]);
+# Générer une chaîne représentant un motif optimisé (similaire à Friedl) qui correspond à une sous-chaîne délimitée par n'importe lequel des caractères spécifiés (ici : n'importe quel type de guillemets ou de backtick).
+$patstring = gen_delimited_pat(q{'&quot;`/});
+# Générer une référence à une sous-routine anonyme qui est presque identique à extract_tagged, mais précompilée et optimisée pour une paire spécifique de balises, ce qui la rend très rapide (par exemple, 3 fois plus rapide). Utilise qr// pour une meilleure performance lors d'appels répétés.
+$extract_head = gen_extract_tagged('&lt;HEAD&gt;','&lt;/HEAD&gt;');
+($extracted, $remainder) = $extract_head-&gt;($text);</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Les diverses sous-routines <span class="Li">&quot;extract_...&quot;</span> peuvent être utilisées pour extraire une sous-chaîne délimitée, éventuellement après avoir sauté un préfixe spécifié. Par défaut, ce préfixe est optionnel ( &quot;/\s*/&quot; ), mais vous pouvez le changer à votre guise (voir ci-dessous).</p>
+<p class="Pp">La sous-chaîne à extraire doit apparaître à la position actuelle de la chaîne (ou à l'index 0, s'il n'y a pas de position &quot;pos&quot; définie). En d'autres termes, les sous-routines <span class="Li">&quot;extract_...&quot;</span> *n'extraient pas* la première occurrence d'une sous-chaîne dans une chaîne entière (comme une expression régulière non ancrée). Au lieu de cela, elles extraient une occurrence de la sous-chaîne qui apparaît immédiatement à la position de correspondance actuelle dans la chaîne (comme une expression régulière ancrée \G).</p>
+<section class="Ss">
+<h2 class="Ss" id='General_Behaviour_in_List_Contexts'><a class='permalink' href='#General_Behaviour_in_List_Contexts'>Comportement général dans les contextes de liste</a></h2>
+<p class="Pp">Dans un contexte de liste, toutes les sous-routines renvoient un tableau, dont les trois premiers éléments sont toujours :</p>
+<dl class="Bl-tag">
+  <dt>[0]</dt>
+  <dd>La sous-chaîne extraite, y compris les délimiteurs spécifiés. Si l'extraction échoue, &quot;undef&quot; est renvoyé.</dd>
+  <dt>[1]</dt>
+  <dd>Le reste de la chaîne (c'est-à-dire les caractères après la sous-chaîne extraite). En cas d'échec, la chaîne entière est renvoyée.</dd>
+  <dt>[2]</dt>
+  <dd>Le préfixe sauté (c'est-à-dire les caractères avant la sous-chaîne extraite). En cas d'échec, &quot;undef&quot; est renvoyé.</dd>
+</dl>
+<p class="Pp">Note : Dans un contexte de liste, le contenu du texte d'origine (le premier argument) n'est modifié en aucun sens.</p>
+<p class="Pp">Cependant, si le texte a été passé dans une variable, la valeur de &quot;pos&quot; de cette variable est mise à jour pour pointer vers le premier caractère après la sous-chaîne extraite. Cela signifie que dans un contexte de liste, les sous-routines peuvent être utilisées de manière similaire aux expressions régulières. Par exemple :</p>
+<pre>while ( $next = (extract_quotelike($text))[0] )
+{
+    # traiter le segment suivant (dans $next)
+}</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='General_Behaviour_in_Scalar_and_Void_Contexts'><a class='permalink' href='#General_Behaviour_in_Scalar_and_Void_Contexts'>Comportement général dans les contextes scalaire et vide</a></h2>
+<p class="Pp">Dans un contexte scalaire, la sous-chaîne extraite est renvoyée, sans être modifiée dans le texte d'origine. Ainsi, le code suivant traite également chaque segment de type "citation" (dans $text), mais le supprime réellement.</p>
+<pre>while ( $next = extract_quotelike($text) )
+{
+    # traiter le segment suivant (dans $next)
+}</pre>
+<p class="Pp">Note : Si le texte est une chaîne immuable (c'est-à-dire un littéral), aucune tentative n'est faite pour supprimer la sous-chaîne extraite.</p>
+<p class="Pp">Dans un contexte vide, le comportement des sous-routines d'extraction est exactement le même que dans un contexte scalaire, sauf que la sous-chaîne extraite n'est pas renvoyée.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='A_Note_About_Prefixes'><a class='permalink' href='#A_Note_About_Prefixes'>Note sur les préfixes</a></h2>
+<p class="Pp">Les motifs de préfixe sont mis en correspondance sans modificateurs ultérieurs (<span class="Li">&quot;/gimsox&quot;</span>, etc.). Cela peut être dangereux si vous attendez un préfixe tel que '.*?(?=&lt;H1&gt;)' pour sauter tout jusqu'à la première balise &lt;H1&gt;. De tels motifs de préfixe ne réussiront que si la balise &lt;H1&gt; se trouve sur la ligne actuelle, car le point ne correspond normalement pas aux nouvelles lignes.</p>
+<p class="Pp">Pour contourner cette limitation, vous devez activer le module de correspondance /s dans le motif de préfixe, en utilisant la directive <span class="Li">&quot;(?s)&quot;</span> :
+  '(?s).*?(?=&lt;H1&gt;)'</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Functions'><a class='permalink' href='#Functions'>Fonctions</a></h2>
+<dl class="Bl-tag">
+  <dt>&quot;extract_delimited&quot;</dt>
+  <dd>La sous-routine <span class="Li">&quot;extract_delimited&quot;</span> formalise le langage courant d'extraction d'une sous-chaîne délimitée par un seul caractère depuis le début d'une chaîne. Par exemple, pour extraire une sous-chaîne délimitée par des guillemets, le code suivant est typiquement utilisé :
+        <pre>($remainder = $text) =~ s/\A('(\\.|[^'])*')//s;
+$extracted = $1;
+</pre>
+    <p class="Pp">mais avec <span class="Li">&quot;extract_delimited&quot;</span>, cela peut être simplifié en :</p>
+        <pre>($extracted,$remainder) = extract_delimited($text, q{'});</pre>
+    <p class="Pp">La sous-routine <span class="Li">&quot;extract_delimited&quot;</span> prend jusqu'à quatre scalaires (le texte d'entrée, les délimiteurs, un motif de préfixe à sauter et tout caractère d'échappement) et extrait la sous-chaîne initiale du texte qui est correctement délimitée. Si la chaîne de délimiteurs contient plusieurs caractères, le premier trouvé dans le texte est utilisé comme délimiteur pour la sous-chaîne. Le troisième argument spécifie un motif de préfixe à sauter (mais il doit être présent !) avant la sous-chaîne. Le dernier argument spécifie le caractère d'échappement à utiliser pour chaque délimiteur.</p>
+    <p class="Pp">Tous les arguments sont facultatifs. Si les caractères d'échappement ne sont pas spécifiés, chaque délimiteur est écrit avec un antislash (<span class="Li">&quot;\&quot;</span>). Si le préfixe n'est pas spécifié, le motif <span class="Li">'\s*'</span> - espace optionnel - est utilisé comme préfixe. Si l'ensemble des délimiteurs n'est pas non plus spécifié, l'ensemble <span class="Li">&quot;/[&quot;'`]/&quot;</span> est utilisé. Si le texte à traiter n'est pas spécifié, <span class="Li">$_</span> est utilisé.</p>
+    <p class="Pp">Dans un contexte de liste, <span class="Li">&quot;extract_delimited&quot;</span> renvoie un tableau de trois éléments : la sous-chaîne extraite (y compris les délimiteurs), le reste du texte et le préfixe sauté (s'il existe). Si aucune sous-chaîne délimitée appropriée n'est trouvée, le premier élément du tableau est la chaîne vide, le second est le texte d'origine complet et le préfixe renvoyé dans le troisième élément est une chaîne vide.</p>
+    <p class="Pp">Dans un contexte scalaire, seule la sous-chaîne extraite est renvoyée. Dans un contexte vide, la sous-chaîne extraite (et tout préfixe) est supprimée du début du premier argument.</p>
+    <p class="Pp">Exemples:</p>
+    <pre>while ( $next = extract_quotelike($text) )
+{
+    # traiter le segment suivant (dans $next)
+}</pre>
+</section>
+</article>
+</main>
+</body>
+</html>
+# Supprimer une sous-chaîne unique entre apostrophes du début de $text :
+    $substring = extract_delimited($text, &quot;'&quot;, '');
+# Supprimer une sous-chaîne de style Pascal (c'est-à-dire une où les apostrophes sont échappées) du début de $text :
+    $substring = extract_delimited($text, &quot;'&quot;, '', &quot;'&quot;);
+# Extraire une sous-chaîne unique ou double entre guillemets du début de $text, éventuellement après quelques espaces (notez le contexte de liste pour protéger $text de la modification) :
+    ($substring) = extract_delimited $text, q{&quot;'};
+# Supprimer la sous-chaîne délimitée par le premier '/' dans $text :
+    $text = join '', (extract_delimited($text,'/','[^/]*')[2,1]);
+</pre>
+<p class="Pp">Note : Ce dernier exemple n'est pas le même que la suppression de motifs de guillemets. Par exemple, si <span class="Li">$text</span> contient la chaîne :</p>
+<pre>&quot;if ('./cmd' =~ m/$UNIXCMD/s) { $cmd = $1; }&quot;</pre>
+<p class="Pp">alors après la suppression, il contiendrait :</p>
+<pre>&quot;if ('.$UNIXCMD/s) { $cmd = $1; }&quot;</pre>
+<p class="Pp">et non :</p>
+<pre>&quot;if ('./cmd' =~ ms) { $cmd = $1; }&quot;</pre>
+<p class="Pp">Voir &quot;extract_quotelike&quot; pour une solution (partielle) à ce problème.</p>
+</dd>
+<dt>&quot;extract_bracketed&quot;</dt>
+<dd>Comme <span class="Li">&quot;extract_delimited&quot;</span>, la fonction <span class="Li">&quot;extract_bracketed&quot;</span> prend jusqu'à trois arguments optionnels : une chaîne à extraire, un spécificateur de délimiteur et un motif de préfixe. Comme précédemment, un préfixe manquant est considéré comme facultatif et un texte manquant est considéré comme <span class="Li">$_</span>. Cependant, un spécificateur de délimiteur manquant est considéré comme <span class="Li">'{}()[]&lt;&gt;'</span> (voir ci-dessous). <p class="Pp"><span class="Li">&quot;extract_bracketed&quot;</span> extrait une sous-chaîne délimitée par des parenthèses équilibrées (en utilisant n'importe lesquels des délimiteurs spécifiés par l'utilisateur : '(..)', '{..}', '[..]', ou '&lt;..&gt;'). Elle respectera également optionnellement les délimiteurs non équilibrés (voir ci-dessous).</p>
+<p class="Pp">Un &quot;délimiteur&quot; est une parenthèse dans la liste des délimiteurs passée comme deuxième argument de <span class="Li">&quot;extract_bracketed&quot;</span>. Les délimiteurs sont spécifiés en fournissant la version gauche ou droite (ou les deux) des parenthèses requises. Notez que l'ordre dans lequel plusieurs délimiteurs sont spécifiés est sans importance.</p>
+<p class="Pp">Une &quot;sous-chaîne délimitée par des parenthèses équilibrées&quot; est une sous-chaîne délimitée par des parenthèses équilibrées, c'est-à-dire une sous-chaîne qui a toute autre (parenthèse gauche ou droite) à l'intérieur de la sous-chaîne également équilibrée par une parenthèse opposée (gauche ou droite) au même niveau de profondeur. Tout type de parenthèse qui n'est pas dans la liste des délimiteurs est traité comme un caractère ordinaire.</p>
+<p class="Pp">En d'autres termes, chaque type de parenthèse spécifié comme délimiteur doit être équilibré et correctement imbriqué dans la sous-chaîne, et tout autre type de parenthèse (« non délimiteur ») à l'intérieur de la sous-chaîne est ignoré.</p>
+<p class="Pp">Par exemple, étant donné la chaîne :</p>
+<pre>$text = &quot;{ an '[irregularly :-(] {} parenthesized &gt;:-)' string }&quot;;</pre>
+<p class="Pp">alors un appel à <span class="Li">&quot;extract_bracketed&quot;</span> dans un contexte de liste :</p>
+<pre>@result = extract_bracketed( $text, '{}' );</pre>
+<p class="Pp">retournerait :</p>
+<pre>( &quot;{ an '[irregularly :-(] {} parenthesized &gt;:-)' string }&quot; , &quot;&quot; , &quot;&quot; )</pre>
+<p class="Pp">car les deux ensembles de <span class="Li">'{..}'</span> sont correctement imbriqués et équilibrés. (Dans un contexte scalaire, seul le premier élément du tableau est renvoyé. Dans un contexte vide, <span class="Li">$text</span> est remplacé par une chaîne vide.)</p>
+<p class="Pp">De même, l'appel dans :</p>
+<pre>@result = extract_bracketed( $text, '{[' );</pre>
+<p class="Pp">retournerait le même résultat, car tous les ensembles des deux types de délimiteurs spécifiés sont correctement imbriqués et équilibrés.</p>
+<p class="Pp">Cependant, l'appel dans :</p>
+<pre>@result = extract_bracketed( $text, '{([&lt;' );</pre>
+<p class="Pp">échouerait, retournant :</p>
+<pre>( undef , &quot;{ an '[irregularly :-(] {} parenthesized &gt;:-)' string }&quot;  );</pre>
+<p class="Pp">parce que les paires de <span class="Li">'(..)'</span> et <span class="Li">'[..]'</span> imbriquées sont « croisées » et que le <span class="Li">'&gt;'</span> n'est pas équilibré. (Dans un contexte scalaire, cet appel retournerait une chaîne vide. Dans un contexte vide, <span class="Li">$text</span> resterait inchangé.)</p>
+<p class="Pp">Note : Les caractères de guillemets imbriqués dans la chaîne n'aident pas dans ce cas, car ils n'ont pas été spécifiés comme délimiteurs acceptés et sont considérés comme des caractères non délimiteurs (et sont ignorés).</p>
+<p class="Pp">Cependant, si un type particulier de caractère de guillemet est inclus dans la spécification des délimiteurs, ce type de guillemet sera correctement géré. Par exemple, si <span class="Li">$text</span> est :</p>
+<pre>$text = '&lt;A HREF=&quot;&gt;&gt;&gt;&quot;&gt;link&lt;/A&gt;';
+</pre>
+<p class="Pp">alors</p>
+<pre>@result = extract_bracketed( $text, '&lt;&quot;&gt;' );</pre>
+<p class="Pp">retournerait :</p>
+<pre>( '&lt;A HREF=&quot;&gt;&gt;&gt;&quot;&gt;', 'link&lt;/A&gt;', &quot;&quot; )</pre>
+<p class="Pp">comme prévu. Sans la spécification de <span class="Li">&quot;&quot;&quot;</span> comme guillemet imbriqué :</p>
+<pre>@result = extract_bracketed( $text, '&lt;&gt;' );</pre>
+<p class="Pp">le résultat serait :</p>
+<pre>( '&lt;A HREF=&quot;&gt;', '&gt;&gt;&gt;&quot;&gt;link&lt;/A&gt;', &quot;&quot; )</pre>
+<p class="Pp">En plus des délimiteurs de guillemets <span class="Li">&quot;'&quot;</span>, <span class="Li">&quot;&quot;&quot;</span> et <span class="Li">&quot;`&quot;</span>, les formes complètes de quoting de Perl (c'est-à-dire q{chaîne}, qq{chaîne}, etc.) peuvent être spécifiées en incluant la lettre 'q' comme délimiteur. Par conséquent :</p>
+<pre>@result = extract_bracketed( $text, '&lt;q&gt;' );</pre>
+<p class="Pp">correspondrait correctement à quelque chose comme :</p>
+<pre>$text = '&lt;leftop: conj /and/ conj&gt;';
+</pre>
+<p class="Pp">Voir aussi :</p>
+<pre>&quot;extract_quotelike&quot;</pre>
+</dd>
+<dt>&quot;extract_variable&quot;</dt>
+<dd><span class="Li">&quot;extract_variable&quot;</span> extrait toute variable valide ou expression impliquant des variables en Perl, y compris les scalaires, tableaux, hachages, accès à des tableaux, consultations de hachages, appels de méthodes via objets, appels de sous-routines via références de sous-routines, etc.
+<p class="Pp">La sous-routine prend jusqu'à deux arguments optionnels :</p>
+</dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt>1.</dt>
+  <dd>Une chaîne à traiter (<span class="Li">$_</span> si la chaîne est omise ou <span class="Li">&quot;undef&quot;</span>)</dd>
+  <dt>2.</dt>
+  <dd>Une chaîne spécifiant un motif à faire correspondre comme préfixe (qui doit être ignoré). Si omis, les espaces blancs optionnels sont ignorés.</dd>
+</dl>
+</div>
+<div class="Bd-indent">
+<p class="Pp">En cas de succès dans un contexte de liste, un tableau de 3 éléments est renvoyé. Les éléments sont :</p>
+<dl class="Bl-tag">
+  <dt>[0]</dt>
+  <dd>la variable extraite, ou l'expression variablistique</dd>
+  <dt>[1]</dt>
+  <dd>le reste du texte d'entrée,</dd>
+  <dt>[2]</dt>
+  <dd>la sous-chaîne de préfixe (le cas échéant),</dd>
+</dl>
+</div>
+<div class="Bd-indent">
+<p class="Pp">En cas d'échec, toutes ces valeurs (sauf le texte restant) sont <span class="Li">&quot;undef&quot;</span>.</p>
+<p class="Pp">Dans un contexte scalaire,</p>
+<pre>extract_variable</pre>
+<p class="Pp">renvoie uniquement la sous-chaîne complète qui correspond à une expression variablistique. <span class="Li">&quot;undef&quot;</span> est renvoyé en cas d'échec. De plus, le texte d'entrée d'origine voit la sous-chaîne renvoyée (et tout préfixe spécifié) supprimée.</p>
+<p class="Pp">Dans un contexte vide, le texte d'entrée voit simplement la sous-chaîne correspondante (et tout préfixe spécifié) supprimée.</p>
+</div>
+<dl class="Bl-tag">
+  <dt>&quot;extract_tagged&quot;</dt>
+  <dd><span class="Li">&quot;extract_tagged&quot;</span> extrait et segmente le texte entre des balises spécifiées (équilibrées).
+    <p class="Pp">La sous-routine prend jusqu'à cinq arguments optionnels :</p>
+  </dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt>1.</dt>
+  <dd>Une chaîne à traiter (<span class="Li">$_</span> si la chaîne est omise ou <span class="Li">&quot;undef&quot;</span>)</dd>
+  <dt>2.</dt>
+  <dd>Une chaîne spécifiant un motif (c'est-à-dire une expression régulière) à faire correspondre comme balise d'ouverture. Si la chaîne de motif est omise (ou <span class="Li">&quot;undef&quot;</span>), alors un motif qui correspond à toute balise XML standard est utilisé.</dd>
+  <dt>3.</dt>
+  <dd>Une chaîne spécifiant un motif à faire correspondre comme balise de fermeture. Si la chaîne de motif est omise (ou <span class="Li">&quot;undef&quot;</span>), alors la balise de fermeture est construite en insérant un <span class="Li">&quot;/&quot;</span> après tout caractère de crochet de début dans la balise d'ouverture réelle qui a été trouvée (<i>pas</i> le motif qui a trouvé la balise). Par exemple, si le motif de balise d'ouverture est spécifié comme <span class="Li">'{{\w+}}'</span> et qu'il a effectivement trouvé la balise d'ouverture <span class="Li">&quot;{{DATA}}&quot;</span>, alors la balise de fermeture construite serait <span class="Li">&quot;{{/DATA}}&quot;</span>.</dd>
+  <dt>4.</dt>
+  <dd>Une chaîne spécifiant un motif à faire correspondre comme préfixe (qui doit être ignoré). Si omis, les espaces blancs optionnels sont ignorés.</dd>
+  <dt>5.</dt>
+  <dd>Une référence de hachage contenant diverses options d'analyse (voir ci-dessous)</dd>
+</dl>
+</div>
+<div class="Bd-indent">
+<p class="Pp">Les différentes options qui peuvent être spécifiées sont :</p>
+<dl class="Bl-tag">
+  <dt>&quot;reject =&gt; $listref&quot;</dt>
+  <dd>La référence de liste contient une ou plusieurs chaînes spécifiant des motifs qui ne doivent *pas* apparaître dans le texte balisé.</dd>
+  <dt>&quot;ignore =&gt; $listref&quot;</dt>
+  <dd>La référence de liste contient une ou plusieurs chaînes spécifiant des motifs qui ne doivent *pas* être traités comme des balises imbriquées dans le texte balisé (même s'ils correspondaient au motif de balise de début).</dd>
+  <dt>&quot;fail =&gt; $str&quot;</dt>
+  <dd>L'option &quot;fail&quot; indique l'action à entreprendre si une balise de fin correspondante n'est pas rencontrée (c'est-à-dire avant la fin de la chaîne ou avant qu'un motif &quot;reject&quot; ne corresponde). Par défaut, un échec de correspondance de balise de fermeture entraîne l'échec immédiat de <span class="Li">&quot;extract_tagged&quot;</span>. Cependant, si la valeur de chaîne associée à &lt;reject&gt; est &quot;MAX&quot;, alors <span class="Li">&quot;extract_tagged&quot;</span> renvoie le c
+Completez le texte jusqu'au point de défaillance. Si la chaîne est
+        "PARA", <span class="Li">"extract_tagged"</span>
+        ne renvoie que le premier paragraphe après la balise (jusqu'à la première ligne
+        qui est vide ou qui ne contient que des espaces blancs). Si la
+        chaîne est "", le comportement par défaut (c'est-à-dire l'échec) est
+        rétablis.</p>
+    <p class="Pp">Par exemple, supposez que la balise de début "/para"
+        introduit un paragraphe, qui continue ensuite jusqu'à la prochaine balise
+        "/endpara" ou jusqu'à ce qu'une autre balise "/para" soit rencontrée :</p>
+        <pre>$text = "/para line 1\n\nline 3\n/para line 4";
+extract_tagged($text, '/para', '/endpara', undef,
+                        {reject => '/para', fail => MAX );
+# EXTRAIT : "/para line 1\n\nline 3\n"
+</pre>
+    <p class="Pp">Supposez plutôt que, si aucune balise "/endpara" correspondante n'est trouvée,
+        la balise "/para" ne fait référence qu'au paragraphe immédiatement suivant :</p>
+        <pre>$text = "/para line 1\n\nline 3\n/para line 4";
+extract_tagged($text, '/para', '/endpara', undef,
+                {reject => '/para', fail => MAX );
+# EXTRAIT : "/para line 1\n"
+</pre>
+    <p class="Pp">Notez que le comportement de
+        <span class="Li">"fail"</span> spécifié s'applique également aux balises imbriquées.</p>
+  </dd>
+</dl>
+</div>
+<div class="Bd-indent">
+<p class="Pp">En cas de succès dans un contexte de liste, un tableau de 6 éléments est renvoyé.
+    Les éléments sont :</p>
+<dl class="Bl-tag">
+  <dt>[0]</dt>
+  <dd>la sous-chaîne marquée extraite (y compris les balises les plus externes),</dd>
+  <dt>[1]</dt>
+  <dd>le reste du texte d'entrée,</dd>
+  <dt>[2]</dt>
+  <dd>la sous-chaîne de préfixe (le cas échéant),</dd>
+  <dt>[3]</dt>
+  <dd>la balise d'ouverture</dd>
+  <dt>[4]</dt>
+  <dd>le texte entre les balises d'ouverture et de fermeture</dd>
+  <dt>[5]</dt>
+  <dd>la balise de fermeture (ou "" s'il n'y a pas de balise de fermeture trouvée)</dd>
+</dl>
+</div>
+<div class="Bd-indent">
+<p class="Pp">En cas d'échec, toutes ces valeurs (sauf le texte restant) sont
+    <span class="Li">"undef"</span>.</p>
+<p class="Pp">Dans un contexte scalaire,
+        <span class="Li">"extract_tagged"</span> ne renvoie que la sous-chaîne complète qui correspond à un texte balisé (y compris les balises de début et de fin).
+    <span class="Li">"undef"</span> est renvoyé en cas d'échec. De plus, le texte d'entrée d'origine a la sous-chaîne renvoyée (et tout préfixe) retirée.</p>
+<p class="Pp">Dans un contexte vide, le texte d'entrée a simplement la sous-chaîne correspondante (et tout préfixe spécifié) retirée.</p>
+</div>
+<dl class="Bl-tag">
+  <dt>"gen_extract_tagged"</dt>
+  <dd><span class="Li">"gen_extract_tagged"</span> génère une nouvelle
+      sous-routine anonyme qui extrait du texte entre des balises spécifiées (équilibrées). En d'autres termes, elle génère une fonction identique en fonction à
+        <span class="Li">"extract_tagged"</span>.
+    <p class="Pp">La différence entre
+        <span class="Li">"extract_tagged"</span> et les sous-routines anonymes générées par
+        <span class="Li">"gen_extract_tagged"</span> est que ces sous-routines générées :</p>
+  </dd>
+</dl>
+<div class="Bd-indent">
+<ul class="Bl-bullet">
+  <li>n'ont pas à réanalyser la spécification de la balise ou les options d'analyse à chaque
+      appel (alors que
+        <span class="Li">"extract_tagged"</span> doit effectivement reconstruire son analyseur de balises à chaque appel) ;</li>
+  <li>utilisent la nouvelle construction qr// pour précompiler les expressions régulières qu'elles utilisent (alors que
+        <span class="Li">"extract_tagged"</span> utilise l'interpolation de variables de chaîne standard pour créer des modèles de correspondance de balises).</li>
+</ul>
+</div>
+<div class="Bd-indent">
+<p class="Pp">La sous-routine prend jusqu'à quatre arguments optionnels (le même ensemble que
+        <span class="Li">"extract_tagged"</span> sauf la chaîne à traiter). Elle renvoie une référence à une sous-routine qui, à son tour, prend un seul argument (le texte à extraire).</p>
+<p class="Pp">En d'autres termes, l'implémentation de
+        <span class="Li">"extract_tagged"</span> est exactement équivalente
+  à :</p>
+<pre>sub extract_tagged
+{
+        my $text = shift;
+        $extractor = gen_extract_tagged(@_);
+        return $extractor->($text);
+}</pre>
+<p class="Pp">(bien que
+        <span class="Li">"extract_tagged"</span> ne soit pas actuellement implémenté de cette façon).</p>
+<p class="Pp">Utiliser
+        <span class="Li">"gen_extract_tagged"</span> pour créer des fonctions d'extraction pour des balises spécifiques est une bonne idée si ces fonctions sont appelées plus d'une fois, car leurs performances sont généralement deux fois meilleures que celles de la fonction plus générale
+        <span class="Li">"extract_tagged"</span>.</p>
+</div>
+<dl class="Bl-tag">
+  <dt>"extract_quotelike"</dt>
+  <dd><span class="Li">"extract_quotelike"</span> tente de reconnaître, d'extraire et de segmenter l'une des diverses citations et opérateurs de type citation de Perl (voir <a href='/man/perlop.3.en'>perlop(3)</a>). Les délimiteurs imbriqués échappés, les délimiteurs d'accolades équilibrés incorporés (pour les opérateurs de type citation) et les modificateurs de fin sont tous capturés. Par exemple, dans :
+        <pre>extract_quotelike 'q # un octothorpe : \# (pas la fin du q!) #'
+extract_quotelike '  "Vous avez dit, \"Utilisez sed\".\"  '
+extract_quotelike ' s{([A-Z]{1,8}\.[A-Z]{3})} /\L$1\E/; '
+extract_quotelike ' tr/\\\/\\\\/\\\//ds; '
+</pre>
+    <p class="Pp">les opérations complètes de type citation de Perl sont toutes extraites correctement.</p>
+    <p class="Pp">Notez également que, lors de l'utilisation du modificateur /x sur une expression régulière, tout commentaire contenant le délimiteur de modèle actuel provoquera l'arrêt immédiat de l'expression régulière. En d'autres termes :</p>
+        <pre>'m /
+        (?i)            # INSENSIBLE À LA CASSE
+        [a-z_]          # ALPHABÉTIQUE/UNDERSCORE DE DÉBUT
+        [a-z0-9]*       # SUIVI DE TOUT NOMBRE D'ALPHANUMÉRIQUES
+   /x'
+</pre>
+    <p class="Pp">sera extrait comme s'il s'agissait de :</p>
+        <pre>'m /
+        (?i)            # INSENSIBLE À LA CASSE
+        [a-z_]          # ALPHABÉTIQUE DE DÉBUT/UNDERSCORE
+</pre>
+    <p class="Pp">Ce comportement est identique à celui du compilateur réel.</p>
+    <p class="Pp"><span class="Li">"extract_quotelike"</span> prend deux arguments : le texte à traiter et un préfixe à faire correspondre au tout début du texte. Si aucun préfixe n'est spécifié, les espaces blancs optionnels sont par défaut. Si aucun texte n'est donné,
+        <span class="Li">$_</span> est utilisé.</p>
+    <p class="Pp">Dans un contexte de liste, un tableau de 11 éléments est renvoyé. Les
+        éléments sont :</p>
+  </dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt>[0]</dt>
+  <dd>la sous-chaîne de type citation extraite (y compris les modificateurs de fin),</dd>
+  <dt>[1]</dt>
+  <dd>le reste du texte d'entrée,</dd>
+  <dt>[2]</dt>
+  <dd>la sous-chaîne de préfixe (le cas échéant),</dd>
+  <dt>[3]</dt>
+  <dd>le nom de l'opérateur de type citation (le cas échéant),</dd>
+  <dt>[4]</dt>
+  <dd>le délimiteur gauche du premier bloc de l'opération,</dd>
+  <dt>[5]</dt>
+  <dd>le texte du premier bloc de l'opération (c'est-à-dire le contenu d'une
+      citation, l'expression régulière d'une correspondance ou d'une substitution, ou la liste cible d'une
+      traduction),</dd>
+  <dt>[6]</dt>
+  <dd>le délimiteur droit du premier bloc de l'opération,</dd>
+  <dt>[7]</dt>
+  <dd>le délimiteur gauche du deuxième bloc de l'opération (c'est-à-dire s'il s'agit d'un
+      <span class="Li">"s"</span>,
+      <span class="Li">"tr"</span>, ou
+      <span class="Li">"y"</span>),</dd>
+  <dt>[8]</dt>
+  <dd>le texte du deuxième bloc de l'opération (c'est-à-dire le remplacement d'une
+      substitution ou la liste de traduction d'une traduction),</dd>
+  <dt>[9]</dt>
+  <dd>le délimiteur droit du deuxième bloc de l'opération (le cas échéant),</dd>
+  <dt>[10]</dt>
+  <dd>les modificateurs de fin sur l'opération (le cas échéant).</dd>
+</dl>
+</div>
+<div class="Bd-indent">
+<p class="Pp">Pour chacun des champs marqués "(le cas échéant)", la valeur par défaut en cas de succès est une chaîne vide. En cas d'échec, toutes ces valeurs (sauf le texte restant) sont
+    <span class="Li">"undef"</span>.</p>
+<p class="Pp">Dans un contexte scalaire,
+        <span class="Li">"extract_quotelike"</span> ne renvoie que la
+    sous-chaîne complète qui correspond à une opération de type citation (ou
+        <span class="Li">"undef"</span> en cas d'échec). Dans un contexte scalaire ou vide, le texte d'entrée a la même sous-chaîne (et tout préfixe spécifié) retirée.</p>
+<p class="Pp">Exemples :</p>
+<pre># Supprimer la première littérale de type citation qui apparaît dans le texte
+        $quotelike = extract_quotelike($text,'.*?');
+# Remplacer une ou plusieurs littérales de type citation séparées par des espaces blancs au début de $_ par "<QLL>"
+        do { $_ = join '<QLL>', (extract_quotelike)[2,1] } until $@;
+# Isoler le motif de recherche dans une opération de type citation de $text
+        ($op,$pat) = (extract_quotelike $text)[3,5];
+        if ($op =~ /[ms]/)
+        {
+                print "motif de recherche : $pat\n";
+        }
+        else
+        {
+                print "$op n'est pas une opération de correspondance de motif\n";
+        }</pre>
+</div>
+<dl class="Bl-tag">
+  <dt>"extract_quotelike"</dt>
+  <dd><span class="Li">"extract_quotelike"</span> peut extraire avec succès des "here documents" d'une chaîne d'entrée, mais avec une mise en garde importante dans les contextes de liste.
+    <p class="Pp">Contrairement aux autres types de littérales de type citation, un here document n'est rarement une sous-chaîne contiguë. Par exemple, un morceau de code typique utilisant un here document peut ressembler à ceci :</p>
+        <pre><&lt;'EOMSG' || die;
+Ceci est le message.
+EOMSG
+exit;
+</pre>
+    <p class="Pp">Étant donné ceci comme chaîne d'entrée dans un contexte scalaire,
+        <span class="Li">"extract_quotelike"</span> renverrait correctement la chaîne "<&lt;'EOMSG'\nCeci est le
+        message.\nEOMSG", laissant la chaîne " || die;\nexit;" dans la variable d'origine. En d'autres termes, les deux morceaux séparés du here document sont extraits et concaténés avec succès.</p>
+    <p class="Pp">Dans un contexte de liste,
+        <span class="Li">"extract_quotelike"</span> renverrait la liste</p>
+  </dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt>[0]</dt>
+  <dd>"<&lt;'EOMSG'\nCeci est le message.\nEOMSG\n" (c'est-à-dire le document ici complet extrait, y compris les délimiteurs avant et après),</dd>
+  <dt>[1]</dt>
+  <dd>" || die;\nexit;" (c'est-à-dire le reste du texte d'entrée,
+      concaténé),</dd>
+  <dt>[2]</dt>
+  <dd>"" (c'est-à-dire la sous-chaîne de préfixe - triviale dans ce cas),</dd>
+  <dt>[3]</dt>
+  <dd>"<&lt;" (c'est-à-dire le "nom" de l'opérateur de type citation)</dd>
+  <dt>[4]</dt>
+  <dd>"'EOMSG'" (c'est-à-dire le délimiteur gauche du here document,
+      y compris les éventuelles guillemets),</dd>
+  <dt>[5]</dt>
+  <dd>"Ceci est le message.\n" (c'est-à-dire le texte du here
+      document),</dd>
+  <dt>[6]</dt>
+  <dd>"EOMSG" (c'est-à-dire le délimiteur droit du here document),</dd>
+  <dt>[7..10]</dt>
+  <dd>"" (un here document n'a pas de deuxième délimiteur gauche, de deuxième texte, de deuxième délimiteur droit ou de modificateurs de fin).</dd>
+</dl>
+</div>
+<div class="Bd-indent">
+<p class="Pp">Cependant, la position de correspondance de la variable d'entrée serait définie sur "exit;" (c'est-à-dire après le délimiteur de fermeture du here document), ce qui provoquerait le saut du " || die;\nexit;" précédent dans toute séquence d'extractions de fragments de code.</p>
+<p class="Pp">Pour éviter ce problème, lorsqu'il rencontre un here document lors de l'extraction d'une chaîne modifiable,
+        <span class="Li">"extract_quotelike"</span> silencieusement réécrit</p>
+Claro, aquí tienes el contenido traducido al francés, manteniendo la estructura del archivo:
+
+Mantén toda la estructura del archivo.
+    arranges
+    la chaîne à une pièce équivalente de Perl :</p>
+<pre>
+&lt;&lt;'EOMSG'
+This is the message.
+EOMSG
+|| die;
+exit;
+&lt;/EOMSG>
+</pre>
+<p class="Pp">dans laquelle le here document <i>est</i> contigu. Bien qu'il reste encore une position correspondante après le here document, le reste de la ligne sur laquelle le here document commence ne sera pas sauté.</p>
+<p class="Pp">Pour éviter que <span class="Li">&quot;extract_quotelike&quot;</span> ne se fâche contre l'entrée dans ce mode (c'est le seul cas où un <span class="Li">&quot;extract_quotelike&quot;</span> en contexte de liste le fait), vous pouvez passer la variable d'entrée comme une chaîne littérale interpolée :</p>
+<pre>
+$quotelike = extract_quotelike(&quot;$var&quot;);
+</pre>
+</div>
+<dl class="Bl-tag">
+  <dt>&quot;extract_codeblock&quot;</dt>
+  <dd><span class="Li">&quot;extract_codeblock&quot;</span> tente de reconnaître et d'extraire une sous-chaîne équilibrée qui pourrait contenir des parenthèses déséquilibrées dans des blocs Perl ou des opérations de type quote.
+    Autrement dit, <span class="Li">&quot;extract_codeblock&quot;</span> est une combinaison de <span class="Li">&quot;extract_bracketed&quot;</span> et <span class="Li">&quot;extract_quotelike&quot;</span>.
+    <p class="Pp"><span class="Li">&quot;extract_codeblock&quot;</span> prend les trois premiers paramètres identiques à <span class="Li">&quot;extract_bracketed&quot;</span> : un texte à traiter, un ensemble de parenthèses délimiteurs à rechercher et un préfixe à faire correspondre en premier. Il prend également un quatrième paramètre optionnel, qui permet de spécifier séparément les parenthèses délimiteurs les plus externes (voir ci-dessous), et un cinquième paramètre utilisé uniquement par Parse::RecDescent.</p>
+    <p class="Pp">Omettre le premier argument (texte d'entrée) signifie traiter <span class="Li">$_</span> à la place. Omettre le deuxième argument (parenthèses délimiteurs) indique que seul <span class="Li">'{'</span> sera utilisé. Omettre le troisième argument (préfixe) implique qu'il y a des espaces optionnels au début. Omettre le quatrième argument (parenthèses délimiteurs les plus externes) indique que la valeur du deuxième argument sera utilisée pour les délimiteurs les plus externes.</p>
+    <p class="Pp">Une fois le préfixe et les parenthèses délimiteurs les plus externes reconnus, les blocs de code sont extraits en parcourant le texte d'entrée et en testant les alternatives en séquence :</p>
+  </dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt>1.</dt>
+  <dd>Tente de faire correspondre une parenthèse fermante. Si la parenthèse était du même type que la dernière parenthèse ouvrante, renvoie la sous-chaîne jusqu'à là. Si la parenthèse était déséquilibrée, renvoie une erreur.</dd>
+  <dt>2.</dt>
+  <dd>Tente de faire correspondre un opérateur de type quote ou une guillemet. Si elle est trouvée, appelle <span class="Li">&quot;extract_quotelike&quot;</span> pour la consommer. Si <span class="Li">&quot;extract_quotelike&quot;</span> échoue, renvoie l'erreur qu'elle a retournée. Sinon, revient à l'étape 1.</dd>
+  <dt>3.</dt>
+  <dd>Tente de faire correspondre une parenthèse délimiteur. Si elle est trouvée, appelle <span class="Li">&quot;extract_codeblock&quot;</span> récursivement pour consommer le bloc imbriqué. Si l'appel récursif échoue, renvoie une erreur. Sinon, revient à l'étape 1.</dd>
+  <dt>4.</dt>
+  <dd>Fait correspondre inconditionnellement un bareword ou tout autre caractère unique, puis revient à l'étape 1.</dd>
+</dl>
+</div>
+<div class="Bd-indent">
+<p class="Pp">Exemples :</p>
+<pre># Trouver une boucle while dans le texte
+if ($text =~ s/.*?while\s*\{/{/)
+{
+        $loop = &quot;while &quot; . extract_codeblock($text);
+}
+# Supprimer la première liste entre parenthèses rondes (qui peut inclure des blocs de code entre parenthèses rondes ou accolades, ou des opérateurs de type quote)
+extract_codeblock $text, &quot;(){}&quot;, '[^(]*';
+</pre>
+<p class="Pp">La capacité de spécifier un délimiteur externe plus large est utile dans certaines circonstances. Par exemple, dans le module Parse::RecDescent, les actions différées qui ne s'exécutent qu'en cas de succès d'un parsing sont spécifiées à l'aide d'une directive <span class="Li">&quot;&lt;defer:...&gt;&quot;</span>. Par exemple :</p>
+<pre>sentence: subject verb object
+                &lt;defer: {$::theVerb = $item{verb}} &gt;</pre>
+<p class="Pp">Parse::RecDescent utilise <span class="Li">&quot;extract_codeblock($text, '{}&lt;&gt;')&quot;</span> pour extraire le code dans la directive <span class="Li">&quot;&lt;defer:...&gt;&quot;</span>, mais il y a un problème.</p>
+<p class="Pp">Une action différée comme celle-ci :</p>
+<pre>&lt;defer: {if ($count&gt;10) {$count--}} &gt;</pre>
+<p class="Pp">est mal analysée comme :</p>
+<pre>&lt;defer: {if ($count&gt;</pre>
+<p class="Pp">car l'opérateur "inférieur à" est interprété comme un délimiteur fermant.</p>
+<p class="Pp">Cependant, en extrayant la directive à l'aide de <span class="Li">&quot;extract_codeblock($text,&#x00A0;'{}',&#x00A0;undef,&#x00A0;'&lt;&gt;')&quot;</span>, le &quot;&gt; n'est traité que comme un délimiteur au niveau le plus externe du bloc de code, ainsi la directive est correctement analysée.</p>
+</div>
+<dl class="Bl-tag">
+  <dt>&quot;extract_multiple&quot;</dt>
+  <dd>La sous-routine <span class="Li">&quot;extract_multiple&quot;</span> prend une chaîne à traiter et une liste d'extracteurs (sous-routines ou expressions régulières) à appliquer à cette chaîne.
+    <p class="Pp">En contexte de tableau, <span class="Li">&quot;extract_multiple&quot;</span> renvoie un tableau de sous-chaînes de la chaîne originale, telles qu'extraites par les extracteurs spécifiés. En contexte scalaire, <span class="Li">&quot;extract_multiple&quot;</span> renvoie la première sous-chaîne extraite avec succès de la chaîne originale. Dans les contextes scalaire et void, la chaîne originale a la première sous-chaîne extraite avec succès supprimée. Dans tous les contextes, <span class="Li">&quot;extract_multiple&quot;</span> commence à la position <span class="Li">&quot;pos&quot;</span> actuelle de la chaîne et ajuste correctement cette position <span class="Li">&quot;pos&quot;</span> après une correspondance.</p>
+    <p class="Pp">Par conséquent, le but d'un appel à <span class="Li">&quot;extract_multiple&quot;</span> en contexte de tableau est de diviser la chaîne traitée en autant de champs non chevauchants que possible, en appliquant répétitivement chacun des extracteurs spécifiés au reste de la chaîne. Ainsi, <span class="Li">&quot;extract_multiple&quot;</span> est une forme généralisée de la sous-routine Perl <span class="Li">&quot;split&quot;</span>.</p>
+    <p class="Pp">La sous-routine prend jusqu'à quatre arguments optionnels :</p>
+  </dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt>1.</dt>
+  <dd>Une chaîne à traiter (<span class="Li">$_</span> si la chaîne est omise ou <span class="Li">&quot;undef&quot;</span>)</dd>
+  <dt>2.</dt>
+  <dd>Une référence à une liste de références de sous-routines ou d'objets qr// ou de chaînes littérales ou de références de hachage, spécifiant les extracteurs à appliquer à la chaîne. Si cet argument est omis (ou <span class="Li">&quot;undef&quot;</span>), la liste suivante est utilisée :</dd>
+  <pre>
+  [
+    sub { extract_variable($_[0], '') },
+    sub { extract_quotelike($_[0],'') },
+    sub { extract_codeblock($_[0],'{}','') },
+  ]
+  </pre>
+  <p class="Pp">Si cet argument est omis (ou <span class="Li">&quot;undef&quot;</span>), la liste ci-dessus est utilisée.</p>
+  </dd>
+  <dt>3.</dt>
+  <dd>Un nombre spécifiant le nombre maximum de champs à renvoyer. Si cet argument est omis (ou <span class="Li">&quot;undef&quot;</span>), l'extraction continue tant que c'est possible.</dd>
+  <p class="Pp">Si le troisième argument est <i>N</i>, l'extraction continue jusqu'à ce que <i>N</i> champs aient été extraits avec succès, ou jusqu'à ce que la chaîne soit entièrement traitée.</p>
+  <p class="Pp">Note : Dans les contextes scalaire et void, la valeur de cet argument est automatiquement réinitialisée à 1 (sous <span class="Li">&quot;-w&quot;</span>, un avertissement est émis si l'argument doit être réinitialisé).</p>
+  </dd>
+  <dt>4.</dt>
+  <dd>Une valeur indiquant si les sous-chaînes non correspondantes (voir ci-dessous) dans le texte doivent être omises ou renvoyées comme champs. Si la valeur est vraie, ces sous-chaînes sont omises. Sinon, elles sont renvoyées.</dd>
+</dl>
+</div>
+<div class="Bd-indent">
+<p class="Pp">Le processus d'extraction fonctionne en appliquant chaque extracteur séquentiellement à la chaîne de texte.</p>
+<p class="Pp">Si l'extracteur est une sous-routine, il est appelé en contexte de tableau et est censé renvoyer une liste à un élément, c'est-à-dire le texte extrait. Il peut éventuellement renvoyer deux arguments supplémentaires : une chaîne représentant le texte restant après l'extraction (comme $' dans une correspondance de modèle), et une chaîne représentant tout préfixe omis avant l'extraction (comme $` dans une correspondance de modèle). Note : ceci est conçu pour faciliter l'utilisation d'autres sous-routines de Text::Balanced avec <span class="Li">&quot;extract_multiple&quot;</span>. Notez également que la valeur renvoyée par une sous-routine d'extraction n'a pas besoin d'être liée à la sous-chaîne correspondante du texte original (voir les exemples ci-dessous).
+</p>
+<p class="Pp">Si l'extracteur est une expression régulière précompilée ou une chaîne, elle est comparée à la chaîne en contexte scalaire avec un préfixe '\G' et les modificateurs gc activés. La valeur extraite est $1 si cette variable est définie après la correspondance, ou la correspondance complète (c'est-à-dire $&amp;).</p>
+<p class="Pp">Si l'extracteur est une référence à un hachage, il doit contenir exactement un élément. La valeur de cet élément est l'un des types d'extracteurs précédents (référence de sous-routine, expression régulière ou chaîne). La clé de cet élément est le nom d'une classe dans laquelle la valeur de retour réussie de la sous-routine sera hachée.</p>
+<p class="Pp">Si un extracteur renvoie une valeur définie, elle est immédiatement traitée comme le champ extrait suivant et ajoutée à la liste des champs. Si l'extracteur a été spécifié dans une référence de hachage, le champ sera également haché dans la classe correspondante.</p>
+<p class="Pp">Si l'extracteur ne correspond pas (dans le cas d'un extracteur regex) ou renvoie une liste vide ou une valeur indéfinie (dans le cas d'un extracteur de sous-routine), on suppose qu'il n'y a pas eu d'extraction. Si aucune des sous-routines d'extraction n'est satisfaite, un seul caractère est extrait de la chaîne et les sous-routines d'extraction sont réappliquées. Les caractères ainsi supprimés sont accumulés et finissent par constituer le champ suivant (sauf si le quatrième argument est vrai, auquel cas ils sont rejetés).</p>
+<p class="Pp">Par exemple, l'exemple suivant extrait les sous-chaînes valides de variables Perl :</p>
+<pre>@fields = extract_multiple($text,
+                           [ sub { extract_variable($_[0]) } ],
+                           undef, 1);
+</pre>
+<p class="Pp">Cet exemple sépare le texte en champs délimités, entre crochets et autres. Les parties délimitées et entre crochets sont également hachées pour les identifier (les "autres" ne sont pas hachées) :</p>
+<pre>@fields = extract_multiple($text,
+           [
+                { Delim =&gt; sub { extract_delimited($_[0],q{'&quot;}) } },
+                { Brack =&gt; sub { extract_bracketed($_[0],'{}') } },
+           ]);
+</pre>
+<p class="Pp">Cet appel extrait la sous-chaîne unique suivante qui est une opération valide de type quote (et la supprime de $text) :</p>
+<pre>$quotelike = extract_multiple($text,
+                              [
+                                sub { extract_quotelike($_[0]) },
+                              ],
+                              undef, 1);
+</pre>
+<p class="Pp">Enfin, voici une autre façon d'analyser des valeurs séparées par des virgules :</p>
+<pre>$csv_text = &quot;a,'x b',c&quot;;
+@fields = extract_multiple($csv_text,
+                          [
+                                sub { extract_delimited(</pre>$_[0],q{'&quot;}) },
+                                qr/([^,]+)/,
+                          ],
+                          undef,1);
+# @champs est maintenant ('a', &quot;'x b'&quot;, 'c')</pre>
+<p class="Pp">La liste dans le deuxième argument signifie : <i>&quot;Essayer d'extraire une chaîne délimitée par une apostrophe ou un guillemet, sinon extraire tout jusqu'à une virgule...&quot;</i>. L'argument non défini du troisième signifie : <i>&quot;...autant de fois que possible...&quot;</i>, et la valeur vraie du quatrième argument signifie <i>&quot;...en ignorant tout le reste qui apparaît (c'est-à-dire les virgules)&quot;</i>.</p>
+<p class="Pp">Si vous vouliez que les virgules soient conservées comme champs séparés (c'est-à-dire comme le fait split si votre motif de séparation contient des parenthèses capturantes), il vous suffirait de rendre le dernier paramètre indéfini (ou de le supprimer).</p>
+</div>
+<dl class="Bl-tag">
+  <dt>&quot;gen_delimited_pat&quot;</dt>
+  <dd>La sous-routine <span class="Li">&quot;gen_delimited_pat&quot;</span> prend un seul argument (une chaîne) et construit une regex optimisée de style Friedl qui correspond à une chaîne délimitée par l'un quelconque des caractères de l'argument unique. Par exemple :
+        <pre>gen_delimited_pat(q{'&quot;})
+</pre>
+    <p class="Pp">renvoie la regex :</p>
+        <pre>(?:\&quot;(?:\\\&quot;|(?!\&quot;).)*\&quot;|\'(?:\\\'|(?!\').)*\')
+</pre>
+    <p class="Pp">Notez que les délimiteurs spécifiés sont automatiquement quotemeta's.</p>
+    <p class="Pp">Une utilisation typique de
+        <span class="Li">&quot;gen_delimited_pat&quot;</span> serait de construire des balises spéciales pour
+        <span class="Li">&quot;extract_tagged&quot;</span>. Par exemple, pour ignorer correctement les éléments XML &quot;vides&quot; (qui pourraient contenir des chaînes entre guillemets) :</p>
+        <pre>my $empty_tag = '&lt;(' . gen_delimited_pat(q{'&quot;}) . '|.)+&gt;';
+extract_tagged($text, undef, undef, undef, {ignore =&gt; [$empty_tag]} );
+</pre>
+    <p class="Pp"><span class="Li">&quot;gen_delimited_pat&quot;</span> peut également être appelée avec un deuxième argument optionnel, qui spécifie le(s) caractère(s) d'échappement à utiliser pour chaque délimiteur. Par exemple, pour faire correspondre une chaîne de style Pascal (où ' est le délimiteur et '' est un ' littéral dans la chaîne) :</p>
+        <pre>gen_delimited_pat(q{'},q{'});
+</pre>
+    <p class="Pp">Des caractères d'échappement différents peuvent être spécifiés pour des délimiteurs différents. Par exemple, pour spécifier que '/' est l'échappement pour les apostrophes et '%' est l'échappement pour les guillemets :</p>
+        <pre>gen_delimited_pat(q{'&quot;},q{/%});
+</pre>
+    <p class="Pp">Si plus de délimiteurs que de caractères d'échappement sont spécifiés, le dernier caractère d'échappement est utilisé pour les délimiteurs restants. Si aucun caractère d'échappement n'est spécifié pour un délimiteur donné, '\' est utilisé.</p>
+  </dd>
+  <dt>&quot;delimited_pat&quot;</dt>
+  <dd>Notez que <span class="Li">&quot;gen_delimited_pat&quot;</span> s'appelait précédemment <span class="Li">&quot;delimited_pat&quot;</span>. Ce nom peut encore être utilisé, mais il est maintenant obsolète.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DIAGNOSTICS'><a class='permalink' href='#DIAGNOSTICS'>DIAGNOSTICS</a></h1>
+<p class="Pp">Dans un contexte de liste, toutes les fonctions renvoient
+    <span class="Li">&quot;(undef,$texte_original)&quot;</span> en cas d'échec. Dans un contexte scalaire, l'échec est indiqué par le retour de
+    <span class="Li">&quot;undef&quot;</span> (dans ce cas, le texte d'entrée n'est modifié d'aucune manière).</p>
+<p class="Pp">De plus, en cas d'échec dans un contexte <i>quelconque</i>, la variable
+    <span class="Li">$@</span> est définie. L'accès à
+    <span class="Li">&quot;$@-&gt;{error}&quot;</span> renvoie l'un des diagnostics d'erreur listés ci-dessous. L'accès à
+    <span class="Li">&quot;$@-&gt;{pos}&quot;</span> renvoie le décalage dans la chaîne d'origine auquel l'erreur a été détectée (bien que pas nécessairement où elle s'est produite !). L'impression directe de <span class="Li">$@</span> produit le message d'erreur, avec le décalage ajouté. En cas de succès, la variable
+    <span class="Li">$@</span> est garantie d'être
+    <span class="Li">&quot;undef&quot;</span>.</p>
+<p class="Pp">Les diagnostics disponibles sont :</p>
+<dl class="Bl-tag">
+  <dt>&quot;Did not find a suitable bracket: &quot;%s&quot;&quot;</dt>
+  <dd>Le délimiteur fourni à
+      <span class="Li">&quot;extract_bracketed&quot;</span> n'était pas l'un des
+      <span class="Li">'()[]&lt;&gt;{}'</span>.</dd>
+  <dt>&quot;Did not find prefix: /%s/&quot;</dt>
+  <dd>Un préfixe non optionnel a été spécifié mais n'a pas été trouvé au début du texte.</dd>
+  <dt>&quot;Did not find opening bracket after prefix: &quot;%s&quot;&quot;</dt>
+  <dd><span class="Li">&quot;extract_bracketed&quot;</span> ou
+      <span class="Li">&quot;extract_codeblock&quot;</span> s'attendait à un
+      type particulier de parenthèse au début du texte, et ne l'a pas trouvé.</dd>
+  <dt>&quot;No quotelike operator found after prefix: &quot;%s&quot;&quot;</dt>
+  <dd><span class="Li">&quot;extract_quotelike&quot;</span> n'a pas trouvé l'un des opérateurs quotelike
+      <span class="Li">&quot;q&quot;</span>,
+      <span class="Li">&quot;qq&quot;</span>,
+      <span class="Li">&quot;qw&quot;</span>,
+      <span class="Li">&quot;qx&quot;</span>,
+      <span class="Li">&quot;s&quot;</span>,
+      <span class="Li">&quot;tr&quot;</span> ou
+      <span class="Li">&quot;y&quot;</span> au début de la sous-chaîne qu'il extrayait.</dd>
+  <dt>&quot;Unmatched closing bracket: &quot;%c&quot;&quot;</dt>
+  <dd><span class="Li">&quot;extract_bracketed&quot;</span>,
+      <span class="Li">&quot;extract_quotelike&quot;</span> ou
+      <span class="Li">&quot;extract_codeblock&quot;</span> a rencontré une
+      parenthèse fermante alors qu'aucune n'était attendue.</dd>
+  <dt>&quot;Unmatched opening bracket(s): &quot;%s&quot;&quot;</dt>
+  <dd><span class="Li">&quot;extract_bracketed&quot;</span>,
+      <span class="Li">&quot;extract_quotelike&quot;</span> ou
+      <span class="Li">&quot;extract_codeblock&quot;</span> a manqué de
+      caractères dans le texte avant de fermer un ou plusieurs niveaux de parenthèses imbriquées.</dd>
+  <dt>&quot;Unmatched embedded quote (%s)&quot;</dt>
+  <dd><span class="Li">&quot;extract_bracketed&quot;</span> a tenté de faire correspondre une sous-chaîne intégrée entre guillemets, mais n'a pas trouvé de guillemet fermant pour la faire correspondre.</dd>
+  <dt>&quot;Did not find closing delimiter to match '%s'&quot;</dt>
+  <dd><span class="Li">&quot;extract_quotelike&quot;</span> n'a pas pu trouver de délimiteur fermant pour faire correspondre celui qui a ouvert l'opération de type guillemet.</dd>
+  <dt>&quot;Mismatched closing bracket: expected &quot;%c&quot; but found
+    &quot;%s&quot;&quot;</dt>
+  <dd><span class="Li">&quot;extract_bracketed&quot;</span>,
+      <span class="Li">&quot;extract_quotelike&quot;</span> ou
+      <span class="Li">&quot;extract_codeblock&quot;</span> a trouvé un délimiteur de parenthèse valide, mais c'était la mauvaise espèce. Cela indique généralement une erreur d'imbrication, mais peut indiquer une citation ou un échappement incorrect.</dd>
+  <dt>&quot;No block delimiter found after quotelike &quot;%s&quot;&quot;</dt>
+  <dd><span class="Li">&quot;extract_quotelike&quot;</span> ou
+      <span class="Li">&quot;extract_codeblock&quot;</span> a trouvé l'un des opérateurs quotelike
+      <span class="Li">&quot;q&quot;</span>,
+      <span class="Li">&quot;qq&quot;</span>,
+      <span class="Li">&quot;qw&quot;</span>,
+      <span class="Li">&quot;qx&quot;</span>,
+      <span class="Li">&quot;s&quot;</span>,
+      <span class="Li">&quot;tr&quot;</span> ou
+      <span class="Li">&quot;y&quot;</span> sans bloc approprié après
+    celui-ci.</dd>
+  <dt>&quot;Did not find leading dereferencer&quot;</dt>
+  <dd><span class="Li">&quot;extract_variable&quot;</span> s'attendait à l'un des '$', '@', ou '%' au début d'une variable, mais n'en a trouvé aucun.</dd>
+  <dt>&quot;Bad identifier after dereferencer&quot;</dt>
+  <dd><span class="Li">&quot;extract_variable&quot;</span> a trouvé un '$', '@', ou
+      '%' indiquant une variable, mais ce caractère n'a pas été suivi d'un identifiant Perl légal.</dd>
+  <dt>&quot;Did not find expected opening bracket at %s&quot;</dt>
+  <dd><span class="Li">&quot;extract_codeblock&quot;</span> n'a pas trouvé l'une des parenthèses ouvrantes externes spécifiées.</dd>
+  <dt>&quot;Improperly nested codeblock at %s&quot;</dt>
+  <dd>Un bloc de code imbriqué a été trouvé qui a commencé par un délimiteur spécifié comme étant utilisé uniquement comme parenthèse externe.</dd>
+  <dt>&quot;Missing second block for quotelike &quot;%s&quot;&quot;</dt>
+  <dd><span class="Li">&quot;extract_codeblock&quot;</span> ou
+      <span class="Li">&quot;extract_quotelike&quot;</span> a trouvé l'un des opérateurs quotelike
+      <span class="Li">&quot;s&quot;</span>,
+      <span class="Li">&quot;tr&quot;</span> ou
+      <span class="Li">&quot;y&quot;</span> suivi d'un seul bloc.</dd>
+  <dt>&quot;No match found for opening bracket&quot;</dt>
+  <dd><span class="Li">&quot;extract_codeblock&quot;</span> n'a pas trouvé de parenthèse fermante pour correspondre à la parenthèse ouvrante externe.</dd>
+  <dt>&quot;Did not find opening tag: /%s/&quot;</dt>
+  <dd><span class="Li">&quot;extract_tagged&quot;</span> n'a pas trouvé de balise ouvrante appropriée (après suppression de tout préfixe spécifié).</dd>
+  <dt>&quot;Unable to construct closing tag to match: /%s/&quot;</dt>
+  <dd><span class="Li">&quot;extract_tagged&quot;</span> a trouvé la balise ouvrante spécifiée et a tenté de modifier le texte correspondant pour produire une balise fermante correspondante (car aucune n'était spécifiée). Il n'a pas réussi à générer la balise fermante, très probablement parce que la balise ouvrante ne commençait pas par une parenthèse quelconque.</dd>
+  <dt>&quot;Found invalid nested tag: %s&quot;</dt>
+  <dd><span class="Li">&quot;extract_tagged&quot;</span> a trouvé une balise imbriquée qui apparaissait dans la liste &quot;reject&quot; (et le mode d'échec n'était pas &quot;MAX&quot; ou &quot;PARA&quot;).</dd>
+  <dt>&quot;Found unbalanced nested tag: %s&quot;</dt>
+  <dd><span class="Li">&quot;extract_tagged&quot;</span> a trouvé une balise ouvrante imbriquée qui n'était pas correspondue par une balise fermante imbriquée correspondante (et le mode d'échec n'était pas &quot;MAX&quot; ou &quot;PARA&quot;).</dd>
+  <dt>&quot;Did not find closing tag&quot;</dt>
+  <dd><span class="Li">&quot;extract_tagged&quot;</span> a atteint la fin du texte sans trouver de balise fermante pour correspondre à la balise ouvrante d'origine (et le mode d'échec n'était pas &quot;MAX&quot; ou &quot;PARA&quot;).</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXPORTS'><a class='permalink' href='#EXPORTS'>EXPORTATIONS</a></h1>
+<p class="Pp">Les symboles suivants sont, ou peuvent être, exportés par ce module :</p>
+<dl class="Bl-tag">
+  <dt id="Default"><a class="permalink" href="#Default">Exportations par défaut</a></dt>
+  <dd><i>Aucune</i>.</dd>
+  <dt id="Optional"><a class="permalink" href="#Optional">Exportations optionnelles</a></dt>
+  <dd><span class="Li">&quot;extract_delimited&quot;</span>,
+      <span class="Li">&quot;extract_bracketed&quot;</span>,
+      <span class="Li">&quot;extract_quotelike&quot;</span>,
+      <span class="Li">&quot;extract_codeblock&quot;</span>,
+      <span class="Li">&quot;extract_variable&quot;</span>,
+      <span class="Li">&quot;extract_tagged&quot;</span>,
+      <span class="Li">&quot;extract_multiple&quot;</span>,
+      <span class="Li">&quot;gen_delimited_pat&quot;</span>,
+      <span class="Li">&quot;gen_extract_tagged&quot;</span>,
+      <span class="Li">&quot;delimited_pat&quot;</span>.</dd>
+  <dt id="Export"><a class="permalink" href="#Export">Étiquettes d'exportation</a></dt>
+  <dd></dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt>&quot;:ALL&quot;</dt>
+  <dd><span class="Li">&quot;extract_delimited&quot;</span>,
+      <span class="Li">&quot;extract_bracketed&quot;</span>,
+      <span class="Li">&quot;extract_quotelike&quot;</span>,
+      <span class="Li">&quot;extract_codeblock&quot;</span>,
+      <span class="Li">&quot;extract_var
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Text::Balanced(3perl) — Perl core modules — Arch Linux</title>
+        <link rel="stylesheet" href="/style.css">
+        <link rel="stylesheet" href="/theme.css">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+    </head>
+    <body>
+        
+        <main>
+            <article>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NAME</a></h1>
+<p class="Pp"><code class="Nm">Text::Balanced</code> — Analyse and extract balanced
+    text constructs.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>    use Text::Balanced qw(:DEFAULT parse_brackets);
+    my $text = q{
+        This is some text.
+        This is an example of a balanced construct:
+        (This is enclosed in parentheses).
+        And here is another: [This is enclosed in square brackets].
+        And another: {This is enclosed in curly braces}.
+        This also works with nested constructs:
+        (This has [nested brackets] inside).
+        (This has {nested braces} inside).
+        ([This has both] nested inside).
+        This is NOT balanced: (This has unmatched closing parenthesis).
+        This is NOT balanced: [This has unmatched closing bracket.
+        This is NOT balanced: {This has unmatched closing brace.
+        This is NOT balanced: ) This has unmatched opening parenthesis.
+        This is NOT balanced: [ This has unmatched opening bracket.
+        This is NOT balanced: { This has unmatched opening brace.
+    };
+    my @constructs = parse_brackets($text);
+    foreach my $construct (@constructs) {
+        print &quot;Found balanced construct:\n&quot;, $construct-&gt;text, &quot;\n&quot;;
+        print &quot;--------------------------\n&quot;;
+    };</pre>
+<p class="Pp">Or, using the general purpose parsing function:</p>
+<pre>    use Text::Balanced qw(extract_balanced_and_unbalanced);
+    my ($balanced, $unbalanced) = extract_balanced_and_unbalanced($text);
+    print &quot;Balanced text:\n&quot;, $balanced, &quot;\n&quot;;
+    print &quot;Unbalanced text:\n&quot;, $unbalanced, &quot;\n&quot;;</pre>
+<p class="Pp">Or, to extract quoted strings:</p>
+<pre>    use Text::Balanced qw(extract_quoted_string);
+    my $string = q{This is "a quoted string" and some text.};
+    my ($quoted, $rest) = extract_quoted_string($string);
+    print &quot;Quoted string: &quot;, $quoted, &quot;\n&quot;;
+    print &quot;Rest of string: &quot;, $rest, &quot;\n&quot;;</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">The <code class="Nm">Text::Balanced</code> module provides a range of
+    functions for parsing and extracting balanced text constructs such as
+    parenthesized expressions, quoted strings, or any other construct defined
+    by user-supplied start and end delimiters.</p>
+<p class="Pp">The module is particularly useful for parsing programming languages,
+    markup languages, or configuration files that contain nested or quoted
+    structures.</p>
+<p class="Pp">The primary functions are:</p>
+<dl class="Bl-tag">
+    <dt><a name="parse_brackets"><code class="Nm">parse_brackets</code></a></dt>
+    <dd>Parses the given text and returns an array of objects, each representing
+        a balanced construct found in the text. The objects have a <code class="Pp">text</code>
+        method that returns the full text of the construct, including the
+        delimiters. This function specifically targets parentheses <code class="Pp">()</code>,
+        square brackets <code class="Pp">[]</code>, and curly braces <code class="Pp">{}</code>.
+        It correctly handles nesting and identifies unbalanced constructs.</dd>
+    <dt><a name="extract_balanced_and_unbalanced"><code class="Nm">extract_balanced_and_unbalanced</code></a></dt>
+    <dd>Takes text and returns two strings: the first contains all the balanced
+        constructs found, concatenated together. The second string contains the
+        remaining text that was not part of any balanced construct. This
+        function uses <code class="Nm">parse_brackets</code> internally.</dd>
+    <dt><a name="extract_quoted_string"><code class="Nm">extract_quoted_string</code></a></dt>
+    <dd>Extracts the first quoted string (enclosed in double quotes <code class="Pp">&quot;</code> or
+        single quotes <code class="Pp">&quot;'&quot;</code>) from the beginning of the
+        given text. It returns the extracted quoted string (including the
+        quotes) and the rest of the text. It handles escaped quotes within the
+        string.</dd>
+    <dt><a name="extract_delimited_string"><code class="Nm">extract_delimited_string</code></a></dt>
+    <dd>Extracts the first string delimited by the specified start and end
+        delimiters. It returns the extracted string (including delimiters) and
+        the rest of the text. It handles nesting and escaped delimiters.</dd>
+    <dt><a name="extract_code"><code class="Nm">extract_code</code></a></dt>
+    <dd>Extracts a code block delimited by <code class="Pp">{...}</code>. This function is
+        specifically designed to handle Perl code blocks, including nested
+        braces. It returns the extracted code block and the remaining text.</dd>
+    <dt><a name="extract_html_comment"><code class="Nm">extract_html_comment</code></a></dt>
+    <dd>Extracts an HTML comment <code class="Pp">&lt;!-- ... --&gt;</code> from the
+        beginning of the given text. It returns the comment and the rest of the
+        text.</dd>
+    <dt><a name="extract_variable"><code class="Nm">extract_variable</code></a></dt>
+    <dd>Extracts a variable name (e.g., <code class="Pp">$var</code>, <code class="Pp">&#64;array</code>,
+        <code class="Pp">%hash</code>) from the beginning of the given text. It
+        returns the variable name and the rest of the text.</dd>
+    <dt><a name="extract_perl_string"><code class="Nm">extract_perl_string</code></a></dt>
+    <dd>Extracts a Perl string literal (single-quoted, double-quoted, or
+        bareword) from the beginning of the given text. It returns the
+        extracted string and the rest of the text.</dd>
+    <dt><a name="extract_balanced_construct"><code class="Nm">extract_balanced_construct</code></a></dt>
+    <dd>A general-purpose function to extract a balanced construct defined by
+        any pair of start and end delimiters. It takes the text, the start
+        delimiter, and the end delimiter as arguments. It returns the extracted
+        construct and the rest of the text.</dd>
+    <dt><a name="extract_multiple"><code class="Nm">extract_multiple</code></a></dt>
+    <dd>Extracts multiple types of constructs from the text based on a list of
+        defined patterns. Returns the extracted text and the remaining text.</dd>
+    <dt><a name="gen_delimited_pat"><code class="Nm">gen_delimited_pat</code></a></dt>
+    <dd>Generates a regular expression pattern to match a delimited string,
+        handling nesting and escapes.</dd>
+    <dt><a name="gen_extract_tagged"><code class="Nm">gen_extract_tagged</code></a></dt>
+    <dd>Generates a subroutine to extract text tagged with specific start and
+        end markers, handling nesting.</dd>
+    <dt><a name="delimited_pat"><code class="Nm">delimited_pat</code></a></dt>
+    <dd>Returns a regular expression pattern for matching delimited strings
+        with nested structures.</dd>
+    <dt><a name="extract_tagged"><code class="Nm">extract_tagged</code></a></dt>
+    <dd>Extracts text enclosed by specific start and end tags, handling nesting.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DIAGNOSTICS'><a class='permalink' href='#DIAGNOSTICS'>DIAGNOSTICS</a></h1>
+<p class="Pp">The module does not explicitly die or warn, but unbalanced constructs
+    will simply not be extracted by functions like <code class="Nm">parse_brackets</code>
+    and will be returned as part of the unbalanced text by
+    <code class="Nm">extract_balanced_and_unbalanced</code>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXPORTS'><a class='permalink' href='#EXPORTS'>EXPORTS</a></h1>
+<p class="Pp">The following functions are exported by default:</p>
+<div class="Bd-indent">
+<pre><span class="Li">&quot;parse_brackets&quot;</span>,
+<span class="Li">&quot;extract_balanced_and_unbalanced&quot;</span>,
+<span class="Li">&quot;extract_quoted_string&quot;</span>,
+<span class="Li">&quot;extract_delimited_string&quot;</span>,
+<span class="Li">&quot;extract_code&quot;</span>,
+<span class="Li">&quot;extract_html_comment&quot;</span>,
+<span class="Li">&quot;extract_variable&quot;</span>,
+<span class="Li">&quot;extract_perl_string&quot;</span>,
+<span class="Li">&quot;extract_balanced_construct&quot;</span>.</pre>
+</div>
+<p class="Pp">The following functions can be exported using the <code class="Pp">:all</code>
+    tag:</p>
+<div class="Bd-indent">
+<pre><span class="Li">&quot;parse_brackets&quot;</span>,
+<span class="Li">&quot;extract_balanced_and_unbalanced&quot;</span>,
+<span class="Li">&quot;extract_quoted_string&quot;</span>,
+<span class="Li">&quot;extract_delimited_string&quot;</span>,
+<span class="Li">&quot;extract_code&quot;</span>,
+<span class="Li">&quot;extract_html_comment&quot;</span>,
+<span class="Li">&quot;extract_variable&quot;</span>,
+<span class="Li">&quot;extract_perl_string&quot;</span>,
+<span class="Li">&quot;extract_balanced_construct&quot;</span>,
+<span class="Li">&quot;extract_tagged&quot;</span>,
+<span class="Li">&quot;extract_multiple&quot;</span>,
+<span class="Li">&quot;gen_delimited_pat&quot;</span>,
+<span class="Li">&quot;gen_extract_tagged&quot;</span>,
+<span class="Li">&quot;delimited_pat&quot;</span>.</dd>
+</dl>
+</div>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='KNOWN_BUGS'><a class='permalink' href='#KNOWN_BUGS'>KNOWN   BUGS</a></h1>
+<p class="Pp">See
+    &lt;<a href='https://rt.cpan.org/Dist/Display.html?Status=Active'>https://rt.cpan.org/Dist/Display.html?Status=Active</a>&amp;Queue=Text-Balanced&gt;.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='FEEDBACK'><a class='permalink' href='#FEEDBACK'>FEEDBACK</a></h1>
+<p class="Pp">Patches, bug reports, suggestions or any other feedback is
+    welcome.</p>
+<p class="Pp">Patches can be sent as GitHub pull requests at
+    <a href='https://github.com/steve-m-hay/Text-Balanced/pulls'>https://github.com/steve-m-hay/Text-Balanced/pulls</a>.</p>
+<p class="Pp">Bug reports and suggestions can be made on the CPAN Request
+    Tracker at
+    <a href='https://rt.cpan.org/Public/Bug/Report.html?Queue=Text-Balanced'>https://rt.cpan.org/Public/Bug/Report.html?Queue=Text-Balanced</a>.</p>
+<p class="Pp">Currently active requests on the CPAN Request Tracker can be
+    viewed at
+    <a href='https://rt.cpan.org/Public/Dist/Display.html?Status=Active;Queue=Text-Balanced'>https://rt.cpan.org/Public/Dist/Display.html?Status=Active;Queue=Text-Balanced</a>.</p>
+<p class="Pp">Please test this distribution. See CPAN Testers Reports at
+    <a href='https://www.cpantesters.org/'>https://www.cpantesters.org/</a> for details of how to get involved.</p>
+<p class="Pp">Previous test results on CPAN Testers Reports can be viewed at
+    <a href='https://www.cpantesters.org/distro/T/Text-Balanced.html'>https://www.cpantesters.org/distro/T/Text-Balanced.html</a>.</p>
+<p class="Pp">Please rate this distribution on CPAN Ratings at
+    <a href='https://cpanratings.perl.org/rate/?distribution=Text-Balanced'>https://cpanratings.perl.org/rate/?distribution=Text-Balanced</a>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AVAILABILITY'><a class='permalink' href='#AVAILABILITY'>AVAILABILITY</a></h1>
+<p class="Pp">The latest version of this module is available from CPAN (see
+    &quot;CPAN&quot; in perlmodlib for details) at</p>
+<p class="Pp"><a href='https://metacpan.org/release/Text-Balanced'>https://metacpan.org/release/Text-Balanced</a> or</p>
+<p class="Pp"><a href='https://www.cpan.org/authors/id/S/SH/SHAY/'>https://www.cpan.org/authors/id/S/SH/SHAY/</a> or</p>
+<p class="Pp"><a href='https://www.cpan.org/modules/by-module/Text/'>https://www.cpan.org/modules/by-module/Text/</a>.</p>
+<p class="Pp">The latest source code is available from GitHub at
+    <a href='https://github.com/steve-m-hay/Text-Balanced'>https://github.com/steve-m-hay/Text-Balanced</a>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INSTALLATION'><a class='permalink' href='#INSTALLATION'>INSTALLATION</a></h1>
+<p class="Pp">See the <i>INSTALL</i> file.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTHOR</a></h1>
+<p class="Pp">Damian Conway &lt;damian@conway.org
+    &lt;mailto:damian@conway.org&gt;&gt;.</p>
+<p class="Pp">Steve Hay &lt;shay@cpan.org &lt;mailto:shay@cpan.org&gt;&gt; is
+    now maintaining Text::Balanced as of version 2.03.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT'><a class='permalink' href='#COPYRIGHT'>COPYRIGHT</a></h1>
+<p class="Pp">Copyright (C) 1997-2001 Damian Conway. All rights reserved.</p>
+<p class="Pp">Copyright (C) 2009 Adam Kennedy.</p>
+<p class="Pp">Copyright (C) 2015, 2020, 2022 Steve Hay and other contributors.
+    All rights reserved.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='LICENCE'><a class='permalink' href='#LICENCE'>LICENCE</a></h1>
+<p class="Pp">This module is free software; you can redistribute it and/or
+    modify it under the same terms as Perl itself, i.e. under the terms of
+    either the GNU General Public License or the Artistic License, as specified
+    in the <i>LICENCE</i> file.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VERSION'><a class='permalink' href='#VERSION'>VERSION</a></h1>
+<p class="Pp">Version 2.06</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DATE'><a class='permalink' href='#DATE'>DATE</a></h1>
+<p class="Pp">05 Jun 2022</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='HISTORY'><a class='permalink' href='#HISTORY'>HISTORY</a></h1>
+<p class="Pp">See the <i>Changes</i> file.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-13</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Package information:</p>
+    <dl>
+        <dt>Package name:</dt>
+        <dd><a href="https://www.archlinux.org/packages/core/x86_64/perl/">core/perl</a></dd>
+        <dt>Version:</dt>
+        <dd>5.42.0-1</dd>
+        <dt>Upstream:</dt>
+        <dd><a href="https://www.perl.org">https://www.perl.org</a></dd>
+        <dt>Licenses:</dt>
+        <dd>Artistic-1.0-Perl OR GPL-1.0-or-later</dd>
+        <dt>Manuals:</dt>
+        <dd><a href="/listing/core/perl/">/listing/core/perl/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table of contents</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NAME</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#DIAGNOSTICS">DIAGNOSTICS</a></li>
+        
+            <li><a href="#EXPORTS">EXPORTS</a></li>
+        
+            <li><a href="#KNOWN_BUGS">KNOWN BUGS</a></li>
+        
+            <li><a href="#FEEDBACK">FEEDBACK</a></li>
+        
+            <li><a href="#AVAILABILITY">AVAILABILITY</a></li>
+        
+            <li><a href="#INSTALLATION">INSTALLATION</a></li>
+        
+            <li><a href="#AUTHOR">AUTHOR</a></li>
+        
+            <li><a href="#COPYRIGHT">COPYRIGHT</a></li>
+        
+            <li><a href="#LICENCE">LICENCE</a></li>
+        
+            <li><a href="#VERSION">VERSION</a></li>
+        
+            <li><a href="#DATE">DATE</a></li>
+        
+            <li><a href="#HISTORY">HISTORY</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Other formats:
+        
+            <a href="/man/Text::Balanced.3perl.en.txt">txt</a>, 
+        
+            <a href="/man/Text::Balanced.3perl.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>The website is available under the terms of the <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               license, except for the contents of the manual pages, which have their own license
+               specified in the corresponding Arch Linux package.
+            </p>
+        </footer>
+    </body>
+</html>

@@ -1,0 +1,270 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Font::TTF::Manual(3pm) — Pages manuelles d'Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Font__TTF__Manual(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-font-ttf/">perl-font-ttf</a></p>
+<p class="lic">Licences: Artistic2.0</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Font::TTF::Manual(3)</td>
+    <td class="head-vol">Documentation Perl contribuée par les utilisateurs</td>
+    <td class="head-rtitle">Font::TTF::Manual(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">Font::TTF::Manual - Informations concernant l'ensemble des modules</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INTRODUCTION'><a class='permalink' href='#INTRODUCTION'>INTRODUCTION</a></h1>
+<p class="Pp">Ce document examine l'ensemble de la question de la façon dont les différents modules
+    de TrueType Font fonctionnent ensemble. En tant que tel, il s'agit en partie d'informations sur ce
+    système de police et en partie d'informations sur les polices TrueType en général.</p>
+<p class="Pp">En raison des interrelations entre tant de tables dans une police TrueType,
+    différentes tables feront des hypothèses quant aux autres tables
+    qui existent. Au minimum, une police devrait se composer d'une
+    <span class="Li">« head »</span> table et d'une
+    <span class="Li">« maxp »</span> table. Le système a été conçu
+    autour de l'hypothèse que les tables nécessaires au rendu des polices dans
+    l'environnement Windows existent. Mais les dépendances entre tables ont été limitées
+    à ce qui est considéré comme nécessaire.</p>
+<p class="Pp">Ce jeu de modules n'est pas destiné à être une suite d'édition de polices simple à utiliser et sans réflexion, mais un jeu de classes de bas niveau, où l'on se salit les mains, pour ceux qui comprennent les subtilités (et il y en a beaucoup) des polices TrueType. À cette fin, si vous faites une erreur dans les structures de données, etc., ce jeu de modules ne vous le dira pas et créera gaiement des polices qui ne fonctionnent pas.</p>
+<p class="Pp">Au moment de la rédaction, toutes les tables TrueType existantes n'ont pas été implémentées ! Seules les tables de base fondamentales de TrueType 1.0 (c'est-à-dire pas de tables de bitmap intégrées, pas de tables de type postscript, pas de tables OpenType et pas de tables GX) ont été implémentées. Si vous voulez aider en implémentant une ou deux autres tables, alors n'hésitez pas et envoyez-moi votre code. Pour une liste complète des tables, voir Font::TTF::Font.</p>
+<section class="Ss">
+<h2 class="Ss" id='Design_Principles'><a class='permalink' href='#Design_Principles'>Principes de conception</a></h2>
+<p class="Pp">PERL n'est pas C++. C++ encourage l'écriture de méthodes pour modifier et lire chaque variable d'instance dans une classe. Si nous faisions cela dans ce programme PERL, les résultats seraient plutôt volumineux et lents. Au lieu de cela, puisque la plupart des accès seront des accès en lecture, nous exposons autant que possible le stockage interne d'un objet à l'accès de l'utilisateur directement via une recherche de hachage. L'avantage que cela procure est considérable. Par exemple, en suivant une chaîne de variables d'instance, la recherche du paramètre
+    <span class="Li">« yMax »</span> pour un glyphe particulier
+    devient :</p>
+<pre>$f-&gt;{'loca'}{'glyphs'}[$glyph]{'yMax'}</pre>
+<p class="Pp">Ou, si nous sommes très paresseux et ne nous soucions pas d'attendre :</p>
+<pre>$f-&gt;{'loca'}{'glyphs'}[$f-&gt;{'cmap'}-&gt;ms_lookup(0x41)]{'yMax'}</pre>
+<p class="Pp">L'inconvénient de cette méthode est qu'elle oblige les utilisateurs du module à se comporter correctement. Ainsi, elle ne vous prend pas par la main et ne s'assure pas que si vous modifiez une table, celle-ci est marquée comme <i>« dirty » (modifiée)</i>, ou que
+    d'autres tables sont mises à jour en conséquence.</p>
+<p class="Pp">Il appartient au développeur de l'application de comprendre les implications des changements qu'il apporte à une police et de prendre les mesures nécessaires pour s'assurer que les données qu'il en extrait sont celles qu'il souhaite. Ainsi, vous pourriez changer la valeur <span class="Li">« yMax »</span> d'un glyphe et produire une nouvelle police avec ce changement, mais c'est à vous de vous assurer que les détails de la boîte englobante de la police dans la table
+    <span class="Li">« head »</span> sont corrects, et même que votre changement de <span class="Li">« yMax »</span> est bien
+  justifié.</p>
+<p class="Pp">Pour faciliter l'utilisation du système, chaque module (ou table) décrira non seulement les méthodes qu'il prend en charge, qui sont relativement peu nombreuses, mais aussi les variables d'instance qu'il prend en charge, qui sont nombreuses. La plupart des variables reflètent directement les attributs de la table tels que spécifiés dans la spécification OpenType, disponible auprès de Microsoft
+    (<a href='http://www.microsoft.com/typography'>http://www.microsoft.com/typography</a>), Adobe et Apple. Une liste des noms utilisés est également donnée dans chaque module, mais pas nécessairement avec une description supplémentaire. Après tout, ce code n'est pas un manuel TrueType en plus !</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Conventions'><a class='permalink' href='#Conventions'>Conventions</a></h2>
+<p class="Pp">Diverses conventions sont utilisées dans ce système.</p>
+<p class="Pp">Tout d'abord, nous considérons les conventions de documentation concernant les variables d'instance. Chaque variable d'instance est marquée pour indiquer si elle est une <b>(P)</b>rivate (privée) que les utilisateurs du module ne sont pas censés lire et certainement pas écrire, ou une <b>(R)</b>ead only (lecture seule) que les utilisateurs pourraient bien vouloir lire mais pas écrire.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='METHODS'><a class='permalink' href='#METHODS'>MÉTHODES</a></h1>
+<p class="Pp">Cette section examine diverses méthodes et la façon dont les différents modules fonctionnent avec ces méthodes.</p>
+<section class="Ss">
+<h2 class="Ss" id='read_and_read_dat'><a class='permalink' href='#read_and_read_dat'>read et read_dat</a></h2>
+<p class="Pp">Avant que les structures de données d'une table puissent être accessibles, elles doivent être remplies à partir de quelque part. La façon habituelle de le faire est de lire une police TrueType existante. Cela peut être réalisé par :</p>
+<pre>$f = Font::TTF::Font-&gt;open($filename) || die "Unable to read $filename";</pre>
+<p class="Pp">Cela ouvrira une police existante et lira son en-tête de répertoire. Notez qu'à ce stade, aucune des tables de la police n'a été lue. (En fait, les tables <span class="Li">« head »</span> et
+    <span class="Li">« maxp »</span> sont lues à ce stade aussi
+    car elles contiennent les paramètres couramment requis de) :</p>
+<pre>$f-&gt;{'head'}{'unitsPerEm'}
+$f-&gt;{'maxp'}{'numGlyphs'}</pre>
+<p class="Pp">Afin de pouvoir accéder aux informations d'une table, il est d'abord nécessaire de la <span class="Li">« read » (lire)</span> . Prenons l'exemple
+    de la recherche de la largeur d'avance d'un caractère espace (U+0020). Le code suivant devrait le faire :</p>
+<pre>$f = Font::TTF::Font-&gt;open($ARGV[0]);
+$snum = $f-&gt;{'cmap'}-&gt;ms_lookup(0x0020);
+$sadv = $f-&gt;{'hmtx'}{'advance'}[$snum];
+print $sadv;</pre>
+<p class="Pp">Cela résulterait en l'impression de la valeur zéro, ce qui est loin d'être correct. Mais pourquoi ? La première ligne lirait correctement le répertoire de la police. La deuxième ligne, par hasard, localiserait correctement le caractère espace dans le cmap Windows (en supposant une police encodée non symbolique). La troisième ligne n'aurait pas de succès dans sa tâche car la table
+    <span class="Li">« hmtx »</span> n'a pas été remplie à partir du
+    fichier de police. Pour obtenir ce que nous voulons, nous devrions d'abord la faire lire :</p>
+<pre>$f-&gt;{'hmtx'}-&gt;read;
+$sadv = $f-&gt;{'hmtx'}{'advance'}[$snum];</pre>
+<p class="Pp">Ou pour ceux qui sont trop paresseux pour écrire plusieurs lignes,
+    <span class="Li">« read »</span> retourne l'objet qu'elle lit. Ainsi
+    nous pourrions écrire :</p>
+<pre>$sadv = $f-&gt;{'hmtx'}-&gt;read-&gt;{'advance'}[$snum];</pre>
+<p class="Pp">Pourquoi, si nous devons toujours lire les tables avant d'accéder à leurs informations, n'avons-nous pas eu à le faire pour la table
+    <span class="Li">« cmap »</span> ? La réponse réside dans l'appel de méthode. Elle détecte que la table n'a pas été lue et la lit pour nous. Cela se produira généralement avec tous les appels de méthode ; c'est seulement lorsque nous faisons un accès direct aux données que nous devons prendre la responsabilité de lire la table d'abord.</p>
+<p class="Pp">La lecture d'une table ne met pas nécessairement toutes les données dans les structures de données internes. Dans le cas d'une table simple,
+    <span class="Li">« read »</span> est suffisant. En fait, le cas normal est que <span class="Li">« read_dat »</span> lit les données
+    du fichier dans une variable d'instance appelée <span class="Li">' dat'</span> (y compris l'espace) et non dans les structures de données.</p>
+<p class="Pp">Ceci est vrai sauf pour la classe
+    <span class="Li">« glyph »</span> qui représente un glyphe unique. Ici, le processus est inversé. La lecture d'un
+    <span class="Li">« glyph »</span> lit les données du glyphe dans la
+    variable d'instance <span class="Li">' dat'</span> et définit divers attributs d'en-tête pour le glyphe (<span class="Li">« xMin »</span>,
+    <span class="Li">« numContours »</span>, etc.). Les données sont converties de la variable vers les structures de données via la méthode
+    <span class="Li">« read_dat »</span> .</p>
+<p class="Pp">L'objectif, par conséquent, est que
+    <span class="Li">« read »</span> devrait faire la chose naturelle (lire dans les structures de données pour les tables et les éléments pour lesquels c'est utile -- tous sauf <span class="Li">« glyph »</span> pour l'instant) et
+    <span class="Li">« read_dat »</span> devrait faire la chose non naturelle :
+    lire seulement les données binaires pour les tables normales et convertir les données binaires en structures de données pour les <span class="Li">« glyph »</span>s.</p>
+<p class="Pp">En résumé, par conséquent, utilisez
+    <span class="Li">« read »</span> sauf si vous voulez bidouiller les internes des glyphes, auquel cas voir Font::TTF::Glyph pour plus de détails.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='update'><a class='permalink' href='#update'>update</a></h2>
+<p class="Pp">L'objectif de cette méthode est de permettre aux différents éléments de données d'une police
+    <span class="Li">« read »</span> de se mettre à jour eux-mêmes. Toutes les tables savent comment se mettre à jour. Toutes les tables savent égalementaine information
+    qui ne peut pas être <i>mise à jour</i> mais qui constitue une nouvelle connaissance dans la fonte. En
+    conséquence, certaines tables ne font rien lorsqu'elles sont mises à jour.
+    Nous pouvons donc construire une hiérarchie de mise à jour des tables, avec
+    les tables indépendantes en bas et <span class="Li">« Font »</span> en haut :</p>
+<pre>       +--loca
+       |
+ glyf--+--maxp
+       |
+       +---+--head
+           |
+ hmtx------+--hhea
+ cmap-----OS/2
+ name--
+ post--
+Il existe une dépendance universelle importante dont il incombe à l'utilisateur
+de maintenir la mise à jour. Il s'agit de C&lt;maxp/numOfGlyphs&gt; qui est utilisé
+pour parcourir tous les glyphes. Notez que les glyphes eux-mêmes ne sont pas
+contenus dans la table C&lt;glyph&gt; mais dans la table C&lt;loca&gt;, de sorte que
+l'ajout de glyphes, etc. implique automatiquement de maintenir la table C&lt;loca&gt;
+à jour.</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Creating_fonts'><a class='permalink' href='#Creating_fonts'>Création   de fontes</a></h2>
+<p class="Pp">Supposons que nous créions une fonte à partir de rien. Quelle
+    quantité d'information devons-nous fournir et combien
+    <span class="Li">« update »</span> fera-t-il pour nous ?</p>
+<p class="Pp">L'information suivante est requise :</p>
+<pre>$f-&gt;{'loca'}{'glyphs'}
+$f-&gt;{'head'}{'upem'}
+$f-&gt;{'maxp'}{'numGlyphs'}   (ne vient pas de $f-&gt;{'loca'}{'glyphs'})
+$f-&gt;{'hmtx'}{'advance'}
+$f-&gt;{'post'}['format'}
+$f-&gt;{'post'}{'VAL'}
+$f-&gt;{'cmap'}
+$f-&gt;{'name'}</pre>
+<p class="Pp">Presque tout le reste est calculé pour vous. Les détails de ce qui
+    est nécessaire pour un glyph peuvent être trouvés dans Font::TTF::Glyph.
+    Une fois que nous avons toutes les informations nécessaires (et il y en a
+    beaucoup d'autres que vous pourriez ajouter), nous faisons simplement :</p>
+<pre>$f-&gt;dirty;          # marquer toutes les tables comme modifiées
+$f-&gt;update;         # mettre à jour la fonte</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTEUR</a></h1>
+<p class="Pp">Martin Hosken <a href='http://scripts.sil.org/FontUtils'>http://scripts.sil.org/FontUtils</a>. (voir
+    CONTRIBUTORS pour les autres auteurs).</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='LICENSING'><a class='permalink' href='#LICENSING'>LICENCE</a></h1>
+<p class="Pp">Copyright (c) 1998-2016, SIL International
+  (<a href='http://www.sil.org'>http://www.sil.org</a>)</p>
+<p class="Pp">Ce module est publié sous les termes de la Licence Artistic
+    2.0. Pour plus de détails, consultez le texte intégral de la licence dans le
+    fichier LICENSE.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2024-07-13</td>
+    <td class="foot-os">perl v5.38.2</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-font-ttf/">extra/perl-font-ttf</a></dd>
+        <dt>Version :</dt>
+        <dd>1.06-6</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://search.cpan.org/dist/Font-TTF">https://search.cpan.org/dist/Font-TTF</a></dd>
+        <dt>Licences :</dt>
+        <dd>Artistic2.0</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-font-ttf/">/listing/extra/perl-font-ttf/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#INTRODUCTION">INTRODUCTION</a></li>
+        
+            <li><a href="#METHODS">MÉTHODES</a></li>
+        
+            <li><a href="#AUTHOR">AUTEUR</a></li>
+        
+            <li><a href="#LICENSING">LICENCE</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Font::TTF::Manual.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/Font::TTF::Manual.3pm.en.raw">brut</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               licence, à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

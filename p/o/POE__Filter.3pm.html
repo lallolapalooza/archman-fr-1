@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>POE::Filter(3pm) — Pages du manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">POE__Filter(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-poe/">perl-poe</a></p>
+<p class="lic">Licences: GPL, PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">POE::Filter(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">POE::Filter(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">POE::Filter - abstractions de protocole pour POE::Wheel et utilisation autonome</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<p class="Pp">Pour utiliser avec les classes POE::Wheel, passez un objet POE::Filter à l'un des paramètres du constructeur &quot;...Filter&quot; :</p>
+<pre>#!perl
+use POE qw(Filter::Line Wheel::FollowTail);
+POE::Session-&gt;create(
+  inline_states =&gt; {
+    _start =&gt; sub {
+      $_[HEAP]{tailor} = POE::Wheel::FollowTail-&gt;new(
+        Filename =&gt; &quot;/var/log/system.log&quot;,
+        InputEvent =&gt; &quot;got_log_line&quot;,
+        Filter =&gt; POE::Filter::Line-&gt;new(),
+      );
+    },
+    got_log_line =&gt; sub {
+      print &quot;Log: $_[ARG0]\n&quot;;
+    }
+  }
+);
+POE::Kernel-&gt;run();
+exit;</pre>
+<p class="Pp">Utilisation autonome sans POE :</p>
+<pre>#!perl
+use warnings;
+use strict;
+use POE::Filter::Line;
+my $filter = POE::Filter::Line-&gt;new( Literal =&gt; &quot;\n&quot; );
+# Affiche trois lignes : one, two three.
+$filter-&gt;get_one_start([&quot;one\ntwo\nthr&quot;, &quot;ee\nfour&quot;]);
+while (1) {
+  my $line = $filter-&gt;get_one();
+  last unless @$line;
+  print $line-&gt;[0], &quot;\n&quot;;
+}
+# Affiche deux lignes : four, five.
+$filter-&gt;get_one_start([&quot;\nfive\n&quot;]);
+while (1) {
+  my $line = $filter-&gt;get_one();
+  last unless @$line;
+  print $line-&gt;[0], &quot;\n&quot;;
+}</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Les objets POE::Filter se connectent aux roues (wheels) et définissent comment les données seront sérialisées pour l'écriture et analysées après la lecture. Les objets POE::Wheel sont responsables du déplacement des données, et les objets POE::Filter définissent l'apparence des données.</p>
+<p class="Pp">Les objets POE::Filter sont simples par conception. Ils n'utilisent pas POE en interne, ils sont donc limités à la sérialisation et à l'analyse. Cela peut compliquer la mise en œuvre de certains protocoles (comme HTTP 1.x), mais permet aux filtres d'être utilisés dans des programmes autonomes.</p>
+<p class="Pp">L'utilisation autonome est très importante. Elle permet aux développeurs d'applications de créer des bibliothèques légères et bloquantes qui peuvent être utilisées comme clients simples pour les serveurs POE. POE::Component::IKC::ClientLite en est un exemple notable. Ce client léger et bloquant de passage d'événements prend en charge les clients légers pour les applications POE distribuées. Le cas d'utilisation canonique est d'injecter des événements dans une application ou une grille IKC à partir d'interfaces CGI, qui nécessitent une utilisation légère des ressources.</p>
+<p class="Pp">Les filtres et pilotes POE passent les données sous forme de références de tableaux. C'est un peu maladroit, mais cela minimise la quantité de données qui doivent être copiées sur la pile de Perl.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INTERFACE_PUBLIQUE'><a class='permalink' href='#INTERFACE_PUBLIQUE'>INTERFACE PUBLIQUE</a></h1>
+<p class="Pp">Toutes les classes POE::Filter doivent supporter l'interface minimale, définie ici. Des filtres spécifiques peuvent implémenter et documenter des méthodes supplémentaires.</p>
+<section class="Ss">
+<h2 class="Ss" id='PARAMÈTRES_new'><a class='permalink' href='#PARAMÈTRES_new'>PARAMÈTRES de new</a></h2>
+<p class="Pp"><b>new()</b> crée et initialise un nouveau filtre. Les paramètres du constructeur varient d'une sous-classe de POE::Filter à l'autre, veuillez donc consulter la documentation de votre filtre souhaité.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='clone'><a class='permalink' href='#clone'>clone</a></h2>
+<p class="Pp"><b>clone()</b> crée et initialise un nouveau filtre basé sur les paramètres du constructeur de celui existant. Le nouveau filtre est une copie quasi identique, à l'exception de ses tampons qui sont vides.</p>
+<p class="Pp">Certains composants, tels que POE::Component::Server::TCP, utilisent <b>clone()</b>. Ces composants acceptent un filtre maître ou modèle lors de leur création, puis le <b>clone()</b> pour chaque nouvelle connexion.</p>
+<pre>my $new_filter = $old_filter-&gt;clone();</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='get_one_start_ARRAYREF'><a class='permalink' href='#get_one_start_ARRAYREF'>get_one_start   ARRAYREF</a></h2>
+<p class="Pp"><b>get_one_start()</b> accepte une référence de tableau contenant des morceaux de flux non traités. Les morceaux sont ajoutés au tampon interne du filtre pour être analysés par <b>get_one()</b>.</p>
+<p class="Pp">Le &quot;SYNOPSIS&quot; montre <b>get_one_start()</b> en utilisation.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='get_one'><a class='permalink' href='#get_one'>get_one</a></h2>
+<p class="Pp"><b>get_one()</b> analyse zéro ou un élément complet à partir du tampon interne du filtre. Les données sont renvoyées sous forme de référence de tableau (ARRAYREF) appropriée pour être transmise à un autre filtre ou à un objet POE::Wheel. Les filtres renverront des références de tableaux vides s'ils n'ont pas assez de données brutes pour construire un élément complet.</p>
+<p class="Pp"><b>get_one()</b> est la forme paresseuse de <b>get()</b>. Il analyse un seul élément à la fois à partir du tampon du filtre. C'est vital pour les applications qui peuvent changer de filtre en cours de flux, car cela garantit que le bon filtre est utilisé à tout moment.</p>
+<p class="Pp">Le &quot;SYNOPSIS&quot; montre <b>get_one()</b> en utilisation. Notez comment il suppose que le retour est toujours une référence de tableau et comment il gère implicitement les références vides.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='get_ARRAYREF'><a class='permalink' href='#get_ARRAYREF'>get   ARRAYREF</a></h2>
+<p class="Pp"><b>get()</b> est la forme gourmande (greedy) de <b>get_one()</b>. Il accepte une référence de tableau contenant des morceaux de flux non traités, ajoute ces données au tampon interne du filtre. Ensuite, il analyse autant d'éléments complets que possible à partir du tampon et les renvoie dans une autre référence de tableau. Toutes les données non traitées restent dans le tampon du filtre pour l'appel suivant.</p>
+<p class="Pp">Comme pour <b>get_one()</b>, <b>get()</b> renverra une référence de tableau vide si le filtre ne contient pas assez de données brutes pour construire un élément complet.</p>
+<p class="Pp">En fait, <b>get()</b> est implémenté dans POE::Filter en termes de <b>get_one_start()</b> et <b>get_one()</b>.</p>
+<p class="Pp">Voici la forme <b>get()</b> de l'exemple autonome du SYNOPSIS :</p>
+<pre>#!perl
+use warnings;
+use strict;
+use POE::Filter::Line;
+my $filter = POE::Filter::Line-&gt;new( Literal =&gt; &quot;\n&quot; );
+# Affiche trois lignes : one, two three.
+my $lines = $filter-&gt;get([&quot;one\ntwo\nthr&quot;, &quot;ee\nfour&quot;]);
+foreach my $line (@$lines) {
+  print &quot;$line\n&quot;;
+}
+# Affiche deux lignes : four, five.
+$lines = $filter-&gt;get([&quot;\nfive\n&quot;]);
+foreach my $line (@$lines) {
+  print &quot;$line\n&quot;;
+}</pre>
+<p class="Pp"><b>get()</b> ne doit pas être utilisé avec des roues qui prennent en charge le changement de filtre. Sa nature gourmande signifie qu'il analyse souvent les flux bien avant les événements d'une roue. Au moment où une application change le filtre de la roue, il est trop tard : l'ancien filtre a déjà analysé le reste des données reçues.</p>
+<p class="Pp">Considérez un flux de lettres, de chiffres et de points. Les points signalent quand changer de filtre, passant de celui qui analyse les lettres à celui qui analyse les chiffres.</p>
+<p class="Pp">Dans notre application hypothétique, les lettres doivent être traitées une par une, mais les chiffres peuvent être traités par morceaux. Nous utiliserons POE::Filter::Block avec une taille de bloc (BlockSize) de 1 pour analyser les lettres, et POE::Filter::Line avec un terminateur littéral (Literal) de &quot;.&quot; pour gérer les chiffres.</p>
+<p class="Pp">Voici le flux d'exemple :</p>
+<pre>abcdefg.1234567.hijklmnop.890.q</pre>
+<p class="Pp">Nous commencerons avec une roue ReadWrite configurée pour analyser les caractères.</p>
+<pre>$_[HEAP]{wheel} = POE::Wheel::ReadWrite-&gt;new(
+  Filter =&gt; POE::Filter::Block-&gt;new( BlockSize =&gt; 1 ),
+  Handle =&gt; $socket,
+  InputEvent =&gt; &quot;got_letter&quot;,
+);</pre>
+<p class="Pp">Le gestionnaire &quot;got_letter&quot; sera appelé 8 fois. Une fois pour chaque lettre de a à g, et une fois pour le point suivant g. En recevant le point, il passera la roue en mode numérique.</p>
+<pre>sub handle_letter {
+  my $letter = $_[ARG0];
+  if ($letter eq &quot;.&quot;) {
+    $_[HEAP]{wheel}-&gt;set_filter(
+      POE::Filter::Line-&gt;new( Literal =&gt; &quot;.&quot; )
+    );
+    $_[HEAP]{wheel}-&gt;event( InputEvent =&gt; &quot;got_number&quot; );
+  }
+  else {
+    print &quot;Got letter: $letter\n&quot;;
+  }
+}</pre>
+<p class="Pp">Si le <b>get()</b> gourmand était utilisé, l'intégralité du flux d'entrée aurait été analysée comme des caractères avant le premier appel à <b>handle_letter()</b>. L'appel à <b>set_filter()</b> aurait été inutile, car il n'y aurait plus de données à analyser.</p>
+<p class="Pp">Le gestionnaire &quot;got_number&quot; reçoit des séquences contiguës de chiffres comme lignes terminées par un point. Le <b>get()</b> gourmand causerait un problème similaire à celui ci-dessus.</p>
+<pre>sub handle_numbers {
+  my $numbers = $_[ARG0];
+  print &quot;Got number(s): $numbers\n&quot;;
+  $_[HEAP]-&gt;{wheel}-&gt;set_filter(
+    POE::Filter::Block-&gt;new( BlockSize =&gt; 1 )
+  );
+  $_[HEAP]-&gt;{wheel}-&gt;event( InputEvent =&gt; &quot;got_letter&quot; );
+}</pre>
+<p class="Pp">Alors, ne le faites pas !</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='put_ARRAYREF'><a class='permalink' href='#put_ARRAYREF'>put   ARRAYREF</a></h2>
+<p class="Pp"><b>put()</b> sérialise les éléments en un flux d'octets qui peut être écrit dans un fichier ou envoyé sur une socket. Il accepte une référence à une liste d'éléments et renvoie une référence à une liste de morceaux de flux mis en forme. Le nombre de morceaux de sortie n'est pas nécessairement lié au nombre d'éléments d'entrée.</p>
+<p class="Pp">En utilisation autonome, <b>put()</b</p>
+</div>
+</section>
+                
+</article>
+            
+        </main>
+    </body>
+</html>
+<div class="article">
+  <h1 class="NAME">NOM</h1>
+  <p class="Pp">POE::Filter::Line</p>
+  <h1 class="SYNOPSIS">SYNTAXIS</h1>
+  <p class="Pp">POE::Filter::Line</p>
+  <h1 class="DESCRIPTION">DESCRIPTION</h1>
+  <p class="Pp">POE::Filter::Line</p>
+  <h1 class="PUBLIC_INTERFACE">INTERFACE PUBLIQUE</h1>
+  <p class="Pp">POE::Filter::Line</p>
+  <h1 class="SEE_ALSO">VOIR AUSSI</h1>
+  <p class="Pp">POE::Filter::Line</p>
+  <h1 class="BUGS">BOGUES</h1>
+  <p class="Pp">POE::Filter::Line</p>
+  <h1 class="AUTHORS_&_COPYRIGHTS">AUTEURS ET DROITS D'AUTEUR</h1>
+  <p class="Pp">POE::Filter::Line</p>
+  <h1 class="TOC">TABLE DES MATIÈRES</h1>
+  <p class="Pp">POE::Filter::Line</p>
+  <table class="foot">
+    <tr>
+      <td class="foot-date">2024-07-13</td>
+      <td class="foot-os">perl v5.38.2</td>
+    </tr>
+  </table>
+</div>
+<aside id="sidebar">
+  <section class="search">
+    <form action="/search" class="search direct-search" role="search">
+      <input type="search" placeholder="Rechercher une page de manuel" name="q" value=""
+             />
+      <input type="submit" name="go" value="Go" />
+    </form>
+  </section>
+  <section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+      <dt>Nom du paquet :</dt>
+      <dd><a href="https://www.archlinux.org/packages/extra/any/perl-poe/">extra/perl-poe</a></dd>
+      <dt>Version :</dt>
+      <dd>1.370-2</dd>
+      <dt>Amont :</dt>
+      <dd><a href="https://search.cpan.org/dist/POE">https://search.cpan.org/dist/POE</a></dd>
+      <dt>Licences :</dt>
+      <dd>GPL, PerlArtistic</dd>
+      <dt>Manuels :</dt>
+      <dd><a href="/listing/extra/perl-poe/">/listing/extra/perl-poe/</a></dd>
+    </dl>
+  </section>
+  <details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+      <ul>
+        <li><a href="#NAME">NOM</a></li>
+        <li><a href="#SYNOPSIS">SYNTAXIS</a></li>
+        <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        <li><a href="#PUBLIC_INTERFACE">INTERFACE PUBLIQUE</a></li>
+        <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        <li><a href="#BUGS">BOGUES</a></li>
+        <li><a href="#AUTHORS_&_COPYRIGHTS">AUTEURS ET DROITS D'AUTEUR</a></li>
+      </ul>
+    </nav>
+  </details>
+  <nav class="other-formats">
+    <p>Autres formats :
+      <a href="/man/POE::Filter.3pm.en.txt">txt</a>, 
+      <a href="/man/POE::Filter.3pm.en.raw">raw</a>
+    </p>
+  </nav>
+</aside>
+<footer>
+  
+  <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+     à l'exception du contenu des pages de manuel, qui ont leur propre licence
+     spécifiée dans le paquet Arch Linux correspondant.
+  </p>
+</footer>
+</body>
+</html>

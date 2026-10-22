@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>ares_process_fds(3) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">ares_process_fds(3)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/c-ares/">c-ares</a></p>
+<p class="lic">Licences: MIT</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">ARES_PROCESS(3)</td>
+    <td class="head-vol">Manuel des fonctions de bibliothèque</td>
+    <td class="head-rtitle">ARES_PROCESS(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">ares_process_fds, ares_process_fd, ares_process - Traiter les événements
+    de résolution de noms</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<pre>#include &lt;ares.h&gt;
+/*! Événements utilisés par ares_fd_events_t */
+typedef enum {
+  ARES_FD_EVENT_NONE  = 0,      /*!&lt; Aucun événement */
+  ARES_FD_EVENT_READ  = 1 &lt;&lt; 0, /*!&lt; Événement de lecture (y compris déconnexion/erreur) */
+  ARES_FD_EVENT_WRITE = 1 &lt;&lt; 1  /*!&lt; Événement d'écriture */
+} ares_fd_eventflag_t;
+/*! Type contenant un descripteur de fichier et un masque d'événements, utilisé par
+ *  ares_process_fds() */
+typedef struct {
+  ares_socket_t fd;     /*!&lt; Descripteur de fichier */
+  unsigned int  events; /*!&lt; Masque de ares_fd_event_t */
+} ares_fd_events_t;
+typedef enum {
+  ARES_PROCESS_FLAG_NONE        = 0,
+  ARES_PROCESS_FLAG_SKIP_NON_FD = 1 &lt;&lt; 0
+} ares_process_flag_t;
+ares_status_t ares_process_fds(ares_channel_t         *<i>channel</i>,
+                               const ares_fd_events_t *<i>events</i>,
+                               size_t                  <i>nevents</i>,
+                               unsigned int            <i>flags</i>)
+void ares_process_fd(ares_channel_t *<i>channel</i>,
+                     ares_socket_t <i>read_fd</i>,
+                     ares_socket_t <i>write_fd</i>)
+void ares_process(ares_channel_t *<i>channel</i>,
+                  fd_set *<i>read_fds</i>,
+                  fd_set *<i>write_fds</i>)</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Ces fonctions doivent être utilisées par les intégrateurs qui choisissent de ne pas utiliser
+    le thread d'événements activé via <b>ARES_OPT_EVENT_THREAD</b> passé à
+    <b>ares_init_options</b>. Cela suppose que les intégrateurs ont déjà leur propre
+    boucle d'événements gérant les notifications d'événements pour divers descripteurs de fichiers et
+    souhaitent faire de même avec leur intégration c-ares.</p>
+<p class="Pp">La fonction <a href='/man/ares_process_fds.3.en'>ares_process_fds(3)</a> gère les événements d'entrée/sortie
+    sur les descripteurs de fichiers et les délais d'attente associés aux requêtes en attente sur le canal
+    identifié par <i>channel</i>. Les descripteurs de fichiers à traiter sont passés dans un tableau de
+    structures de données <i>ares_fd_events_t</i> dans le membre <i>fd</i>, et les événements sont un masque
+    binaire de <i>ares_fd_eventflag_t</i> dans le membre <i>event</i>. Cette fonction peut
+    également être utilisée pour traiter les délais d'attente en passant NULL au membre <i>events</i> avec une
+    valeur <i>nevents</i> de 0. Des drapeaux peuvent également être spécifiés dans le
+    champ <i>flags</i> et sont définis dans <b>ares_process_flag_t</b>.</p>
+<p class="Pp"><b>ARES_PROCESS_FLAG_SKIP_NON_FD</b> peut être spécifié pour
+    ignorer spécifiquement tout traitement non lié aux événements de descripteur de fichier
+    passés, par exemple le traitement des délais d'attente et la gestion du nettoyage. Ceci est
+    utile si un intégrateur sait qu'il enverra plusieurs
+    demandes <a href='/man/ares_process_fds.3.en'>ares_process_fds(3)</a> et souhaite ignorer ce traitement supplémentaire.
+    Cependant, l'intégrateur doit envoyer la demande finale avec le drapeau afin que le délai d'attente
+    et les autres traitements soient effectués avant que sa boucle d'événements n'attende
+    d'autres événements.</p>
+<p class="Pp">Il est permis d'utiliser un <i>ares_fd_events_t</i> avec le
+    membre <i>events</i> ayant la valeur <i>ARES_FD_EVENT_NONE</i> (0) s'il n'y a pas d'événements pour un descripteur de fichier donné si un intégrateur souhaite simplement
+    maintenir un tableau avec tous les descripteurs de fichiers possibles et mettre à jour leur disponibilité
+    via le membre <i>event</i>.</p>
+<p class="Pp">Cette fonction retournera <i>ARES_ENOMEM</i> en cas de manque de mémoire, sinon elle retournera <i>ARES_SUCCESS</i>.</p>
+<p class="Pp">Cette fonction est recommandée par rapport à <a href='/man/ares_process_fd.3.en'>ares_process_fd(3)</a> car
+    elle peut gérer le traitement de plusieurs descripteurs de fichiers à la fois, évitant ainsi de répéter
+    une logique supplémentaire telle que le traitement des délais d'attente qui serait
+    nécessaire lors de l'appel à <a href='/man/ares_process_fd.3.en'>ares_process_fd(3)</a> pour plusieurs descripteurs de fichiers
+    notifiés en même temps.</p>
+<p class="Pp">Cette fonction est généralement utilisée avec l'option
+    <i>ARES_OPT_SOCK_STATE_CB</i>.</p>
+<p class="Pp"><a href='/man/ares_timeout.3.en'>ares_timeout(3)</a> doit être utilisée pour récupérer le délai d'attente souhaité,
+    et lorsque le délai d'attente expire, l'intégrateur doit appeler
+    <a href='/man/ares_process_fds.3.en'>ares_process_fds(3)</a> avec un tableau <i>events</i> NULL. (ou
+    <a href='/man/ares_process_fd.3.en'>ares_process_fd(3)</a> avec les deux sockets définis sur <i>ARES_SOCKET_BAD</i>).
+    Il n'est pas nécessaire de le faire si des événements sont également livrés pour des descripteurs de fichiers, car le traitement des délais d'attente sera automatiquement géré par tout appel à
+    <a href='/man/ares_process_fds.3.en'>ares_process_fds(3)</a> ou <a href='/man/ares_process_fd.3.en'>ares_process_fd(3)</a>.</p>
+<p class="Pp">La fonction <a href='/man/ares_process_fd.3.en'>ares_process_fd(3)</a> est identique à
+    <a href='/man/ares_process_fds.3.en'>ares_process_fds(3)</a> sauf qu'elle ne peut traiter qu'un seul descripteur de fichier de lecture et un seul de lecture à la fois. Les nouveaux intégrateurs devraient utiliser
+    <a href='/man/ares_process_fds.3.en'>ares_process_fds(3)</a> si possible.</p>
+<p class="Pp">La fonction <a href='/man/ares_process.3.en'>ares_process(3)</a> fonctionne de la même manière,
+    sauf qu'elle opère sur des <i>fd_sets</i> comme ceux utilisés par <a href='/man/select.3.en'>select(3)</a> et
+    récupérés par <a href='/man/ares_fds.3.en'>ares_fds(3)</a>. Cette méthode est obsolète et ne doit pas être utilisée dans les applications modernes en raison des limitations connues de
+    l'implémentation de <a href='/man/select.3.en'>select(3)</a>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DISPONIBILITÉ'><a class='permalink' href='#DISPONIBILITÉ'>DISPONIBILITÉ</a></h1>
+<p class="Pp"><a href='/man/ares_process_fds.3.en'>ares_process_fds(3)</a> a été introduite dans c-ares 1.34.0.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR AUSSI</a></h1>
+<p class="Pp"><a href='/man/ares_fds.3.en'>ares_fds(3)</a>, <a href='/man/ares_timeout.3.en'>ares_timeout(3)</a>,
+    <a href='/man/ares_init_options.3.en'>ares_init_options(3)</a> avec <i>ARES_OPT_EVENT_THREAD</i> ou
+    <i>ARES_OPT_SOCK_STATE_CB</i></p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">25 juillet 1998</td>
+    <td class="foot-os"></td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/c-ares/">extra/c-ares</a></dd>
+        <dt>Version :</dt>
+        <dd>1.34.5-1</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://c-ares.org/">https://c-ares.org/</a></dd>
+        <dt>Licences :</dt>
+        <dd>MIT</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/c-ares/">/listing/extra/c-ares/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#SYNTAXE">SYNTAXE</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#DISPONIBILITÉ">DISPONIBILITÉ</a></li>
+        
+            <li><a href="#VOIR_AUSSI">VOIR AUSSI</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/ares_process_fds.3.en.txt">txt</a>, 
+        
+            <a href="/man/ares_process_fds.3.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

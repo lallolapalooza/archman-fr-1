@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>auplugin(3) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">auplugin(3)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/core/x86_64/audit/">audit</a></p>
+<p class="lic">Licences: GPL-2.0-or-later, LGPL-2.0-or-later</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">AUPLUGIN(3)</td>
+    <td class="head-vol">API d'audit Linux</td>
+    <td class="head-rtitle">AUPLUGIN(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">auplugin_init, auplugin_stop, auplugin_event_loop,
+    auplugin_event_feed - Assistants de traitement des événements de plugin</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp"><b>#include &lt;auplugin.h&gt;</b></p>
+<p class="Pp"><b>int auplugin_init(int </b><i>inbound_fd</i><b>, unsigned
+    </b><i>queue_size</i><b>, int </b><i>q_flags</i><b>, const char
+    *</b><i>path</i><b>);</b>
+  <br/>
+  <b>void auplugin_stop(void);</b>
+  <br/>
+  <b>void auplugin_event_loop(auplugin_callback_ptr </b><i>callback</i><b>);</b>
+  <br/>
+  <b>int auplugin_event_feed(auparse_callback_ptr </b><i>callback</i><b>,
+    unsigned </b><i>timer_interval</i><b>, auplugin_timer_callback_ptr
+    </b><i>timer_cb</i><b>);</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp"><b>auplugin_init</b> initialise le framework des plugins. Le
+    paramètre <i>inbound_fd</i> spécifie le descripteur de fichier qui fournira
+    les messages d'audit, typiquement l'entrée standard. L'argument
+    <i>queue_size</i> contrôle le nombre maximum d'événements qui peuvent être
+    mis en file d'attente pour traitement. Le paramètre <i>q_flags</i> sélectionne
+    le stockage en mémoire ou sur fichier à l'aide des constantes
+    <b>AUPLUGIN_Q_*</b> définies dans <b>auplugin.h</b>. Si
+    <i>q_flags</i> inclut <b>AUPLUGIN_Q_IN_FILE,</b> <i>path</i> spécifie le
+    fichier de sauvegarde. Tous les événements déjà présents dans le fichier sont
+    mis en file d'attente au démarrage afin que les plugins reprennent le
+    traitement des enregistrements précédemment non traités. La bibliothèque maintient un état global pour sa file d'attente et ses threads de travail. Une seule instance de plugin est supportée, les appelants ne doivent donc pas invoquer auplugin_init()
+    simultanément à partir de plusieurs threads. La fonction retourne 0 en cas de succès ou -1 si l'initialisation échoue.</p>
+<p class="Pp"><b>auplugin_stop</b> signale au framework de se terminer. Elle est
+    normalement appelée à partir d'un gestionnaire SIGTERM ou d'une autre logique
+    d'arrêt.</p>
+<p class="Pp"><b>auplugin_event_loop</b> démarre un thread de travail pour livrer
+    les événements mis en file d'attente à la fonction <i>callback</i> fournie, un
+    enregistrement à la fois. La fonction bloque l'appelant jusqu'à ce que
+    <b>auplugin_stop</b> soit invoquée.</p>
+<p class="Pp"><b>auplugin_event_feed</b> se comporte comme
+    <b>auplugin_event_loop</b>, sauf que les événements mis en file d'attente sont
+    fournis à libauparse. Le <i>callback</i> fourni doit correspondre au type
+    <b>auparse_callback_ptr</b>. L'argument <i>timer_interval</i> spécifie
+    combien de secondes le thread de travail attendra de nouveaux enregistrements. Une
+    valeur de 0 désactive la logique du minuteur. Lorsque l'intervalle expire,
+    <b>auparse_feed_age_events</b> est appelée pour vider les événements expirés.
+    Si <i>timer_cb</i> n'est pas <b>NULL,</b> il est appelé avec l'intervalle avant
+    la vidange. Passer un <i>timer_cb</i> de <b>NULL</b> conserve le comportement par
+    défaut consistant à appeler uniquement <b>auparse_feed_age_events</b>. La
+    fonction retourne 0 en cas de succès ou -1 si libauparse n'a pas pu être
+    initialisé.</p>
+<p class="Pp">Les plugins peuvent interroger les statistiques de la file d'attente avec
+    <b>auplugin_queue_depth</b>, <b>auplugin_queue_max_depth</b>, et
+    <b>auplugin_queue_overflow</b>. Enregistrez un callback avec
+    <b>auplugin_register_stats_callback</b>, et appelez-le en utilisant
+    <b>auplugin_report_stats</b>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='GESTION_DES_SIGNaux'><a class='permalink' href='#GESTION_DES_SIGNaux'>GESTION DES SIGNaux</a></h1>
+<p class="Pp">Les plugins doivent établir des gestionnaires de signaux avec sigaction(2)
+    avant d'entrer dans la boucle d'événements. Le gestionnaire SIGTERM doit appeler
+    auplugin_stop() pour arrêter le thread de travail. Les gestionnaires pour d'autres
+    signaux, tels que SIGHUP ou SIGUSR1, doivent définir des indicateurs globaux qui
+    sont traités dans les callbacks d'événements ou de minuteur.</p>
+<p class="Pp">Exemple :</p>
+<pre>static volatile sig_atomic_t reload;
+static void handler(int sig)
+{
+    if (sig == SIGTERM)
+        auplugin_stop();
+    else if (sig == SIGHUP)
+        reload = 1;
+}</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR AUSSI</a></h1>
+<p class="Pp"><a href='/man/auplugin_fgets.3.en'>auplugin_fgets(3)</a>, <a href='/man/auparse_feed.3.en'>auparse_feed(3)</a></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h1>
+<p class="Pp">Steve Grubb</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">juin 2025</td>
+    <td class="foot-os">Red Hat</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/core/x86_64/audit/">core/audit</a></dd>
+        <dt>Version :</dt>
+        <dd>4.1.2-1</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://github.com/linux-audit/audit-userspace">https://github.com/linux-audit/audit-userspace</a></dd>
+        <dt>Licences :</dt>
+        <dd>GPL-2.0-or-later, LGPL-2.0-or-later</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/core/audit/">/listing/core/audit/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#SYNTAXE">SYNTAXE</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#GESTION_DES_SIGNaux">GESTION DES SIGNaux</a></li>
+        
+            <li><a href="#VOIR_AUSSI">VOIR AUSSI</a></li>
+        
+            <li><a href="#AUTEUR">AUTEUR</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/auplugin.3.en.txt">txt</a>, 
+        
+            <a href="/man/auplugin.3.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

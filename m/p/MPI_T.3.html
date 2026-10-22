@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>MPI_T(3) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">MPI_T(3)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/openmpi/">openmpi</a></p>
+<p class="lic">Licences: BSD-3-Clause ET LicenseRef-MPICH</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">MPI_T(3)</td>
+    <td class="head-vol">Open MPI</td>
+    <td class="head-rtitle">MPI_T(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<p class="Pp">Interface MPI_T d'Open MPI - Informations générales</p>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Il y a quelques notes spécifiques à Open MPI concernant son implémentation de l'interface MPI_T qui méritent d'être mentionnées.</p>
+<section class="Ss">
+<h2 class="Ss" id='MPI_T_Control_Variables'><a class='permalink' href='#MPI_T_Control_Variables'>Variables de contrôle MPI_T</a></h2>
+<p class="Pp">L'implémentation par Open MPI des API de variables de contrôle MPI_T (ou "cvar") est une interface aux paramètres/variables de l'architecture modulaire de composants (MCA) sous-jacente d'Open MPI. En termes simples : l'utilisation de l'interface cvar MPI_T est un autre mécanisme pour obtenir/définir les paramètres MCA d'Open MPI.</p>
+<p class="Pp">Par ordre de priorité (du plus élevé au plus bas), Open MPI fournit les mécanismes suivants pour définir les paramètres MCA :</p>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt>1.</dt>
+  <dd>L'interface MPI_T a la priorité la plus élevée. Spécifiquement : les valeurs définies via l'interface MPI_T remplaceront tous les autres réglages.</dd>
+  <dt>2.</dt>
+  <dd>La ligne de commande mpirun(1) / mpiexec(1) (par exemple, via le paramètre &#x2013;mca).</dd>
+  <dt>3.</dt>
+  <dd>Les variables d'environnement.</dd>
+  <dt>4.</dt>
+  <dd>Les fichiers de paramètres ont la priorité la plus basse. Spécifiquement : les valeurs définies via les fichiers de paramètres peuvent être remplacées par l'un des autres mécanismes de définition de variables MCA.</dd>
+</dl>
+</div>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='MPI_initialization'><a class='permalink' href='#MPI_initialization'>Initialisation MPI</a></h2>
+<p class="Pp">Une application peut utiliser l'interface MPI_T avant l'initialisation de MPI pour définir des paramètres MCA. La définition de paramètres MCA de niveau MPI avant l'initialisation de MPI peut affecter <i>la manière</i> dont MPI est initialisé (par exemple, en influençant les frameworks et composants qui sont sélectionnés).</p>
+<p class="Pp">L'exemple suivant définit les paramètres MCA pml et btl avant d'appeler <i>MPI_Init</i> afin de forcer une sélection spécifique des composants PML et BTL :</p>
+<div class="Bd-indent">
+<div class="Bd-indent">
+<pre>int provided, index, count;
+MPI_T_cvar_handle pml_handle, btl_handle;
+char pml_value[64], btl_value[64];
+MPI_T_init_thread(MPI_THREAD_SINGLE, &amp;provided);
+MPI_T_cvar_get_index(&quot;pml&quot;, &amp;index);
+MPI_T_cvar_handle_alloc(index, NULL, &amp;pml_handle, &amp;count);
+MPI_T_cvar_write(pml_handle, &quot;ob1&quot;);
+MPI_T_cvar_get_index(&quot;btl&quot;, &amp;index);
+MPI_T_cvar_handle_alloc(index, NULL, &amp;btl_handle, &amp;count);
+MPI_T_cvar_write(btl_handle, &quot;tcp,vader,self&quot;);
+MPI_T_cvar_read(pml_handle, pml_value);
+MPI_T_cvar_read(btl_handle, btl_value);
+printf(&quot;Set value of cvars: PML: %s, BTL: %s\n&quot;,
+       pml_value, btl_value);
+MPI_T_cvar_handle_free(&amp;pml_handle);
+MPI_T_cvar_handle_free(&amp;btl_handle);
+MPI_Init(NULL, NULL);
+// ...
+MPI_Finalize();
+MPI_T_finalize();</pre>
+</div>
+</div>
+<p class="Pp">Notez qu'une fois que MPI est initialisé, la plupart des cvars d'Open MPI deviennent en lecture seule.</p>
+<p class="Pp">Par exemple, après l'initialisation de MPI, il n'est plus possible de définir les mécanismes de sélection PML et BTL. Ceci est dû au fait que bon nombre de ces paramètres MCA ne sont utilisés que pendant l'initialisation de MPI ; les définir après que MPI ait déjà été initialisé serait de toute façon dénué de sens.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='MPI_T_Categories'><a class='permalink' href='#MPI_T_Categories'>Catégories MPI_T</a></h2>
+<p class="Pp">Les catégories MPI_T d'Open MPI sont organisées hiérarchiquement :</p>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt>1.</dt>
+  <dd>Couche (ou "projet"). Il y a deux couches dans Open MPI :</dd>
+</dl>
+<div class="Bd-indent">
+<ul class="Bl-bullet">
+  <li>ompi : Cette couche contient les cvars, pvars et sous-catégories liés aux caractéristiques MPI.</li>
+  <li>opal : Cette couche contient généralement des cvars, pvars et sous-catégories de constructions de couches inférieures, telles que les problèmes du système d'exploitation, les problèmes de réseau, etc.</li>
+</ul>
+</div>
+<dl class="Bl-tag">
+  <dt>2.</dt>
+  <dd>Framework ou section.</dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt>&#x2022;</dt>
+  <dd>Dans la plupart des cas, le niveau suivant dans la hiérarchie est le framework MCA d'Open MPI.</dd>
+</dl>
+<div class="Bd-indent">
+<ul class="Bl-bullet">
+  <li>Par exemple, vous pouvez trouver le framework btl sous la couche opal (car il concerne le réseau sous-jacent).</li>
+  <li>De plus, le framework pml est sous la couche ompi (car il concerne la sémantique MPI des messages point à point).</li>
+</ul>
+</div>
+<dl class="Bl-tag">
+  <dt>&#x2022;</dt>
+  <dd>Il existe cependant quelques entités non-framework MCA sous la couche.</dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt>&#x2022;</dt>
+  <dd>Par exemple, il existe une section mpi sous les couches opal et ompi pour les constructions MPI générales/de base.</dd>
+</dl>
+</div>
+</div>
+<dl class="Bl-tag">
+  <dt>3.</dt>
+  <dd>Composant.</dd>
+</dl>
+<div class="Bd-indent">
+<ul class="Bl-bullet">
+  <li>Si pertinent, le troisième niveau de la hiérarchie est le composant MCA.</li>
+  <li>Par exemple, le composant tcp se trouve sous le framework opal dans la couche opal.</li>
+</ul>
+</div>
+</div>
+<p class="Pp"><b>VOIR AUSSI :</b></p>
+<div class="Bd-indent">
+<div class="Bd-indent">
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt>&#x2022;</dt>
+  <dd><i>MPI_T_init_thread</i></dd>
+</dl>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT'><a class='permalink' href='#COPYRIGHT'>COPYRIGHT</a></h1>
+<p class="Pp">2003-2025, La Communauté Open MPI</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">30 octobre 2025</td>
+    <td class="foot-os"></td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/openmpi/">extra/openmpi</a></dd>
+        <dt>Version :</dt>
+        <dd>5.0.9-2</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://www.open-mpi.org">https://www.open-mpi.org</a></dd>
+        <dt>Licences :</dt>
+        <dd>BSD-3-Clause ET LicenseRef-MPICH</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/openmpi/">/listing/extra/openmpi/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#COPYRIGHT">COPYRIGHT</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/MPI_T.3.fr.txt">txt</a>, 
+        
+            <a href="/man/MPI_T.3.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>, à l'exception du contenu des pages de manuel, qui ont leur propre licence spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

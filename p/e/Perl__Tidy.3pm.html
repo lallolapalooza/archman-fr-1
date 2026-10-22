@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Perl::Tidy(3pm) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Perl__Tidy(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-tidy/">perl-tidy</a></p>
+<p class="lic">Licences: GPL, PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Perl::Tidy(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">Perl::Tidy(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">Perl::Tidy - Analyse et embellit le code source perl</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNTAXE</a></h1>
+<pre>use Perl::Tidy;
+my $error_flag = Perl::Tidy::perltidy(
+    source            =&gt; $source,
+    destination       =&gt; $destination,
+    stderr            =&gt; $stderr,
+    argv              =&gt; $argv,
+    perltidyrc        =&gt; $perltidyrc,
+    logfile           =&gt; $logfile,
+    errorfile         =&gt; $errorfile,
+    teefile           =&gt; $teefile,
+    debugfile         =&gt; $debugfile,
+    formatter         =&gt; $formatter,    # objet callback (voir ci-dessous)
+    dump_options      =&gt; $dump_options,
+    dump_options_type =&gt; $dump_options_type,
+    prefilter         =&gt; $prefilter_coderef,
+    postfilter        =&gt; $postfilter_coderef,
+);</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Ce module rend la fonctionnalité de l'utilitaire perltidy
+    disponible pour les scripts perl. Tous les paramètres d'entrée, ou aucun,
+    peuvent être omis, auquel cas le tableau <span class="Li">@ARGV</span> sera
+    utilisé pour fournir les paramètres d'entrée comme décrit dans la page de
+    manuel de <a href='/man/perltidy.1.en'>perltidy(1)</a>.</p>
+<p class="Pp">Par exemple, le script perltidy n'est essentiellement que ceci :</p>
+<pre>use Perl::Tidy;
+Perl::Tidy::perltidy();</pre>
+<p class="Pp">L'appel à <b>perltidy</b> renvoie un scalaire
+    <span class="Li"><b>$error_flag</b></span><b></b> qui est VRAI si une erreur
+    a provoqué une terminaison prématurée, et FAUX si le processus s'est
+    terminé normalement. Des discussions supplémentaires sur les erreurs sont
+    contenues ci-dessous dans la section GESTION DES ERREURS.</p>
+<p class="Pp">Le module accepte les flux d'entrée et de sortie par diverses
+    méthodes. La liste suivante de paramètres peut être l'un des éléments
+    suivants : un nom de fichier, une référence de TABLEAU, une référence de
+    SCALAIRE, ou un objet avec une méthode <b>getline</b> ou <b>print</b>,
+    selon le cas.</p>
+<pre>source            - la source du script à formater
+destination       - la destination de la sortie formatée
+stderr            - sortie d'erreur standard
+perltidyrc        - le fichier .perltidyrc
+logfile           - le flux du fichier .LOG, le cas échéant
+errorfile         - le flux du fichier .ERR, le cas échéant
+dump_options      - ref vers un hash pour recevoir les paramètres (voir ci-dessous),
+dump_options_type - contrôle le contenu de dump_options
+dump_getopt_flags - ref vers un hash pour recevoir les drapeaux Getopt
+dump_options_category - ref vers un hash donnant la catégorie des options
+dump_abbreviations    - ref vers un hash donnant toutes les abréviations</pre>
+<p class="Pp">Le tableau suivant illustre la logique utilisée pour décider
+    comment traiter un paramètre.</p>
+<pre>ref($param)  $param est supposé être :
+-----------  ---------------------
+undef        un nom de fichier
+SCALAR       ref vers une chaîne
+ARRAY        ref vers un tableau
+(autre)      objet avec getline (si source) ou print méthode</pre>
+<p class="Pp">Si le paramètre est un objet, et que l'objet a une méthode
+    <b>close</b>, cette méthode close sera appelée à la fin du flux.</p>
+<dl class="Bl-tag">
+  <dt id="source"><a class="permalink" href="#source"><b>source</b></a></dt>
+  <dd>Si le paramètre <b>source</b> est fourni, il définit la source du flux
+      d'entrée. Si un flux d'entrée est défini avec le paramètre
+      <b>source</b>, aucun autre nom de fichier source ne peut être spécifié
+      dans le tableau <span class="Li">@ARGV</span> ou le paramètre
+      <b>argv</b>.</dd>
+  <dt id="destination"><a class="permalink" href="#destination"><b>destination</b></a></dt>
+  <dd>Si le paramètre <b>destination</b> est fourni, il sera utilisé pour
+      définir le fichier ou l'emplacement mémoire pour recevoir la sortie de
+      perltidy.
+    <p class="Pp"><b>Note importante si destination est une chaîne ou une
+        référence de tableau</b>. Les chaînes de caractères Perl qui sont
+        décodées en utf8 par Perl::Tidy peuvent être retournées dans deux états
+        possibles, décodé ou encodé, et il est important que le programme appelant
+        et Perl::Tidy soient d'accord sur l'état à retourner. Un indicateur
+        <b>--encode-output-strings</b>, ou simplement <b>-eos</b>, a été ajouté
+        dans la version 20220217 de Perl::Tidy à cet effet.</p>
+  </dd>
+</dl>
+<div class="Bd-indent">
+<ul class="Bl-bullet">
+  <li>Utilisez <b>-eos</b> si Perl::Tidy doit encoder toute chaîne qu'il
+      décode. C'est le défaut actuel car cela fait de perltidy un bon filtre, et
+      c'est le réglage correct pour la plupart des programmes. Mais n'utilisez
+      pas ce réglage si le programme appelant encode également les données, car
+      un double encodage corrompra les données.</li>
+  <li>Utilisez <b>-neos</b> si une chaîne doit rester décodée si elle a été
+      décodée par Perl::Tidy. Ceci n'est approprié que si le programme appelant
+      gérera tout encodage nécessaire avant de sortir la chaîne. Si nécessaire,
+      cet indicateur peut être ajouté à la fin du paramètre <b>argv</b> passé
+      à Perl::Tidy.</li>
+</ul>
+</div>
+<div class="Bd-indent">
+<p class="Pp">Pour plus d'informations, voir
+    <a href='https://github.com/perltidy/perltidy/blob/master/docs/eos_flag.md'>https://github.com/perltidy/perltidy/blob/master/docs/eos_flag.md</a>.</p>
+<p class="Pp">Ce changement de comportement par défaut a été effectué sur une
+    période comme suit :</p>
+<ul class="Bl-bullet">
+  <li>Pour les versions antérieures à 20220217, l'indicateur <b>-eos</b> n'était
+      pas disponible et le comportement était équivalent à <b>-neos</b>.</li>
+  <li>Dans la version 20220217, l'indicateur <b>-eos</b> a été ajouté mais le
+      défaut est resté <b>-neos</b>.</li>
+  <li>Pour les versions après 20220217, le défaut a été réglé sur <b>-eos</b>.</li>
+</ul>
+</div>
+<dl class="Bl-tag">
+  <dt id="stderr"><a class="permalink" href="#stderr"><b>stderr</b></a></dt>
+  <dd>Le paramètre <b>stderr</b> permet au programme appelant de rediriger le
+      flux qui irait autrement vers le périphérique de sortie d'erreur standard
+      vers l'un des types de flux listés ci-dessus. Ce flux contient des
+      avertissements et des erreurs importants liés aux paramètres passés à
+      perltidy.</dd>
+  <dt id="perltidyrc"><a class="permalink" href="#perltidyrc"><b>perltidyrc</b></a></dt>
+  <dd>Si le fichier <b>perltidyrc</b> est fourni, il sera utilisé à la place de
+      tout fichier de configuration <i>.perltidyrc</i> qui serait autrement
+      utilisé.</dd>
+  <dt id="errorfile"><a class="permalink" href="#errorfile"><b>errorfile</b></a></dt>
+  <dd>Le paramètre <b>errorfile</b> permet au programme appelant de capturer le
+      flux qui irait autrement vers un fichier .ERR. Ce flux contient des
+      avertissements ou des erreurs liés au contenu d'un fichier ou d'un flux
+      source.
+    <p class="Pp">La raison pour laquelle cela est différent du flux stderr est
+        que lorsque perltidy est appelé pour traiter plusieurs fichiers, il y aura
+        jusqu'à un fichier .ERR créé pour chaque fichier et il serait très confus
+        s'ils étaient combinés.</p>
+    <p class="Pp">Cependant, si perltidy est appelé pour traiter un seul script
+        perl, il peut être plus pratique de combiner le flux <b>errorfile</b>
+        avec le flux <b>stderr</b>. Cela peut être fait en réglant le paramètre
+        <b>-se</b>, auquel cas ce paramètre est ignoré.</p>
+  </dd>
+  <dt id="logfile"><a class="permalink" href="#logfile"><b>logfile</b></a></dt>
+  <dd>Le paramètre <b>logfile</b> permet au programme appelant de capturer le
+      flux de journalisation. Ce flux n'est créé que s'il est demandé avec un
+      paramètre <b>-g</b>. Il contient des informations diagnostiques détaillées
+      sur un script qui peuvent être utiles pour le débogage.</dd>
+  <dt id="teefile"><a class="permalink" href="#teefile"><b>teefile</b></a></dt>
+  <dd>Le paramètre <b>teefile</b> permet au programme appelant de capturer le
+      flux de copie. Ce flux n'est créé que s'il est demandé avec l'un des
+      paramètres 'tee', un <b>--tee-pod</b>, <b>--tee-block-comments</b>,
+      <b>--tee-side-commnts</b>, ou <b>--tee-all-comments</b>.</dd>
+  <dt id="debugfile"><a class="permalink" href="#debugfile"><b>debugfile</b></a></dt>
+  <dd>Le paramètre <b>debugfile</b> permet au programme appelant de capturer le
+      flux produit par le paramètre <b>--DEBUG</b>. Ce paramètre est principalement
+      utilisé pour le débogage de perltidy lui-même.</dd>
+  <dt id="argv"><a class="permalink" href="#argv"><b>argv</b></a></dt>
+  <dd>Si le paramètre <b>argv</b> est fourni, il sera utilisé à la place du
+      tableau <span class="Li"><b>@ARGV</b></span><b></b>. Le paramètre
+      <b>argv</b> peut être une chaîne, une référence à une chaîne, ou une
+      référence à un tableau. S'il s'agit d'une chaîne ou d'une référence à une
+      chaîne, elle sera analysée en un tableau d'éléments comme si c'était une
+      chaîne de ligne de commande.</dd>
+  <dt id="dump_options"><a class="permalink" href="#dump_options"><b>dump_options</b></a></dt>
+  <dd>Si le paramètre <b>dump_options</b> est fourni, il doit être une référence
+      vers un hash. Dans ce cas, les paramètres contenus dans tout fichier de
+      configuration perltidyrc seront placés dans ce hash et perltidy retournera
+      immédiatement. Ceci est équivalent à exécuter perltidy avec --dump-options,
+      sauf que les paramètres sont retournés dans un hash plutôt que d'être
+      affichés sur la sortie standard. De plus, par défaut, seuls les paramètres
+      du fichier perltidyrc sont retournés, mais cela peut être modifié (voir le
+      paramètre suivant). Ce paramètre fournit une méthode pratique pour que les
+      programmes externes lisent un fichier perltidyrc. Un exemple de programme
+      utilisant cette fonctionnalité, <i>perltidyrc_dump.pl</i>, est inclus dans
+      la distribution.
+    <p class="Pp">Toute combinaison des paramètres <b>dump_</b> peut être utilisée
+        ensemble.</p>
+  </dd>
+  <dt id="dump_options_type"><a class="permalink" href="#dump_options"><b>dump_options_type</b></a></dt>
+</dl>
+<section class="Sh">
+<h1 class="Sh" id='OPTIONS'><a class='permalink' href='#OPTIONS'>OPTIONS</a></h1>
+<p class="Pp">Les options sont décrites dans la page de manuel de <a href='/man/perltidy.1.en'>perltidy(1)</a>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ENVIRONMENT'><a class='permalink' href='#ENVIRONMENT'>ENVIRONNEMENT</a></h1>
+<p class="Pp"><span class="Nm">PERLTIDY_PERLRC</span></p>
+<p class="Pp">Si cette variable d'environnement est définie, elle sera utilisée
+    comme nom de fichier perltidyrc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXIT_STATUS'><a class='permalink' href='#EXIT_STATUS'>STATUT DE SORTIE</a></h1>
+<p class="Pp">Le retour de <span class="Nm">perltidy</span> est un indicateur
+    d'erreur. VRAI si une erreur a provoqué une terminaison prématurée, FAUX si
+    le processus s'est terminé normalement.</p>
+<p class="Pp">Le module <b>Perl::Tidy</b> utilise les codes de sortie du module
+    <b>Perl::Strip</b>. Les codes de sortie possibles sont :</p>
+<dl class="Bl-tag">
+  <dt>0</dt>
+  <dd>Succès</dd>
+  <dt>1</dt>
+  <dd>Erreur de syntaxe</dd>
+  <dt>2</dt>
+  <dd>Erreur lors de la lecture d'un fichier</dd>
+  <dt>3</dt>
+  <dd>Erreur lors de l'écriture d'un fichier</dd>
+  <dt>4</dt>
+  <dd>Erreur lors de l'exécution de l'interpréteur Perl</dd>
+  <dt>5</dt>
+  <dd>Paramètre non valide</dd>
+  <dt>6</dt>
+  <dd>Pas assez de mémoire</dd>
+  <dt>7</dt>
+  <dd>Erreur interne</dd>
+  <dt>8</dt>
+  <dd>Erreur de décodage</dd>
+  <dt>9</dt>
+  <dd>Erreur d'encodage</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ERROR_HANDLING'><a class='permalink' href='#ERROR_HANDLING'>GESTION DES ERREURS</a></h1>
+<p class="Pp">Le paramètre <span class="Li"><b>$stderr</b></span><b></b> est
+    un flux qui contient les messages d'erreur et d'avertissement du processus
+    de formatage. Les erreurs de syntaxe dans le script perl source peuvent être
+    signalées ici.</p>
+<p class="Pp">Le paramètre <span class="Li"><b>$errorfile</b></span><b></b>
+    est le fichier .ERR. Ce fichier ne sera créé que s'il y a des erreurs ou des
+    avertissements liés au fichier source.</p>
+<p class="Pp">Le retour de la fonction <span class="Nm">perltidy</span> est un
+    indicateur d'erreur. Si cet indicateur est vrai, une erreur s'est produite et
+    le script ne s'est pas terminé normalement.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTEUR</a></h1>
+<p class="Pp">Thomas R. Wyant III &lt;thomas at wyant3 dot dynip dot com&gt;</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT'><a class='permalink' href='#COPYRIGHT'>COPYRIGHT</a></h1>
+<p class="Pp">Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011,
+    2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022 Thomas R.
+    Wyant III</p>
+<p class="Pp">Ce module est libre ; vous pouvez le redistribuer et/ou le
+    modifier sous les mêmes conditions que Perl lui-même.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR AUSSI</a></h1>
+<p class="Pp"><a href='/man/perltidy.1.en'>perltidy(1)</a>, <a href='/man/Perl/Strip.3pm.en'>Perl::Strip(3pm)</a>.</p>
+</section>
+</div>
+</section>
+            </article>
+            
+        </main>
+        <footer>
+            
+        </footer>
+    </body>
+</html>
+<section class="Sh">
+<h1 class="Sh" id='ERROR_HANDLING'><a class='permalink' href='#ERROR_HANDLING'>GESTION DES ERREURS</a></h1>
+<p class="Pp">La valeur de retour de perltidy peut être 0, 1 ou 2, pour indiquer le statut du résultat.</p>
+<p class="Pp">Une valeur de retour de 0 indique que perltidy s'est terminé avec succès et n'a affiché aucun message d'erreur.</p>
+<p class="Pp">Une valeur de retour de 1 indique que le processus s'est terminé prématurément en raison d'erreurs dans les paramètres d'entrée. Cela peut se produire, par exemple, si un paramètre est mal orthographié ou s'il reçoit une valeur invalide. Le programme appelant doit vérifier ce drapeau, car s'il est actif, le flux de destination sera vide ou incomplet et devra être ignoré. Les messages d'erreur dans le flux stderr indiqueront la cause de tout problème.</p>
+<p class="Pp">Une valeur de retour de 2 indique que perltidy s'est terminé avec succès mais qu'il y a des messages d'avertissement dans le flux stderr liés à des erreurs ou des conflits dans les paramètres, ou des messages d'erreur dans le flux errorfile liés à des erreurs de syntaxe dans le code source qui est en cours de nettoyage.</p>
+<p class="Pp">En cas d'erreur catastrophique irrécupérable, perltidy se terminera en appelant les fonctions croak ou confess pour aider le programmeur à localiser le problème. Celles-ci devraient normalement se produire pendant le développement du programme.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='NOTES_ON_FORMATTING_PARAMETERS'><a class='permalink' href='#NOTES_ON_FORMATTING_PARAMETERS'>NOTES SUR LES PARAMÈTRES DE MISE EN FORME</a></h1>
+<p class="Pp">Les paramètres qui contrôlent la mise en forme peuvent être passés de différentes manières : dans un fichier de configuration .perltidyrc, dans le paramètre perltidy, ou dans le paramètre argv.</p>
+<p class="Pp">Si le style -pbp est utilisé, le drapeau -nst doit également être spécifié. Ceci est nécessaire pour désactiver le drapeau -st contenu dans le paramètre -pbp, qui sinon dirigerait la sortie vers la console standard.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXAMPLES'><a class='permalink' href='#EXAMPLES'>Exemples</a></h1>
+<p class="Pp">L'exemple suivant utilise des références de chaînes pour stocker le code d'entrée et de sortie, ainsi que les flux d'erreurs, et montre comment l'erreur est vérifiée.</p>
+<pre>use Perl::Tidy;
+my $source_string = &lt;&lt;'EOT';
+my $error = Perl::Tidy::perltidy(argv=&gt;$argv,source=&gt;\$source_string,
+  destination=&gt;\$dest_string,stderr=&gt;\$stderr_string,
+errorfile=&gt;\$errorfile_string,);
+EOT
+my $dest_string;
+my $stderr_string;
+my $errorfile_string;
+my $argv = &quot;-npro&quot;;   # Ignore tout .perltidyrc à cet endroit
+$argv .= &quot; -pbp&quot;;     # Formate selon les meilleures pratiques de perl
+$argv .= &quot; -nst&quot;;     # Doit désactiver -st si -pbp est spécifié
+$argv .= &quot; -se&quot;;      # -se ajoute errorfile à stderr
+## $argv .= &quot; --spell-check&quot;;  # commenter pour activer une erreur
+print &quot;&lt;&lt;RAW SOURCE&gt;&gt;\n$source_string\n&quot;;
+my $error = Perl::Tidy::perltidy(
+    argv        =&gt; $argv,
+    source      =&gt; \$source_string,
+    destination =&gt; \$dest_string,
+    stderr      =&gt; \$stderr_string,
+    errorfile   =&gt; \$errorfile_string,  # ignoré lorsque -se est spécifié
+    ##phasers   =&gt; 'stun',              # commenter pour activer une erreur
+);
+if ($error) {
+    # erreur dans les paramètres d'entrée, aucune sortie nettoyée
+    print &quot;&lt;&lt;STDERR&gt;&gt;\n$stderr_string\n&quot;;
+    die &quot;Arrêt en raison d'erreurs graves\n&quot;;
+}
+if ($dest_string)      { print &quot;&lt;&lt;TIDIED SOURCE&gt;&gt;\n$dest_string\n&quot; }
+if ($stderr_string)    { print &quot;&lt;&lt;STDERR&gt;&gt;\n$stderr_string\n&quot; }
+if ($errorfile_string) { print &quot;&lt;&lt;.ERR file&gt;&gt;\n$errorfile_string\n&quot; }</pre>
+<p class="Pp">D'autres exemples sont donnés dans la section d'exemples de la distribution perltidy.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Using_the_&lt;b&gt;formatter&lt;/b&gt;_Callback_Object'><a class='permalink' href='#Using_the_&lt;b&gt;formatter&lt;/b&gt;_Callback_Object'>Utilisation de l'objet de rappel <b>formatter</b></a></h1>
+<p class="Pp">Le paramètre <b>formatter</b> est un objet de rappel facultatif qui permet à l'application de recevoir des lignes tokenisées de perltidy pour un traitement supplémentaire. Lorsque ce paramètre est utilisé, les deux options de mise en forme intégrées de perltidy (beautification ou html) sont ignorées. Le diagramme suivant montre le flux logique :</p>
+<pre>                  |-- (chemin normal)   -&gt; mise en forme standard
+caller-&gt;perltidy-&gt;|-- (-html flag )    -&gt; créer du html
+                  |-- (formatter donné)-&gt; callback vers write_line</pre>
+<p class="Pp">Cela peut être utile pour traiter les scripts perl d'une manière ou d'une autre. Le paramètre <span class="Li">$formatter</span> dans l'appel à perltidy :</p>
+<pre>formatter   =&gt; $formatter,</pre>
+<p class="Pp">est un objet créé par l'appelant avec une méthode <span class="Li">&quot;write_line&quot;</span> qui accepte et traite des lignes tokenisées, une par appel. Voici un exemple simple d'un <span class="Li">&quot;write_line&quot;</span> qui imprime simplement le numéro de ligne, le type de ligne (déterminé par perltidy) et le texte de la ligne :</p>
+<pre>sub write_line {
+    # appelé ligne par ligne par perltidy
+    my $self              = shift;
+    my $line_of_tokens    = shift;
+    my $line_type         = $line_of_tokens-&gt;{_line_type};
+    my $input_line_number = $line_of_tokens-&gt;{_line_number};
+    my $input_line        = $line_of_tokens-&gt;{_line_text};
+    print &quot;$input_line_number:$line_type:$input_line&quot;;
+}</pre>
+<p class="Pp">Le programme complet, <b>perllinetype</b>, est contenu dans la section des exemples de la distribution source. Comme le montre cet exemple, la méthode de rappel reçoit un paramètre <span class="Li"><b>$line_of_tokens</b></span><b></b>, qui est une référence à un hash d'informations utiles. Cet exemple utilise ces enregistrements de hash :</p>
+<pre>$line_of_tokens-&gt;{_line_number} - le numéro de ligne (1, 2, ...)
+$line_of_tokens-&gt;{_line_text}   - le texte de la ligne
+$line_of_tokens-&gt;{_line_type}   - le type de la ligne, l'un des suivants :
+   SYSTEM         - code spécifique au système avant la ligne shebang
+   CODE           - ligne de code perl (y compris les commentaires)
+   POD_START      - ligne commençant par pod, comme '=head'
+   POD            - texte de documentation pod
+   POD_END        - dernière ligne de la section pod, '=cut'
+   HERE           - texte here-document
+   HERE_END       - dernière ligne du here-document (mot cible)
+   FORMAT         - section de format
+   FORMAT_END     - dernière ligne de la section de format, '.'
+   DATA_START     - ligne __DATA__
+   DATA           - texte non identifié après __DATA__
+   END_START      - ligne __END__
+   END            - texte non identifié après __END__
+   ERROR          - nous avons un problème sérieux, probablement pas un script perl</pre>
+<p class="Pp">La plupart des applications ne s'intéresseront qu'aux lignes de type <b>COD</b>. Pour un exemple supplémentaire, écrivons un programme qui vérifie l'une des variables connues telles que <span class="Li">&quot;&amp;`&quot;</span>, <span class="Li">$&amp;</span>, et <span class="Li">&quot;$'&quot;</span>, qui peuvent ralentir le traitement. Voici un exemple de <b>write_line</b>, du programme d'exemple <b>find_naughty.pl</b>, qui le fait :</p>
+<pre>sub write_line {
+    # appelé par perltidy ligne par ligne
+    # nous recherchons $`, $&amp; et $'
+    my ( $self, $line_of_tokens ) = @_;
+    # nous extrayons certaines choses dont nous pourrions avoir besoin
+    my $line_type         = $line_of_tokens-&gt;{_line_type};
+    my $input_line_number = $line_of_tokens-&gt;{_line_number};
+    my $input_line        = $line_of_tokens-&gt;{_line_text};
+    my $rtoken_type       = $line_of_tokens-&gt;{_rtoken_type};
+    my $rtokens           = $line_of_tokens-&gt;{_rtokens};
+    chomp $input_line;
+    # ignorer les commentaires, pod, etc.
+    return if ( $line_type ne 'CODE' );
+    # nous parcourons les jetons à la recherche de $`, $&amp; et $'
+    for ( my $j = 0 ; $j &lt; @$rtoken_type ; $j++ ) {
+        # nous voulons seulement examiner les types de jetons 'i' (identificateur)
+        next unless $$rtoken_type[$j] eq 'i';
+        # nous extrayons le texte du jeton
+        my $token = $$rtokens[$j];
+        # et nous le vérifions
+        if ( $token =~ /^\$[\`\&amp;\']$/ ) {
+            print STDERR
+              &quot;$input_line_number: $token\n&quot;;
+        }
+    }
+}</pre>
+<p class="Pp">Cet exemple extrait ces variables de tokenisation du hash <span class="Li">$line_of_tokens</span> :</p>
+<pre>$rtoken_type = $line_of_tokens-&gt;{_rtoken_type};
+$rtokens     = $line_of_tokens-&gt;{_rtokens};</pre>
+<p class="Pp">La variable <span class="Li">$rtoken_type</span> est une référence à un tableau de codes de type de jeton, et <span class="Li">$rtokens</span> est une référence à un tableau de texte de jeton correspondant. Ils ne sont clairement définis que pour les lignes de type <b>COD</b>. Perltidy classe les jetons par type et a un code court pour chaque type. Vous pouvez obtenir une liste complète en exécutant perltidy depuis la ligne de commande avec :</p>
+<pre>perltidy --dump-token-types</pre>
+<p class="Pp">Dans cet exemple, nous ne recherchons que :</p>
+</section>
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Perl::Tidy(3pm) — archlinux man pages</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    
+    <main>
+        <section class="man-page">
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NAME</a></h1>
+<p class="Pp">Perl::Tidy - A Perl module to format Perl code</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>
+    use Perl::Tidy;
+    my $tidier = new Perl::Tidy;
+    $tidier-&gt;load_perltidyrc( '/path/to/.perltidyrc' );
+    $tidier-&gt;parse_string( $perl_code );
+    my $formatted_code = $tidier-&gt;formatted_code;
+</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Perl::Tidy is a Perl module that provides functionality for
+    formatting Perl code according to various style guidelines. It can be used
+    as a library within other Perl programs or as a standalone command-line
+    tool (the <a href='/man/perltidy.1.en'>perltidy(1)</a> script).</p>
+<p class="Pp">The module parses Perl code, analyzes its structure, and
+    rewrites it with consistent indentation, spacing, and line breaks.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ERROR_HANDLING'><a class='permalink' href='#ERROR_HANDLING'>ERROR HANDLING</a></h1>
+<p class="Pp">When Perl::Tidy encounters syntax errors in the input code, it
+    attempts to report them. The level of detail and the exact format of error
+    messages can depend on the configuration.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='NOTES_ON_FORMATTING_PARAMETERS'><a class='permalink' href='#NOTES_ON_FORMATTING_PARAMETERS'>NOTES ON FORMATTING PARAMETERS</a></h1>
+<p class="Pp">Perl::Tidy's behavior is controlled by a set of formatting
+    parameters. These can be set via command-line options when using the
+    <a href='/man/perltidy.1.en'>perltidy(1)</a> script, or programmatically
+    through the module's methods. A common way to manage these parameters is
+    through a configuration file named <span class="Li">.perltidyrc</span> in the
+    project directory or the user's home directory.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXAMPLES'><a class='permalink' href='#EXAMPLES'>EXAMPLES</a></h1>
+<p class="Pp">The source distribution for Perl::Tidy includes an
+    <span class="Li">examples</span> directory containing sample programs that
+    demonstrate how to use the module's features.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Using_the_&lt;b&gt;formatter&lt;/b&gt;_Callback_Object'><a class='permalink' href='#Using_the_&lt;b&gt;formatter&lt;/b&gt;_Callback_Object'>Using the <b>formatter</b> Callback Object</a></h1>
+<p class="Pp">Perl::Tidy offers a debugging feature that can be enabled with the
+    <span class="Li">-D</span> flag on the command line. This feature writes detailed
+    information about the tokenization process to a file. The callback object
+    used for this process is accessible via the following method:</p>
+<pre>
+    $tidier-&gt;formatter( \&Perl::Tidy::Debugger::write_debug_entry );
+</pre>
+<p class="Pp">When the <span class="Li">-D</span> flag is used, Perl::Tidy will
+    iterate through all tokens. It specifically looks for tokens of type
+    <b>i</b> (identifiers). The loop skips all other token types. When an
+    identifier is found, its actual text is checked to see if it matches one
+    of the identifiers being sought. If a match is found, the
+    <span class="Li">write_line</span> function prints the token along with its line
+    number.</p>
+<p class="Pp">The <span class="Li">examples</span> section of the source distribution
+    contains some programs that utilize the <b>formatter</b> option.</p>
+<p class="Pp">For assistance with Perl::Tidy's method of breaking lines into
+    tokens, you can run the following command from the command line:</p>
+<pre>
+    perltidy -D filename
+</pre>
+<p class="Pp">Replace <i>filename</i> with the name of a short script you are
+    interested in. This command will generate a file named
+    <i>filename.DEBUG</i> containing interleaved lines of text and their
+    corresponding token types. The <b>-D</b> flag has been available in
+    perltidy since its inception for this specific purpose. If you wish to
+    examine the code responsible for creating this debug file, it can be found
+    in <span class="Li">&quot;sub
+    Perl::Tidy::Debugger::write_debug_entry&quot;</span>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXPORT'><a class='permalink' href='#EXPORT'>EXPORT</a></h1>
+<pre>&amp;perltidy</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INSTALLATION'><a class='permalink' href='#INSTALLATION'>INSTALLATION</a></h1>
+<p class="Pp">The 'Perl::Tidy' module includes a binary executable named
+    'perltidy', which is installed automatically when the module is installed.
+    Note that the module name is case-sensitive. For example, the standard command
+    to install using cpanm is:</p>
+<pre>
+    cpanm Perl::Tidy
+</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VERSION'><a class='permalink' href='#VERSION'>VERSION</a></h1>
+<p class="Pp">This man page documents Perl::Tidy version 20250912.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='LICENSE'><a class='permalink' href='#LICENSE'>LICENSE</a></h1>
+<p class="Pp">This package is free software; you may redistribute it and/or modify
+    it under the terms of the "GNU General Public License".</p>
+<p class="Pp">Please refer to the file "COPYING" for details.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BUG_REPORTS'><a class='permalink' href='#BUG_REPORTS'>BUG REPORTS</a></h1>
+<p class="Pp">The source code repository for Perl::Tidy is located at
+    <a href='https://github.com/perltidy/perltidy'>https://github.com/perltidy/perltidy</a>.</p>
+<p class="Pp">To report a new bug or issue, please use the "issues" link on the
+    repository page.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>SEE ALSO</a></h1>
+<p class="Pp">The man page <a href='/man/perltidy.1.en'>perltidy(1)</a> provides a comprehensive description of all
+    Perl::Tidy features. It can be accessed online at
+    <a href='http://perltidy.sourceforge.net'>http://perltidy.sourceforge.net</a>.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-09-17</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Package information:</p>
+    <dl>
+        <dt>Package name:</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-tidy/">extra/perl-tidy</a></dd>
+        <dt>Version:</dt>
+        <dd>20250912-1</dd>
+        <dt>Upstream:</dt>
+        <dd><a href="https://search.cpan.org/dist/Perl-Tidy">https://search.cpan.org/dist/Perl-Tidy</a></dd>
+        <dt>Licenses:</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuals:</dt>
+        <dd><a href="/listing/extra/perl-tidy/">/listing/extra/perl-tidy/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table of contents</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NAME</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#ERROR_HANDLING">ERROR HANDLING</a></li>
+        
+            <li><a href="#NOTES_ON_FORMATTING_PARAMETERS">NOTES ON FORMATTING PARAMETERS</a></li>
+        
+            <li><a href="#EXAMPLES">EXAMPLES</a></li>
+        
+            <li><a href="#Using_the_&lt;b&gt;formatter&lt;/b&gt;_Callback_Object">Using the <b>formatter</b> Callback Object</a></li>
+        
+            <li><a href="#EXPORT">EXPORT</a></li>
+        
+            <li><a href="#INSTALLATION">INSTALLATION</a></li>
+        
+            <li><a href="#VERSION">VERSION</a></li>
+        
+            <li><a href="#LICENSE">LICENSE</a></li>
+        
+            <li><a href="#BUG_REPORTS">BUG REPORTS</a></li>
+        
+            <li><a href="#SEE_ALSO">SEE ALSO</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Other formats:
+        
+            <a href="/man/Perl::Tidy.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/Perl::Tidy.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>The website is available under the terms of the <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               license, except for the contents of the manual pages, which have their own license
+               specified in the corresponding Arch Linux package.
+            </p>
+        </footer>
+    </body>
+</html>

@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>POE::Wheel::ListenAccept(3pm) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">POE__Wheel__ListenAccept(3pm)</h1>
+<p class="lic">Licences: GPL, PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">POE::Wheel::ListenAccept(3)</td>
+    <td class="head-vol">Documentation Perl fournie par la communauté</td>
+    <td class="head-rtitle">POE::Wheel::ListenAccept(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">POE::Wheel::ListenAccept - accepter des connexions depuis des
+    sockets d'écoute normaux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPIS'><a class='permalink' href='#SYNOPIS'>SYNOPIS</a></h1>
+<p class="Pp">Voir &quot;SYNOPSIS&quot; dans POE::Wheel::SocketFactory pour une
+    version plus simple de ce programme.</p>
+<pre>#!perl
+use warnings;
+use strict;
+use IO::Socket;
+use POE qw(Wheel::ListenAccept Wheel::ReadWrite);
+POE::Session-&gt;create(
+  inline_states =&gt; {
+    _start =&gt; sub {
+      # Démarre le serveur.
+      $_[HEAP]{server} = POE::Wheel::ListenAccept-&gt;new(
+        Handle =&gt; IO::Socket::INET-&gt;new(
+          LocalPort =&gt; 12345,
+          Listen =&gt; 5,
+        ),
+        AcceptEvent =&gt; &quot;on_client_accept&quot;,
+        ErrorEvent =&gt; &quot;on_server_error&quot;,
+      );
+    },
+    on_client_accept =&gt; sub {
+      # Commence l'interaction avec le client.
+      my $client_socket = $_[ARG0];
+      my $io_wheel = POE::Wheel::ReadWrite-&gt;new(
+        Handle =&gt; $client_socket,
+        InputEvent =&gt; &quot;on_client_input&quot;,
+        ErrorEvent =&gt; &quot;on_client_error&quot;,
+      );
+      $_[HEAP]{client}{ $io_wheel-&gt;ID() } = $io_wheel;
+    },
+    on_server_error =&gt; sub {
+      # Arrête le serveur.
+      my ($operation, $errnum, $errstr) = @_[ARG0, ARG1, ARG2];
+      warn &quot;Erreur du serveur $operation $errnum: $errstr\n&quot;;
+      delete $_[HEAP]{server};
+    },
+    on_client_input =&gt; sub {
+      # Gère l'entrée du client.
+      my ($input, $wheel_id) = @_[ARG0, ARG1];
+      $input =~ tr[a-zA-Z][n-za-mN-ZA-M]; # ASCII rot13
+      $_[HEAP]{client}{$wheel_id}-&gt;put($input);
+    },
+    on_client_error =&gt; sub {
+      # Gère l'erreur client, y compris la déconnexion.
+      my $wheel_id = $_[ARG3];
+      delete $_[HEAP]{client}{$wheel_id};
+    },
+  }
+);
+POE::Kernel-&gt;run();
+exit;</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">POE::Wheel::ListenAccept implémente des appels <b>accept()</b>
+    non bloquants pour les sockets serveur d'écoute classiques. L'application
+    fournit le socket, en utilisant des moyens normaux tels que <b>socket()</b>,
+    IO::Socket::INET ou IO::Socket::UNIX. POE::Wheel::ListenAccept surveille le
+    socket d'écoute et émet des événements chaque fois qu'un nouveau client est
+    accepté.</p>
+<p class="Pp">Veuillez consulter POE::Wheel::SocketFactory si vous avez besoin
+    de <b>connect()</b> non bloquant ou d'une solution d'écoute/acceptation plus
+    riche en fonctionnalités.</p>
+<p class="Pp">POE::Wheel::ListenAccept n'accepte que les connexions client. Il ne
+    lit ni n'écrit de données, donc il n'a pas besoin de méthode <b>put()</b> et ne
+    l'inclut pas. POE::Wheel::ReadWrite gère généralement le socket client accepté.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MÉTHODES_PUBLIQUES'><a class='permalink' href='#MÉTHODES_PUBLIQUES'>MÉTHODES PUBLIQUES</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='new'><a class='permalink' href='#new'>new</a></h2>
+<p class="Pp"><b>new()</b> crée un nouvel objet POE::Wheel::ListenAccept pour un
+    socket d'écoute donné. L'objet générera des événements relatifs au socket tant
+    qu'il existera.</p>
+<p class="Pp"><b>new()</b> accepte deux paramètres nommés requis :</p>
+<p class="Pp"><i>Handle</i></p>
+<p class="Pp">Le paramètre constructeur <span class="Li">&quot;Handle&quot;</span>
+    doit contenir un descripteur de socket d'écoute. POE::Wheel::FollowTail
+    surveillera ce socket et <b>accept()</b>era les nouvelles connexions à leur
+    arrivée.</p>
+<p class="Pp"><i>AcceptEvent</i></p>
+<p class="Pp"><span class="Li">&quot;AcceptEvent&quot;</span> est un nom d'événement
+    requis que POE::Wheel::ListenAccept émettra pour chaque socket client accepté.
+    &quot;ÉVÉNEMENTS PUBLICS&quot; le décrit en détail.</p>
+<p class="Pp"><i>ErrorEvent</i></p>
+<p class="Pp"><span class="Li">&quot;ErrorEvent&quot;</span> est un nom d'événement
+    optionnel qui sera émis en cas de problème sérieux. Veuillez consulter
+    &quot;ÉVÉNEMENTS PUBLICS&quot; pour plus de détails.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='event'><a class='permalink' href='#event'>event</a></h2>
+<p class="Pp"><b>event()</b> permet à une session de changer les événements émis par
+    une roue sans détruire et recréer l'objet. Il accepte un ou plusieurs des
+    événements listés dans &quot;ÉVÉNEMENTS PUBLICS&quot;. Les noms d'événements
+    indéfinis désactivent ces événements.</p>
+<p class="Pp">Ignorer les connexions :</p>
+<pre>sub ignore_new_connections {
+  $_[HEAP]{tailor}-&gt;event( AcceptEvent =&gt; &quot;on_ignored_accept&quot; );
+}
+sub handle_ignored_accept {
+  # ne fait rien
+}</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='ID'><a class='permalink' href='#ID'>ID</a></h2>
+<p class="Pp">La méthode <b>ID()</b> renvoie l'identifiant unique de la roue. Il est
+    utile pour stocker la roue dans une table de hachage. Tous les événements
+    POE::Wheel doivent être accompagnés d'un ID de roue, ce qui permet de
+    référencer la roue dans leurs gestionnaires d'événements.</p>
+<pre>sub setup_listener {
+  my $wheel = POE::Wheel::ListenAccept-&gt;new(... etc  ...);
+  $_[HEAP]{listeners}{$wheel-&gt;ID} = $wheel;
+}</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ÉVÉNEMENTS_PUBLICS'><a class='permalink' href='#ÉVÉNEMENTS_PUBLICS'>ÉVÉNEMENTS PUBLICS</a></h1>
+<p class="Pp">POE::Wheel::ListenAccept émet quelques événements.</p>
+<section class="Ss">
+<h2 class="Ss" id='AcceptEvent'><a class='permalink' href='#AcceptEvent'>AcceptEvent</a></h2>
+<p class="Pp"><span class="Li">&quot;AcceptEvent&quot;</span> nomme l'événement
+    qui sera émis pour chaque socket client nouvellement accepté. Il est
+    accompagné de trois paramètres :</p>
+<p class="Pp"><span class="Li">$_[ARG0]</span> contient le descripteur du
+    socket client nouvellement accepté. Il appartient à l'application de faire
+    quelque chose avec ce socket. La plupart des cas d'utilisation impliquent de
+    passer le socket à un constructeur POE::Wheel::ReadWrite.</p>
+<p class="Pp"><span class="Li">$_[ARG1]</span> contient la valeur de retour de
+    l'appel <b>accept()</b>, qui est souvent l'extrémité distante encodée du socket.</p>
+<p class="Pp"><span class="Li">$_[ARG2]</span> contient l'identifiant unique de
+    l'objet POE::Wheel::ListenAccept. C'est la même valeur que celle renvoyée par
+    la méthode <b>ID()</b> de la roue.</p>
+<p class="Pp">Un exemple de gestionnaire <span class="Li">&quot;AcceptEvent&quot;</span>
+    :</p>
+<pre>sub accept_state {
+  my ($client_socket, $remote_addr, $wheel_id) = @_[ARG0..ARG2];
+  # Rend l'adresse distante lisible par l'homme.
+  my ($port, $packed_ip) = sockaddr_in($remote_addr);
+  my $dotted_quad = inet_ntoa($packed_ip);
+  print(
+    &quot;La roue $wheel_id a accepté une connexion de &quot;,
+    &quot;$dotted_quad port $port.\n&quot;
+  );
+  # Lance une session pour interagir avec le socket.
+  create_server_session($handle);
+}</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='ErrorEvent'><a class='permalink' href='#ErrorEvent'>ErrorEvent</a></h2>
+<p class="Pp"><span class="Li">&quot;ErrorEvent&quot;</span> nomme l'événement
+    qui sera généré chaque fois qu'une nouvelle connexion n'a pas pu être acceptée
+    avec succès. Cet événement est accompagné de quatre paramètres :</p>
+<p class="Pp"><span class="Li">$_[ARG0]</span> contient le nom de l'opération
+    qui a échoué. Il s'agit généralement de 'accept', mais gardez à l'esprit que
+    ce n'est pas nécessairement un nom de fonction.</p>
+<p class="Pp"><span class="Li">$_[ARG1]</span> et <span class="Li">$_[ARG2]</span>
+    contiennent les valeurs numérique et textuelle de <span class="Li">$!</span>,
+    respectivement. POE::Wheel::ListenAccept sait comment gérer EAGAIN (et les
+    équivalents dépendant du système), donc cette erreur ne sera jamais renvoyée.</p>
+<p class="Pp"><span class="Li">$_[ARG3]</span> contient l'identifiant unique de
+    la roue, ce qui peut être utile pour arrêter une roue particulière parmi un
+    groupe.</p>
+<p class="Pp">Un exemple de gestionnaire d'événement <span class="Li">&quot;ErrorEvent&quot;</span>.
+    Cela suppose que les roues sont sauvegardées comme dans l'exemple
+    &quot;ID&quot;.</p>
+<pre>sub error_state {
+  my ($operation, $errnum, $errstr, $wheel_id) = @_[ARG0..ARG3];
+  warn &quot;La roue $wheel_id a généré une erreur $operation $errnum: $errstr\n&quot;;
+  delete $_[HEAP]{listeners}{$wheel_id};
+}</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR AUSSI</a></h1>
+<p class="Pp">POE::Wheel décrit les opérations de base de toutes les roues plus en
+    profondeur. Vous devez savoir cela.</p>
+<p class="Pp">POE::Wheel::ReadWrite pour une façon possible de gérer les clients une
+    fois que vous avez leurs sockets.</p>
+<p class="Pp">La section SEE ALSO de POE contient une table des matières couvrant
+    l'ensemble de la distribution POE.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BOGUES'><a class='permalink' href='#BOGUES'>BOGUES</a></h1>
+<p class="Pp">Aucun connu.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEURS_ET_DROITS_DACTUALITÉ'><a class='permalink' href='#AUTEURS_ET_DROITS_DACTUALITÉ'>AUTEURS   ET DROITS D'ACTUALITÉ</a></h1>
+<p class="Pp">Veuillez consulter POE pour plus d'informations sur les auteurs et
+    les contributeurs.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2024-07-13</td>
+    <td class="foot-os">perl v5.38.2</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher une page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://w
+    <dl>
+        <dt>Paquet:</dt>
+        <dd><a href="https://packages.archlinux.org/extra/any/perl-poe/">extra/perl-poe</a></dd>
+        <dt>Version:</dt>
+        <dd>1.370-2</dd>
+        <dt>En amont:</dt>
+        <dd><a href="https://search.cpan.org/dist/POE">https://search.cpan.org/dist/POE</a></dd>
+        <dt>Licences:</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuels:</dt>
+        <dd><a href="/listing/extra/perl-poe/">/listing/extra/perl-poe/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#PUBLIC_METHODS">MÉTHODES PUBLIQUES</a></li>
+        
+            <li><a href="#PUBLIC_EVENTS">ÉVÉNEMENTS PUBLICS</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+            <li><a href="#BUGS">BOGUES</a></li>
+        
+            <li><a href="#AUTHORS_&amp;amp;_COPYRIGHTS">AUTEURS &amp; DROITS D'AUTEUR</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats:
+        
+            <a href="/man/POE::Wheel::ListenAccept.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/POE::Wheel::ListenAccept.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

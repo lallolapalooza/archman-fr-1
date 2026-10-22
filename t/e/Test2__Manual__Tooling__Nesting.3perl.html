@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Test2::Manual::Tooling::Nesting(3perl) — Pages du manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Test2__Manual__Tooling__Nesting.3perl</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/core/x86_64/perl/">perl</a></p>
+<p class="lic">Licences: Artistic-1.0-Perl OR GPL-1.0-or-later</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Test2::Manual::Tooling::Nesting(3perl)</td>
+    <td class="head-vol">Guide de référence des programmeurs Perl</td>
+    <td class="head-rtitle">Test2::Manual::Tooling::Nesting(3perl)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Test2::Manual::Tooling::Nesting - Tutoriel pour utiliser d'autres outils
+    au sein des vôtres.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Parfois, vous vous retrouvez à écrire le même modèle de test encore et
+    encore. Dans de tels cas, vous pourriez vouloir encapsuler la logique dans une
+    nouvelle fonction de test qui appelle plusieurs outils ensemble. Cela semble
+    assez facile, mais peut causer des maux de tête si ce n'est pas fait
+    correctement.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MANIERE_NAIVE'><a class='permalink' href='#MANIERE_NAIVE'>MANIÈRE NAÏVE</a></h1>
+<p class="Pp">Disons que vous vous retrouvez à écrire le même modèle de test encore et
+    encore pour plusieurs objets :</p>
+<pre>my $obj1 = $class1-&gt;new;
+is($obj1-&gt;foo, 'foo', &quot;got foo&quot;);
+is($obj1-&gt;bar, 'bar', &quot;got bar&quot;);
+my $obj2 = $class1-&gt;new;
+is($obj2-&gt;foo, 'foo', &quot;got foo&quot;);
+is($obj2-&gt;bar, 'bar', &quot;got bar&quot;);
+... 10 fois de plus pour les classes 2-12</pre>
+<p class="Pp">La manière naïve de faire cela est d'écrire une fonction
+    <span class="Li">check_class()</span> comme ceci :</p>
+<pre>sub check_class {
+    my $class = shift;
+    my $obj = $class-&gt;new;
+    is($obj-&gt;foo, 'foo', &quot;got foo&quot;);
+    is($obj-&gt;bar, 'bar', &quot;got bar&quot;);
+}
+check_class($class1);
+check_class($class2);
+check_class($class3);
+...</pre>
+<p class="Pp">Cela semblera fonctionner correctement, et vous pourriez ne pas
+    remarquer de problèmes, <i>tant que les tests réussissent.</i></p>
+<section class="Ss">
+<h2 class="Ss" id='QU_EST_CE_QUI_NE_VA_PAS_?'><a class='permalink' href='#QU_EST_CE_QUI_NE_VA_PAS_?'>QU'EST-CE QUI NE VA PAS ?</a></h2>
+<p class="Pp">Les problèmes avec l'approche naïve deviennent évidents si les choses
+    commencent à échouer. Les diagnostics qui vous indiquent quel fichier et quelle
+    ligne l'échec s'est produit seront incorrects. L'échec sera signalé à la ligne
+    <i>à l'intérieur</i> de <span class="Li">&quot;check_class&quot;</span>, et non
+    à la ligne où <span class="Li">check_class()</span> a été appelée. C'est un
+    problème car cela vous laisse sans idée de quelle classe échoue.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='COMMENT_R_PARER_?'><a class='permalink' href='#COMMENT_R_PARER_?'>COMMENT RÉPARER ?</a></h2>
+<p class="Pp">Heureusement, c'est extrêmement facile à réparer. Vous devez obtenir un
+    objet de contexte au début de votre fonction, et le libérer à la fin...
+    oui, c'est aussi simple que ça.</p>
+<pre>use Test2::API qw/context/;
+sub check_class {
+    my $class = shift;
+    my $ctx = context();
+    my $obj = $class-&gt;new;
+    is($obj-&gt;foo, 'foo', &quot;got foo&quot;);
+    is($obj-&gt;bar, 'bar', &quot;got bar&quot;);
+    $ctx-&gt;release;
+}</pre>
+<p class="Pp">Voyez, c'était facile. Avec ces 2 lignes supplémentaires, nous avons
+    maintenant un rapport de fichier+ligne correct. Les outils imbriqués trouveront
+    le contexte que nous avons acquis ici, et sauront utiliser ses numéros de
+    fichier et de ligne.</p>
+<p class="Pp"><i>L'ANCIENNE MANIÈRE (NE LE FAITES PLUS MAINTENANT)</i></p>
+<p class="Pp">Avec Test::Builder, il y avait une variable globale appelée
+    <span class="Li">$Test::Builder::Level</span> qui aidait à résoudre ce
+    problème :</p>
+<pre>sub check_class {
+    my $class = shift;
+    local $Test::Builder::Level = $Test::Builder::Level + 1;
+    my $obj = $class-&gt;new;
+    is($obj-&gt;foo, 'foo', &quot;got foo&quot;);
+    is($obj-&gt;bar, 'bar', &quot;got bar&quot;);
+}</pre>
+<p class="Pp">Cette variable fonctionnait assez bien (et fonctionnera toujours),
+    mais elle n'était pas très découvrable. Un autre problème avec cette variable
+    est qu'elle devient encombrante si vous avez une structure de code plus
+    profondément imbriquée appelant les outils imbriqués, vous pourriez avoir
+    besoin de compter les cadres de pile, et espérer qu'ils ne changent jamais en
+    raison d'un module tiers. La solution de contexte n'a pas de tels
+    inconvénients.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR AUSSI</a></h1>
+<p class="Pp">Test2::Manual - Index principal du manuel.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SOURCE'><a class='permalink' href='#SOURCE'>SOURCE</a></h1>
+<p class="Pp">Le dépôt de code source de Test2-Manual peut être trouvé à
+    l'adresse <a href='https://github.com/Test-More/test-more/'>https://github.com/Test-More/test-more/</a>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MAINTENEURS'><a class='permalink' href='#MAINTENEURS'>MAINTENEURS</a></h1>
+<dl class="Bl-tag">
+  <dt id="Chad"><a class="permalink" href="#Chad">Chad Granum
+    &lt;exodist@cpan.org&gt;</a></dt>
+  <dd></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEURS'><a class='permalink' href='#AUTEURS'>AUTEURS</a></h1>
+<dl class="Bl-tag">
+  <dt id="Chad~2"><a class="permalink" href="#Chad~2">Chad Granum
+    &lt;exodist@cpan.org&gt;</a></dt>
+  <dd></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT'><a class='permalink' href='#COPYRIGHT'>COPYRIGHT</a></h1>
+<p class="Pp">Copyright Chad Granum &lt;exodist@cpan.org&gt;.</p>
+<p class="Pp">Ce programme est un logiciel libre ; vous pouvez le redistribuer et/ou le
+    modifier sous les mêmes conditions que Perl lui-même.</p>
+<p class="Pp">Voir <a href='http://dev.perl.org/licenses/'>http://dev.perl.org/licenses/</a></p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-13</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page du manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/core/x86_64/perl/">core/perl</a></dd>
+        <dt>Version :</dt>
+        <dd>5.42.0-1</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://www.perl.org">https://www.perl.org</a></dd>
+        <dt>Licences :</dt>
+        <dd>Artistic-1.0-Perl OR GPL-1.0-or-later</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/core/perl/">/listing/core/perl/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#MANIERE_NAIVE">MANIÈRE NAÏVE</a></li>
+        
+            <li><a href="#VOIR_AUSSI">VOIR AUSSI</a></li>
+        
+            <li><a href="#SOURCE">SOURCE</a></li>
+        
+            <li><a href="#MAINTENEURS">MAINTENEURS</a></li>
+        
+            <li><a href="#AUTEURS">AUTEURS</a></li>
+        
+            <li><a href="#COPYRIGHT">COPYRIGHT</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Test2::Manual::Tooling::Nesting.3perl.fr.txt">txt</a>, 
+        
+            <a href="/man/Test2::Manual::Tooling::Nesting.3perl.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages du manuel, qui ont leur propre licence spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

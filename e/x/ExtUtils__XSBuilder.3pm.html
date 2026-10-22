@@ -1,0 +1,423 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>ExtUtils::XSBuilder(3pm) — Pages manuelles d'Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">ExtUtils__XSBuilder(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-extutils-xsbuilder/">perl-extutils-xsbuilder</a></p>
+<p class="lic">Licences: GPL, PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">XSBuilder(3)</td>
+    <td class="head-vol">Documentation Perl contribuée par les utilisateurs</td>
+    <td class="head-rtitle">XSBuilder(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">ExtUtils::XSBuilder - Génération automatique de code de liaison XS pour Perl</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">ExtUtils::XSBuilder est un ensemble de modules pour analyser des fichiers d'en-tête C et créer du code de liaison XS et de la documentation à partir de ceux-ci. Idéalement, cela permet de « créer » une interface vers une bibliothèque C sans coder une seule ligne. Comme aucune API C n'est idéale, certains ajustements sont nécessaires la plupart du temps. Ainsi, pour utiliser ce module, vous devez toujours être familier avec la programmation C et XS, mais cela vous évite beaucoup de travail ennuyeux et de copier-coller. De plus, lorsque l'API C change, la plupart du temps vous n'avez qu'à relancer XSBuilder pour obtenir votre nouvelle API Perl.</p>
+<p class="Pp">Le processus de création se déroule en étapes suivantes :</p>
+<section class="Ss">
+<h2 class="Ss" id='Derive_a_class_from_ExtUtils::XSBuilder::ParseSource'><a class='permalink' href='#Derive_a_class_from_ExtUtils::XSBuilder::ParseSource'>Dériver   une classe de ExtUtils::XSBuilder::ParseSource</a></h2>
+<p class="Pp">Cette classe doit redéfinir certaines méthodes pour indiquer à XSBuilder quels fichiers d'en-tête C analyser et quelques autres paramètres nécessaires. Vous devez au moins redéfinir la méthode <span class="Li">"package"</span> pour donner le nom du package que vous voulez créer, et soit la méthode
+    <span class="Li">"find_includes"</span> qui retourne tous les fichiers d'en-tête C à analyser, soit la méthode
+    <span class="Li">"include_dirs"</span> qui retourne une liste de tous les répertoires où chercher des fichiers d'en-tête C.</p>
+<p class="Pp">Bien sûr, il y a d'autres méthodes que vous pouvez redéfinir. Voir ExtUtils::XSBuilder::ParseSource pour une liste complète des méthodes redéfinissables.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Scan_the_source_files'><a class='permalink' href='#Scan_the_source_files'>Scanner   les fichiers source</a></h2>
+<p class="Pp">Si votre classe dérivée est appelée MyClass::ParseSource, vous lancez simplement l'analyse des sources avec</p>
+<pre>perl -MMyClass::ParseSource -e 'MyClass::ParseSource-&gt;run'</pre>
+<p class="Pp">Vous pouvez aussi mettre cela dans un petit script pour faciliter l'utilisation, définir le chemin de librairie Perl, etc.</p>
+<p class="Pp">Pendant l'analyse des sources, XSBuilder crée un ensemble de tableaux qui contiennent les résultats de l'analyse. Si vous n'avez pas modifié les emplacements par défaut dans votre sous-classe, ces tableaux sont créés sous
+    <span class="Li">"xs/tables"</span>, suivi du nom du module retourné par la méthode <span class="Li">"package"</span> que vous avez créée. Là, vous trouverez quatre modules générés :
+    <span class="Li">"FunctionTable.pm"</span>, qui contient les déclarations de fonctions ;
+    <span class="Li">"StructureTable.pm"</span>, qui contient les structures ; <span class="Li">"ConstantTable.pm"</span>, qui contient les constantes trouvées dans les fichiers d'en-tête ; et
+    <span class="Li">"CallbackTable.pm"</span>, qui contient les définitions pour les types de rappel (callbacks).</p>
+<p class="Pp">Comme l'analyse des sources peut prendre du temps, nous créons des tableaux intermédiaires et les transformons en code XS plus tard, plutôt que de créer le code XS directement. Comme nous sauvegardons le résultat, nous pouvons éviter de ré-analyser les fichiers source tant qu'ils ne changent pas.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Derive_a_class_from_ExtUtils::XSBuilder::WrapXS'><a class='permalink' href='#Derive_a_class_from_ExtUtils::XSBuilder::WrapXS'>Dériver   une classe de ExtUtils::XSBuilder::WrapXS</a></h2>
+<p class="Pp">La classe WrapXS est responsable de prendre les informations générées à la fois à partir des fichiers source et des fichiers de correspondance (voir ci-dessous) pour créer le code XS. Comme pour la classe ParseSource, vous devez redéfinir cette méthode avec votre propre implémentation pour indiquer à WrapXS quoi faire.</p>
+<p class="Pp">Voir ExtUtils::XSBuilder::WrapXS pour une liste des méthodes redéfinissables.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Create_map_files'><a class='permalink' href='#Create_map_files'>Créer   les fichiers de correspondance</a></h2>
+<p class="Pp">XSBuilder ne créera pas automatiquement de fonctions XS pour toutes les fonctions et structures C. Vous devez fournir des indications pour que les fichiers XS soient créés correctement. Les fichiers de correspondance sont le mécanisme pour fournir ces indications. Par défaut, les fichiers de correspondance se trouvent sous
+    <span class="Li">"xs/maps"</span>. Il y a quatre types de correspondance :
+    <span class="Li">"types"</span>,
+    <span class="Li">"functions"</span>,
+    <span class="Li">"structures"</span>, et
+    <span class="Li">"callbacks"</span>. Chaque fichier de correspondance est nommé avec un préfixe sélectionnable par l'utilisateur (par exemple <span class="Li">"foo"</span>,) suivi d'un underscore, du nom du type de correspondance, et de l'extension de correspondance
+    <span class="Li">".map"</span>. Par exemple, les indications pour les fonctions relatives au traitement des erreurs dans votre source peuvent être contenues dans un fichier de correspondance nommé <span class="Li">"error_functions.map"</span>.</p>
+<dl class="Bl-tag">
+  <dt id="foo_types.map"><a class="permalink" href="#foo_types.map">foo_types.map</a></dt>
+  <dd>Contient la correspondance des types C vers les classes Perl.</dd>
+  <dt id="foo_functions.map"><a class="permalink" href="#foo_functions.map">foo_functions.map</a></dt>
+  <dd>Contient la correspondance des fonctions C vers les fonctions Perl. Peut être utilisé pour réordonner les arguments, indiquer à XSBuilder quels arguments sont en fait des valeurs de retour et dans quel package Perl la fonction sera créée.</dd>
+  <dt id="foo_structures.map"><a class="permalink" href="#foo_structures.map">foo_structures.map</a></dt>
+  <dd>Contient la correspondance des structures C vers les classes Perl et définit pour quelles classes les méthodes d'accès doivent être créées. Vous pouvez aussi spécifier si vous voulez une méthode <span class="Li">"new"</span> pour la classe.</dd>
+  <dt id="foo_callbacks.map"><a class="permalink" href="#foo_callbacks.map">foo_callbacks.map</a></dt>
+  <dd>Contient la correspondance des fonctions de rappel C vers les fonctions de rappel Perl. Peut être utilisé pour réordonner les arguments, indiquer à XSBuilder quels arguments sont des valeurs de retour, et dans quel package Perl les fonctions seront créées.</dd>
+</dl>
+<p class="Pp">Pour une description détaillée des formats de fichiers de correspondance, voir ci-dessous.</p>
+<p class="Pp">Pour avoir un point de départ, XSBuilder est capable de créer des fichiers de correspondance par défaut qui incluent simplement tous les types, fonctions et structures. Vous pouvez recréer les fichiers de correspondance à tout moment et XSBuilder ajoutera tous les éléments qui ne sont pas déjà dans les fichiers de correspondance.</p>
+<p class="Pp">Copiez d'abord le fichier _types.map du répertoire xsbuilder vers votre répertoire de correspondances. Ce fichier contient la correspondance standard pour quelques types de base.</p>
+<p class="Pp">Si, par exemple, votre classe dérivée est appelée MyClass::WrapXS, vous lancez simplement la création/mise à jour des fichiers de correspondance avec</p>
+<pre>perl -MMyClass::WrapXS -e 'MyClass::WrapXS-&gt;checkmaps(" ")'</pre>
+<p class="Pp">L'argument de checkmaps fournit un caractère à préfixer à la première colonne des nouvelles entrées de correspondance. Si vous ne passez pas d'argument à checkmaps, aucun fichier de correspondance n'est écrit, et checkmaps ne fera que comparer ce qui manque. (Vous devez imprimer le résultat d'une manière ou d'une autre, par exemple en utilisant Data::Dumper). Vous pouvez aussi mettre cela dans un petit script pour faciliter l'utilisation, définir le chemin de librairie Perl, etc.</p>
+<p class="Pp">Après avoir créé vos correspondances par défaut, vous devez éditer le fichier
+    <span class="Li">"xs/maps/new_type.map"</span> , qui contient tous les types trouvés dans la source. Ajoutez un pipe (<span class="Li">"|"</span>) suivi du nom de la classe ou du type, par exemple</p>
+<pre>int                 | IV
+struct request_rec  | Apache::RequestRec</pre>
+<p class="Pp">.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Create_the_XS_files'><a class='permalink' href='#Create_the_XS_files'>Créer   les fichiers XS</a></h2>
+<p class="Pp">Maintenant nous pouvons créer le code. En exécutant</p>
+<pre>perl -MMyClass::WrapXS -e 'MyClass::WrapXS-&gt;run'</pre>
+<p class="Pp">XSBuilder créera les fichiers XS, pm et Makefile.PL pour chaque module mentionné dans les fichiers de correspondance. Le résultat est placé comme une hiérarchie de répertoires sous WrapXS. Pour contrôler le contenu des fichiers
+    <span class="Li">"Makefile.PL"</span> et
+    <span class="Li">"pm"</span> , vous pouvez redéfinir les méthodes
+    <span class="Li">"makefilepl_text"</span> et
+    <span class="Li">"pm_text"</span> . Vous pouvez inclure du code supplémentaire dans les fichiers XS en écrivant un fichier d'inclusion qui est inclus en haut du fichier XS. Ce fichier peut contenir des fonctions auxiliaires qui ne peuvent pas être générées automatiquement. Les fichiers doivent être placés sous le répertoire
+    <span class="Li">"xs"</span> , avec le chemin et le nom corrects. Par exemple, pour avoir un fichier d'en-tête inclus pour le module Apache::DAV, créez un fichier nommé
+    <span class="Li">"xs/Apache/DAV/Apache__DAV.h"</span>. La même chose peut être faite pour l'inclusion dans le fichier pm. En suivant l'exemple ci-dessus, le nom du fichier serait
+  <span class="Li">"xs/Apache/DAV/DAV_pm"</span>.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Format_of_the_map_files'><a class='permalink' href='#Format_of_the_map_files'>Format   des fichiers de correspondance</a></h1>
+<p class="Pp">Pour tous les fichiers de correspondance, les lignes vides sont ignorées et les lignes commençant par un <span class="Li">"#"</span> sont traitées comme des commentaires et sont aussi ignorées.</p>
+<section class="Ss">
+<h2 class="Ss" id='Types_map_file'><a class='permalink' href='#Types_map_file'>Fichier de correspondance des types</a></h2>
+<p class="Pp">Contient la correspondance entre les types C et les classes Perl.</p>
+<p class="Pp">Le format est le nom du type C suivi du nom de la classe Perl
+    ou du spécificateur de type XS, séparés par un
+    <span class="Li">"|"</span>. Exemple :</p>
+<pre>int                 | IV
+struct request_rec  | Apache::RequestRec</pre>
+<p class="Pp">Si vous avez une classe Perl avec un espace de noms à un seul niveau (par ex.
+    Apache), vous devez le suffixer avec deux deux-points (par ex. "Apache::").
+    Lorsqu'un typedef et une structure portent le même nom, les structures doivent
+    être écrites avec le préfixe "struct " (par ex. "struct foo".)
+    De plus, vous pouvez donner l'identifiant pour le typemap si vous avez besoin d'une conversion
+    spéciale et un ou plusieurs autres noms pour la structure :</p>
+<pre>struct request_rec  | Apache::RequestRec | T_APACHEOBJ | r</pre>
+<p class="Pp">Un cinquième paramètre facultatif spécifie que les données doivent être
+    copiées lorsqu'elles sont assignées à un membre de structure et sélectionne la manière dont la mémoire est
+    allouée :</p>
+<pre>char *   | PV | | | strdup</pre>
+<p class="Pp">Le code réel pour l'allocation de mémoire est fourni à l'intérieur de la
+    map de structure, par exemple :</p>
+<pre>MALLOC=strdup:$dest = ($type)ap_pstrdup(obj -&gt; pool, $src)
+MALLOC=malloc:ap_palloc(obj -&gt; pool, $src, sizeof($type)) ; memcpy($dest,$src,sizeof($type))</pre>
+<p class="Pp">Cela donne deux façons d'allouer de la mémoire et de copier les données dedans.
+    Le cinquième paramètre dans le typemap sélectionne laquelle de ces deux doit
+    être utilisée. <span class="Li">$src</span>, <span class="Li">$dest</span> et
+    <span class="Li">$type</span> sont remplacés par la source, la destination
+    et le type. <span class="Li">"obj"</span> est un pointeur vers la
+    structure C.</p>
+<p class="Pp"><i>Types spéciaux</i></p>
+<dl class="Bl-tag">
+  <dt id="String,"><a class="permalink" href="#String,">Chaîne, PV et
+    PVnull</a></dt>
+  <dd>Une chaîne est représentée en C comme un pointeur vers une plage de
+      caractères terminée par un caractère nul. En Perl, cela est appelé
+      <span class="Li">"PV"</span> (pointer value). Lors de la conversion d'un
+      Perl <span class="Li">"undef"</span> vers une chaîne C, Perl le convertit par
+      défaut en une chaîne vide. Bien que cela soit sûr, ce n'est pas
+      toujours ce qui est requis, car de nombreuses interfaces C traitent NULL comme un cas
+      spécial. Pour cette raison le type <span class="Li">"PVnull"</span> est
+      introduit, qui convertit <span class="Li">"undef"</span> en
+      <span class="Li">"NULL"</span> et
+      <span class="Li">"NULL"</span> en
+      <span class="Li">"undef"</span>.
+    <p class="Pp">Pour le faire fonctionner, vous avez besoin de la ligne suivante dans votre fichier
+        de typemap :</p>
+        <pre>PVnull          | PVnull | | | strdup
+</pre>
+    <p class="Pp">Maintenant, vous pouvez définir n'importe quel type, membre de structure ou argument
+        de fonction comme type <span class="Li">"PVnull"</span>.</p>
+  </dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Functions_map_file'><a class='permalink' href='#Functions_map_file'>Fichier map Functions</a></h2>
+<p class="Pp">Contient la correspondance entre les fonctions C et les fonctions Perl. Cela peut
+    être utilisé pour réordonner les arguments, indiquer à XSBuilder quels arguments sont des
+    valeurs de retour, et dans quel paquet Perl la fonction sera créée.</p>
+<p class="Pp">Il y a quelques directives qui affectent les correspondances de fonctions qui
+    suivent. Chaque directive peut apparaître dans le fichier plus d'une fois.</p>
+<dl class="Bl-tag">
+  <dt id="MODULE"><a class="permalink" href="#MODULE">MODULE</a></dt>
+  <dd>le nom du module (nom de fichier) où la fonction devrait être définie, par ex.
+        <pre>MODULE=Apache::Connection
+</pre>
+    <p class="Pp">définira les fonctions qui suivent dans des fichiers nommés
+        Apache/Connection.{pm,xs}</p>
+  </dd>
+  <dt id="PACKAGE"><a class="permalink" href="#PACKAGE">PACKAGE</a></dt>
+  <dd>Le nom du paquet dans lequel les fonctions sont définies. Si non défini,
+      PACKAGE prend par défaut la valeur de MODULE. Une valeur de 'guess' indique que
+      le nom du paquet devrait être deviné en se basant sur le premier argument trouvé qui correspond
+      à une classe Perl. Repli sur le préfixe (ap_ -&gt; Apache, apr_ -&gt;
+    APR).</dd>
+  <dt id="PREFIX"><a class="permalink" href="#PREFIX">PREFIX</a></dt>
+  <dd>Le préfixe à retirer des fonctions C lors de la création des stubs XS.
+      Par défaut, la valeur de PACKAGE, convertie en convention de nommage C. Par
+      exemple,
+        <pre>PREFIX=APR::Base64
+</pre>
+    <p class="Pp">retirera <span class="Li">"apr_base64_"</span>
+        des fonctions C. Si le préfixe ne correspond pas, par défaut
+        <span class="Li">"ap_"</span> ou
+        <span class="Li">"apr_"</span>.</p>
+  </dd>
+</dl>
+<p class="Pp"><b>NOTE :</b> Vous devez avoir au moins une
+    <span class="Li">"MODULE"</span> définition, sinon toutes les
+    fonctions seront ignorées.</p>
+<p class="Pp">Le format des entrées est :</p>
+<pre>C function name | dispatch function name (dispatch argspec) | argspec | Perl alias</pre>
+<p class="Pp">Le <span class="Li">"dispatch function name"</span>
+    (la fonction C qui est réellement appelée) prend par défaut le nom de la fonction C. Si le
+    nom de la fonction de dispatch est juste un préfixe (mpxs_, MPXS_), le
+    <span class="Li">"C function name"</span> y est ajouté. Le
+    type de retour peut être spécifié avant le <span class="Li">"C function
+    name"</span>, et prend par défaut la
+    <span class="Li">"return_type"</span> dans le
+    <span class="Li">"{foo}::FunctionTable"</span> module généré par
+    le module <span class="Li">"ParseSource"</span> .</p>
+<p class="Pp">Le <span class="Li">"dispatch argspec"</span> est
+    facultatif. S'il est fourni, il peut être utilisé pour passer des paramètres différents à la
+    fonction de dispatch qu'à la fonction XS. Si le nom de fonction commence par
+    <span class="Li">"DEFINE_"</span>, une nouvelle fonction est définie (pour
+    définir des fonctions qui ne sont pas analysées depuis la source).
+    <span class="Li">"argspec"</span> doit être fourni.
+    <span class="Li">"DEFINE_"</span> n'est pas inclus dans le nom de fonction
+    généré.</p>
+<p class="Pp">Le <span class="Li">"argspec"</span> prend par défaut les
+    arguments dans <span class="Li">"{foo}::FunctionTable"</span>, tel que
+    généré par le module <span class="Li">"ParseSource"</span> .
+    Les types d'arguments peuvent être spécifiés pour remplacer ceux dans
+    <span class="Li">"{foo}::FunctionTable"</span>. Des valeurs par défaut peuvent
+    aussi être spécifiées, par ex. arg=default_value</p>
+<p class="Pp">Par exemple :
+  <br/>
+   ap_get_client_block | mpxs_ | r, SV *:buffer, bufsiz
+  <br/>
+   ap_setup_client_block | | r, read_policy=REQUEST_CHUNKED_ERROR
+  <br/>
+   ap_make_array | ap_make_array(r-&gt;pool, nelts, elt_size) | request_rec *:r,
+    nelts, elt_size</p>
+<p class="Pp">argspec de '...' indique passthru, appelant la fonction avec</p>
+<pre>(aTHX_ I32 items, SP **sp, SV **MARK)</pre>
+<p class="Pp">Pour marquer un argument comme étant seulement en retour, vous pouvez le préfixer avec
+    &lt; par ex.</p>
+<pre>dav_open_lockdb | | r, ro, &lt;lockdb</pre>
+<p class="Pp">sera appelé comme ($error reçoit la valeur de retour de la fonction C
+  )</p>
+<pre>($error, $lockdb) = $r -&gt; open_lockdb (0) ;</pre>
+<p class="Pp">L'argument de retour (par ex. lockdb) sera toujours passé par adresse
+    à la fonction.</p>
+<p class="Pp">L'alias de fonction, s'il est défini, sera créé dans le
+    <span class="Li">"PACKAGE"</span>courant.</p>
+<p class="Pp">Les noms de fonctions sur les lignes qui ne commencent pas par un caractère de mot ou
+    une seule espace sont ignorés. Les noms de fonctions peuvent être préfixés avec les
+    symboles suivants :</p>
+<pre>'!' =&gt; 'désactivé ou pas encore implémenté',
+'~' =&gt; 'implémenté mais pas auto-généré',
+'-' =&gt; 'probablement jamais disponible pour Perl',
+'&gt;' =&gt; '"privé" pour votre bibliothèque C',
+'?' =&gt; 'non classifié',</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Structures_map_file'><a class='permalink' href='#Structures_map_file'>Fichier map Structures</a></h2>
+<p class="Pp">Contient la correspondance entre les structures C et les classes Perl et définit
+    les membres pour lesquels des méthodes d'accès doivent être créées. Une
+    <span class="Li">"new"</span> méthode peut être spécifiée, si désiré.
+    Le format ressemble à ce qui suit :</p>
+<pre>&lt;struct_name&gt;
+  member1
+  member2
+  new
+&lt;/struct_name&gt;</pre>
+<p class="Pp">Un nom de module facultatif peut être donné, pour spécifier dans quel module
+    le code devrait être placé. Pour placer la structure dans My::Module, par
+    exemple, spécifiez :</p>
+<pre>&lt;struct_name MODULE=My::Module&gt;</pre>
+<p class="Pp">Pour tous les membres listés ici, XSBuilder générera une
+    méthode d'accès pour lire et écrire son contenu. Si vous voulez nommer la méthode d'accès Perl
+    différemment du membre C, vous pouvez écrire</p>
+<pre>cMemberValue | member_value | type</pre>
+<p class="Pp">cela correspondra le membre de structure <span class="Li">"cMemberValue"</span>
+    à la fonction d'accès
+    <span class="Li">"member_value"</span>. Par défaut, on utilise le
+    même nom en Perl qu'en C. En troisième argument, vous pouvez donner un nom de type. Cela
+    prend par défaut le type de la variable. Cela peut être utilisé pour spécifier un type
+    différent, pour des besoins de conversion spéciaux. (par ex. PV versus PVnull) Si vous donnez le
+    <span class="Li">"new"</span> membre, XSBuilder créera une méthode
+    new pour cette classe, qui peut être utilisée pour créer une nouvelle instance et
+    l'initialiser avec des données.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Callbacks_map_file'><a class='permalink' href='#Callbacks_map_file'>Fichier map Callbacks</a></h2>
+<p class="Pp">Le format des entrées est :</p>
+<pre>C function name | argspec</pre>
+<p class="Pp">Le contenu est le même que pour la map des fonctions, mais il contient les
+    callbacks.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Additional_generated_methods'><a class='permalink' href='#Additional_generated_methods'>Méthodes générées supplémentaires</a></h1>
+<p class="Pp">Pour les structures, XSBuilder générera deux méthodes supplémentaires :
+    <span class="Li">"new"</span>, et
+    <span class="Li">"init_callbacks"</span>.</p>
+<section class="Ss">
+<h2 class="Ss" id='new_($initialvalue)'><a class='permalink' href='#new_($initialvalue)'>new   ($initialvalue)</a></h2>
+<p class="Pp">Avec <span class="Li">"new"</span> vous pouvez créer un nouvel
+    objet Perl pour une structure C. Optionnellement, vous pouvez passer soit une
+    référence à un hash avec des données initiales, soit un autre objet, dont les données seront copiées dans le nouvel
+    objet.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='init_callbacks'><a class='permalink' href='#init_callbacks'>init_callbacks</a></h2>
+<p class="Pp"><span class="Li">"init_callbacks"</span> devrait être
+    appelé lors de l'initialisation de l'objet. Il remplira tous les membres de callback d'une
+    structure avec des pointeurs qui provoquent un appel de méthode vers l'objet, lorsque le
+    callback est appelé depuis C.</p>
+<p class="Pp">Vous pouvez l'appeler soit avec</p>
+<pre>$obj -&gt; init_callbacks</pre>
+<p class="Pp">ou</p>
+<pre>MyModule -&gt; init_callbacks ($obj) ;</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Callbacks'><a class='permalink' href='#Callbacks'>Callbacks</a></h1>
+<p class="Pp">Un callback qui fait partie d'une structure provoquera un appel à la
+    méthode portant le même nom que le membre de structure, préfixée avec
+    <span class="Li">"cb_"</span>. Par exemple, si vous avez un
+    membre de structure nommé <span class="Li">"open"</span>, alors la
+    méthode Perl <span class="Li">"cb_open"</span> sera appelée
+    chaque fois que le code C appelle le callback.</p>
+<p class="Pp">Si vous voulez appeler le callback vous-même, vous devez appeler la
+    méthode qui est appelée comme le membre de structure, par ex.
+    <span class="Li">"open"</span>.</p>
+<p class="Pp">NOTE : Vousavez besoin d'appeler
+    <span class="Li">"init_callbacks"</span> lors de l'initialisation
+    de votre méthode pour pouvoir appeler les rappels.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2024-07-13</td>
+    <td class="foot-os">perl v5.38.2</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-extutils-xsbuilder/">extra/perl-extutils-xsbuilder</a></dd>
+        <dt>Version :</dt>
+        <dd>0.28-11</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://search.cpan.org/dist/ExtUtils-XSBuilder">https://search.cpan.org/dist/ExtUtils-XSBuilder</a></dd>
+        <dt>Licences :</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-extutils-xsbuilder/">/listing/extra/perl-extutils-xsbuilder/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#Format_of_the_map_files">Format des fichiers de correspondance</a></li>
+        
+            <li><a href="#Additional_generated_methods">Méthodes générées supplémentaires</a></li>
+        
+            <li><a href="#Callbacks">Rappels</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/ExtUtils::XSBuilder.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/ExtUtils::XSBuilder.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible selon les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               , à l'exception du contenu des pages de manuel, qui possède sa propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

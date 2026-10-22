@@ -1,0 +1,993 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Algorithm::Diff(3pm) — Pages manuelles d'Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Algorithm__Diff(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-algorithm-diff/">perl-algorithm-diff</a></p>
+<p class="lic">Licences: GPL, PerlArtistic</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Algorithm::Diff(3)</td>
+    <td class="head-vol">Documentation Perl contribuée par les utilisateurs</td>
+    <td class="head-rtitle">Algorithm::Diff(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">Algorithm::Diff - Calcule les différences « intelligentes » entre deux
+    fichiers / listes</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>require Algorithm::Diff;
+# Cet exemple produit une sortie 'diff' traditionnelle :
+my $diff = Algorithm::Diff-&gt;new( \@seq1, \@seq2 );
+$diff-&gt;Base( 1 );   # Retourne les numéros de ligne, pas les indices
+while(  $diff-&gt;Next()  ) {
+    next   if  $diff-&gt;Same();
+    my $sep = '';
+    if(  ! $diff-&gt;Items(2)  ) {
+        printf "%d,%dd%d\n",
+            $diff-&gt;Get(qw( Min1 Max1 Max2 ));
+    } elsif(  ! $diff-&gt;Items(1)  ) {
+        printf "%da%d,%d\n",
+            $diff-&gt;Get(qw( Max1 Min2 Max2 ));
+    } else {
+        $sep = "---\n";
+        printf "%d,%dc%d,%d\n",
+            $diff-&gt;Get(qw( Min1 Max1 Min2 Max2 ));
+    }
+    print "&lt; $_"   for  $diff-&gt;Items(1);
+    print $sep;
+    print "&gt; $_"   for  $diff-&gt;Items(2);
+}
+# Interfaces alternatives :
+use Algorithm::Diff qw(
+    LCS LCS_length LCSidx
+    diff sdiff compact_diff
+    traverse_sequences traverse_balanced );
+@lcs    = LCS( \@seq1, \@seq2 );
+$lcsref = LCS( \@seq1, \@seq2 );
+$count  = LCS_length( \@seq1, \@seq2 );
+( $seq1idxref, $seq2idxref ) = LCSidx( \@seq1, \@seq2 );
+# Interfaces compliquées :
+@diffs  = diff( \@seq1, \@seq2 );
+@sdiffs = sdiff( \@seq1, \@seq2 );
+@cdiffs = compact_diff( \@seq1, \@seq2 );
+traverse_sequences(
+    \@seq1,
+    \@seq2,
+    {   MATCH     =&gt; \&amp;callback1,
+        DISCARD_A =&gt; \&amp;callback2,
+        DISCARD_B =&gt; \&amp;callback3,
+    },
+    \&amp;key_generator,
+    @extra_args,
+);
+traverse_balanced(
+    \@seq1,
+    \@seq2,
+    {   MATCH     =&gt; \&amp;callback1,
+        DISCARD_A =&gt; \&amp;callback2,
+        DISCARD_B =&gt; \&amp;callback3,
+        CHANGE    =&gt; \&amp;callback4,
+    },
+    \&amp;key_generator,
+    @extra_args,
+);</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='INTRODUCTION'><a class='permalink' href='#INTRODUCTION'>INTRODUCTION</a></h1>
+<p class="Pp">(par Mark-Jason Dominus)</p>
+<p class="Pp">J'ai lu un jour un article écrit par les auteurs de
+    <span class="Li">"diff"</span>; ils disaient qu'ils avaient travaillé très
+    dur sur l'algorithme jusqu'à ce qu'ils trouvent le bon.</p>
+<p class="Pp">Je pense que ce qu'ils ont fini par utiliser (et j'espère que quelqu'un me corrigera,
+    car je ne suis pas très sûr de cela) était la méthode de la « plus longue sous-séquence commune ».
+    Dans le problème de la LCS, vous avez deux séquences d'éléments :</p>
+<pre>a b c d f g h j q z
+a b c d e f g i j k r x y z</pre>
+<p class="Pp">et vous voulez trouver la plus longue séquence d'éléments présente
+    dans les deux séquences d'origine dans le même ordre. C'est-à-dire, vous voulez trouver une
+    nouvelle séquence <i>S</i> qui peut être obtenue à partir de la première séquence en
+    supprimant certains éléments, et à partir de la deuxième séquence en supprimant d'autres éléments.
+    Vous voulez aussi que <i>S</i> soit aussi longue que possible. Dans ce cas, <i>S</i>
+  est</p>
+<pre>a b c d f g j z</pre>
+<p class="Pp">De là, il ne manque qu'un petit pas pour obtenir une sortie de type diff :</p>
+<pre>e   h i   k   q r x y
++   - +   +   - + + +</pre>
+<p class="Pp">Ce module résout le problème de la LCS. Il inclut également une fonction toute faite pour générer une sortie de type <span class="Li">"diff"</span>.</p>
+<p class="Pp">D'après l'exemple ci-dessus, il pourrait sembler que la LCS de deux séquences
+    est toujours assez évidente, mais ce n'est pas toujours le cas, surtout lorsque
+    les deux séquences ont de nombreux éléments répétés. Par exemple, considérez</p>
+<pre>a x b y c z p d q
+a b c a x b y c z</pre>
+<p class="Pp">Une approche naïve pourrait commencer par appairer le
+    <span class="Li">"a"</span> et le
+    <span class="Li">"b"</span> qui apparaissent au début de chaque
+    séquence, comme ceci :</p>
+<pre>a x b y c         z p d q
+a   b   c a b y c z</pre>
+<p class="Pp">Cela trouve la sous-séquence commune <span class="Li">"a b c
+    z"</span>. Mais en fait, la LCS est <span class="Li">"a x b y c
+    z"</span>:</p>
+<pre>      a x b y c z p d q
+a b c a x b y c z</pre>
+<p class="Pp">ou</p>
+<pre>a       x b y c z p d q
+a b c a x b y c z</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='USAGE'><a class='permalink' href='#USAGE'>UTILISATION</a></h1>
+<p class="Pp">(Voir aussi le fichier README et plusieurs scripts d'exemple inclus avec
+    ce module.)</p>
+<p class="Pp">Ce module fournit maintenant une interface orientée objet qui utilise
+    moins de mémoire et est plus facile à utiliser que la plupart des interfaces procédurales
+    précédentes. Il fournit toujours plusieurs fonctions exportables. Nous les aborderons
+    par ordre croissant de difficulté :
+    <span class="Li">"LCS"</span>,
+    <span class="Li">"LCS_length"</span>,
+    <span class="Li">"LCSidx"</span>, interface OO,
+    <span class="Li">"prepare"</span>,
+    <span class="Li">"diff"</span>,
+    <span class="Li">"sdiff"</span>,
+    <span class="Li">"traverse_sequences"</span>, et
+    <span class="Li">"traverse_balanced"</span>.</p>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;LCS&amp;quot;'><a class='permalink' href='#&amp;quot;LCS&amp;quot;'>"LCS"</a></h2>
+<p class="Pp">Étant donné des références à deux listes d'éléments, LCS retourne un tableau
+    contenant leur plus longue sous-séquence commune. En contexte scalaire, elle retourne une
+    référence à une telle liste.</p>
+<pre>@lcs    = LCS( \@seq1, \@seq2 );
+$lcsref = LCS( \@seq1, \@seq2 );</pre>
+<p class="Pp"><span class="Li">"LCS"</span> peut recevoir un troisième paramètre
+    optionnel ; c'est une référence CODE à une fonction de génération de clé. Voir
+    "FONCTIONS DE GÉNÉRATION DE CLÉS".</p>
+<pre>@lcs    = LCS( \@seq1, \@seq2, \&amp;keyGen, @args );
+$lcsref = LCS( \@seq1, \@seq2, \&amp;keyGen, @args );</pre>
+<p class="Pp">Les paramètres supplémentaires, s'il y en a, seront passés à la
+    routine de génération de clés.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;LCS_length&amp;quot;'><a class='permalink' href='#&amp;quot;LCS_length&amp;quot;'>"LCS_length"</a></h2>
+<p class="Pp">C'est exactement comme <span class="Li">"LCS"</span> sauf
+    qu'elle ne retourne que la longueur de la plus longue sous-séquence commune. Cela offre
+    un gain de performance d'environ 9 % par rapport à
+    <span class="Li">"LCS"</span>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;LCSidx&amp;quot;'><a class='permalink' href='#&amp;quot;LCSidx&amp;quot;'>"LCSidx"</a></h2>
+<p class="Pp">Comme <span class="Li">"LCS"</span> sauf qu'elle retourne
+    des références à deux tableaux. Le premier tableau contient les indices dans
+    <span class="Li">@seq1</span> où se trouvent les éléments de la LCS. Le deuxième
+    tableau contient les indices dans <span class="Li">@seq2</span> où se trouvent les
+    éléments de la LCS.</p>
+<p class="Pp">Par conséquent, les trois listes suivantes contiendront les mêmes
+  valeurs :</p>
+<pre>my( $idx1, $idx2 ) = LCSidx( \@seq1, \@seq2 );
+my @list1 = @seq1[ @$idx1 ];
+my @list2 = @seq2[ @$idx2 ];
+my @list3 = LCS( \@seq1, \@seq2 );</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;new&amp;quot;'><a class='permalink' href='#&amp;quot;new&amp;quot;'>"new"</a></h2>
+<pre>$diff = Algorithm::Diff-&gt;new( \@seq1, \@seq2 );
+$diff = Algorithm::Diff-&gt;new( \@seq1, \@seq2, \%opts );</pre>
+<p class="Pp"><span class="Li">"new"</span> calcule le plus petit ensemble
+    d'ajouts et de suppressions nécessaire pour transformer la première séquence en
+    la deuxième et les enregistre de manière compacte dans l'objet.</p>
+<p class="Pp">Vous utilisez l'objet pour itérer sur les <i>blocs</i>, où chaque bloc
+    représente une section contiguë d'éléments qui doivent être ajoutés, supprimés,
+    remplacés ou laissés inchangés.</p>
+<p class="Pp">Le résumé suivant de toutes les méthodes ressemble beaucoup à du code
+    Perl mais certains symboles ont des significations différentes :</p>
+<pre>[ ]     Enveloppe des arguments optionnels
+:       Est suivi de la valeur par défaut d'un argument optionnel
+|       Sépare les résultats de retour alternatifs</pre>
+<p class="Pp">Résumé des méthodes :</p>
+<pre>$obj        = Algorithm::Diff-&gt;new( \@seq1, \@seq2, [ \%opts ] );
+$pos        = $obj-&gt;Next(  [ $count : 1 ] );
+$revPos     = $obj-&gt;Prev(  [ $count : 1 ] );
+$obj        = $obj-&gt;Reset( [ $pos : 0 ] );
+$copy       = $obj-&gt;Copy(  [ $pos, [ $newBase ] ] );
+$oldBase    = $obj-&gt;Base(  [ $newBase ] );</pre>
+<p class="Pp">Notez que toutes les méthodes suivantes
+    <span class="Li">"die"</span> si elles sont utilisées sur un objet qui est
+    "réinitialisé" (ne pointant actuellement vers aucun bloc).</p>
+<pre>$bits       = $obj-&gt;Diff(  );
+@items|$cnt = $obj-&gt;Same(  );
+@items|$cnt = $obj-&gt;Items( $seqNum );
+@idxs |$cnt = $obj-&gt;Range( $seqNum, [ $base ] );
+$minIdx     = $obj-&gt;Min(   $seqNum, [ $base ] );
+$maxIdx     = $obj-&gt;Max(   $seqNum, [ $base ] );
+@values     = $obj-&gt;Get(   @names );</pre>
+<p class="Pp">Passer <span class="Li">"undef"</span> pour un argument optionnel est toujours traité de la même manière que si aucun argument n'était passé.</p>
+<dl class="Bl-tag">
+  <dt>"Next"</dt>
+  <dd>
+    <pre>$pos = $diff-&gt;Next();    # Avance d'un bloc
+$pos = $diff-&gt;Next( 2 ); # Avance de deux blocs
+$pos = $diff-&gt;Next(-5);  # Recule de cinq blocs
+</pre>
+    <p class="Pp"><span class="Li">"Next"</span> déplace l'objet pour
+        qu'il pointe vers le suivant. L'objet commence dans un état "réinitialisé", ce qui
+        signifie qu'il ne pointe vers aucun bloc. Si l'objet est réinitialisé, alors
+        <span class="Li">Next()</span> se déplace vers le premier bloc.</p>
+    <p class="Pp"><span class="Li">"Next"</span> retourne une valeur vraie
+        si le déplacement n'est pas allé au-delà du dernier bloc. Ainsi
+        <span class="Li">Next(0)</span> renverra une valeur vraie si l'objet n'est pas
+        réinitialisé.</p>
+    <p class="Pp">En fait, <span class="Li">"Next"</span> renvoie la
+        nouvelle position de l'objet, qui est un nombre compris entre 1 et le
+        nombre de blocs (inclus), ou renvoie une valeur fausse.</p>
+  </dd>
+  <dt>"Prev"</dt>
+  <dd><span class="Li">Prev($N)</span> est presque identique à
+      <span class="Li">Next(-$N)</span>; il se déplace vers le
+      <span class="Li">$Nième</span> bloc précédent. Sur un objet 'réinitialisé',
+      <span class="Li">Prev()</span> [et <span class="Li">Next(-1)</span>] se déplacent
+      vers le dernier bloc.
+    <p class="Pp">La position renvoyée par
+        <span class="Li">"Prev"</span> est relative à la <i>fin</i>
+        des blocs ; -1 pour le dernier bloc, -2 pour l'avant-dernier, etc.</p>
+  </dd>
+  <dt>"Reset"</dt>
+  <dd>
+    <pre>$diff-&gt;Reset();     # Réinitialise la position de l'objet
+$diff-&gt;Reset($pos); # Se déplace vers le bloc spécifié
+$diff-&gt;Reset(1);    # Se déplace vers le premier bloc
+$diff-&gt;Reset(-1);   # Se déplace vers le dernier bloc
+</pre>
+    <p class="Pp"><span class="Li">"Reset"</span> renvoie l'objet,
+        donc, par exemple, vous pourriez utiliser
+        <span class="Li">"$diff-&gt;Reset()-&gt;Next(-1)"</span> pour
+        obtenir le nombre de blocs.</p>
+  </dd>
+  <dt>"Copy"</dt>
+  <dd>
+    <pre>$copy = $diff-&gt;Copy( $newPos, $newBase );
+</pre>
+    <p class="Pp"><span class="Li">"Copy"</span> renvoie une copie de
+        l'objet. La copie et l'objet original partagent la plupart de leurs
+        données, donc faire des copies prend très peu de mémoire. La copie
+        maintient sa propre position (séparée de celle de l'original), ce qui
+        est le but principal des copies. Elle maintient également sa propre
+        base.</p>
+    <p class="Pp">Par défaut, la position de la copie est initialement la même que
+        celle de l'objet original. Mais <span class="Li">"Copy"</span>
+        accepte un premier argument optionnel pour définir la nouvelle
+        position, donc les trois extraits suivants sont équivalents :</p>
+        <pre>$copy = $diff-&gt;Copy($pos);
+$copy = $diff-&gt;Copy();
+$copy-&gt;Reset($pos);
+$copy = $diff-&gt;Copy()-&gt;Reset($pos);
+</pre>
+    <p class="Pp"><span class="Li">"Copy"</span> accepte un deuxième
+        argument optionnel pour définir la base de la copie. Si vous souhaitez
+        changer la base de la copie mais laisser la position identique à celle
+        de l'original, voici deux manières équivalentes :</p>
+        <pre>$copy = $diff-&gt;Copy();
+$copy-&gt;Base( 0 );
+$copy = $diff-&gt;Copy(undef,0);
+</pre>
+    <p class="Pp">Voici deux manières équivalentes d'obtenir une copie
+      "réinitialisée" :</p>
+        <pre>$copy = $diff-&gt;Copy(0);
+$copy = $diff-&gt;Copy()-&gt;Reset();
+</pre>
+  </dd>
+  <dt>"Diff"</dt>
+  <dd>
+    <pre>$bits = $obj-&gt;Diff();
+</pre>
+    <p class="Pp"><span class="Li">"Diff"</span> renvoie une valeur vraie
+        si et seulement si le bloc courant contient des éléments qui sont
+        différents entre les deux séquences. Il renvoie en réalité l'une des
+        4 valeurs suivantes :</p>
+  </dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt>3</dt>
+  <dd><span class="Li">"3==(1|2)"</span>. Ce bloc contient des éléments
+      de <span class="Li">@seq1</span> et les éléments de
+      <span class="Li">@seq2</span> qui doivent les remplacer. Les séquences 1 et 2
+      contiennent toutes deux des éléments modifiés, donc les bits 1 et 2 sont
+      définis.</dd>
+  <dt>2</dt>
+  <dd>Ce bloc ne contient que des éléments de <span class="Li">@seq2</span> qui doivent être insérés (et non des éléments de <span class="Li">@seq1</span>). Seule la séquence 2 contient des éléments
+      modifiés, donc seul le bit 2 est défini.</dd>
+  <dt>1</dt>
+  <dd>Ce bloc ne contient que des éléments de <span class="Li">@seq1</span> qui doivent être supprimés (et non des éléments de <span class="Li">@seq2</span>). Seule la séquence 1 contient des éléments
+      modifiés, donc seul le bit 1 est défini.</dd>
+  <dt>0</dt>
+  <dd>Cela signifie que les éléments de ce bloc sont identiques dans les
+      deux séquences. Ni la séquence 1 ni la séquence 2 ne contiennent
+      d'éléments modifiés, donc ni le bit 1 ni le bit 2 ne sont définis.</dd>
+</dl>
+</div>
+<dl class="Bl-tag">
+  <dt>"Same"</dt>
+  <dd><span class="Li">"Same"</span> renvoie une valeur vraie si et
+      seulement si le bloc courant contient des éléments qui sont identiques
+      dans les deux séquences. Il renvoie en réalité la liste des éléments
+      s'ils sont identiques, ou une liste vide s'ils ne le sont pas. Dans un
+      contexte scalaire, il renvoie la taille de la liste.</dd>
+  <dt>"Items"</dt>
+  <dd>
+    <pre>$count = $diff-&gt;Items(2);
+@items = $diff-&gt;Items($seqNum);
+</pre>
+    <p class="Pp"><span class="Li">"Items"</span> renvoie les éléments (ou le
+        nombre d'éléments) de la séquence spécifiée qui font partie du bloc
+      courant.</p>
+    <p class="Pp">Si le bloc courant ne contient que des insertions, alors
+        <span class="Li">"$diff-&gt;Items(1)"</span> renverra une
+        liste vide (0 dans un contexte scalaire). Si le bloc courant ne
+        contient que des suppressions, alors <span class="Li">"$diff-&gt;Items(2)"</span>
+        renverra une liste vide (0 dans un contexte scalaire).</p>
+    <p class="Pp">Si le bloc contient des remplacements, alors à la fois
+        <span class="Li">"$diff-&gt;Items(1)"</span> et
+        <span class="Li">"$diff-&gt;Items(2)"</span> renverront
+        des listes différentes et non vides.</p>
+    <p class="Pp">Sinon, le bloc contient des éléments identiques et tout ce qui suit
+        renverra les mêmes listes :</p>
+        <pre>@items = $diff-&gt;Items(1);
+@items = $diff-&gt;Items(2);
+@items = $diff-&gt;Same();
+</pre>
+  </dd>
+  <dt>"Range"</dt>
+  <dd>
+    <pre>$count = $diff-&gt;Range( $seqNum );
+@indices = $diff-&gt;Range( $seqNum );
+@indices = $diff-&gt;Range( $seqNum, $base );
+</pre>
+    <p class="Pp"><span class="Li">"Range"</span> est comme
+        <span class="Li">"Items"</span> sauf qu'il renvoie une liste
+        d' <i>indices</i> vers les éléments plutôt que les éléments
+        eux-mêmes. Par défaut, l'index du premier élément (dans chaque
+        séquence) est 0 mais cela peut être changé en appelant la méthode <span class="Li">"Base"</span>
+        . Ainsi, par défaut, les deux extraits suivants renvoient
+        les mêmes listes :</p>
+        <pre>@list = $diff-&gt;Items(2);
+@list = @seq2[ $diff-&gt;Range(2) ];
+</pre>
+    <p class="Pp">Vous pouvez également spécifier la base à utiliser comme deuxième
+        argument. Ainsi les deux extraits suivants <i>toujours</i> renvoient les mêmes listes :</p>
+        <pre>@list = $diff-&gt;Items(1);
+@list = @seq1[ $diff-&gt;Range(1,0) ];
+</pre>
+  </dd>
+  <dt>"Base"</dt>
+  <dd>
+    <pre>$curBase = $diff-&gt;Base();
+$oldBase = $diff-&gt;Base($newBase);
+</pre>
+    <p class="Pp"><span class="Li">"Base"</span> définit et/ou renvoie
+        la base courante (généralement 0 ou 1) qui est utilisée lorsque vous
+        demandez des informations de plage. La base vaut par défaut 0 afin que
+        les informations de plage soient renvoyées sous forme d'indices de
+        tableau. Vous pouvez définir la base à 1 si vous préférez rapporter
+        des numéros de ligne traditionnels.</p>
+  </dd>
+  <dt>"Min"</dt>
+  <dd>
+    <pre>$min1 = $diff-&gt;Min(1);
+$min = $diff-&gt;Min( $seqNum, $base );
+</pre>
+    <p class="Pp"><span class="Li">"Min"</span> renvoie la première
+        valeur que <span class="Li">"Range"</span> renverrait (avec
+        les mêmes arguments) ou renvoie <span class="Li">"undef"</span>
+        si <span class="Li">"Range"</span> renverrait une liste
+      vide.</p>
+  </dd>
+  <dt>"Max"</dt>
+  <dd><span class="Li">"Max"</span> renvoie la dernière valeur que
+      <span class="Li">"Range"</span> renverrait ou
+      <span class="Li">"undef"</span>.</dd>
+  <dt>"Get"</dt>
+  <dd>
+    <pre>( $n, $x, $r ) = $diff-&gt;Get(qw( min1 max1 range1 ));
+@values = $diff-&gt;Get(qw( 0min2 1max2 range2 same base ));
+</pre>
+    <p class="Pp"><span class="Li">"Get"</span> renvoie une ou plusieurs
+        valeurs scalaires. Vous passez une liste des noms des valeurs que vous
+        souhaitez voir renvoyées. Chaque nom doit correspondre à l'une des
+        expressions régulières suivantes :</p>
+        <pre>/^(-?\d+)?(min|max)[12]$/i
+/^(range[12]|same|diff|base)$/i
+</pre>
+    <p class="Pp">Le 1 ou 2 après un nom indique pour quelle séquence vous voulez
+        les informations (et, lorsque c'est autorisé, il est requis). Le nombre
+        optionnel avant "min" ou "max" est la base à utiliser. Ainsi, les
+        égalités suivantes sont valables :</p>
+        <pre>$diff-&gt;Get('min1') == $diff-&gt;Min(1)
+$diff-&gt;Get('0min2') == $diff-&gt;Min(2,0)
+</pre>
+    <p class="Pp">Utiliser <span class="Li">"Get"</span> dans un contexte
+        scalaire lorsque vous avez passé plus d'un nom est une erreur fatale
+        (<span class="Li">"die"</span> est appelé).</p>
+  </dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;prepare&amp;quot;'><a class='permalink' href='#&amp;quot;prepare&amp;quot;'>"prepare"</a></h2>
+<p class="Pp">Étant donné une référence à une liste d'éléments,
+    <span class="Li">"prepare"</span> renvoie une référence à un
+    hachage qui peut être utilisé pour comparer cette séquence à d'autres
+    séquences avec
+    <span class="Li">"LCS"</span> ou
+    <span class="Li">"LCS_length"</span>.</p>
+<pre>$prep = prepare( \@seq1 );
+for $i ( 0 .. 10_000 )
+{
+    @lcs = LCS( $prep, $seq[$i] );
+    # faire quelque chose d'utile avec @lcs
+}</pre>
+<p class="Pp"><span class="Li">"prepare"</span> peut recevoir un
+    troisième paramètre optionnel ; c'est une référence CODE à une fonction de
+    génération de clés. Voir "KEY GENERATION FUNCTIONS".</p>
+<pre>$prep = prepare( \@seq1, \&amp;keyGen );
+for $i ( 0 .. 10_000 )
+{
+    @lcs = LCS( $seq[$i], $prep, \&amp;keyGen );
+    # faire quelque chose d'utile avec @lcs
+}</pre>
+<p class="Pp">Utiliser <span class="Li">"prepare"</span> procure un gain
+    de performance d'environ 50% lors de nombreux appels à LCS par rapport à
+    l'absence de préparation.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;diff&amp;quot;'><a class='permalink' href='#&amp;quot;diff&amp;quot;'>"diff"</a></h2>
+<pre>@diffs     = diff( \@seq1, \@seq2 );
+$diffs_ref = diff( \@seq1, \@seq2 );</pre>
+<p class="Pp"><span class="Li">"diff"</span> calcule le plus petit
+    ensemble d'ajouts et de suppressions nécessaire pour transformer la
+    première séquence en la seconde, et renvoie une description de ces
+    changements. La description est une liste de <i>blocs</i>; chaque bloc représente une section contiguë d'éléments
+    qui doivent être ajoutés, supprimés ou remplacés. (Les blocs contenant des
+    éléments inchangés ne sont pas inclus.)</p>
+<p class="Pp">La valeur de retour de <span class="Li">"diff"</span> est une
+    liste de blocs, ou, dans un contexte scalaire, une référence à une telle
+    liste. S'il n'y a pas de différences, la liste sera vide.</p>
+<p class="Pp">Voici un exemple. Appeler
+    <span class="Li">"diff"</span> pour les deux séquences
+  suivantes :</p>
+<pre>a b c e h j l m n p
+b c d e f j k l m r s t</pre>
+<p class="Pp">produirait la liste suivante :</p>
+<pre>(
+  [ [ '-', 0, 'a' ] ],
+  [ [ '+', 2, 'd' ] ],
+  [ [ '-', 4, 'h' ],
+    [ '+', 4, 'f' ] ],
+  [ [ '+', 6, 'k' ] ],
+  [ [ '-',  8, 'n' ],
+    [ '-',  9, 'p' ],
+    [ '+',  9, 'r' ],
+    [ '+', 10, 's' ],
+    [ '+', 11, 't' ] ],
+)</pre>
+<p class="Pp">Il y a cinq blocs ici. Le premier bloc indique que le
+    <span class="Li">"a"</span> à la position 0 de la première séquence
+    doit être supprimé (<span class="Li">"-"</span>). Le deuxième bloc
+    indique que le <span class="Li">"d"</span> à la position 2 de la
+    deuxième séquence doit être inséré (<span class="Li">"+"</span>).
+    Le troisième bloc indique que le <span class="Li">"h"</span> à
+    la position 4 de la première séquence doit être retiré et remplacé par le
+    <span class="Li">"f"</span> de la position 4 de la deuxième
+    séquence. Et ainsi de suite.</p>
+<p class="Pp"><span class="Li">"diff"</span> peut recevoir un
+    troisième paramètre optionnel ; il s'agit d'une référence CODE vers une
+    fonction de génération de clé. Voir "KEY GENERATION FUNCTIONS".</p>
+<p class="Pp">Les paramètres supplémentaires, s'il y en a, seront passés à la
+    routine de génération de clé.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;sdiff&amp;quot;'><a class='permalink' href='#&amp;quot;sdiff&amp;quot;'>"sdiff"</a></h2>
+<pre>@sdiffs     = sdiff( \@seq1, \@seq2 );
+$sdiffs_ref = sdiff( \@seq1, \@seq2 );</pre>
+<p class="Pp"><span class="Li">"sdiff"</span> calcule tous les
+    composants nécessaires pour afficher deux séquences et leurs différences
+    minimisées côte à côte, tout comme l'utilitaire Unix <i>sdiff</i> le fait :</p>
+<pre>same             same
+before     |     after
+old        &lt;     -
+-          &gt;     new</pre>
+<p class="Pp">Elle retourne une liste de références de tableaux, chacune pointant vers
+    un tableau d'instructions d'affichage. En contexte scalaire, elle retourne
+    une référence vers une telle liste. S'il n'y a pas de différences, la
+    liste contiendra une entrée pour chaque élément, chacune indiquant que
+    l'élément n'a pas été modifié.</p>
+<p class="Pp">Les instructions d'affichage se composent de trois éléments : un indicateur
+    de modificateur (<span class="Li">"+"</span>: élément ajouté,
+    <span class="Li">"-"</span>: élément supprimé,
+    <span class="Li">"u"</span>: élément non modifié,
+    <span class="Li">"c"</span>: élément modifié) et les valeurs des
+    éléments ancien et nouveau, à afficher côte à côte.</p>
+<p class="Pp">Un <span class="Li">"sdiff"</span> des deux
+    séquences suivantes :</p>
+<pre>a b c e h j l m n p
+b c d e f j k l m r s t</pre>
+<p class="Pp">donne</p>
+<pre>( [ '-', 'a', ''  ],
+  [ 'u', 'b', 'b' ],
+  [ 'u', 'c', 'c' ],
+  [ '+', '',  'd' ],
+  [ 'u', 'e', 'e' ],
+  [ 'c', 'h', 'f' ],
+  [ 'u', 'j', 'j' ],
+  [ '+', '',  'k' ],
+  [ 'u', 'l', 'l' ],
+  [ 'u', 'm', 'm' ],
+  [ 'c', 'n', 'r' ],
+  [ 'c', 'p', 's' ],
+  [ '+', '',  't' ],
+)</pre>
+<p class="Pp"><span class="Li">"sdiff"</span> peut recevoir un
+    troisième paramètre optionnel ; il s'agit d'une référence CODE vers une
+    fonction de génération de clé. Voir "KEY GENERATION FUNCTIONS".</p>
+<p class="Pp">Les paramètres supplémentaires, s'il y en a, seront passés à la
+    routine de génération de clé.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;compact_diff&amp;quot;'><a class='permalink' href='#&amp;quot;compact_diff&amp;quot;'>"compact_diff"</a></h2>
+<p class="Pp"><span class="Li">"compact_diff"</span> est très similaire à
+    <span class="Li">"sdiff"</span> sauf qu'elle retourne une description beaucoup plus
+    compacte consistant en une seule liste plate d'indices. Un exemple
+    aide à expliquer le format :</p>
+<pre>my @a = qw( a b c   e  h j   l m n p      );
+my @b = qw(   b c d e f  j k l m    r s t );
+@cdiff = compact_diff( \@a, \@b );
+# Returns:
+#   @a      @b       @a       @b
+#  start   start   values   values
+(    0,      0,   #       =
+     0,      0,   #    a  !
+     1,      0,   #  b c  =  b c
+     3,      2,   #       !  d
+     3,      3,   #    e  =  e
+     4,      4,   #    f  !  h
+     5,      5,   #    j  =  j
+     6,      6,   #       !  k
+     6,      7,   #  l m  =  l m
+     8,      9,   #  n p  !  r s t
+    10,     12,   #
+);</pre>
+<p class="Pp">Les entrées 0, 2, 4, etc. sont toutes des indices dans
+    <span class="Li">@seq1</span> (@a dans l'exemple ci-dessus) indiquant où un
+    bloc commence. Les entrées 1, 3, 5, etc. sont toutes des indices dans
+    <span class="Li">@seq2</span> (@b dans l'exemple ci-dessus) indiquant où le
+    même bloc commence.</p>
+<p class="Pp">Ainsi, chaque paire d'indices (sauf la dernière paire) décrit où un
+    bloc commence (dans chaque séquence). Puisque chaque bloc doit se terminer à
+    l'élément juste avant celui qui commence le bloc suivant, la paire
+    d'indices suivante peut être utilisée pour déterminer où le bloc se
+    termine.</p>
+<p class="Pp">Ainsi, les 4 premières entrées (0..3) décrivent le premier bloc. Les
+    entrées 0 et 1 décrivent où le premier bloc commence (et sont donc
+    toujours toutes les deux à 0). Les entrées 2 et 3 décrivent où le bloc
+    suivant commence, donc en soustrayant 1 de chacune, nous savons où le
+    premier bloc se termine. C'est-à-dire que le premier bloc contient les
+    éléments <span class="Li">$diff[0]</span> à
+    <span class="Li">"$diff[2] - 1"</span> de la première séquence et
+    contient les éléments <span class="Li">$diff[1]</span> à
+    <span class="Li">"$diff[3] - 1"</span> de la deuxième séquence.</p>
+<p class="Pp">En d'autres termes, le premier bloc se compose des deux listes
+    suivantes d'éléments :</p>
+<pre>           #  1st pair     2nd pair
+           # of indices   of indices
+@list1 = @a[ $cdiff[0] .. $cdiff[2]-1 ];
+@list2 = @b[ $cdiff[1] .. $cdiff[3]-1 ];
+           # Hunk start   Hunk end</pre>
+<p class="Pp">Notez que les blocs alterneront toujours entre ceux qui font
+    partie de la LCS (ceux qui contiennent des éléments inchangés) et ceux qui
+    contiennent des changements. Cela signifie que tout ce dont nous avons
+    besoin est de savoir si le premier bloc est un bloc 'same' ou 'diff', et
+    nous pouvons déterminer lesquels des autres blocs contiennent des éléments
+    'same' ou 'diff'.</p>
+<p class="Pp">Par convention, nous faisons toujours en sorte que le premier bloc contienne
+    des éléments inchangés. Ainsi, les blocs 1, 3, 5, etc. (tous les blocs de
+    numéro impair si vous commencez à compter à partir de 1) contiennent tous
+    des éléments inchangés. Et les blocs 2, 4, 6, etc. (tous les blocs de
+    numéro pair si vous commencez à compter à partir de 1) contiennent tous
+    des éléments modifiés.</p>
+<p class="Pp">Puisque <span class="Li">@a</span> et <span class="Li">@b</span>
+    ne commencent pas par la même valeur, le premier bloc dans notre
+    exemple est vide (sinon nous violerions la convention ci-dessus). Notez
+    que les 4 premières valeurs d'indices dans notre exemple sont toutes à
+    zéro. Insérez ces valeurs dans notre bloc de code précédent et nous
+    obtenons :</p>
+<pre>@hunk1a = @a[ 0 .. 0-1 ];
+@hunk1b = @b[ 0 .. 0-1 ];</pre>
+<p class="Pp">Et <span class="Li">"0..-1"</span> retourne la liste
+    vide.</p>
+<p class="Pp">Descendez d'une paire d'indices (2..5) et nous obtenons les plages
+    d'offsets pour le deuxième bloc, qui contient des éléments modifiés.</p>
+<p class="Pp">Puisque <span class="Li">@diff[2..5]</span> contient (0,0,1,0) dans
+    notre exemple, le deuxième bloc se compose de ces deux listes d'éléments :</p>
+<pre>    @hunk2a = @a[ $cdiff[2] .. $cdiff[4]-1 ];
+    @hunk2b = @b[ $cdiff[3] .. $cdiff[5]-1 ];
+# or
+    @hunk2a = @a[ 0 .. 1-1 ];
+    @hunk2b = @b[ 0 .. 0-1 ];
+# or
+    @hunk2a = @a[ 0 .. 0 ];
+    @hunk2b = @b[ 0 .. -1 ];
+# or
+    @hunk2a = ( 'a' );
+    @hunk2b = ( );</pre>
+<p class="Pp">C'est-à-dire que nous supprimerions l'élément 0 ('a') de
+    <span class="Li">@a</span>.</p>
+<p class="Pp">Puisque <span class="Li">@diff[4..7]</span> contient (1,0,3,2) dans
+    notre exemple, le troisième bloc se compose de ces deux listes d'éléments :</p>
+<pre>    @hunk3a = @a[ $cdiff[4] .. $cdiff[6]-1 ];
+    @hunk3a = @b[ $cdiff[5] .. $cdiff[7]-1 ];
+# or
+    @hunk3a = @a[ 1 .. 3-1 ];
+    @hunk3a = @b[ 0 .. 2-1 ];
+# or
+    @hunk3a = @a[ 1 .. 2 ];
+    @hunk3a = @b[ 0 .. 1 ];
+# or
+    @hunk3a = qw( b c );
+    @hunk3a = qw( b c );</pre>
+<p class="Pp">Notez que ce troisième bloc contient des éléments inchangés comme
+    l'exige notre convention.</p>
+<p class="Pp">Vous pouvez continuer ce processus jusqu'à ce que vous atteigniez les
+    deux derniers indices, qui seront toujours le nombre d'éléments dans
+    chaque séquence. Cela est nécessaire pour que la soustraction de 1 à
+    chacun vous donne les indices des derniers éléments de chaque
+    séquence.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;traverse_sequences&amp;quot;'><a class='permalink' href='#&amp;quot;traverse_sequences&amp;quot;'>"traverse_sequences"</a></h2>
+<p class="Pp"><span class="Li">"traverse_sequences"</span> était
+    la fonctionnalité la plus générale fournie par ce module (la nouvelle
+    interface OO est plus puissante et beaucoup plus facile à utiliser).</p>
+<p class="Pp">Imaginez qu'il y ait deux flèches. La flèche A pointe vers un élément de
+    la séquence A, et la flèche B pointe vers un élément de la séquence B.
+    Initialement, les flèches pointent vers les premiers éléments des
+    séquences respectives.
+    <span class="Li">"traverse_sequences"</span> fera avancer les
+    flèches à travers les séquences un élément à la fois, en appelant une
+    fonction de rappel appropriée spécifiée par l'utilisateur avant chaque
+    avancement. Elle fera avancer les flèches de telle manière que s'il y a des
+    éléments égaux
+    <span class="Li">$A[$i]</span> et <span class="Li">$B[$j]</span> qui sont
+    égaux et qui font partie de la LCS, il y aura un moment pendant
+    l'exécution de <span class="Li">"traverse_sequences"</span> où la
+    flèche A pointe vers <span class="Li">$A[$i]</span> et la flèche B
+    pointe vers <span class="Li">$B[$j]</span>. Quand cela se produit,
+    <span class="Li">"traverse_sequences"</span> appellera la
+    fonction de rappel
+    <span class="Li">"MATCH"</span> puis fera avancer les deux
+    flèches.</p>
+<p class="Pp">Sinon, l'une des flèches pointe vers un élément de sa
+    séquence qui ne fait pas partie de la LCS.
+    <span class="Li">"traverse_sequences"</span> fera avancer cette
+    flèche et appellera le rappel <span class="Li">"DISCARD_A"</span> ou
+    <span class="Li">"DISCARD_B"</span> , selon la
+    flèche qu'elle a fait avancer. Si les deux flèches pointent vers des
+    éléments qui ne font pas partie de la LCS, alors <span class="Li">"traverse_sequences"</span> en fera
+    avancer une et appellera le rappel approprié, mais il n'est pas
+    spécifié lequel elle appellera.</p>
+<p class="Pp">Les arguments de
+    <span class="Li">"traverse_sequences"</span> sont les deux séquences
+    à parcourir, et un hash qui spécifie les fonctions de rappel, comme
+  ceci :</p>
+<pre>traverse_sequences(
+    \@seq1, \@seq2,
+    {   MATCH =&gt; $callback_1,
+        DISCARD_A =&gt; $callback_2,
+        DISCARD_B =&gt; $callback_3,
+    }
+);</pre>
+<p class="Pp">Les rappels pour MATCH, DISCARD_A et DISCARD_B sont invoqués avec au
+    moins les indices des deux flèches comme arguments. On ne s'attend pas à ce
+    qu'ils retournent des valeurs. Si un rappel est omis de la table, il
+    n'est pas appelé.</p>
+<p class="Pp">Les rappels pour A_FINISHED et B_FINISHED sont invoqués avec au moins
+    l'indice correspondant dans A ou B.</p>
+<p class="Pp">Si la flèche A atteint la fin de sa séquence avant que la flèche B ne le fasse,
+    <span class="Li">"traverse_sequences"</span> appellera le rappel
+    <span class="Li">"A_FINISHED"</span> quand elle fera avancer
+    la flèche B, s'il y a une telle fonction ; sinon elle appellera
+    <span class="Li">"DISCARD_B"</span> à la place. De même si la
+    flèche B se termine la première. <span class="Li">"traverse_sequences"</span>
+    se termine lorsque les deux flèches sont aux extrémités de leurs
+    séquences respectives. Elle retourne vrai en cas de succès et faux en cas
+    d'échec. Actuellement, il n'y a aucun moyen d'échouer.</p>
+<p class="Pp"><span class="Li">"traverse_sequences"</span> peut recevoir un
+    quatrième paramètre optionnel ; il s'agit d'une référence CODE vers une
+    fonction de génération de clé. Voir "KEY GENERATION FUNCTIONS".</p>
+<p class="Pp">Les paramètres supplémentaires, s'il y en a, seront passés à la
+    fonction de génération de clé.</p>
+<p class="Pp">Si vous voulez passer des paramètres supplémentaires à vos rappels, mais
+    que vous n'avez pas besoin d'une fonction de génération de clé personnalisée,
+    vous pouvez obtenir la valeur par défaut en passant undef :</p>
+<pre>traverse_sequences(
+    \@seq1, \@seq2,
+    {   MATCH =&gt; $callback_1,
+        DISCARD_A =&gt; $callback_2,
+        DISCARD_B =&gt; $callback_3,
+    },
+    undef,     # default key-gen
+    $myArgument1,
+    $myArgument2,
+    $myArgument3,
+);</pre>
+<p class="Pp"><span class="Li">"traverse_sequences"</span> n'a pas de
+    valeur de retour utile ; on s'attend à ce que vous insériez le
+    comportement approprié avec les fonctions de rappel.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='&amp;quot;traverse_balanced&amp;quot;'><a class='permalink' href='#&traverse_balanced&'&gt;"traverse_balanced"</a></h2>
+<p class="Pp"><span class="Li">"traverse_balanced"</span> est une
+    alternative à <span class="Li">"traverse_sequences"</span>. Elle
+    utilise un algorithme différent pour parcourir les entrées dans le LCS
+    calculé. Au lieu de rester d'un seul côté et de montrer les changements
+    d'éléments uniquement comme des insertions et des suppressions, elle sautera
+    d'avant en arrière entre les deux séquences et signalera <i>les changements</i> survenant comme des suppressions d'un côté
+    suivies immédiatement par une insertion de l'autre.</p>
+<p class="Pp">En plus des <span class="Li">"DISCARD_A"</span>,
+    <span class="Li">"DISCARD_B"</span>, et
+    <span class="Li">"MATCH"</span> rappels (callbacks) pris en charge par
+    <span class="Li">"traverse_sequences"</span>,
+    <span class="Li">"traverse_balanced"</span> prend en charge un rappel
+    <span class="Li">"CHANGE"</span> indiquant qu'un
+    élément a été <span class="Li">"remplacé"</span> par un autre :</p>
+<pre>traverse_balanced(
+    \@seq1, \@seq2,
+    {   MATCH =&gt; $callback_1,
+        DISCARD_A =&gt; $callback_2,
+        DISCARD_B =&gt; $callback_3,
+        CHANGE    =&gt; $callback_4,
+    }
+);</pre>
+<p class="Pp">Si aucun rappel <span class="Li">"CHANGE"</span> n'est
+    spécifié, <span class="Li">"traverse_balanced"</span> fera correspondre les événements
+    <span class="Li">"CHANGE"</span> aux actions
+    <span class="Li">"DISCARD_A"</span> et
+    <span class="Li">"DISCARD_B"</span> , résultant donc en un
+    comportement similaire à celui de
+    <span class="Li">"traverse_sequences"</span> avec un ordre
+    d'événements différent.</p>
+<p class="Pp"><span class="Li">"traverse_balanced"</span> peut être un
+    peu plus lent que <span class="Li">"traverse_sequences"</span>,
+    perceptible uniquement lors du traitement de quantités massives de données.</p>
+<p class="Pp">La fonction <span class="Li">"sdiff"</span> de ce
+    module est implémentée comme un appel à
+    <span class="Li">"traverse_balanced"</span>.</p>
+<p class="Pp"><span class="Li">"traverse_balanced"</span> n'a pas de
+    valeur de retour utile ; vous êtes censé fournir le comportement approprié
+    avec les fonctions de rappel.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='KEY_GENERATION_FUNCTIONS'><a class='permalink' href='#KEY_GENERATION_FUNCTIONS'>FONCTIONS DE GÉNÉRATION DE CLÉS</a></h1>
+<p class="Pp">La plupart des fonctions acceptent un paramètre supplémentaire facultatif. C'est
+    une référence CODE à une fonction de génération de clés (hachage) qui doit
+    retourner une chaîne identifiant de manière unique un élément donné. Il doit
+    être le cas que si deux éléments doivent être considérés comme égaux, leurs
+    clés doivent être les mêmes (et vice versa). Si aucune fonction de génération
+    de clés n'est fournie, la clé sera l'élément sous forme de chaîne.</p>
+<p class="Pp">Par défaut, les comparaisons utiliseront "eq" et les éléments seront
+    convertis en clés en utilisant l'opérateur de conversion en chaîne par défaut
+  '""'.</p>
+<p class="Pp">Cela est important lorsque vous comparez autre chose que des chaînes.
+    S'il arrive que vous ayez plusieurs objets différents qui doivent être
+    considérés comme égaux, vous devez fournir une fonction de génération de
+    clés. Sinon, vous devez vous assurer que vos tableaux contiennent des
+    références uniques.</p>
+<p class="Pp">Par exemple, considérez cet exemple :</p>
+<pre>package Person;
+sub new
+{
+    my $package = shift;
+    return bless { name =&gt; '', ssn =&gt; '', @_ }, $package;
+}
+sub clone
+{
+    my $old = shift;
+    my $new = bless { %$old }, ref($old);
+}
+sub hash
+{
+    return shift()-&gt;{'ssn'};
+}
+my $person1 = Person-&gt;new( name =&gt; 'Joe', ssn =&gt; '123-45-6789' );
+my $person2 = Person-&gt;new( name =&gt; 'Mary', ssn =&gt; '123-47-0000' );
+my $person3 = Person-&gt;new( name =&gt; 'Pete', ssn =&gt; '999-45-2222' );
+my $person4 = Person-&gt;new( name =&gt; 'Peggy', ssn =&gt; '123-45-9999' );
+my $person5 = Person-&gt;new( name =&gt; 'Frank', ssn =&gt; '000-45-9999' );</pre>
+<p class="Pp">Si vous faisiez ceci :</p>
+<pre>my $array1 = [ $person1, $person2, $person4 ];
+my $array2 = [ $person1, $person3, $person4, $person5 ];
+Algorithm::Diff::diff( $array1, $array2 );</pre>
+<p class="Pp">tout fonctionnerait correctement (chaque objet serait
+    converti en une chaîne comme "Person=HASH(0x82425b0)" pour la
+    comparaison).</p>
+<p class="Pp">Mais si vous faisiez ceci :</p>
+<pre>my $array1 = [ $person1, $person2, $person4 ];
+my $array2 = [ $person1, $person3, $person4-&gt;clone(), $person5 ];
+Algorithm::Diff::diff( $array1, $array2 );</pre>
+<p class="Pp"><span class="Li">$person4</span> et
+    <span class="Li">$person4</span>-&gt;<b>clone()</b> (qui ont le même
+    nom et le même numéro de sécurité sociale) seraient vus comme des objets
+    différents. Si vous vouliez qu'ils soient considérés comme équivalents, vous
+    devriez passer une fonction de génération de clés :</p>
+<pre>my $array1 = [ $person1, $person2, $person4 ];
+my $array2 = [ $person1, $person3, $person4-&gt;clone(), $person5 ];
+Algorithm::Diff::diff( $array1, $array2, \&amp;Person::hash );</pre>
+<p class="Pp">Cela utiliserait le champ 'ssn' de chaque Person comme clé de comparaison,
+    et considérerait donc <span class="Li">$person4</span> et
+    <span class="Li">$person4</span>-&gt;<b>clone()</b> comme égaux.</p>
+<p class="Pp">Vous pouvez également passer des paramètres supplémentaires à la fonction de
+    génération de clés si vous le souhaitez.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ERROR_CHECKING'><a class='permalink' href='#ERROR_CHECKING'>VÉRIFICATION DES ERREURS</a></h1>
+<p class="Pp">Si vous passez à ces routines une valeur non-référence alors qu'elles
+    attendent une référence, elles mourront avec un message.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTEUR</a></h1>
+<p class="Pp">Cette version a été publiée par Tye McQueen
+    (<a href='http://perlmonks.org/?node=tye'>http://perlmonks.org/?node=tye</a>).</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='LICENSE'><a class='permalink' href='#LICENSE'>LICENCE</a></h1>
+<p class="Pp">Parties Copyright (c) 2000-2004 Ned Konz. Tous droits réservés. Parties
+    par Tye McQueen.</p>
+<p class="Pp">Ce programme est un logiciel libre ; vous pouvez le redistribuer et/ou le
+    modifier selon les mêmes termes que Perl.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MAILING_LIST'><a class='permalink' href='#MAILING_LIST'>LISTE DE DIFFUSION</a></h1>
+<p class="Pp">Mark-Jason maintient toujours une liste de diffusion. Pour rejoindre une
+    liste de diffusion à faible volume pour les annonces liées à diff et
+    Algorithm::Diff, envoyez un message de courriel vide à
+    mjd-perl-diff-request@plover.com.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CREDITS'><a class='permalink' href='#CREDITS'>CRÉDITS</a></h1>
+<p class="Pp">Les versions jusqu'à 0.59 (et une grande partie de cette documentation) ont
+    été écrites par :</p>
+<p class="Pp">Mark-Jason Dominus</p>
+<p class="Pp">Cette version emprunte de la documentation et des noms de routines à ceux
+    de Mark-Jason, mais le code de Diff.pm a été complètement remplacé.</p>
+<p class="Pp">Ce code a été adapté du code Smalltalk de Mario Wolczko
+    &lt;mario@wolczko.com&gt;, qui est disponible à
+    ftp://st.cs.uiuc.edu/pub/Smalltalk/MANCHESTER/manchester/4.0/diff.st</p>
+<p class="Pp"><span class="Li">"sdiff"</span> et
+    <span class="Li">"traverse_balanced"</span> ont été écrits par Mike
+    Schilli &lt;m@perlmeister.com&gt;.</p>
+<p class="Pp">L'algorithme est celui décrit dans <i>A Fast Algorithm for
+    Computing Longest Common Subsequences</i>, CACM, vol.20, no.5, pp.350-353,
+    Mai 1977, avec quelques améliorations mineures pour améliorer la vitesse.</p>
+<p class="Pp">Beaucoup de travail a été fait par Ned Konz (perl@bike-nomad.com).</p>
+<p class="Pp">L'interface OO et quelques autres changements sont de Tye McQueen.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-13</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-algorithm-diff/">extra/perl-algorithm-diff</a></dd>
+        <dt>Version :</dt>
+        <dd>1:1.201-7</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://search.cpan.org/dist/Algorithm-Diff">https://search.cpan.org/dist/Algorithm-Diff</a></dd>
+        <dt>Licences :</dt>
+        <dd>GPL, PerlArtistic</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-algorithm-diff/">/listing/extra/perl-algorithm-diff/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#INTRODUCTION">INTRODUCTION</a></li>
+        
+            <li><a href="#USAGE">UTILISATION</a></li>
+        
+            <li><a href="#KEY_GENERATION_FUNCTIONS">FONCTIONS DE GÉNÉRATION DE CLÉS</a></li>
+        
+            <li><a href="#ERROR_CHECKING">VÉRIFICATION DES ERREURS</a></li>
+        
+            <li><a href="#AUTHOR">AUTEUR</a></li>
+        
+            <li><a href="#LICENSE">LICENCE</a></li>
+        
+            <li><a href="#MAILING_LIST">LISTE DE DIFFUSION</a></li>
+        
+            <li><a href="#CREDITS">CRÉDITS</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Algorithm::Diff.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/Algorithm::Diff.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible selon les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               , sauf pour le contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

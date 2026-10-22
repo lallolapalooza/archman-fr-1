@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>MERGE(7) — Pages du manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">MERGE(7)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/postgresql/">postgresql</a></p>
+<p class="lic">Licences: PostgreSQL</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">MERGE(7)</td>
+    <td class="head-vol">Documentation PostgreSQL 18.1</td>
+    <td class="head-rtitle">MERGE(7)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">MERGE - insère, met à jour ou supprime conditionnellement des lignes
+    d'une table</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<pre>[ WITH <i>requete_avec</i> [, ...] ]
+MERGE INTO [ ONLY ] <i>nom_table_cible</i> [ * ] [ [ AS ] <i>alias_cible</i> ]
+    USING <i>source_donnees</i> ON <i>condition_jointure</i>
+    <i>clause_quand</i> [...]
+    [ RETURNING [ WITH ( { OLD | NEW } AS <i>alias_sortie</i> [, ...] ) ]
+                { * | <i>expression_sortie</i> [ [ AS ] <i>nom_sortie</i> ] } [, ...] ]
+où <i>source_donnees</i> est :
+    { [ ONLY ] <i>nom_table_source</i> [ * ] | ( <i>requete_source</i> ) } [ [ AS ] <i>alias_source</i> ]
+et <i>clause_quand</i> est :
+    { WHEN MATCHED [ AND <i>condition</i> ] THEN { <i>mise_a_jour_fusion</i> | <i>suppression_fusion</i> | DO NOTHING } |
+      WHEN NOT MATCHED BY SOURCE [ AND <i>condition</i> ] THEN { <i>mise_a_jour_fusion</i> | <i>suppression_fusion</i> | DO NOTHING } |
+      WHEN NOT MATCHED [ BY TARGET ] [ AND <i>condition</i> ] THEN { <i>insertion_fusion</i> | DO NOTHING } }
+et <i>insertion_fusion</i> est :
+    INSERT [( <i>nom_colonne</i> [, ...] )]
+        [ OVERRIDING { SYSTEM | USER } VALUE ]
+        { VALUES ( { <i>expression</i> | DEFAULT } [, ...] ) | DEFAULT VALUES }
+et <i>mise_a_jour_fusion</i> est :
+    UPDATE SET { <i>nom_colonne</i> = { <i>expression</i> | DEFAULT } |
+                 ( <i>nom_colonne</i> [, ...] ) = [ ROW ] ( { <i>expression</i> | DEFAULT } [, ...] ) |
+                 ( <i>nom_colonne</i> [, ...] ) = ( <i>sous-SELECT</i> )
+               } [, ...]
+et <i>suppression_fusion</i> est :
+    DELETE</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp"><b>MERGE</b> effectue des actions qui modifient les lignes de la table
+    cible identifiée par <i>nom_table_cible</i>, en utilisant la
+    <i>source_donnees</i>. <b>MERGE</b> fournit une seule instruction SQL qui peut
+    conditionnellement <b>INSERT</b>, <b>UPDATE</b> ou <b>DELETE</b> des lignes, une tâche
+    qui nécessiterait autrement plusieurs instructions en langage procédural.</p>
+<p class="Pp">Premièrement, la commande <b>MERGE</b> effectue une jointure de la
+    <i>source_donnees</i> à la table cible produisant zéro ou plusieurs lignes de
+    modification candidates. Pour chaque ligne de modification candidate, le statut
+    MATCHED, NOT MATCHED BY SOURCE, ou NOT MATCHED [BY TARGET] est défini une seule
+    fois, après quoi les clauses WHEN sont évaluées dans l'ordre spécifié. Pour
+    chaque ligne de modification candidate, la première clause évaluée comme vraie
+    est exécutée. Pas plus d'une clause WHEN n'est exécutée pour une ligne de
+    modification candidate.</p>
+<p class="Pp">Les actions <b>MERGE</b> ont le même effet que les commandes
+    régulières <b>UPDATE</b>, <b>INSERT</b> ou <b>DELETE</b> du même nom. La syntaxe
+    de ces commandes est différente, notamment qu'il n'y a pas de clause WHERE et
+    qu'aucun nom de table n'est spécifié. Toutes les actions se réfèrent à la table
+    cible, bien que des modifications à d'autres tables puissent être effectuées à
+    l'aide de déclencheurs (triggers).</p>
+<p class="Pp">Lorsque DO NOTHING est spécifié, la ligne source est ignorée.
+    Puisque les actions sont évaluées dans leur ordre spécifié, DO NOTHING peut
+    être utile pour ignorer les lignes sources non intéressantes avant un traitement
+    plus détaillé.</p>
+<p class="Pp">La clause RETURNING optionnelle provoque le calcul et le retour de
+    valeurs par <b>MERGE</b> en fonction de chaque ligne insérée, mise à jour ou
+    supprimée. Toute expression utilisant les colonnes de la table source ou cible,
+    ou la fonction <b>merge_action()</b> peut être calculée. Par défaut, lorsqu'une
+    action <b>INSERT</b> ou <b>UPDATE</b> est effectuée, les nouvelles valeurs des
+    colonnes de la table cible sont utilisées, et lorsqu'un <b>DELETE</b> est effectué,
+    les anciennes valeurs des colonnes de la table cible sont utilisées, mais il
+    est également possible de demander explicitement les anciennes et nouvelles
+    valeurs. La syntaxe de la liste RETURNING est identique à celle de la liste de
+    sortie de <b>SELECT</b>.</p>
+<p class="Pp">Il n'y a pas de privilège MERGE séparé. Si vous spécifiez une action
+    de mise à jour, vous devez avoir le privilège UPDATE sur la ou les colonnes de la
+    table cible qui sont référencées dans la clause SET. Si vous spécifiez une action
+    d'insertion, vous devez avoir le privilège INSERT sur la table cible. Si vous
+    spécifiez une action de suppression, vous devez avoir le privilège DELETE sur la
+    table cible. Si vous spécifiez une action DO NOTHING, vous devez avoir le privilège
+    SELECT sur au moins une colonne de la table cible. Vous aurez également besoin du
+    privilège SELECT sur toute colonne de la <i>source_donnees</i> et de la table cible
+    référencée dans une condition (y compris join_condition) ou une expression. Les
+    privilèges sont testés une fois au début de l'instruction et sont vérifiés que les
+    clauses WHEN particulières soient exécutées ou non.</p>
+<p class="Pp"><b>MERGE</b> n'est pas pris en charge si la table cible est une vue
+    matérialisée, une table étrangère, ou si elle possède des règles définies sur
+    elle.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='PARAMETRES'><a class='permalink' href='#PARAMETRES'>PARAMETRES</a></h1>
+<p class="Pp"><i>requete_avec</i></p>
+<div class="Bd-indent">La clause WITH permet de spécifier une ou plusieurs sous-requêtes
+    qui peuvent être référencées par nom dans la requête <b>MERGE</b>. Voir la
+    Section 7.8 et <a href='/man/SELECT.7.fr'>SELECT(7)</a> pour les détails. Notez que WITH RECURSIVE n'est pas pris en charge par
+    <b>MERGE</b>.</div>
+<p class="Pp"><i>nom_table_cible</i></p>
+<div class="Bd-indent">Le nom (éventuellement qualifié par un schéma) de la table
+    ou vue cible dans laquelle fusionner. Si ONLY est spécifié avant un nom de table,
+    les lignes correspondantes sont mises à jour ou supprimées uniquement dans la table
+    nommée. Si ONLY n'est pas spécifié, les lignes correspondantes sont également
+    mises à jour ou supprimées dans toutes les tables héritant de la table nommée.
+    Optionnellement, * peut être spécifié après le nom de la table pour indiquer
+    explicitement que les tables descendantes sont incluses. Le mot-clé ONLY et l'option *
+    n'affectent pas les actions d'insertion, qui insèrent toujours uniquement dans la table
+    nommée.
+<p class="Pp">Si <i>nom_table_cible</i> est une vue, elle doit soit être automatiquement
+    mettable à jour sans aucun déclencheur INSTEAD OF, soit avoir des déclencheurs
+    INSTEAD OF pour chaque type d'action (INSERT, UPDATE et DELETE) spécifié dans les
+    clauses WHEN. Les vues avec des règles ne sont pas prises en charge.</p>
+</div>
+<p class="Pp"><i>alias_cible</i></p>
+<div class="Bd-indent">Un nom substitut pour la table cible. Lorsqu'un alias est
+    fourni, il masque complètement le nom réel de la table. Par exemple, étant donné
+    MERGE INTO foo AS f, le reste de l'instruction <b>MERGE</b> doit faire référence
+    à cette table comme f et non comme foo.</div>
+<p class="Pp"><i>nom_table_source</i></p>
+<div class="Bd-indent">Le nom (éventuellement qualifié par un schéma) de la table
+    source, de la vue ou de la table de transition. Si ONLY est spécifié avant le nom
+    de la table, les lignes correspondantes sont incluses uniquement à partir de la table
+    nommée. Si ONLY n'est pas spécifié, les lignes correspondantes sont également
+    incluses à partir de toutes les tables héritant de la table nommée.
+    Optionnellement, * peut être spécifié après le nom de la table pour indiquer
+    explicitement que les tables descendantes sont incluses.</div>
+<p class="Pp"><i>requete_source</i></p>
+<div class="Bd-indent">Une requête (instruction <b>SELECT</b> ou instruction
+    <b>VALUES</b>) qui fournit les lignes à fusionner dans la table cible. Référez-vous
+    à la déclaration <a href='/man/SELECT.7.fr'>SELECT(7)</a> ou à la déclaration <a href='/man/VALUES.7.fr'>VALUES(7)</a> pour une description de la syntaxe.</div>
+<p class="Pp"><i>alias_source</i></p>
+<div class="Bd-indent">Un nom substitut pour la source de données. Lorsqu'un alias
+    est fourni, il masque complètement le nom réel de la table ou le fait qu'une
+    requête ait été émise.</div>
+<p class="Pp"><i>condition_jointure</i></p>
+<div class="Bd-indent"><i>condition_jointure</i> est une expression résultant en
+    une valeur booléenne (similaire à une clause WHERE) qui spécifie quelles lignes
+    dans la <i>source_donnees</i> correspondent aux lignes de la table cible.
+<div class="Bd-indent">
+<br/>
+<b>Attention</b>
+<br/>
+Seules les colonnes de la table cible qui tentent de correspondre aux lignes de
+    <i>source_donnees</i> doivent apparaître dans <i>condition_jointure</i>. Les sous-expressions
+    <i>condition_jointure</i> qui font référence uniquement aux colonnes de la table cible
+    peuvent affecter l'action entreprise, souvent de manière surprenante.
+<p class="Pp">Si les clauses WHEN NOT MATCHED BY SOURCE et WHEN NOT MATCHED [BY
+    TARGET] sont toutes deux spécifiées, la commande <b>MERGE</b> effectuera une jointure
+    COMPLÈTE entre <i>source_donnees</i> et la table cible. Pour que cela fonctionne,
+    au moins une sous-expression <i>condition_jointure</i> doit utiliser un opérateur qui peut
+    supporter une jointure par hachage (hash join), ou toutes les sous-expressions doivent
+    utiliser des opérateurs qui peuvent supporter une jointure par tri fusion (merge join).</p>
+</div>
+</div>
+<p class="Pp"><i>clause_quand</i></p>
+<div class="Bd-indent">Au moins une clause WHEN est requise.
+<p class="Pp">La clause WHEN peut spécifier WHEN MATCHED, WHEN NOT MATCHED BY
+    SOURCE, ou WHEN NOT MATCHED [BY TARGET]. Notez que la norme SQL ne définit que
+    WHEN MATCHED et WHEN NOT MATCHED (qui est défini comme aucune ligne cible correspondante).
+    WHEN NOT MATCHED BY SOURCE est une extension à la norme SQL, tout comme l'option
+    d'ajouter BY TARGET à WHEN NOT MATCHED, pour rendre son sens plus explicite.</p>
+<p class="Pp">Si la clause WHEN spécifie WHEN MATCHED et que la ligne de modification
+    candidate correspond à une ligne dans la <i>source_donnees</i> par rapport à une
+    ligne dans la table cible, la clause WHEN est exécutée si la <i>condition</i> est
+    absente ou si elle s'évalue à vrai.</p>
+<p class="Pp">Si la clause WHEN spécifie WHEN NOT MATCHED BY SOURCE et que la ligne
+    de modification candidate représente une ligne dans la table cible qui ne correspond
+    pas à une ligne dans la <i>source_donnees</i>, la clause WHEN est exécutée si la
+    <i>condition</i> est absente ou si elle s'évalue à vrai.</p>
+<p class="Pp">Si la clause WHEN spécifie WHEN NOT MATCHED [BY TARGET] et que la
+    ligne de modification candidate représente une ligne dans la</p>
+</div>
+</section>
+</div>
+</section>
+            </article>
+            <aside id="content-right">
+                
+            </aside>
+        </main>
+        <footer>
+            <p>Copyright © 2002-2024 The Arch Linux Community</p>
+            <p>Page generated in 0.002191 seconds.</p>
+        </footer>
+    </body>
+</html>
+<section class="Sh">
+<h1 class="Sh" id='DATA_SOURCE'><a class='permalink' href='#DATA_SOURCE'>DATA_SOURCE</a></h1>
+<p class="Pp">Une <i>data_source</i> qui ne correspond à aucune ligne dans la table cible, le bloc <i>WHEN</i> est exécuté si la <i>condition</i> est absente ou évaluée à vrai.</p>
+</div>
+<p class="Pp"><i>condition</i></p>
+<div class="Bd-indent">Une expression qui retourne une valeur booléenne. Si l'expression pour un bloc <i>WHEN</i> retourne vrai, l'action de ce bloc est exécutée pour cette ligne.</div>
+<p class="Pp">Une condition dans un bloc <i>WHEN MATCHED</i> peut faire référence à des colonnes dans les deux relations source et cible. Une condition dans un bloc <i>WHEN NOT MATCHED BY SOURCE</i> ne peut faire référence qu'aux colonnes de la relation cible, car par définition il n'y a pas de ligne source correspondante. Une condition dans un bloc <i>WHEN NOT MATCHED [BY TARGET]</i> ne peut faire référence qu'aux colonnes de la relation source, car par définition il n'y a pas de ligne cible correspondante. Seuls les attributs système de la table cible sont accessibles.</p>
+</div>
+<p class="Pp"><i>merge_insert</i></p>
+<div class="Bd-indent">La spécification d'une action <i>INSERT</i> qui insère une ligne dans la table cible. Les noms de colonnes de la table cible peuvent apparaître dans n'importe quel ordre. Si une liste de noms de colonnes n'est pas spécifiée, la valeur par défaut est toutes les colonnes de la table dans leur ordre déclaré.</div>
+<p class="Pp">Chaque colonne non présente dans la liste explicite ou implicite sera remplie avec une valeur par défaut, soit sa valeur par défaut déclarée, soit NULL s'il n'y en a pas.</p>
+<p class="Pp">Si la table cible est une table partitionnée, chaque ligne est dirigée vers la partition appropriée et insérée dans celle-ci. Si la table cible est une partition, une erreur se produit si une ligne d'entrée viole la contrainte de partition.</p>
+<p class="Pp">Les noms de colonnes ne peuvent pas être spécifiés plus d'une fois. Les actions <b>INSERT</b> ne peuvent pas contenir de sous-requêtes.</p>
+<p class="Pp">Une seule instruction <i>VALUES</i> peut être spécifiée. L'instruction <i>VALUES</i> ne peut faire référence qu'aux colonnes de la relation source, car par définition il n'y a pas de ligne cible correspondante.</p>
+</div>
+<p class="Pp"><i>merge_update</i></p>
+<div class="Bd-indent">La spécification d'une action <i>UPDATE</i> qui met à jour la ligne actuelle de la table cible. Les noms de colonnes ne peuvent pas être spécifiés plus d'une fois.</div>
+<p class="Pp">Ni un nom de table ni une clause <i>WHERE</i> ne sont autorisés.</p>
+</div>
+<p class="Pp"><i>merge_delete</i></p>
+<div class="Bd-indent">Spécifie une action <i>DELETE</i> qui supprime la ligne actuelle de la table cible. N'incluez pas le nom de la table ou toute autre clause, car cela serait effectué normalement avec une instruction <a href='/man/DELETE.7.en'>DELETE(7)</a>.</div>
+<p class="Pp"><i>column_name</i></p>
+<div class="Bd-indent">Le nom d'une colonne de la table cible. Le nom de la colonne peut être qualifié par un nom de sous-champ ou un sous-indice, si nécessaire. (L'insertion uniquement dans certains champs d'une colonne composite laisse les autres champs nuls.) N'incluez pas le nom de la table dans la spécification d'une colonne cible.</div>
+<p class="Pp">OVERRIDING SYSTEM VALUE</p>
+<div class="Bd-indent">Sans cette clause, il est une erreur de spécifier une valeur explicite (autre que DEFAULT) pour une colonne définie comme <i>GENERATED ALWAYS</i>. Cette clause remplace cette restriction.</div>
+<p class="Pp">OVERRIDING USER VALUE</p>
+<div class="Bd-indent">Si cette clause est spécifiée, toute valeur fournie pour les colonnes définies comme <i>GENERATED BY DEFAULT</i> est ignorée et les valeurs générées par la séquence par défaut sont appliquées.</div>
+<p class="Pp">DEFAULT VALUES</p>
+<div class="Bd-indent">Toutes les colonnes sont remplies avec leurs valeurs par défaut. (L'utilisation d'une clause <b>OVERRIDING</b> n'est pas autorisée dans ce format.)</div>
+<p class="Pp"><i>expression</i></p>
+<div class="Bd-indent">Une expression à attribuer à la colonne. Si elle est utilisée dans un bloc <i>WHEN MATCHED</i>, l'expression peut utiliser des valeurs de la ligne d'origine dans la table cible et des valeurs de la ligne <i>data_source</i>. Si elle est utilisée dans un bloc <i>WHEN NOT MATCHED BY SOURCE</i>, l'expression ne peut utiliser que des valeurs de la ligne d'origine dans la table cible. Si elle est utilisée dans un bloc <i>WHEN NOT MATCHED [BY TARGET]</i>, l'expression ne peut utiliser que des valeurs de la ligne <i>data_source</i>.</div>
+<p class="Pp">DEFAULT</p>
+<div class="Bd-indent">Définit la colonne à sa valeur par défaut (qui sera NULL si aucune expression de valeur par défaut n'a été explicitement attribuée).</div>
+<p class="Pp"><i>sub-SELECT</i></p>
+<div class="Bd-indent">Une sous-requête <i>SELECT</i> qui génère autant de colonnes de sortie que spécifié dans la liste de colonnes précédente. La sous-requête doit générer au maximum une seule ligne. Si elle génère une ligne, ses valeurs de colonne sont attribuées aux colonnes cibles ; si elle ne génère aucune ligne, des valeurs NULL sont attribuées aux colonnes cibles. Si elle est utilisée dans un bloc <i>WHEN MATCHED</i>, la sous-requête peut faire référence à des valeurs de la ligne d'origine dans la table cible et à des valeurs de la ligne <i>data_source</i>. Si elle est utilisée dans un bloc <i>WHEN NOT MATCHED BY SOURCE</i>, la sous-requête ne peut faire référence qu'à des valeurs de la ligne d'origine dans la table cible.</div>
+<p class="Pp"><i>output_alias</i></p>
+<div class="Bd-indent">Un nom optionnel qui remplace <i>OLD</i> ou <i>NEW</i> dans la liste <i>RETURNING</i>.
+<p class="Pp">Par défaut, les anciennes valeurs de la table cible peuvent être retournées en écrivant <i>OLD.column_name</i> ou <i>OLD.*</i>, et les nouvelles valeurs peuvent être retournées en écrivant <i>NEW.column_name</i> ou <i>NEW.*</i>. Lorsqu'un alias est fourni, ces noms sont masqués et les enregistrements anciens ou nouveaux doivent être référencés en utilisant l'alias. Par exemple, <i>RETURNING WITH (OLD AS o, NEW AS n)</i> ou <i>o.*, n.*</i>.</p>
+</div>
+<p class="Pp"><i>output_expression</i></p>
+<div class="Bd-indent">Une expression qui est calculée et retournée par l'instruction <b>MERGE</b> après chaque ligne modifiée (insérée, mise à jour ou supprimée). L'expression peut utiliser n'importe quelle colonne de la table source ou de la table cible, ou la fonction <b>merge_action()</b> pour retourner des informations supplémentaires sur l'action exécutée.
+<p class="Pp">Écrire <i>*</i> retourne toutes les colonnes de la table source, suivies de toutes les colonnes de la table cible. Cela entraîne généralement un grand doublon, car les tables source et cible ont souvent de nombreuses colonnes en commun. Vous pouvez éviter cela en spécifiant <i>*</i> avec le nom ou l'alias de la table source ou de la table cible.
+<p class="Pp">Un nom de colonne ou <i>*</i> peut également être qualifié avec <i>OLD</i> ou <i>NEW</i>, ou avec l'alias de sortie correspondant pour <i>OLD</i> ou <i>NEW</i>, pour retourner les anciennes ou nouvelles valeurs de la table cible. Un nom de colonne non qualifié de la table cible, ou une colonne de la table cible ou <i>*</i> qualifiée avec le nom ou l'alias de la table cible, retourne les nouvelles valeurs pour les actions <b>INSERT</b> et <b>UPDATE</b>, et les anciennes valeurs pour les actions <b>DELETE</b>.</p>
+</div>
+<p class="Pp"><i>output_name</i></p>
+<div class="Bd-indent">Un nom pour une colonne retournée.</div>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='OUTPUTS'><a class='permalink' href='#OUTPUTS'>SORTIES</a></h1>
+<p class="Pp">Après une complétion réussie, une instruction <b>MERGE</b> retourne un tag de commande de la forme</p>
+<div class="Bd-indent">
+<pre>MERGE <i>total_count</i></pre>
+</div>
+<p class="Pp">Le <i>total_count</i> est le nombre total de lignes modifiées (insérées, mises à jour ou supprimées). Si <i>total_count</i> est 0, aucune ligne n'a été modifiée.</p>
+<p class="Pp">Si l'instruction <b>MERGE</b> contient une clause <i>RETURNING</i>, le résultat sera similaire à celui d'une instruction <b>SELECT</b> contenant les colonnes et les valeurs définies dans la liste <i>RETURNING</i>, calculées sur les lignes insérées, mises à jour ou supprimées par l'instruction.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='NOTES'><a class='permalink' href='#NOTES'>NOTES</a></h1>
+<p class="Pp">Les étapes suivantes sont effectuées lors de l'exécution de <b>MERGE</b>.</p>
+<div class="Bd-indent">1. Exécute tous les déclencheurs <b>BEFORE STATEMENT</b> pour toutes les actions spécifiées, indépendamment de si leurs clauses <i>WHEN</i> correspondent.</div>
+<div class="Bd-indent">2. Effectue une jointure de la table source à la table cible. La requête résultante sera normalement optimisée et produira un ensemble de lignes candidates pour la modification. Pour chaque ligne candidate de modification,
+<div class="Bd-indent">1. Évalue si chaque ligne est <i>MATCHED</i>, <i>NOT MATCHED BY SOURCE</i> ou <i>NOT MATCHED [BY TARGET]</i>.</div>
+<div class="Bd-indent">2. Teste chaque clause <i>WHEN</i> dans l'ordre spécifié jusqu'à ce qu'une retourne vrai.</div>
+<div class="Bd-indent">3. Lorsqu'une clause retourne vrai, les actions suivantes sont exécutées :
+<div class="Bd-indent">1. Exécute tous les déclencheurs <b>BEFORE ROW</b> qui sont activés pour le type d'événement de l'action.</div>
+<div class="Bd-indent">2. Exécute l'action spécifiée, en invoquant toutes les contraintes de la table cible.</div>
+<div class="Bd-indent">3. Exécute tous les déclencheurs <b>AFTER ROW</b> qui sont activés pour le type d'événement de l'action.</div>
+<p class="Pp">Si la relation cible est une vue avec des déclencheurs <b>INSTEAD OF ROW</b> pour le type d'événement de l'action, ces déclencheurs seront utilisés pour effectuer l'action à la place.</p>
+</div>
+</div>
+<div class="Bd-indent">3. Exécute tous les déclencheurs <b>AFTER STATEMENT</b> pour les actions spécifiées, indépendamment de si elles se produisent ou non. Ceci est similaire au comportement d'une instruction <b>UPDATE</b> qui ne modifie aucune ligne.</div>
+<p class="Pp">En résumé, les déclencheurs de type événement (par exemple, <b>INSERT</b>) sont déclenchés chaque fois qu'une action de ce type est spécifiée. En revanche, les déclencheurs de niveau ligne sont déclenchés uniquement pour le type d'événement spécifique en cours d'exécution. Ainsi, une instruction <b>MERGE</b> pourrait déclencher des déclencheurs de type événement <b>UPDATE</b> et <b>INSERT</b>, même si seuls des déclencheurs de niveau ligne <b>UPDATE</b> ont été déclenchés.</p>
+<p class="Pp">Vous devez vous assurer que la jointure produit au maximum une ligne candidate de modification par ligne cible. En d'autres termes, une ligne cible ne doit pas correspondre à plus d'une ligne source. Si c'est le cas, seule l'une des lignes candidates de modification sera utilisée pour modifier la ligne cible ; les tentatives ultérieures entraîneront une erreur. Cela peut également se produire si les déclencheurs de niveau ligne modifient la table cible et que les lignes modifiées sont ensuite modifiées par <b>MERGE</b>. Si l'action répétée est <b>INSERT</b>, cela entraînera une violation d'unicité, tandis qu'une action répétée <b>UPDATE</b> ou <b>DELETE</b> entraînera une violation de cardinalité ; cette dernière est requise par la norme SQL. Cette différence contraste avec le comportement précédent des jointures dans les instructions <b>UPDATE</b> et <b>DELETE</b> de PostgreSQL, où les tentatives ultérieures sont ignorées.</p>
+<p class="Pp">Si une clause <i>WHEN</i> omet une sous-clause <i>AND</i>, elle devient la clause finalement atteignable de ce type (MATCHED, NOT MATCHED BY SOURCE, ou NOT MATCHED [BY TARGET]). Si une clause <i>WHEN</i> de ce type est spécifiée plus tard, elle sera probablement inaccessible et une erreur sera générée. Si aucune clause finalement atteignable de l'un des types n'est spécifiée, aucune action ne peut être effectuée pour une ligne candidate de modification.</p>
+<p class="Pp">L'ordre dans lequel les lignes sont générées à partir de la source est indéterminé par défaut. Une <i>source_query</i> peut être utilisée pour spécifier un ordre cohérent, si nécessaire, ce qui pourrait aider à éviter les blocages entre transactions concurrentes.</p>
+<p class="Pp">Lorsque <b>MERGE</b> est exécuté simultanément avec d'autres commandes qui modifient la table cible, les règles d'isolation des transactions s'appliquent normalement ; voir la section 13.2 pour une explication du comportement à chaque niveau d'isolation. Vous pourriez également envisager d'utiliser <b>INSERT ... ON CONFLICT</b> comme une instruction alternative qui offre la possibilité d'exécuter un <b>UPDATE</b> si un <b>INSERT</b> concurrent se produit. Il existe des différences et des restrictions entre les deux instructions et elles ne sont pas interchangeables.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXAMPLES'><a class='permalink' href='#EXAMPLES'>EXEMPLES</a></h1>
+<p class="Pp">Effectuer la maintenance sur <i>customer_accounts</i> en fonction des nouvelles <i>recent_transactions</i>.</p>
+<div class="Bd-indent">
+<pre>MERGE INTO customer_account ca
+USING recent_transactions t
+ON t.customer_id = ca.customer_id
+WHEN MATCHED THEN
+  UPDATE</pre>
+</div>
+</section>
+E SET balance = balance + transaction_value
+WHEN NOT MATCHED THEN
+  INSERT (customer_id, balance)
+  VALUES (t.customer_id, t.transaction_value);</pre>
+</div>
+<p class="Pp">Essayer d'insérer un nouvel article en stock avec la quantité de
+    stock. Si l'article existe déjà, mettre à jour le compte de stock de l'article
+    existant. Ne pas autoriser les entrées avec un stock nul. Retourner les détails
+    de toutes les modifications effectuées.</p>
+<div class="Bd-indent">
+<pre>MERGE INTO wines w
+USING wine_stock_changes s
+ON s.winename = w.winename
+WHEN NOT MATCHED AND s.stock_delta &gt; 0 THEN
+  INSERT VALUES(s.winename, s.stock_delta)
+WHEN MATCHED AND w.stock + s.stock_delta &gt; 0 THEN
+  UPDATE SET stock = w.stock + s.stock_delta
+WHEN MATCHED THEN
+  DELETE
+RETURNING merge_action(), w.winename, old.stock AS old_stock, new.stock AS new_stock;</pre>
+</div>
+<p class="Pp">La table <code class="Nm">wine_stock_changes</code> peut être, par
+    exemple, une table temporaire récemment chargée dans la base de données.</p>
+<p class="Pp">Mettre à jour <code class="Nm">wines</code> en fonction d'une liste
+    de vins de remplacement, insérer des lignes pour tout nouveau stock, mettre à
+    jour les entrées de stock modifiées et supprimer tous les vins qui ne sont pas
+    présents dans la nouvelle liste.</p>
+<div class="Bd-indent">
+<pre>MERGE INTO wines w
+USING new_wine_list s
+ON s.winename = w.winename
+WHEN NOT MATCHED BY TARGET THEN
+  INSERT VALUES(s.winename, s.stock)
+WHEN MATCHED AND w.stock != s.stock THEN
+  UPDATE SET stock = s.stock
+WHEN NOT MATCHED BY SOURCE THEN
+  DELETE;</pre>
+</div>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COMPATIBILITÉ'><a class='permalink' href='#COMPATIBILITÉ'>COMPATIBILITÉ</a></h1>
+<p class="Pp">Cette commande est conforme à la norme SQL.</p>
+<p class="Pp">La clause <code class="Nm">WITH</code>, les qualificateurs <code class="Nm">BY SOURCE</code> et <code class="Nm">BY TARGET</code> pour <code class="Nm">WHEN NOT MATCHED</code>, l'action <code class="Nm">DO NOTHING</code>, et la clause <code class="Nm">RETURNING</code> sont des extensions à la norme SQL.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025</td>
+    <td class="foot-os">PostgreSQL 18.1</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page man" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/postgresql/">extra/postgresql</a></dd>
+        <dt>Version :</dt>
+        <dd>18.1-1</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://www.postgresql.org/">https://www.postgresql.org/</a></dd>
+        <dt>Licences :</dt>
+        <dd>PostgreSQL</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/postgresql/">/listing/extra/postgresql/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#PARAMÈTRES">PARAMÈTRES</a></li>
+        
+            <li><a href="#SORTIES">SORTIES</a></li>
+        
+            <li><a href="#NOTES">NOTES</a></li>
+        
+            <li><a href="#EXEMPLES">EXEMPLES</a></li>
+        
+            <li><a href="#COMPATIBILITÉ">COMPATIBILITÉ</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/MERGE.7.fr.txt">txt</a>, 
+        
+            <a href="/man/MERGE.7.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>, à l'exception du contenu des pages de manuel, qui ont leur propre licence spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

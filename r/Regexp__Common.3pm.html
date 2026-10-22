@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Regexp::Common(3pm) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Regexp__Common(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-regexp-common/">perl-regexp-common</a></p>
+<p class="lic">Licences: PerlArtistic, Artistic2.0, BSD, MIT</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Regexp::Common(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">Regexp::Common(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Regexp::Common - Fournir des expressions régulières couramment demandées</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPIS'><a class='permalink' href='#SYNOPIS'>SYNOPIS</a></h1>
+<pre># UTILISATION STANDARD 
+use Regexp::Common;
+while (&lt;&gt;) {
+    /$RE{num}{real}/               and print q{un nombre};
+    /$RE{quoted}/                  and print q{une chaîne entre guillemets ['&quot;`]};
+   m[$RE{delimited}{-delim=&gt;'/'}]  and print q{une séquence /.../};
+    /$RE{balanced}{-parens=&gt;'()'}/ and print q{parenthèses équilibrées};
+    /$RE{profanity}/               and print q{un mot #*@%-é};
+}
+# INTERFACE BASÉE SUR LES SOUS-ROUTINES
+use Regexp::Common 'RE_ALL';
+while (&lt;&gt;) {
+    $_ =~ RE_num_real()              and print q{un nombre};
+    $_ =~ RE_quoted()                and print q{une chaîne entre guillemets ['&quot;`]};
+    $_ =~ RE_delimited(-delim=&gt;'/')  and print q{une séquence /.../};
+    $_ =~ RE_balanced(-parens=&gt;'()'} and print q{parenthèses équilibrées};
+    $_ =~ RE_profanity()             and print q{un mot #*@%-é};
+}
+# MATCHING EN LIGNE...
+if ( $RE{num}{int}-&gt;matches($text) ) {...}
+# ...ET SUBSTITUTION
+my $cropped = $RE{ws}{crop}-&gt;subs($uncropped);
+# MOTIFS PERSONNALISÉS
+use Regexp::Common 'pattern';
+pattern name   =&gt; ['name', 'mine'],
+        create =&gt; '(?i:J[.]?\s+A[.]?\s+Perl-Hacker)',
+        ;
+my $name_matcher = $RE{name}{mine};
+pattern name    =&gt; [ 'lineof', '-char=_' ],
+        create  =&gt; sub {
+                       my $flags = shift;
+                       my $char = quotemeta $flags-&gt;{-char};
+                       return '(?:^$char+$)';
+                   },
+        match   =&gt; sub {
+                       my ($self, $str) = @_;
+                       return $str !~ /[^$self-&gt;{flags}{-char}]/;
+                   },
+        subs   =&gt; sub {
+                       my ($self, $str, $replacement) = @_;
+                       $_[1] =~ s/^$self-&gt;{flags}{-char}+$//g;
+                  },
+        ;
+my $asterisks = $RE{lineof}{-char=&gt;'*'};
+# CHOISIR LES MOTIFS À CHARGER.
+use Regexp::Common qw /comment number/;  # Motifs de commentaire et de nombre.
+use Regexp::Common qw /no_defaults/;     # Ne charger aucun motif.
+use Regexp::Common qw /!delimited/;      # Tous, sauf les motifs délimités.</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Par défaut, ce module exporte une seule table de hachage
+    (<span class="Li">%RE</span>) qui stocke ou génère les expressions régulières
+    couramment nécessaires (voir &quot;Liste des motifs disponibles&quot;).</p>
+<p class="Pp">Il existe une interface alternative basée sur les sous-routines,
+    décrite dans &quot;Interface basée sur les sous-routines&quot;.</p>
+<section class="Ss">
+<h2 class="Ss" id='Syntaxe_générale_pour_demander_des_motifs'><a class='permalink' href='#Syntaxe_générale_pour_demander_des_motifs'>Syntaxe générale pour demander des motifs</a></h2>
+<p class="Pp">Pour accéder à un motif particulier, <span class="Li">%RE</span>
+    est traitée comme une table de hachage hiérarchique de tables de hachage (de
+    tables de hachage...), chaque clé successive étant un identifiant. Par
+    exemple, pour accéder au motif qui correspond aux nombres réels, vous
+    spécifiez :</p>
+<pre>$RE{num}{real}</pre>
+<p class="Pp">et pour accéder au motif qui correspond aux entiers :</p>
+<pre>$RE{num}{int}</pre>
+<p class="Pp">Des couches plus profondes de la table de hachage sont utilisées
+    pour spécifier des <i>indicateurs</i> : des arguments qui modifient le motif
+    résultant d'une manière ou d'une autre. Les clés utilisées pour accéder à ces
+    couches sont préfixées par un signe moins et peuvent avoir une valeur ; si
+    une valeur est donnée, elle est utilisée via une clé multidimensionnelle.
+    Par exemple, pour accéder au motif qui correspond aux nombres réels en base
+    2 avec des virgules incorporées séparant des groupes de trois chiffres (par
+    exemple, 10,101,110.110101101) :</p>
+<pre>$RE{num}{real}{-base =&gt; 2}{-sep =&gt; ','}{-group =&gt; 3}</pre>
+<p class="Pp">Grâce à la magie de Perl, ces couches d'indicateurs peuvent être
+    spécifiées dans n'importe quel ordre (et même intercalées parmi les clés
+    identifiantes), vous pourriez donc obtenir le même motif avec :</p>
+<pre>$RE{num}{real}{-sep =&gt; ','}{-group =&gt; 3}{-base =&gt; 2}</pre>
+<p class="Pp">ou :</p>
+<pre>$RE{num}{-base =&gt; 2}{real}{-group =&gt; 3}{-sep =&gt; ','}</pre>
+<p class="Pp">ou même :</p>
+<pre>$RE{-base =&gt; 2}{-group =&gt; 3}{-sep =&gt; ','}{num}{real}</pre>
+<p class="Pp">etc.</p>
+<p class="Pp">Notez cependant que l'ordre relatif des clés identifiantes *est*
+    significatif. C'est-à-dire :</p>
+<pre>$RE{list}{set}</pre>
+<p class="Pp">ne serait pas identique à :</p>
+<pre>$RE{set}{list}</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Syntaxe_des_indicateurs'><a class='permalink' href='#Syntaxe_des_indicateurs'>Syntaxe des indicateurs</a></h2>
+<p class="Pp">Dans les versions antérieures à 2.113, les indicateurs pouvaient
+    également être écrits sous la forme <span class="Li">&quot;{&quot;-flag=valeur&quot;}&quot;</span>.
+    Cela ne fonctionne plus, bien que <span class="Li">&quot;{&quot;-flag$;valeur&quot;}&quot;</span>
+    fonctionne toujours. Cependant, <span class="Li">&quot;{-flag =&gt; 'valeur'}&quot;</span>
+    est la syntaxe préférée.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Indicateurs_universels'><a class='permalink' href='#Indicateurs_universels'>Indicateurs universels</a></h2>
+<p class="Pp">Normalement, les indicateurs sont spécifiques à un seul motif.
+    Cependant, il existe deux indicateurs que tous les motifs peuvent spécifier.</p>
+<dl class="Bl-tag">
+  <dt>&quot;-keep&quot;</dt>
+  <dd>Par défaut, les motifs fournis par <span class="Li">%RE</span> ne contiennent
+      pas de parenthèses de capture. Cependant, si l'indicateur
+      <span class="Li">&quot;-keep&quot;</span> est spécifié (il ne nécessite pas
+      de valeur), alors toutes les sous-chaînes significatives que le motif
+      correspondent sont capturées. Par exemple :
+        <pre>if ($str =~ $RE{num}{real}{-keep}) {
+        $number   = $1;
+        $whole    = $3;
+        $decimals = $5;
+}
+</pre>
+    <p class="Pp">Une attention particulière est nécessaire si un motif
+        &quot;conservé&quot; est interpolé dans une expression régulière plus
+        grande, car la présence d'autres parenthèses de capture est susceptible
+        de modifier les &quot;variables de nombre&quot; dans lesquelles les
+        sous-chaînes significatives sont enregistrées.</p>
+    <p class="Pp">Voir aussi &quot;Ajout de nouvelles expressions régulières&quot;,
+        qui décrit comment créer de nouveaux motifs avec des parenthèses
+        &quot;optionnelles&quot; qui répondent à <span class="Li">&quot;-keep&quot;</span>.</p>
+  </dd>
+  <dt>&quot;-i&quot;</dt>
+  <dd>Certains motifs ou sous-motifs ne correspondent qu'aux lettres minuscules
+      ou majuscules. Si l'on souhaite effectuer une correspondance insensible à la
+      casse, une option consiste à utiliser le modificateur d'expression régulière
+      <span class="Li">&quot;/i&quot;</span>, ou la séquence spéciale
+      <span class="Li">&quot;(?i)&quot;</span>. Mais si l'interface fonctionnelle
+      est utilisée, on n'a pas cette option. Le commutateur
+      <span class="Li">&quot;-i&quot;</span> résout ce problème ; en l'utilisant,
+      le motif effectuera une correspondance insensible à la casse.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Interface_OO_et_matching/substitution_en_ligne'><a class='permalink' href='#Interface_OO_et_matching/substitution_en_ligne'>Interface OO et matching/substitution en ligne</a></h2>
+<p class="Pp">Les motifs renvoyés par <span class="Li">%RE</span> sont des
+    objets, donc au lieu d'écrire :</p>
+<pre>if ($str =~ /$RE{some}{pattern}/ ) {...}</pre>
+<p class="Pp">vous pouvez écrire :</p>
+<pre>if ( $RE{some}{pattern}-&gt;matches($str) ) {...}</pre>
+<p class="Pp">Pour la correspondance, cela ne semble pas présenter un grand
+    avantage en dehors de la lisibilité (mais voir ci-dessous).</p>
+<p class="Pp">Pour les substitutions, cela présente d'autres avantages
+    significatifs. Souvent, vous voulez effectuer une substitution sur une chaîne
+    sans modifier l'original. La plupart des gens utilisent ceci :</p>
+<pre>$changed = $original;
+$changed =~ s/$RE{some}{pattern}/$replacement/;</pre>
+<p class="Pp">Les plus habiles utilisent :</p>
+<pre>($changed = $original) =~ s/$RE{some}{pattern}/$replacement/;</pre>
+<p class="Pp">Regexp::Common vous permet d'écrire ceci :</p>
+<pre>$changed = $RE{some}{pattern}-&gt;subs($original=&gt;$replacement);</pre>
+<p class="Pp">Outre la réduction de l'angoisse de la précédence, cette approche
+    a l'avantage supplémentaire que le comportement de substitution peut être
+    optimisé à partir de l'expression régulière, et la chaîne de remplacement peut
+    être fournie par défaut (voir &quot;Ajout de nouvelles expressions
+    régulières&quot;).</p>
+<p class="Pp">Par exemple, dans l'implémentation de cette substitution :</p>
+<pre>$cropped = $RE{ws}{crop}-&gt;subs($uncropped);</pre>
+<p class="Pp">la chaîne vide par défaut est fournie automatiquement, et la
+    substitution est optimisée pour utiliser :</p>
+<pre>$uncropped =~ s/^\s+//;
+$uncropped =~ s/\s+$//;</pre>
+<p class="Pp">plutôt que :</p>
+<pre>$uncropped =~ s/^\s+|\s+$//g;</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Interface_basée_sur_les_sous-routines'><a class='permalink' href='#Interface_basée_sur_les_sous-routines'>Interface basée sur les sous-routines</a></h2>
+<p class="Pp">L'interface basée sur les tables de hachage a été choisie car elle
+    permet d'interpoler facilement les regex et parce qu'elle permet également de
+    les &quot;curry&quot;. Par exemple :</p>
+<pre>my $num = $RE{num}{int};
+my $commad     = $num-&gt;{-sep=&gt;','}{-group=&gt;3};
+my $duodecimal = $num-&gt;{-base=&gt;12};</pre>
+<p class="Pp">Cependant, l'utilisation de tables de hachage liées rend l'accès aux
+    motifs de Regexp::Common plus lent qu'il ne pourrait l'être autrement. Dans
+    les contextes où l'impatience l'emporte sur la paresse, Regexp::Common fournit
+    une interface supplémentaire basée sur les sous-routines.</p>
+<p class="Pp">Pour chaque entrée (sous-entrée) dans la table de hachage
+    <span class="Li">%RE</span> (<span class="Li">&quot;$RE{clé1}{clé2}{etc}&quot;</span>),
+    il existe une sous-routine exportable correspondante :
+    <span class="Li">RE_clé1_clé2_etc()</span>. Le nom de chaque sous-routine est
+    la concaténation des clés séparées par des tirets bas.</p>
+</section>
+</div>
+</section>
+            </article>
+            
+        </main>
+        <footer>
+            
+        </footer>
+    </body>
+</html>
+<p class="Pp">Vous pouvez ajouter vos propres expressions régulières à la table de hachage <span class="Li">%RE</span> à l'exécution en utilisant la sous-routine exportable <span class="Li">&quot;pattern&quot;</span>. Cette sous-routine attend une liste de paires clé-valeur spécifiant le comportement de l'expression régulière. Les différentes paires possibles sont :</p>
+<dl class="Bl-tag">
+  <dt>&quot;name =&gt; [ @list ]&quot;</dt>
+  <dd>Un argument obligatoire spécifiant le nom de l'expression régulière, et tous les indicateurs qu'elle peut prendre, via une référence à une liste de chaînes de caractères. Par exemple :
+    <pre>pattern name =&gt; [qw( line of -char )],
+    # autres arguments ici
+    ;
+</pre>
+    <p class="Pp">Ceci spécifie une entrée <span class="Li">&quot;$RE{line}{of}&quot;</span>, qui peut prendre un indicateur <span class="Li">&quot;-char&quot;</span>.</p>
+    <p class="Pp">Les indicateurs peuvent également être spécifiés avec une valeur par défaut, qui est utilisée lorsque l'indicateur est spécifié sans valeur explicite (mais pas lorsque l'indicateur est omis). Par exemple :</p>
+    <pre>pattern name =&gt; [qw( line of -char=_ )],
+    # le caractère par défaut est '_'
+    # autres arguments ici
+    ;
+</pre>
+  </dd>
+  <dt>&quot;create =&gt; $sub_ref_or_string&quot;</dt>
+  <dd>Un argument obligatoire spécifiant soit une chaîne qui sera retournée comme expression régulière :
+    <pre>pattern name =&gt; [qw( line of underscores )],
+    create =&gt; q/(?:^_+$)/
+    ;
+</pre>
+    <p class="Pp">soit une référence à une sous-routine qui sera appelée pour créer l'expression régulière :</p>
+    <pre>pattern name =&gt; [qw( line of -char=_ )],
+    create =&gt; sub {
+                        my ($self, $flags) = @_;
+                        my $char = quotemeta $flags-&gt;{-char};
+                        return '(?:^$char+$)';
+                    },
+    ;
+</pre>
+    <p class="Pp">Si la version sous-routine est utilisée, la sous-routine sera appelée avec trois arguments : une référence à l'objet d'expression régulière, une référence à une table de hachage contenant les indicateurs et leurs valeurs, et une référence à un tableau contenant les clés non-indicateurs.</p>
+    <p class="Pp">Quels que soient les résultats de la sous-routine, ils seront convertis en une chaîne pour l'expression régulière.</p>
+    <p class="Pp">Peu importe comment l'expression régulière est créée, elle sera immédiatement post-traitée pour inclure ou non des parenthèses de capture (selon la valeur de l'indicateur <span class="Li">&quot;-keep&quot;</span>). Pour spécifier des parenthèses de capture &quot;facultatives&quot; à l'intérieur de l'expression régulière associée à <span class="Li">&quot;create&quot;</span>, utilisez la notation <span class="Li">&quot;(?k:...)&quot;</span>. Toutes les parenthèses de cette catégorie seront converties en <span class="Li">&quot;(...)&quot;</span> lorsque l'indicateur <span class="Li">&quot;-keep&quot;</span> est spécifié, ou en <span class="Li">&quot;(?:...)&quot;</span> lorsqu'il est omis. C'est une convention de Regexp::Common que les parenthèses de capture les plus externes capturent toujours le motif complet, bien que cela ne soit pas appliqué.</p>
+  </dd>
+  <dt>&quot;match =&gt; $sub_ref&quot;</dt>
+  <dd>Un argument optionnel spécifiant une sous-routine qui sera appelée lorsque la méthode <span class="Li">&quot;$RE{...}-&gt;matches(...)&quot;</span> de cette expression régulière sera invoquée.
+    <p class="Pp">La sous-routine doit attendre deux arguments : une référence à l'objet d'expression régulière et la chaîne à comparer.</p>
+    <p class="Pp">Elle doit retourner les mêmes types de valeurs qu'une expression régulière <span class="Li">&quot;m/.../&quot;</span>.</p>
+    <pre>pattern name =&gt; [qw( line of -char )],
+    create =&gt; sub {...},
+    match =&gt; sub {
+                        my ($self, $str) = @_;
+                        $str !~ /[^$self-&gt;{flags}{-char}]/;
+                   },
+    ;
+</pre>
+  </dd>
+  <dt>&quot;subs =&gt; $sub_ref&quot;</dt>
+  <dd>Un argument optionnel spécifiant une sous-routine qui sera appelée lorsque la méthode <span class="Li">&quot;$RE{...}-&gt;subs(...)&quot;</span> de cette expression régulière sera invoquée.
+    <p class="Pp">La sous-routine doit attendre trois arguments : une référence à l'objet d'expression régulière, la chaîne à modifier et la valeur de remplacement. Le troisième argument peut être <span class="Li">&quot;undef&quot;</span>, indiquant que le remplacement par défaut est nécessaire.</p>
+    <p class="Pp">La sous-routine doit retourner les mêmes types de valeurs qu'une expression régulière <span class="Li">&quot;s/.../.../&quot;</span>.</p>
+    <p class="Pp">Par exemple :</p>
+    <pre>pattern name =&gt; [ 'lineof', '-char=_' ],
+    create =&gt; sub {...},
+    subs =&gt; sub {
+                     my ($self, $str, $ignore_replacement) = @_;
+                     $_[1] =~ s/^$self-&gt;{flags}{-char}+$//g;
+                   },
+    ;
+</pre>
+    <p class="Pp">Note : une telle sous-routine devra presque toujours modifier <span class="Li">$_[1]</span> directement.</p>
+  </dd>
+  <dt>&quot;version =&gt; $minimum_perl_version&quot;</dt>
+  <dd>Si cet argument est spécifié, il indique la version minimale de Perl requise pour utiliser la nouvelle expression régulière. Les tentatives de l'utiliser avec des versions antérieures généreront un diagnostic grave.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Loading_specific_sets_of_patterns.'><a class='permalink' href='#Loading_specific_sets_of_patterns.'>Chargement de jeux de motifs spécifiques.</a></h2>
+<p class="Pp">Par défaut, tous les jeux de motifs mentionnés ci-dessous sont disponibles. Cependant, il est possible d'indiquer quels jeux de motifs doivent être disponibles - les jeux souhaités sont indiqués comme arguments à l'instruction <span class="Li">&quot;use&quot;</span>. Alternativement, il est également possible d'indiquer quels jeux de motifs ne doivent pas être disponibles - ces jeux sont indiqués comme arguments à l'instruction <span class="Li">&quot;use&quot;</span>, mais précédés d'un point d'exclamation. L'argument <i>no_defaults</i> indique qu'aucun des motifs par défaut ne doit être disponible. Ceci est utile, par exemple, si vous ne souhaitez que la sous-routine <span class="Li">pattern()</span>.</p>
+<p class="Pp">Exemples :</p>
+<pre>use Regexp::Common qw /comment number/;  # Motifs de commentaires et de nombres.
+use Regexp::Common qw /no_defaults/;     # Ne charger aucun motif.
+use Regexp::Common qw /!delimited/;      # Tous, sauf les motifs délimités.
+</pre>
+<p class="Pp">Il est également possible de charger vos propres jeux de motifs. Si vous avez un module <span class="Li">&quot;Regexp::Common::my_patterns&quot;</span> qui fournit des motifs, vous pouvez le faire avec :</p>
+<pre>use Regexp::Common qw /my_patterns/;</pre>
+<p class="Pp">Note : les motifs par défaut resteront disponibles, sauf si vous utilisez <i>no_defaults</i> ou si vous mentionnez explicitement l'un des jeux par défaut, les autres ne seront pas disponibles.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='List_of_available_patterns'><a class='permalink' href='#List_of_available_patterns'>Liste des motifs disponibles</a></h2>
+<p class="Pp">Les motifs mentionnés ci-dessous sont actuellement disponibles. Chaque jeu de motifs a sa propre page de manuel décrivant les détails. Pour chaque jeu de motifs nommé <i>name</i>, la page de manuel <i>Regexp::Common::name</i> décrit les détails.</p>
+<p class="Pp">Actuellement disponibles :</p>
+<dl class="Bl-tag">
+  <dt id="Regexp::Common::balanced"><a class="permalink" href="#Regexp::Common::balanced">Regexp::Common::balanced</a></dt>
+  <dd>Fournit des expressions régulières pour les chaînes avec des délimiteurs de parenthèses équilibrés.</dd>
+  <dt id="Regexp::Common::comment"><a class="permalink" href="#Regexp::Common::comment">Regexp::Common::comment</a></dt>
+  <dd>Fournit des expressions régulières pour les commentaires de divers langages (43 langages actuellement).</dd>
+  <dt id="Regexp::Common::delimited"><a class="permalink" href="#Regexp::Common::delimited">Regexp::Common::delimited</a></dt>
+  <dd>Fournit des expressions régulières pour les chaînes délimitées.</dd>
+  <dt id="Regexp::Common::lingua"><a class="permalink" href="#Regexp::Common::lingua">Regexp::Common::lingua</a></dt>
+  <dd>Fournit des expressions régulières pour les palindromes.</dd>
+  <dt id="Regexp::Common::list"><a class="permalink" href="#Regexp::Common::list">Regexp::Common::list</a></dt>
+  <dd>Fournit des expressions régulières pour les listes.</dd>
+  <dt id="Regexp::Common::net"><a class="permalink" href="#Regexp::Common::net">Regexp::Common::net</a></dt>
+  <dd>Fournit des expressions régulières pour les adresses IPv4, IPv6 et MAC.</dd>
+  <dt id="Regexp::Common::number"><a class="permalink" href="#Regexp::Common::number">Regexp::Common::number</a></dt>
+  <dd>Fournit des expressions régulières pour les nombres (entiers et réels).</dd>
+  <dt id="Regexp::Common::profanity"><a class="permalink" href="#Regexp::Common::profanity">Regexp::Common::profanity</a></dt>
+  <dd>Fournit des expressions régulières pour les grossièretés.</dd>
+  <dt id="Regexp::Common::whitespace"><a class="permalink" href="#Regexp::Common::whitespace">Regexp::Common::whitespace</a></dt>
+  <dd>Fournit des expressions régulières pour les espaces de début et de fin.</dd>
+  <dt id="Regexp::Common::zip"><a class="permalink" href="#Regexp::Common::zip">Regexp::Common::zip</a></dt>
+  <dd>Fournit des expressions régulières pour les codes postaux.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Forthcoming_patterns_and_features'><a class='permalink' href='#Forthcoming_patterns_and_features'>Motifs et fonctionnalités à venir</a></h2>
+<p class="Pp">Les futures versions de la bibliothèque fourniront également des motifs pour les éléments suivants :</p>
+<pre>* adresses e-mail
+* balises HTML/XML
+* plus de correspondances numériques
+* en-têtes de courrier (y compris les en-têtes multilignes)
+* plus d'URL
+* numéros de téléphone de divers pays
+* devises (format universel à 3 lettres, code Latin-1, noms de devises)
+* dates
+* formats binaires (par exemple, encodé UU, MIME)</pre>
+<p class="Pp">Si vous avez des motifs ou des générateurs de motifs que vous jugez généralement utiles, veuillez les soumettre au mainteneur -- de préférence sous forme de code source utilisant la sous-routine <span class="Li">&quot;pattern&quot;</span>. Les soumissions incluant un jeu de tests seront particulièrement bienvenues.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DIAGNOSTICS'><a class='permalink' href='#DIAGNOSTICS'>DIAGNOSTICS</a></h1>
+<dl class="Bl-tag">
+  <dt>&quot;Can't export unknown subroutine %s&quot;</dt>
+</dl>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">NOM</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<p class="Pp">SYNTAXE</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">DESCRIPTION</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DIAGNOSTICS'><a class='permalink' href='#DIAGNOSTICS'>DIAGNOSTICS</a></h1>
+<p class="Pp">DIAGNOSTICS</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ACKNOWLEDGEMENTS'><a class='permalink' href='#ACKNOWLEDGEMENTS'>REMERCIEMENTS</a></h1>
+<p class="Pp">REMERCIEMENTS</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHOR'><a class='permalink' href='#AUTHOR'>AUTEUR</a></h1>
+<p class="Pp">AUTEUR</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='MAINTENANCE'><a class='permalink' href='#MAINTENANCE'>MAINTENANCE</a></h1>
+<p class="Pp">MAINTENANCE</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BUGS_AND_IRRITATIONS'><a class='permalink' href='#BUGS_AND_IRRITATIONS'>BOGUES ET IRRITATIONS</a></h1>
+<p class="Pp">BOGUES ET IRRITATIONS</p>
+<p class="Pp">Pour commencer, il manque beaucoup de patrons courants. Veuillez les envoyer à <i>regexp-common@abigail.freedom.nl</i>.</p>
+<p class="Pp">Certains problèmes de documentation peuvent survenir lors de l'installation de ce module avec une version de Perl antérieure à 5.6.0 ; certains manuels peuvent ne pas s'installer correctement ou ne pas être consultables avec une ancienne version de Perl. Envisagez de mettre à jour votre Perl.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='NOT_A_BUG'><a class='permalink' href='#NOT_A_BUG'>PAS UN BOGUE</a></h1>
+<dl class="Bl-tag">
+  <dt>•</dt>
+  <dd>Les différents patrons ne sont pas ancrés. C'est-à-dire qu'un patron comme <span class="Li">&quot;$RE {num} {int}&quot;</span> correspondra à &quot;abc4def&quot;, car une sous-chaîne de l'échantillon correspond. C'est intentionnel, pas un bogue. Si vous voulez que le patron soit ancré, utilisez quelque chose comme :
+    <pre>my $integer = $RE {num} {int};
+$subj =~ /^$integer$/ and print &quot;Ça correspond !\n&quot;;
+</pre>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='LICENSE_and_COPYRIGHT'><a class='permalink' href='#LICENSE_and_COPYRIGHT'>LICENCE ET COPYRIGHT</a></h1>
+<p class="Pp">Ce logiciel est Copyright (c) 2001 - 2024, Damian Conway et Abigail.</p>
+<p class="Pp">Ce module est un logiciel libre et peut être utilisé sous l'une des licences suivantes :</p>
+<pre>1) La Licence Artistique Perl.     Voir le fichier COPYRIGHT.AL.
+2) La Licence Artistique Perl 2.0.     Voir le fichier COPYRIGHT.AL2.
+3) La Licence BSD.               Voir le fichier COPYRIGHT.BSD.
+4) La Licence MIT.               Voir le fichier COPYRIGHT.MIT.</pre>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher des pages de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Aller" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-regexp-common/">extra/perl-regexp-common</a></dd>
+        <dt>Version :</dt>
+        <dd>2024080801-3</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://metacpan.org/release/Regexp-Common">https://metacpan.org/release/Regexp-Common</a></dd>
+        <dt> Licences :</dt>
+        <dd>PerlArtistic, Artistic2.0, BSD, MIT</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-regexp-common/">/listing/extra/perl-regexp-common/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#SYNTAXE">SYNTAXE</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#DIAGNOSTICS">DIAGNOSTICS</a></li>
+        
+            <li><a href="#REMERCIEMENTS">REMERCIEMENTS</a></li>
+        
+            <li><a href="#AUTEUR">AUTEUR</a></li>
+        
+            <li><a href="#MAINTENANCE">MAINTENANCE</a></li>
+        
+            <li><a href="#BOGUES ET IRRITATIONS">BOGUES ET IRRITATIONS</a></li>
+        
+            <li><a href="#PAS UN BOGUE">PAS UN BOGUE</a></li>
+        
+            <li><a href="#LICENCE ET COPYRIGHT">LICENCE ET COPYRIGHT</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Regexp::Common.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/Regexp::Common.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui a sa propre licence spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

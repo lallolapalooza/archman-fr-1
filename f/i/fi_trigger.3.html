@@ -1,0 +1,217 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>fi_trigger(3) — Pages manuelles d'Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">fi_trigger(3)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/libfabric/">libfabric</a></p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">fi_trigger(3)</td>
+    <td class="head-vol">Libfabric v2.3.1</td>
+    <td class="head-rtitle">fi_trigger(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">fi_trigger - Opérations déclenchées</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>#include &lt;rdma/fi_trigger.h&gt;
+</pre>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Les opérations déclenchées permettent à une application de mettre en file d'attente une requête de transfert de données qui est différée jusqu'à ce qu'une condition spécifiée soit remplie. Un usage typique est d'envoyer un message seulement après avoir reçu toutes les données d'entrée. Les opérations déclenchées peuvent aider à réduire la latence nécessaire pour initier un transfert en éliminant le besoin de retourner le contrôle à l'application avant que le transfert de données ne commence.</p>
+<p class="Pp">Un point de terminaison doit être créé avec la capacité FI_TRIGGER afin que des opérations déclenchées puissent être spécifiées. Une opération déclenchée est demandée en spécifiant l'indicateur FI_TRIGGER comme partie de l'opération. Un tel point de terminaison est appelé un point de terminaison déclenchable.</p>
+<p class="Pp">Toute opération de transfert de données est potentiellement déclenchable, sous réserve des contraintes du fournisseur. Les points de terminaison déclenchables sont initialisés de sorte que seules les interfaces prises en charge par le fournisseur qui sont déclenchables soient disponibles.</p>
+<p class="Pp">Les opérations déclenchées exigent que les applications utilisent struct fi_triggered_context comme paramètre de contexte par opération, ou si le fournisseur exige le mode FI_CONTEXT2, struct fi_trigger_context2. L'utilisation de struct fi_triggered_context[2] remplace struct fi_context[2], si requis par le fournisseur. Bien que struct fi_triggered_context[2] ne soit pas opaque pour l'application, le contenu de la structure peut être modifié par le fournisseur une fois qu'elle a été soumise en tant qu'opération. Cette structure a des exigences similaires à celles de struct fi_context[2]. Elle doit être allouée par l'application et rester valide jusqu'à ce que l'opération correspondante se termine ou soit annulée avec succès.</p>
+<p class="Pp">Struct fi_triggered_context[2] est utilisée pour spécifier la condition qui doit être remplie avant que le transfert de données déclenché soit initié. Si la condition est remplie au moment où la requête est faite, le transfert de données peut être initié immédiatement. Le format de struct fi_triggered_context[2] est décrit ci-dessous.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>struct fi_triggered_context {
+    enum fi_trigger_event event_type;   /* trigger type */
+    union {
+        struct fi_trigger_threshold threshold;
+        struct fi_trigger_xpu xpu;
+        void *internal[3]; /* reserved */
+    } trigger;
+};
+struct fi_triggered_context2 {
+    enum fi_trigger_event event_type;   /* trigger type */
+    union {
+        struct fi_trigger_threshold threshold;
+        struct fi_trigger_xpu xpu;
+        void *internal[7]; /* reserved */
+    } trigger;
+};
+</pre>
+  </dd>
+</dl>
+<p class="Pp">Le contexte déclenché indique le type d'événement assigné au déclencheur, ainsi qu'une union de détails du déclencheur qui est basée sur le type d'événement.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COMPLETION_BASED_TRIGGERS'><a class='permalink' href='#COMPLETION_BASED_TRIGGERS'>DÉCLENCHEURS BASÉS SUR L'ACHÈVEMENT</a></h1>
+<p class="Pp">Les déclencheurs basés sur l'achèvement diffèrent un transfert de données jusqu'à ce qu'un ou plusieurs transferts de données connexes se terminent. Par exemple, une opération d'envoi peut être différée jusqu'à ce qu'une opération de réception se termine, indiquant que les données à transférer sont maintenant disponibles.</p>
+<p class="Pp">L'événement de déclenchement suivant lié aux transferts basés sur l'achèvement est défini.</p>
+<dl class="Bl-tag">
+  <dt id="FI_TRIGGER_THRESHOLD"><a class="permalink" href="#FI_TRIGGER_THRESHOLD"><i>FI_TRIGGER_THRESHOLD</i></a></dt>
+  <dd>Cela indique que l'opération de transfert de données sera différée jusqu'à ce qu'un compteur d'événements franchisse une valeur de seuil spécifiée par l'application. Le seuil est spécifié à l'aide de struct fi_trigger_threshold :</dd>
+</dl>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>struct fi_trigger_threshold {
+    struct fid_cntr *cntr; /* event counter to check */
+    size_t threshold;      /* threshold value */
+};
+</pre>
+  </dd>
+</dl>
+<p class="Pp">Les opérations de seuil sont déclenchées dans l'ordre des valeurs de seuil. Cela est vrai même si le compteur s'incrémente d'une valeur supérieure à 1. Si deux opérations déclenchées ont le même seuil, elles seront déclenchées dans l'ordre dans lequel elles ont été soumises au point de terminaison.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DEFERRED_WORK_QUEUES'><a class='permalink' href='#DEFERRED_WORK_QUEUES'>FILES D'ATTENTE DE TRAVAIL DIFFÉRÉ</a></h1>
+<p class="Pp">La fonctionnalité et la description suivantes sont des améliorations de la prise en charge des opérations déclenchées.</p>
+<p class="Pp">L'interface de file d'attente de travail différée est conçue comme des constructions primitives qui peuvent être utilisées pour implémenter des opérations collectives au niveau de l'application. Elles sont une forme plus avancée d'opération déclenchée. Elles permettent à une application de mettre en file d'attente des opérations vers une file de travail différée qui est associée au domaine. Notez que la file de travail différée est une construction conceptuelle, plutôt qu'une exigence d'implémentation. Les requêtes de travail différées se composent de trois composants principaux : un événement ou une condition qui doit d'abord être remplie, une opération à effectuer, et une notification d'achèvement.</p>
+<p class="Pp">Parce que les requêtes de travail différées sont postées directement au domaine, elles peuvent prendre en charge un ensemble plus large de conditions et d'opérations. Les requêtes de travail différées sont soumises à l'aide de struct fi_deferred_work. Cette structure, ainsi que les structures d'opération correspondantes (référencées à travers l'union op) utilisées pour décrire le travail doivent rester valides jusqu'à ce que l'opération se termine ou soit annulée. Le format de la requête de travail différée est le suivant :</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>struct fi_deferred_work {
+    struct fi_context2    context;
+    uint64_t              threshold;
+    struct fid_cntr       *triggering_cntr;
+    struct fid_cntr       *completion_cntr;
+    enum fi_trigger_op    op_type;
+    union {
+        struct fi_op_msg            *msg;
+        struct fi_op_tagged         *tagged;
+        struct fi_op_rma            *rma;
+        struct fi_op_atomic         *atomic;
+        struct fi_op_fetch_atomic   *fetch_atomic;
+        struct fi_op_compare_atomic *compare_atomic;
+        struct fi_op_cntr           *cntr;
+    } op;
+};
+</pre>
+  </dd>
+</dl>
+<p class="Pp">Une fois qu'une requête de travail a été postée à la file de travail différée, elle restera dans la file jusqu'à ce que le compteur de déclenchement (valeurs des compteurs de succès plus d'erreur) ait atteint le seuil indiqué. Si la condition de déclenchement a déjà été remplie au moment où la requête de travail est mise en file, l'opération sera initiée immédiatement.</p>
+<p class="Pp">À l'achèvement d'un transfert de données différé, le compteur d'achèvement spécifié sera incrémenté de un. Notez que les opérations de compteur différées ne mettent pas à jour le compteur d'achèvement ; seul le compteur spécifié à travers le fi_op_cntr est modifié. Le champ completion_cntr doit être NULL pour les opérations de compteur.</p>
+<p class="Pp">Parce que le travail différé cible la prise en charge des opérations de communication collective, les requêtes de travail postées ne génèrent aucune achèvement au point de terminaison par défaut. Par exemple, les opérations terminées ne sont pas écrites dans la file d'achèvement du PE ni ne mettent à jour le compteur du PE (sauf si le compteur du PE est explicitement référencé comme completion_cntr). Une application peut demander des achèvements du PE en spécifiant l'indicateur FI_COMPLETION comme partie de l'opération.</p>
+<p class="Pp">Il est de la responsabilité de l'application de détecter et de gérer les situations qui surviennent et qui pourraient entraîner le non-respect de la condition d'une requête de travail différée. Par exemple, si une requête de travail dépend de l'achèvement réussi d'une opération de transfert de données, qui échoue, alors l'application doit annuler la requête de travail.</p>
+<p class="Pp">Pour soumettre une requête de travail différée, les applications devraient utiliser la fonction fi_control du domaine avec la commande FI_QUEUE_WORK et struct fi_deferred_work comme paramètre fi_control arg. Pour annuler une requête de travail différée, utilisez fi_control avec la commande FI_CANCEL_WORK et la struct fi_deferred_work correspondante à annuler. La commande fi_control FI_FLUSH_WORK annulera toutes les requêtes de travail mises en file. FI_FLUSH_WORK peut être utilisé pour vider tout le travail mis en file vers le domaine, ou peut être utilisé pour annuler toutes les requêtes en attente sur un triggering_cntr spécifique.</p>
+<p class="Pp">Les requêtes de travail différées ne sont pas traitées par le fournisseur jusqu'à ce que l'événement associé se soit produit ; bien que certaines vérifications de validation puissent encore avoir lieu lorsqu'une requête est soumise. Les tampons de données référencés ne sont pas lus ni autrement accessibles. Mais le fournisseur peut valider les objets de fabric, tels que les points de terminaison et les compteurs, et que les paramètres d'entrée se situent dans les plages prises en charge. Si une requête spécifique n'est pas prise en charge par le fournisseur, il fera échouer l'opération avec -FI_ENOSYS.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SEE_ALSO'><a class='permalink' href='#SEE_ALSO'>VOIR AUSSI</a></h1>
+<p class="Pp">fi_getinfo(3), fi_endpoint(3), fi_mr(3), fi_alias(3),
+  fi_cntr(3)</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTHORS'><a class='permalink' href='#AUTHORS'>AUTEURS</a></h1>
+<p class="Pp">OpenFabrics.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2024-12-10</td>
+    <td class="foot-os">Manuel du programmeur Libfabric</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le </p>paquet :
+    <dl>
+        <dt>Nom du </dt>paquet :
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/libfabric/">extra/lib</a></dd>fabric
+        <dt>Version </dt>:
+        <dd>2.</dd>3.1-1
+        <dt>Amont </dt>:
+        <dd><a href="https://ofiwg.github.io/libfabric/">https://ofiwg.github.</a></dd>io/libfabric/
+        <dt>Licences </dt>:
+        <dd>BSD-2-Clause OR GPL-2.</dd>0-or-later
+        <dt>Manuels </dt>:
+        <dd><a href="/listing/extra/libfabric/">/listi</a></dd>ng/ext</dl>ra/libf</section>abric/
+
+<details>
+    <summary>Table des </summary>matières
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">N</a></li>OM
+        
+            <li><a href="#SYNOPSIS">SYN</a></li>OPSISSE
+        
+            <li><a href="#DESCRIPTION">DESC</a></li>RIPTION
+        
+            <li><a href="#COMPLETION_BASED_TRIGGERS">DÉCLENCHEURS BASÉS </a></li>SUR LA COMPLÉTION
+        
+            <li><a href="#DEFERRED_WORK_QUEUES">FILES D'ATTENTE </a></li>DE TRAVAUX DIFFÉRÉS
+        
+            <li><a href="#SEE_ALSO">VOIR </a></li>AUSSI
+        
+            <li><a href="#AUTHORS">A</a></li>UTE</ul>U</nav>R</details>S
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/fi_trigger.3.en.txt">t</a>xt, 
+        
+            <a href="/man/fi_trigger.3.en.raw">b</a></p>r</nav>u</aside></main>t
+        <footer>
+            de manuel.
+            <p>Le site web est disponible selon les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0
+               , à l</a>'exception du contenu des pag</p>es de manuel, qui possèdent </footer>leur propre licence
+        </body>       spécifiée dans le paqu</html>et Arch Linux correspondant.

@@ -1,0 +1,240 @@
+
+
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>cmake-cxxmodules(7) — Pages manuelles </title>d'Arch
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">cmake-cxxmodules(7)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/cmake/">cmake</a></p>
+
+        nt
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">CMAKE-CXXMODULE</td>S(7)
+    <td class="head-vol">CM</td>ake
+    <td class="head-rtitle">CMAKE-CXXMODULE</td>S(</tr>7</table>)
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NO</a></h1>M
+<p class="Pp">cmake-cxxmodules - Référence du support des modules C++ de </p>CMake
+<p class="Pp">Ajouté dans la version 3.</p>28.
+<p class="Pp">C++ 20 a introduit le concept de « modules » dans le
+    langage. La conception nécessite que les systèmes de build ordonnent les compilations entre elles pour satisfaire
+    les instructions <b>import de manière fiable. L'implémentation de CMake
+    demande au compilateur d</b>e scanner les fichiers sources pour les dépendances de modules pendant le
+    bui</p>ld, compile les résultats du scan pour inférer les contraintes d'ordre, et indiqu</section>e à
+    l'outil de build comment mettre à jour dynamiquement le graphe de build.
+<section class="Sh">
+<h1 class="Sh" id='COMPILATION_STRATEGY'><a class='permalink' href='#COMPILATION_STRATEGY'>STRATÉGIE DE </a></h1>COMPILATION
+<p class="Pp">Avec les modules C++, compiler un ensemble de sources C++ n'est plus
+    embarrassingly parallel (parallélisable sans contrainte). C'est-à-dire que toute source donnée peut d'abord nécessiter la
+    compilation d'un autre fichier source afin de fournir un
+    « CMI » (interface de module compilée) ou « BMI » (interface de module binaire)
+    que les compilateurs C++ utilisent pour satisfaire les instructions <b>import
+</b>    dans d'autres sources. Avec les en-têtes, les sources pouvaient partager leurs déclarations afin
+    que n'importe quel consommateur puisse compiler indépendamment. Avec les modules, les déclarations
+    sont maintenant générées dans ces fichiers BMI par le compilateur pendant la compilation
+    en fonction du contenu du fichier source et de ses instructions <b>ex</b>port</p>.
+<p class="Pp">L'ordre nécessaire pour la compilation nécessite une résolution au moment du build
+    de l'ordre car l'ordre est contrôlé par le contenu des
+    sources. Cela signifie que l'ordre doit être extrait des sources pendant le
+    build pour éviter de régénérer le graphe de build via une phase de configuration et de génération
+    pour chaque changement de source afin d'obtenir un build </p>correct.
+<p class="Pp">La stratégie générale consiste à utiliser un « scanner » pour extraire
+    les informations de dépendance d'ordre et à mettre à jour le graphe de build avec de nouvelles
+    arêtes entre les arêtes existantes en prenant les résultats de scan par source
+    (représentés par les fichiers
+    <a href='https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1689r5.html'>https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1689r5.html
+    P1689R5) </a>et en « compilant » les dépendances au sein d'une cible et avec les
+    modules produits par des cibles visibles par la cible. La tâche principale est de
+    générer des fichiers « module map » à passer à chaque règle de compilation avec les
+    chemins vers les BMIs nécessaires pour satisfaire les instructions <b>import. </b>Le compilateur de dépendances
+    a également pour tâche d'utiliser les informations au moment du build pour remplir des informations
+    comprenant les <b>règles </b>d'installation pour les unités d'interface de module, leurs BMIs,
+    et les propriétés pour toute cible exportée avec des modules </p>C++.
+<p class="Pp"><b>Remarque </b></p>:
+<div class="Bd-indent">
+<div class="Bd-indent">CMake se concentre sur des builds corrects avant d'envisager des
+  améliorations de performance. Il existe des tactiques connues au sein de la stratégie choisie
+</div>  qui pourraient offrir des améliorations de performance de build. Cependant, elles sont
+  différées jusqu'à ce que nous ayons un modèle fonctionnel auquel les c</div>omparer. Il est
+  également important de noter qu'une tactique utile dans une situation (par ex., les builds
+  à partir de zéro) peut ne pas être performante da</section>ns une autre situation (par ex., les builds
+  incrémentaux). Trouver un équilibre et offrir des contrôles pour sélectionner les tactiques est
+  un travail futur.
+<section class="Sh">
+<h1 class="Sh" id='SCANNING_CONTROL'><a class='permalink' href='#SCANNING_CONTROL'>CONTRÔLE DU </a></h1>SCAN
+<p class="Pp">Le fait que les sources soient scannées pour l'utilisation de modules C++ dépend
+    des requêtes suivantes. La première requête qui fournit une réponse oui/non
+    est </p>utilisée.
+<div class="Bd-indent">
+<ul class="Bl-bullet">
+  <li>Si le fichier source appartient à un file set de type <b>CXX_MODULES,</b> il
+      sera </li>scanné.
+  <li>Si la cible n'utilise pas au moins C++ 20, elle ne sera pas </li>scannée.
+  <li>Si le fichier source n'est pas de langage <b>CXX,</b> il ne sera pas
+    </li>scanné.
+  <li>Si la propriété de fichier source <b>CXX_SCAN_FOR_MODULES </b>&lt;#prop_sf:CXX_SCAN_FOR_MODULES&gt;
+      est définie, sa valeur sera </li>utilisée.
+  <li>Si la propriété de cible <b>CXX_SCAN_FOR_MODULES </b>&lt;#prop_tgt:CXX_SCAN_FOR_MODULES&gt;
+      est définie, sa valeur sera utilisée. Définissez la variable
+      <b>CMAKE_CXX_SCAN_FOR_MODULES
+</b>      &lt;#variable:CMAKE_CXX_SCAN_FOR_MODULES&gt; pour initialiser cette
+      propriété sur toutes les cibles lors de leur </li>création.
+  <li>Sinon, le fichier source sera scanné si le compilateur et le générateur
+      prennent en charge le scan. Voir la politique <b>CMP01</b>55 &lt;#</li>policy</ul>:CMP0</div>155&gt;.
+<p class="Pp">Notez que tout fichier source scanné sera exclu de tout unity build
+    (voir <b>UNITY_BUILD &lt;#prop_tgt:UNITY_BUILD&gt;) car</b>
+    les instructions liées aux modules </p>ne peuvent se produire qu'à un seul endro</section>it dans une unité de
+    traduction C++.
+<section class="Sh">
+<h1 class="Sh" id='COMPILER_SUPPORT'><a class='permalink' href='#COMPILER_SUPPORT'>PRISE EN CHARGE DES </a></h1>COMPILATEURS
+<p class="Pp">Les compilateurs pour lesquels CMake prend nativement en charge le scan des dépendances de modules sont </p>:
+<div class="Bd-indent">
+<ul class="Bl-bullet">
+  <li>MSVC toolset 14.34 et plus récent (fourni avec Visual Studio 17.4 et
+    plus </li>récent)
+  <li>LLVM/Clang 16.0 et plus </li>récent
+  <li>GCC 14 (pour la</li> branche en dév</ul>eloppement, ap</div>rès 2023-09-20)</section> et plus récent
+<section class="Sh">
+<h1 class="Sh" id='IMPORT_STD_SUPPORT'><a class='permalink' href='#IMPORT_STD_SUPPORT'>PRISE EN CHARGE DE IMPORT </a></h1>STD
+<p class="Pp">La prise en charge de <b>import std </b>est limitée aux combinaisons suivantes de
+    chaîne d'outils et de bibliothèque standard </p>:
+<div class="Bd-indent">
+<ul class="Bl-bullet">
+  <li>Clang 18.1.2 et plus récent avec <b>-stdlib=libc++ </b>ou
+      <b>-stdlib=libstd</b></li>c++
+  <li>MSVC toolset 14.36 et plus récent (fourni avec Visual Studio 17.6 Preview 2
+      et plus </li>récent)
+  <li>GCC 15</li> et p</ul>lus r</div>écent.
+<p class="Pp">La variable <b>CMAKE_CXX_COMPILER_IMPORT_STD
+  </b>  &lt;#variable:CMAKE_CXX_COMPILER_IMPORT_STD&gt; peut être utilisée pour
+    détecter la prise en charge d'un niveau standard avec la chaîne d'outils C++ </p>active.
+<p class="Pp"><b>Remarque </b></p>:
+<div class="Bd-indent">
+<div class="Bd-indent">Cette prise en charge n'est fournie que lorsque le support expérimental
+  de <b>import </b>std; a été activé par le
+  <b>mécanisme CMAKE_EXPERIMENTAL_CXX_IM</b>PORT_S</div>T</div>D</section>.
+<section class="Sh">
+<h1 class="Sh" id='GENERATOR_SUPPORT'><a class='permalink' href='#GENERATOR_SUPPORT'>PRISE EN CHARGE DES </a></h1>GÉNÉRATEURS
+<p class="Pp">La liste des générateurs qui prennent en charge le scan des sources pour les
+    modules C++ comprend </p>:
+<div class="Bd-indent">
+<ul class="Bl-bullet">
+  <li><b>Ninja </b>&lt;#generator:</li>Ninja&gt;
+  <li><b>Ninja Multi-Config </b>&lt;#generator:Ninja </li>Multi-Config&gt;
+  <li><b>Visual Stud</b>io 17 2022 </li>&lt;#generator:</ul>Visual Stud</div>io 17 2022&gt;
+<section class="Ss">
+<h2 class="Ss" id='Limitations'><a class='permalink' href='#Limitations'>Limitation</a></h2>s
+<p class="Pp">Il existe un certain nombre de limitations connues de la prise en charge actuelle des modules C++
+    dans CMake. Ceci ne documente pas les limitations ou bugs connus dans les
+    compilateurs car ceux-ci peuvent changer au fil du </p>temps.
+<p class="Pp">Pour tous les générateurs </p>:
+<div class="Bd-indent">
+<ul class="Bl-bullet">
+  <li>Les unités d'en-tête ne sont pas prises en </li>charge.
+  <li>Pas de support intégré pour <b>import std; o</b>u d'autres mo</li>dules fournis</ul> par le
+     </div> compilateur.
+<p class="Pp">Pour les générateurs Ninja </p>:
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt></dt>•
+  <dd><b>ninja 1</b>.11 ou p</dd>lus réc</dl>ent est </div>requis.
+<p class="Pp">Pour les générateurs Visual Studio
+    &lt;#visual-studio-generators&gt; </p>:
+<div class="Bd-indent">
+<ul class="Bl-bullet">
+  <li>Seulement Visual Studio 2022 et les toolsets MSVC 14.34 (Visual Studio 17.4) et
+      plus </li>récents.
+  <li>Pas de support pour l'exportation ou l'installation des BMI ou des informations de </li>module.
+  <li>Pas de support pour compiler les BMIs à partir de <b>cibles </b>IMPORTED avec des modules C++
+      (y compris <b>import </b>std)</li>.
+  <li>Pas de diagnostic pour l'utilisation de modules fournis par des <b>sources </b>PRIVATE à partir de
+      <b>sour</b>ces</li> de </ul>mod</div>ule </section>PUB</section>LIC.
+<section class="Sh">
+<h1 class="Sh" id='Copyright'><a class='permalink' href='#Copyright'>Copyrigh</a></h1>t
+<p class="Pp">2000-2025 </p>Kitware, I</section>nc. et con</div>tributeurs
+<table class="foot">
+  <tr>
+    <td class="foot-date">19 novembre </td>2025
+    <td class="foot-os">4</td>.</tr></table>2</section>.</article>0
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le </p>paquet :
+    <dl>
+        <dt>Nom du </dt>paquet :
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/cmake/">extra/</a></dd>cmake
+        <dt>Version </dt>:
+        <dd>4.</dd>2.0-1
+        <dt>Amont </dt>:
+        <dd><a href="https://www.cmake.org/">https://www.cmake.</a></dd>org/
+        <dt>Licences </dt>:
+        <dd>perso</dd>nnalisée
+        <dt>Manuels </dt>:
+        <dd><a href="/listing/extra/cmake/">/listing/extra/</a></dd>cmak</dl>e</section>/
+
+<details>
+    <summary>Table des </summary>matières
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">N</a></li>OM
+        
+            <li><a href="#COMPILATION_STRATEGY">STRATÉGIE </a></li>DE COMPILATION
+        
+            <li><a href="#SCANNING_CONTROL">CONTRÔLE </a></li>DU SCAN
+        
+            <li><a href="#COMPILER_SUPPORT"&gt;SUPPORT </a></li>DU COMPILATEUR
+        
+            <li><a href="#IMPORT_STD_SUPPORT">SUPPORT </a></li>DE IMPORT STD
+        
+            <li><a href="#GENERATOR_SUPPORT">SUPPORT </a></li>DES GÉNÉRATEURS
+        
+            <li><a href="#Copyright">Co</a></li>py</ul>r</nav>ig</details>ht
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/cmake-cxxmodules.7.en.txt">t</a>xt, 
+        
+            <a href="/man/cmake-cxxmodules.7.en.raw"></a>r</p>a</nav></aside></main>w
+        <footer>
+            de manuel.
+            <p>Le site est disponible selon les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0
+               , sa</a>uf pour le contenu des page</p>s de manuel, qui possède sa</footer> propre licence
+           </body>    spécifiée dans le paque</html>t Arch Linux correspondant.

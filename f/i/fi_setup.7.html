@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>fi_setup(7) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">fi_setup(7)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/libfabric/">libfabric</a></p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">fi_setup(7)</td>
+    <td class="head-vol">Libfabric v2.3.1</td>
+    <td class="head-rtitle">fi_setup(7)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NOM"><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">fi_setup - Configuration et initialisation de libfabric</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="APERÇU"><a class='permalink' href='#APERÇU'>APERÇU</a></h1>
+<p class="Pp">Une description complète de l'API libfabric est documentée dans les pages de manuel correspondantes. Cette section fournit une introduction à certaines interfaces sélectionnées, y compris la manière dont elles peuvent être utilisées. Elle ne prétend pas capturer toutes les subtilités ou cas d'utilisation, ni décrire toutes les structures de données ou champs possibles. Cependant, elle est utile pour les nouveaux développeurs qui essaient de démarrer avec libfabric.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="fi_getinfo()"><a class='permalink' href='#fi_getinfo()'>fi_getinfo()</a></h1>
+<p class="Pp">L'appel fi_getinfo() est l'un des premiers appels que les applications invoquent. Il est conçu pour être facile à utiliser pour des applications simples, mais suffisamment extensible pour configurer un réseau afin d'obtenir des performances optimales. Il remplit plusieurs objectifs. Premièrement, il abstrait les détails d'implémentation réseau et d'adressage. Deuxièmement, il permet à une application de spécifier les fonctionnalités dont elle a besoin du réseau. Enfin, il fournit un mécanisme permettant à un fournisseur de signaler comment une application peut utiliser le réseau afin d'obtenir les meilleures performances. fi_getinfo() est vaguement basé sur l'appel getaddrinfo().</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>/* Prototypes d'API */
+struct fi_info *fi_allocinfo(void);
+int fi_getinfo(int version, const char *node, const char *service,
+    uint64_t flags, struct fi_info *hints, struct fi_info **info);
+</pre>
+  </dd>
+  <dt></dt>
+  <dd>
+    <pre>/* Flux de code d'initialisation d'exemple */
+struct fi_info *hints, *info;
+hints = fi_allocinfo();
+/* hints pointera vers une structure fi_info effacée
+ * Initialiser hints ici pour demander des capacités réseau spécifiques
+ */
+fi_getinfo(FI_VERSION(1, 16), NULL, NULL, 0, hints, &amp;info);
+fi_freeinfo(hints);
+/* Utiliser la structure info retournée pour allouer des ressources fabric */
+</pre>
+  </dd>
+</dl>
+<p class="Pp">Le paramètre hints est la clé pour demander des services fabric. La structure fi_info contient plusieurs champs de données, plus des pointeurs vers une grande variété d'attributs. L'appel fi_allocinfo() simplifie la création d'une structure fi_info et son utilisation est fortement recommandée. Dans cet exemple, l'application tente simplement d'obtenir une liste des fournisseurs disponibles dans le système et des fonctionnalités qu'ils prennent en charge. Notez que l'API est conçue pour être extensible. Des informations de version sont fournies dans le cadre de l'appel fi_getinfo(). La version est utilisée par libfabric pour déterminer les fonctionnalités de l'API dont l'application est consciente. Dans ce cas, l'application indique qu'elle peut gérer correctement toute fonctionnalité définie pour la version 1.16 (ou antérieure).</p>
+<p class="Pp">Les applications doivent *toujours* coder en dur la version pour laquelle elles sont écrites dans l'appel fi_getinfo(). Cela garantit que les versions plus récentes de libfabric fourniront la rétrocompatibilité avec celle utilisée par l'application. Les versions plus récentes de libfabric doivent prendre en charge les applications compilées contre une version antérieure de la bibliothèque. Elles doivent également prendre en charge les applications écrites contre des fichiers d'en-tête d'une version de bibliothèque antérieure, mais recompilées contre des fichiers d'en-tête plus récents. Entre autres choses, le paramètre de version permet à libfabric de déterminer si une application est consciente des nouveaux champs qui peuvent avoir été ajoutés aux structures, ou si les données dans ces champs peuvent être non initialisées.</p>
+<p class="Pp">Généralement, une application initialise le paramètre hints pour lister les fonctionnalités qu'elle utilisera.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>/* Jetez un coup d'œil au contenu de fi_info */
+struct fi_info {
+    struct fi_info *next;
+    uint64_t caps;
+    uint64_t mode;
+    uint32_t addr_format;
+    size_t src_addrlen;
+    size_t dest_addrlen;
+    void *src_addr;
+    void *dest_addr;
+    fid_t handle;
+    struct fi_tx_attr *tx_attr;
+    struct fi_rx_attr *rx_attr;
+    struct fi_ep_attr *ep_attr;
+    struct fi_domain_attr *domain_attr;
+    struct fi_fabric_attr *fabric_attr;
+    struct fid_nic *nic;
+};
+</pre>
+  </dd>
+</dl>
+<p class="Pp">La structure fi_info référence plusieurs attributs différents, qui correspondent aux différents objets libfabric qu'une application alloue. Pour les applications de base, la modification ou l'accès à la plupart des champs d'attributs sont inutiles. De nombreuses applications n'auront besoin de traiter que quelques champs de fi_info, notamment le type de point de terminaison, les bits de capacité (caps) et les bits de mode. Ceux-ci sont définis plus en détail ci-dessous.</p>
+<p class="Pp">En cas de succès, la fonction fi_getinfo() renvoie une liste chaînée de structures fi_info. Chaque entrée de la liste satisfera les conditions spécifiées via le paramètre hints. Les entrées retournées peuvent provenir de différents fournisseurs de réseau, ou différer dans les attributs retournés. Par exemple, si hints ne spécifie pas un type de point de terminaison particulier, il peut y avoir une entrée pour chacun des trois types de points de terminaison. En règle générale, libfabric tente de renvoyer la liste des structures fi_info par ordre de désirabilité, du plus désirable au moins désirable. Les fournisseurs de réseau haute performance sont listés avant les fournisseurs plus génériques.</p>
+<section class="Ss">
+<h2 class="Ss" id="Capacités_(fi_info::caps)"><a class='permalink' href='#Capacités_(fi_info::caps)'>Capacités (fi_info::caps)</a></h2>
+<p class="Pp">Le champ caps de fi_info est utilisé pour spécifier les fonctionnalités et les services que l'application requiert du réseau. Ce champ est un masque de bits des capacités souhaitées. Il existe des bits de capacité pour chacun des services de transfert de données mentionnés précédemment : FI_MSG, FI_TAGGED, FI_RMA, FI_ATOMIC et FI_COLLECTIVE. Les applications doivent définir chaque bit pour chaque ensemble d'opérations qu'elles utiliseront. Ces bits sont souvent les seuls bits caps définis par une application.</p>
+<p class="Pp">Les capacités sont regroupées en trois catégories générales : primaires, secondaires et modificateurs primaires. Les capacités primaires doivent être explicitement demandées par une application, et un fournisseur doit activer le support uniquement pour les capacités primaires qui ont été sélectionnées. Ceci est requis pour des raisons de performance et de sécurité. Les modificateurs primaires sont utilisés pour limiter une capacité primaire, comme restreindre un point de terminaison à n'être qu'en émission.</p>
+<p class="Pp">Les capacités secondaires peuvent être facultativement demandées par une application. Si elles sont demandées, un fournisseur doit prendre en charge une capacité si elle est demandée, sinon échouer la requête fi_getinfo. Un fournisseur peut facultativement signaler des capacités secondaires non demandées si cela ne compromet pas les performances ou la sécurité. C'est-à-dire qu'un fournisseur peut accorder à une application une capacité secondaire, qu'elle l'ait demandée ou non. Les bits de capacité secondaire les plus couramment accédés indiquent si la communication du fournisseur est restreinte au nœud local (par exemple, le fournisseur de mémoire partagée ne prend en charge que la communication locale) et/ou aux nœuds distants (ce qui peut être le cas pour les cartes réseau sans support de boucle locale). D'autres bits de capacité secondaire concernent principalement des fonctionnalités visant des applications hautement évolutives, mais ne sont pas forcément couramment supportées par plusieurs fournisseurs.</p>
+<p class="Pp">Étant donné que différents fournisseurs prennent en charge différents ensembles de capacités, les applications qui souhaitent des performances réseau optimales peuvent avoir besoin de coder pour qu'une capacité soit présente ou absente. Lorsqu'elle est présente, de telles capacités peuvent offrir un avantage en termes d'évolutivité ou de performance. Lorsqu'elle est absente, une application peut préférer ajuster son protocole ou son implémentation pour contourner les limitations du réseau. Bien que les fournisseurs puissent souvent émuler des fonctionnalités, cela peut avoir un impact sur les performances globales, y compris les performances des transferts de données qui semblent par ailleurs sans rapport avec la fonctionnalité utilisée. Par exemple, si un fournisseur doit insérer des en-têtes de protocole dans le flux de messages pour implémenter une capacité donnée, l'insertion de cet en-tête pourrait avoir un impact négatif sur les performances de tous les transferts. En exposant de telles limitations à l'application, le développeur de l'application a un meilleur contrôle sur la manière d'émuler au mieux la fonctionnalité ou de contourner son absence.</p>
+<p class="Pp">Il est recommandé que les applications ne codent que les capacités requises pour obtenir les meilleures performances. Si une capacité n'avait que peu ou pas d'effet sur les performances globales, les développeurs devraient éviter d'utiliser de telles fonctionnalités dans le cadre d'une implémentation initiale. Cela permettra à l'application de bien fonctionner sur la plus large gamme de matériel. Les optimisations d'application peuvent ensuite ajouter la prise en charge de fonctionnalités moins courantes. Pour voir quelles fonctionnalités sont prises en charge par quels fournisseurs, consultez la Matrice des Fonctionnalités des Fournisseurs libfabric pour la version pertinente.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id="Bits_de_mode_(fi_info::mode)"><a class='permalink' href='#Bits_de_mode_(fi_info::mode)'>Bits de mode (fi_info::mode)</a></h2>
+<p class="Pp">Alors que les bits de capacité représentent les fonctionnalités souhaitées par les applications, les bits de mode correspondent aux comportements nécessaires au fournisseur. Autrement dit, les bits de capacité sont des requêtes descendantes, tandis que les bits de mode sont des restrictions ascendantes. Les bits de mode sont définis par le fournisseur pour demander à l'application d'utiliser l'API d'une manière spécifique afin d'obtenir des performances optimales. Les bits de mode impliquent souvent que le travail supplémentaire pour implémenter certaines sémantiques de communication nécessaires à l'application sera moindre si implémenté par l'application que de forcer cette même implémentation dans le fournisseur. Les bits de mode résultent de</p>
+</section>
+</div>
+</section>
+
+            </article>
+            
+        </main>
+        <footer>
+            
+
+        </footer>
+    </body>
+</html>
+restrictions de l'implémentation matérielle.</p>
+<p class="Pp">Un développeur d'application décide quels bits de mode il souhaite ou peut facilement prendre en charge dans le cadre de son processus de développement. Chaque bit de mode décrit un comportement particulier que l'application doit suivre pour utiliser diverses interfaces. Les applications définissent les bits de mode qu'elles prennent en charge lors de l'appel à fi_getinfo(). Si un fournisseur (provider) exige un bit de mode qui n'est pas défini, ce fournisseur sera ignoré par fi_getinfo(). Si un fournisseur n'a pas besoin d'un bit de mode qui est défini, il répondra à l'appel fi_getinfo() avec le bit de mode effacé. Cela indique que l'application n'a pas besoin d'effectuer l'action requise par le bit de mode.</p>
+<p class="Pp">L'un des bits de mode courants nécessaires aux fournisseurs est FI_CONTEXT (et FI_CONTEXT2). Ce bit de mode exige que les applications transmettent une structure de données définie par libfabric (struct fi_context) à toute fonction de transfert de données. Cette structure doit rester valide et non utilisée par l'application jusqu'à la fin de l'opération de transfert de données. Le but de ce bit de mode est que la structure fi_context fournit un espace « brouillon » que le fournisseur peut utiliser pour suivre la requête. Par exemple, il peut avoir besoin d'insérer la requête dans une liste chaînée pendant qu'elle est en attente, ou de suivre le nombre de fois qu'un transfert sortant a été réessayé. Comme de nombreuses applications suivent déjà les opérations en attente avec leur propre structure de données, en intégrant la structure fi_context dans cette même structure, les performances globales peuvent être améliorées. Cela évite au fournisseur d'avoir à allouer et libérer des structures internes pour chaque requête.</p>
+<p class="Pp">En continuant avec cet exemple, si une application ne suit pas déjà les requêtes en attente, elle laisserait le bit de mode FI_CONTEXT non défini. Cela indiquerait que le fournisseur doit obtenir et libérer sa propre structure à des fins de suivi. Dans ce cas, les coûts seraient essentiellement les mêmes, que ce soit fait par l'application ou le fournisseur.</p>
+<p class="Pp">Pour la prise en charge la plus large des différentes technologies réseau, les applications devraient tenter de prendre en charge autant de bits de mode que possible. Il est recommandé que les fournisseurs prennent en charge les applications qui ne peuvent prendre en charge aucun bit de mode, avec un impact aussi faible possible. Cependant, l'implémentation de l'évitement des bits de mode dans le fournisseur peut toujours impacter les performances, même lorsque le bit de mode est désactivé. En conséquence, certains fournisseurs peuvent toujours exiger que des bits de mode spécifiques soient définis.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='FIDs_(fid_t)'><a class='permalink' href='#FIDs_(fid_t)'>FIDs (fid_t)</a></h1>
+<p class="Pp">FID signifie identifiant de tissu (fabric identifier). C'est le type d'objet de base assigné à tous les objets de l'API libfabric. Toutes les ressources de tissu sont représentées par une structure fid, et toutes les fid sont dérivées d'un type fid de base. En termes de programmation orientée objet, une fid serait la classe parent. Le contenu d'une fid est visible par l'application.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>/* Définition de la FID de base */
+enum {
+    FI_CLASS_UNSPEC,
+    FI_CLASS_FABRIC,
+    FI_CLASS_DOMAIN,
+    ...
+};
+struct fi_ops {
+    size_t size;
+    int (*close)(struct fid *fid);
+    ...
+};
+/* Tous les descripteurs d'interface de tissu doivent commencer par cette structure */
+struct fid {
+    size_t fclass;
+    void *context;
+    struct fi_ops *ops;
+};
+</pre>
+  </dd>
+</dl>
+<p class="Pp">La structure fid est conçue comme un compromis entre la minimisation de l'empreinte mémoire et le surcoût logiciel. Chaque fid est identifiée comme une classe d'objet spécifique, ce qui aide au débogage. Des exemples sont donnés ci-dessus (par exemple FI_CLASS_FABRIC). Le champ context est une valeur de données définie par l'application, assignée à un objet lors de sa création. L'utilisation du champ context est spécifique à l'application, mais il est destiné à être lu par les applications. Les applications définissent souvent context à une structure correspondante qu'elles ont allouée. Le champ context est le seul champ auquel il est recommandé aux applications d'accéder directement. L'accès aux autres champs doit se faire à l'aide d'appels de fonctions définis (par exemple, l'opération close()).</p>
+<p class="Pp">Le champ ops pointe vers un ensemble de pointeurs de fonctions. La structure fi_ops définit les opérations qui s'appliquent à cette classe. Le champ size dans la structure fi_ops est utilisé pour l'extensibilité, et permet à la structure fi_ops de croître de manière rétrocompatible à mesure que de nouvelles opérations sont ajoutées. La fid pointe délibérément vers la structure fi_ops, plutôt que d'intégrer les opérations directement. Cela permet à plusieurs fid de pointer vers le même ensemble d'ops, ce qui minimise l'empreinte mémoire de chaque fid. (En interne, les fournisseurs définissent généralement ops comme une structure de données statique, avec la structure fid allouée dynamiquement.)</p>
+<p class="Pp">Bien qu'il soit possible pour les applications d'accéder directement aux pointeurs de fonctions, il est fortement recommandé d'utiliser les fonctions inline statiques définies dans les pages de manuel à la place. Cela est requis pour les applications qui peuvent être construites en utilisant la fonctionnalité de bibliothèque FABRIC_DIRECT. (FABRIC_DIRECT est une option de compilation qui permet des constructions hautement optimisées en couplant étroitement une application à un fournisseur spécifique.)</p>
+<p class="Pp">D'autres classes OFI sont dérivées de cette structure, ajoutant leur propre ensemble d'opérations.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>/* Exemple de dérivation d'une nouvelle classe pour un objet de tissu */
+struct fi_ops_fabric {
+    size_t size;
+    int (*domain)(struct fid_fabric *fabric, struct fi_info *info,
+        struct fid_domain **dom, void *context);
+    ...
+};
+struct fid_fabric {
+    struct fid fid;
+    struct fi_ops_fabric *ops;
+};
+</pre>
+  </dd>
+</dl>
+<p class="Pp">D'autres classes fid suivent un motif similaire à celui montré pour fid_fabric. La structure fid de base est suivie de zéro ou plusieurs pointeurs vers des ensembles d'opérations.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Fabric_(fid_fabric)'><a class='permalink' href='#Fabric_(fid_fabric)'>Tissu (fid_fabric)</a></h1>
+<p class="Pp">L'objet de premier niveau que les applications ouvrent est l'identifiant de tissu. Le tissu peut être considéré principalement comme un objet conteneur par les applications, bien qu'il identifie les fournisseurs que les applications utilisent.</p>
+<p class="Pp">L'ouverture d'un tissu est généralement un appel simple après l'appel à fi_getinfo().</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>int fi_fabric(struct fi_fabric_attr *attr, struct fid_fabric **fabric, void *context);
+</pre>
+  </dd>
+</dl>
+<p class="Pp">Les attributs du tissu peuvent être directement accédés à partir de struct fi_info. Le tissu nouvellement ouvert est retourné via le paramètre `fabric'. Le paramètre `context' apparaît dans de nombreuses opérations. C'est une valeur spécifiée par l'utilisateur qui est associée au tissu. Elle peut être utilisée pour pointer vers une structure spécifique à l'application et est récupérable depuis struct fid_fabric.</p>
+<section class="Ss">
+<h2 class="Ss" id='Attributes_(fi_fabric_attr)'><a class='permalink' href='#Attributes_(fi_fabric_attr)'>Attributs (fi_fabric_attr)</a></h2>
+<p class="Pp">Les attributs du tissu sont simples.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>struct fi_fabric_attr {
+    struct fid_fabric *fabric;
+    char *name;
+    char *prov_name;
+    uint32_t prov_version;
+    uint32_t api_version;
+};
+</pre>
+  </dd>
+</dl>
+<p class="Pp">Le seul champ que les applications sont susceptibles d'utiliser directement est prov_name. C'est une valeur de chaîne de caractères qui peut être utilisée par les indications (hints) pour sélectionner un fournisseur spécifique à utiliser. Sur la plupart des systèmes, il y aura plusieurs fournisseurs disponibles. Seul un seul est susceptible de représenter le réseau haute performance attaché au système. Les autres sont des fournisseurs génériques qui peuvent être disponibles sur n'importe quel système, comme les fournisseurs de sockets TCP et UDP.</p>
+<p class="Pp">Le champ fabric est utilisé pour aider les applications à gérer les ressources de tissu ouvertes. Si une application a déjà ouvert un tissu qui peut prendre en charge la structure fi_info retournée, celui-ci sera défini à ce tissu.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Domains_(fid_domain)'><a class='permalink' href='#Domains_(fid_domain)'>Domaines (fid_domain)</a></h1>
+<p class="Pp">Les domaines correspondent souvent à un adaptateur d'interface réseau local spécifique. Un domaine peut faire référence à toute la carte réseau (NIC), à un port sur une NIC multi-ports, à un virtuel exposé par une NIC, à plusieurs NIC utilisées de manière multi-rail, etc. Bien qu'il soit pratique de penser qu'un domaine fait référence à une NIC, une telle association n'est pas attendue par libfabric. Du point de vue de l'application, un domaine identifie un ensemble de ressources qui peuvent être utilisées ensemble.</p>
+<p class="Pp">De manière similaire à un tissu, l'ouverture d'un domaine est simple après l'appel à fi_getinfo().</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>int fi_domain(struct fid_fabric *fabric, struct fi_info *info,
+    struct fid_domain **domain, void *context);
+</pre>
+  </dd>
+</dl>
+<p class="Pp">La structure fi_info retournée par fi_getinfo() peut être passée directement à fi_domain() pour ouvrir un nouveau domaine.</p>
+<section class="Ss">
+<h2 class="Ss" id='Attributes_(fi_domain_attr)'><a class='permalink' href='#Attributes_(fi_domain_attr)'>Attributs (fi_domain_attr)</a></h2>
+<p class="Pp">L'un des objectifs d'un domaine est de définir la relation entre les services de transfert de données (points de terminaison) et les services d'achèvement (files d'achèvement et compteurs). Beaucoup des attributs de domaine décrivent cette relation et son impact sur l'application.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>struct fi_domain_attr {
+    struct fid_domain *domain;
+    char *name;
+    enum fi_threading threading;
+    enum fi_progress progress;
+    enum fi_resource_mgmt resource_mgmt;
+    enum fi_av_type av_type;
+    enum fi_mr_mode mr_mode;
+    size_t mr_key_size;
+    size_t cq_data_size;
+    size_t cq_cnt;
+    size_t ep_cnt;
+    size_t tx_ctx_cnt;
+    size_t rx_ctx_cnt;
+    ...
+</pre>
+  </dd>
+</dl>
+<p class="Pp">Les détails complets des attributs de domaine et de leur signification se trouvent dans la page de manuel fi_domain. Des informations sur certains attributs et leur impact sur l'application sont décrites ci-dessous.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Threading_(fi_threading)'><a class='permalink' href='#Threading_(fi_threading)'>Filage (fi_threading)</a></h2>
+<p class="Pp">libfabric définit un modèle de filage unique. La conception de libfabric est fortement influencée par les concepts de la programmation orientée objet. Une application multi-thread doit déterminer comment les objets libfabric (domaines, points de terminaison, files d'achèvement, etc.) seront alloués entre ses threads, ou si n'importe quel thread peut accéder à n'importe quel objet. Par exemple, une application peut générer un nouveau thread pour gérer chaque nouveau point de terminaison connecté. Le champ threading du domaine fournit un mécanisme permettant à une application d'identifier quels objets peuvent être accédés simultanément par différents threads. Cela permet à son tour à un fournisseur d'optimiser ou, dans certains cas, d'éliminer la synchronisation et le verrouillage internes autour de ces objets.</p>
+<p class="Pp">Le filage définit où les fournisseurs pourraient optimiser les primitives de synchronisation. Cependant, les fournisseurs peuvent toujours implémenter plus de sérialisation que ce dont l'application a besoin. (C'est généralement le résultat du fait de garder l'implémentation du fournisseur plus simple).</p>
+<p class="Pp">Il est recommandé que les applications visent soit FI_THREAD_SAFE (sécurité des threads complète implémentée par le fournisseur) soit FI_THREAD_DOMAIN (les objets associés à un seul domaine ne seront accédés que par un seul thread).</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Progress_(fi_progress)'><a class='permalink' href='#Progress_(fi_progress)'>Progression (fi_progress)</a></h2>
+<p class="Pp">Les modèles de progression sont le résultat de utilisant le processeur hôte afin
+    d'effectuer une partie du protocole de transport. Afin de simplifier le
+    développement, libfabric définit deux modèles de progression : automatique ou
+    manuelle. Il n'essaie pas d'identifier quelles fonctionnalités spécifiques de
+    l'interface peuvent être déchargées, ni quelles opérations nécessitent un
+    traitement supplémentaire par le thread de l'application.</p>
+<p class="Pp">La progression automatique signifie qu'une opération initiée par
+    l'application finira par s'achever, même si l'application n'effectue plus
+    d'appels à l'API libfabric. L'opération est soit entièrement déchargée sur le
+    matériel, soit le fournisseur utilise un thread interne, soit le noyau du
+    système d'exploitation peut effectuer la tâche. L'utilisation de la progression
+    automatique peut augmenter la surcharge système et la latence dans les deux
+    derniers cas. Pour les opérations de contrôle, telles que l'établissement de
+    la connexion, cela est généralement acceptable. Cependant, l'impact sur les
+    transferts de données peut être mesurable, surtout si des threads internes sont
+    nécessaires pour assurer une progression automatique.</p>
+<p class="Pp">Le modèle de progression manuelle peut éviter cette surcharge pour
+    les fournisseurs qui ne déchargent pas toutes les fonctionnalités de transport
+    sur le matériel. Avec la progression manuelle, l'implémentation du fournisseur
+    gérera les opérations de transport dans le cadre de fonctions libfabric
+    spécifiques. Par exemple, un appel à fi_cq_read(), qui récupère un tableau
+    d'opérations terminées, peut également être responsable de l'envoi de
+    messages d'accusé de réception pour notifier les pairs qu'un message a été reçu.
+    Étant donné que la lecture de la file d'attente d'achèvement fait partie du
+    fonctionnement normal d'une application, l'impact sur l'application est
+    minimal et des threads supplémentaires sont évités.</p>
+<p class="Pp">Les applications doivent être prudentes lors de l'utilisation de la
+    progression manuelle, en particulier si elles se lient à libfabric plusieurs
+    fois par différents chemins de code ou dépendances de bibliothèques. Si des
+    threads d'application sont utilisés pour piloter la progression, comme la
+    réponse aux données reçues avec des accusés de réception, il est essentiel que
+    le thread de l'application appelle libfabric en temps voulu.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Enregistrement_de_mémoire_(fid_mr)'><a class='permalink' href='#Enregistrement_de_mémoire_(fid_mr)'>Enregistrement de mémoire (fid_mr)</a></h2>
+<p class="Pp">Les opérations RMA, atomiques et collectives peuvent lire et écrire
+    de la mémoire appartenant à un processus pair, sans impliquer le processeur
+    cible. Étant donné que la mémoire peut être modifiée sur le réseau, une
+    application doit accepter d'exposer sa mémoire à ses pairs. Ceci est géré par
+    le processus d'enregistrement de mémoire. Les régions de mémoire enregistrées
+    associent des tampons mémoire à des permissions accordées pour l'accès par les
+    ressources du tissu. Un tampon mémoire doit être enregistré avant de pouvoir
+    être utilisé comme cible d'un transfert de données RMA, atomique ou
+    collectif à distance. De plus, un fournisseur de tissu peut exiger que les
+    tampons de données soient enregistrés avant d'être utilisés, même dans le cas
+    de transferts locaux. Ceci est nécessaire pour garantir que les mappages de
+    pages virtuelles à physiques ne changent pas pendant que le matériel réseau
+    effectue le transfert.</p>
+<p class="Pp">Afin de gérer les exigences matérielles diverses, il existe un ensemble
+    de bits mr_mode associés à l'enregistrement de mémoire. Les bits mr_mode se
+    comportent de manière similaire aux bits de mode fi_info. Les applications
+    indiquent les types de restrictions qu'elles peuvent prendre en charge, et les
+    fournisseurs effacent les bits qui ne sont pas nécessaires.</p>
+<p class="Pp">Pour le matériel qui nécessite un enregistrement de mémoire, la
+    gestion de l'enregistrement est essentielle pour obtenir de bonnes
+    performances et une bonne évolutivité. L'acte d'enregistrer la mémoire est
+    coûteux et doit être évité pour chaque transfert de données. libfabric dispose
+    d'un support interne étendu pour gérer l'enregistrement de mémoire, masquer
+    l'enregistrement à l'application utilisateur, mettre en cache les enregistrements
+    pour réduire la surcharge par transfert, et détecter quand les enregistrements
+    en cache ne sont plus valides. Il est recommandé aux applications qui ne sont
+    pas conçues nativement pour tenir compte de l'enregistrement de mémoire
+    d'utiliser le cache d'enregistrement de libfabric. Cela peut être fait simplement
+    en ne définissant pas les bits mr_mode pertinents.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='API_de_régions_de_mémoire'><a class='permalink' href='#API_de_régions_de_mémoire'>API de régions de mémoire</a></h2>
+<p class="Pp">Les API suivantes illustrent comment allouer et accéder à une région
+    de mémoire enregistrée. Notez qu'il ne s'agit pas d'une liste complète des
+    appels de région de mémoire (MR), et pour plus de détails sur chaque API, les
+    lecteurs doivent se référer directement à la page man fi_mr.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>int fi_mr_reg(struct fid_domain *domain, const void *buf, size_t len,
+    uint64_t access, uint64_t offset, uint64_t requested_key, uint64_t flags,
+    struct fid_mr **mr, void *context);
+void * fi_mr_desc(struct fid_mr *mr);
+uint64_t fi_mr_key(struct fid_mr *mr);
+</pre>
+  </dd>
+</dl>
+<p class="Pp">Par défaut, les régions de mémoire sont associées à un domaine. Un MR
+    est accessible par tout point de terminaison ouvert sur ce domaine. Une région
+    commence à l'adresse spécifiée par `buf' et a une longueur de `len'
+    octets. Le paramètre `access' sont des indicateurs de permission qui sont combinés
+    par un OU (OR). Les permissions indiquent quel type d'opérations peut être
+    invoqué sur la région (par exemple, FI_READ, FI_WRITE, FI_REMOTE_READ,
+    FI_REMOTE_WRITE). Le paramètre `buf' référence généralement la mémoire
+    virtuelle allouée.</p>
+<p class="Pp">Un MR est associé à des clés de protection locales et distantes. La
+    clé locale est appelée un descripteur de mémoire et peut être récupérée en
+    appelant fi_mr_desc(). Cet appel n'est nécessaire que si le bit mr_mode
+    FI_MR_LOCAL a été défini. Le descripteur de mémoire est directement passé dans
+    les opérations de transfert de données, par exemple :</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>/* Exemple fi_mr_desc() utilisant fi_send() */
+fi_send(ep, buf, len, fi_mr_desc(mr), 0, NULL);
+</pre>
+  </dd>
+</dl>
+<p class="Pp">La clé distante, ou simplement clé MR, est utilisée par le pair lors
+    de la cible du MR avec une opération RMA ou atomique. Dans de nombreux cas, la
+    clé devra être envoyée dans un message séparé au pair initiateur. L'API
+    libfabric utilise une clé de 64 bits où une est utilisée. La taille réelle de la
+    clé utilisée par un fournisseur fait partie de ses attributs de domaine. La
+    prise en charge de tailles de clés plus grandes, comme requis par certains
+    fournisseurs, est communiquée via un bit mr_mode, et nécessite l'utilisation
+    d'appels API MR étendus qui mappent la taille plus grande à une valeur de 64
+    bits.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Points_de_terminaison'><a class='permalink' href='#Points_de_terminaison'>Points de terminaison</a></h1>
+<p class="Pp">Les points de terminaison sont des portails de communication au niveau
+    du transport. L'ouverture d'un point de terminaison est triviale après avoir
+    appelé fi_getinfo().</p>
+<section class="Ss">
+<h2 class="Ss" id='Actifs_(fid_ep)'><a class='permalink' href='#Actifs_(fid_ep)'>Actifs (fid_ep)</a></h2>
+<p class="Pp">Les points de terminaison actifs peuvent être orientés connexion ou sans
+    connexion. Ils sont considérés comme actifs car ils peuvent être utilisés pour
+    effectuer des transferts de données. Toutes les interfaces de transfert de
+    données – messages (fi_msg), messages étiquetés (fi_tagged), RMA (fi_rma),
+    atomiques (fi_atomic) et collectives (fi_collective) – sont associées aux points
+    de terminaison actifs. Bien qu'un point de terminaison individuel puisse ne pas
+    être activé pour utiliser tous les transferts de données. Dans les configurations
+    standard, un point de terminaison actif a une file d'attente d'émission et une
+    file d'attente de réception. En général, les opérations qui génèrent du trafic
+    sur le tissu sont postées dans la file d'attente d'émission. Cela inclut toutes
+    les opérations RMA et atomiques, ainsi que les messages envoyés et les messages
+    étiquetés envoyés. Les opérations qui postent des tampons pour recevoir des
+    données entrantes sont soumises à la file d'attente de réception.</p>
+<p class="Pp">Les points de terminaison actifs sont créés à l'état désactivé. Le point
+    de terminaison doit d'abord être configuré avant d'être activé. Les points de
+    terminaison doivent passer à un état activé avant d'accepter des opérations de
+    transfert de données, y compris le post des tampons de réception. L'appel à
+    fi_enable() est utilisé pour faire passer un point de terminaison actif à un
+    état activé. Les appels à fi_connect() et fi_accept() feront également passer un
+    point de terminaison à l'état activé, s'il n'est pas déjà activé.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>int fi_endpoint(struct fid_domain *domain, struct fi_info *info,
+    struct fid_ep **ep, void *context);
+</pre>
+  </dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Activation_(fi_enable)'><a class='permalink' href='#Activation_(fi_enable)'>Activation (fi_enable)</a></h2>
+<p class="Pp">Pour faire passer un point de terminaison à l'état activé, il doit être
+    lié à une ou plusieurs ressources du tissu. Cela inclut la liaison du point de
+    terminaison à une file d'attente d'achèvement et à une file d'attente d'événements.
+    Les points de terminaison non connectés doivent également être liés à un vecteur
+    d'adresses.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>/* Exemple pour activer un point de terminaison non connecté */
+/* Allouer un vecteur d'adresses et l'associer au point de terminaison */
+fi_av_open(domain, &amp;av_attr, &amp;av, NULL);
+fi_ep_bind(ep, &amp;av-&gt;fid, 0);
+/* Allouer et associer des files d'attente d'achèvement au point de terminaison */
+fi_cq_open(domain, &amp;cq_attr, &amp;cq, NULL);
+fi_ep_bind(ep, &amp;cq-&gt;fid, FI_TRANSMIT | FI_RECV);
+fi_enable(ep);
+</pre>
+  </dd>
+</dl>
+<p class="Pp">Dans l'exemple ci-dessus, nous allouons un AV et un CQ. Les attributs de
+    l'AV et du CQ sont omis (discussion supplémentaire ci-dessous). Ceux-ci sont
+    ensuite associés au point de terminaison via l'appel fi_ep_bind(). Une fois que
+    toutes les ressources nécessaires ont été attribuées au point de terminaison, nous
+    l'activons. L'activation du point de terminaison indique au fournisseur qu'il doit
+    allouer les ressources matérielles et logicielles nécessaires et terminer
+    l'initialisation du point de terminaison. (Si le point de terminaison n'est pas
+    lié à toutes les ressources nécessaires, l'appel fi_enable() échouera.)</p>
+<p class="Pp">L'appel fi_enable() est toujours effectué pour les points de
+    terminaison non connectés. Les points de terminaison connectés peuvent sauter
+    l'appel à fi_enable(), car fi_connect() et fi_accept() activeront le point de
+    terminaison automatiquement. Cependant, les applications peuvent toujours appeler
+    fi_enable() avant d'appeler fi_connect() ou fi_accept(). Faire cela permet à
+    l'application de poster des tampons de réception au point de terminaison, ce qui
+    garantit qu'ils sont disponibles pour recevoir des données au cas où le point de
+    terminaison pair envoie des messages immédiatement après avoir établi la
+    connexion.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Passifs_(fid_pep)'><a class='permalink' href='#Passifs_(fid_pep)'>Passifs (fid_pep)</a></h2>
+<p class="Pp">Les points de terminaison passifs sont utilisés pour écouter les demandes
+    de connexion entrantes. Les points de terminaison passifs sont de type FI_EP_MSG
+    et ne peuvent effectuer aucun transfert de données. Une application souhaitant
+    créer un point de terminaison passif appelle généralement fi_getinfo() en
+    utilisant le drapeau FI_SOURCE, en spécifiant souvent uniquement une adresse de
+    `service'. L'adresse de service correspond à un numéro de port TCP.</p>
+<p class="Pp">Les points de terminaison passifs sont associés à des files d'attente
+    d'événements. Les files d'attente d'événements rapportent les demandes de
+    connexion des pairs. Contrairement aux points de terminaison actifs, les points de
+    terminaison passifs ne sont pas associés à un domaine. Cela permet à une
+    application d'écouter les demandes de connexion sur plusieurs domaines, bien que
+    toujours limitée à un seul fournisseur.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>/* Exemple d'écoute de point de terminaison passif */
+fi_passive_ep(fabric, info, &amp;pep, NULL);
+fi_eq_open(fabric, &amp;eq_attr, &amp;eq, NULL);
+fi_pep_bind(pep, &amp;eq-&gt;fid, 0);
+fi_listen(pep);
+</pre>
+  </dd>
+</dl>
+<p class="Pp">Un point de terminaison passif doit être lié à une file d'attente
+    d'événements avant d'appeler listen. Cela garantit que les demandes de connexion
+    peuvent être rapportées à l'application. Pour accepter de nouvelles connexions,
+    l'application attend une demande, alloue un nouveau point de terminaison actif
+    pour celle-ci et accepte la demande.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>/* Exemple d'acceptation d'une nouvelle connexion */
+/* Attendre un événement CONNREQ */
+fi_eq_sread(eq, &amp;eve
+nt, &amp;cm_entry, sizeof cm_entry, -1, 0);
+assert(event == FI_CONNREQ);
+/* Allouer un nouveau point de terminaison pour la connexion */
+if (!cm_entry.info-&gt;domain_attr-&gt;domain)
+    fi_domain(fabric, cm_entry.info, &amp;domain, NULL);
+fi_endpoint(domain, cm_entry.info, &amp;ep, NULL);
+fi_ep_bind(ep, &amp;eq-&gt;fid, 0);
+fi_cq_open(domain, &amp;cq_attr, &amp;cq, NULL);
+fi_ep_bind(ep, &amp;cq-&gt;fid, FI_TRANSMIT | FI_RECV);
+fi_enable(ep);
+fi_recv(ep, rx_buf, len, NULL, 0, NULL);
+fi_accept(ep, NULL, 0);
+fi_eq_sread(eq, &amp;event, &amp;cm_entry, sizeof cm_entry, -1, 0);
+assert(event == FI_CONNECTED);
+</pre>
+  </dd>
+</dl>
+<p class="Pp">L'événement de demande de connexion (FI_CONNREQ) inclut des
+    informations sur le type de point de terminaison à allouer, y compris les
+    attributs par défaut à utiliser. Si un domaine n'a pas déjà été ouvert pour
+    le point de terminaison, il doit en être ouvert un. Ensuite, le point de
+    terminaison et les ressources associées peuvent être alloués. Contrairement
+    à l'exemple de point de terminaison non connecté ci-dessus, un point de
+    terminaison connecté n'a pas d'AV, mais doit être lié à une file d'événements.
+    Dans ce cas, nous utilisons la même EQ que le point de terminaison d'écoute.
+    Une fois que les autres ressources de point de terminaison (par exemple, CQ)
+    ont été allouées et liées, le point de terminaison peut être activé.</p>
+<p class="Pp">Pour accepter la connexion, l'application appelle fi_accept().
+    Notez qu'en raison de problèmes de synchronisation des threads, il est possible
+    que le point de terminaison actif reçoive des données avant même que fi_accept()
+    ne puisse retourner. La publication des tampons de réception avant d'appeler
+    fi_accept() gère cette condition, ce qui évite les problèmes de contrôle
+    de flux réseau survenant immédiatement après la connexion.</p>
+<p class="Pp">Les appels fi_eq_sread() sont des appels de lecture bloquants
+    (synchrone) vers la file d'événements. Ces appels attendent qu'un événement
+    se produise, qui dans ce cas sont des événements de demande et d'établissement
+    de connexion.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='EP_Attributes_(fi_ep_attr)'><a class='permalink' href='#EP_Attributes_(fi_ep_attr)'>Attributs du point de terminaison (fi_ep_attr)</a></h2>
+<p class="Pp">Les propriétés d'un point de terminaison sont spécifiées à l'aide
+    d'attributs de point de terminaison. Ce sont des attributs pour le point de
+    terminaison dans son ensemble. Il existe des attributs supplémentaires
+    spécifiquement liés aux contextes d'émission et de réception qui sous-tendent
+    le point de terminaison (détails ci-dessous).</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>struct fi_ep_attr {
+    enum fi_ep_type type;
+    uint32_t        protocol;
+    uint32_t        protocol_version;
+    size_t          max_msg_size;
+    ...
+};
+</pre>
+  </dd>
+</dl>
+<p class="Pp">Une description complète de chaque champ est disponible dans la
+    page man de fi_endpoint, avec des détails sélectionnés listés ci-dessous.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Endpoint_Type_(fi_ep_type)'><a class='permalink' href='#Endpoint_Type_(fi_ep_type)'>Type de point de terminaison (fi_ep_type)</a></h2>
+<p class="Pp">Ceci indique le type de point de terminaison : datagramme fiable
+    (FI_EP_RDM), connecté fiable (FI_EP_MSG) ou datagramme non fiable
+    (FI_EP_DGRAM). Presque toutes les applications voudront spécifier le type
+    de point de terminaison comme un indice passé à fi_getinfo, car la plupart
+    des applications ne seront codées que pour supporter un seul type de point
+    de terminaison.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Maximum_Message_Size_(max_msg_size)'><a class='permalink' href='#Maximum_Message_Size_(max_msg_size)'>Taille maximale des messages (max_msg_size)</a></h2>
+<p class="Pp">Cette taille est la taille maximale pour toute opération de
+    transfert de données qui passe par le point de terminaison. Pour les points
+    de terminaison de datagrammes non fiables, il s'agit souvent de l'MTU du
+    réseau sous-jacent. Pour les points de terminaison fiables, cette valeur est
+    souvent une restriction du protocole de transport sous-jacent. Une taille
+    minimale courante de message maximal est de 2 Go, bien que certains fournisseurs
+    prennent en charge une taille arbitrairement grande. Les applications qui
+    nécessitent des transferts plus importants que la taille maximale signalée
+    sont tenues de diviser un transfert unique et volumineux en plusieurs
+    opérations.</p>
+<p class="Pp">Les fournisseurs exposent leurs limites matérielles ou réseau aux
+    applications, plutôt que de segmenter les transferts volumineux en interne,
+    afin de minimiser les frais généraux de complétion. Par exemple, pour qu'un
+    fournisseur prenne en charge la segmentation de messages volumineux en interne,
+    il faudrait émuler tous les mécanismes de complétion (files d'attente et
+    compteurs) par logiciel, même si les transferts supérieurs à la taille maximale
+    prise en charge par le transport n'étaient jamais utilisés.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Message_Order_Size_(max_order_xxx_size)'><a class='permalink' href='#Message_Order_Size_(max_order_xxx_size)'>Taille de l'ordre des messages (max_order_xxx_size)</a></h2>
+<p class="Pp">Ces champs spécifient l'ordre des données. Ils définissent l'ordre de
+    livraison des données de transport dans la mémoire cible pour les opérations
+    RMA et atomiques. L'ordre des données nécessite l'ordre des messages. Si l'ordre
+    des messages n'est pas spécifié, ces champs ne s'appliquent pas.</p>
+<p class="Pp">Par exemple, supposons qu'une application émette deux opérations
+    d'écriture RMA sur le même emplacement mémoire cible. (L'application peut écrire
+    une valeur d'horodatage chaque fois qu'une condition locale est remplie, par
+    exemple). L'ordre des messages indique que la première écriture, telle qu'initiée
+    par l'expéditeur, est la première écriture traitée par le destinataire. L'ordre
+    des données indique si les *données* de la première écriture mettent à jour
+    la mémoire avant que la seconde écriture ne mette à jour la mémoire.</p>
+<p class="Pp">Les champs max_order_xxx_size indiquent la taille d'un message qui
+    peut être traitée tout en maintenant l'ordre des données. Si un champ est 0,
+    aucun ordre de données n'est garanti. Si un champ est identique à max_msg_size,
+    l'ordre des données est garanti pour tous les messages.</p>
+<p class="Pp">Les fournisseurs peuvent prendre en charge l'ordre des données jusqu'à
+    max_msg_size pour des opérations successives identiques. Par exemple, une
+    écriture RMA suivie d'une écriture RMA peuvent avoir un ordre des données, quelle
+    que soit la taille du transfert de données (max_order_waw_size = max_msg_size).
+    Les opérations mixtes, comme une lecture suivie d'une écriture, sont souvent
+    limitées. En effet, les opérations de lecture RMA peuvent nécessiter des accusés
+    de réception de l'*initiateur*, ce qui a un impact sur le protocole de retransmission.</p>
+<p class="Pp">Par exemple, considérons une lecture RMA suivie d'une écriture. La cible
+    traitera la demande de lecture, récupérera les données et enverra une réponse.
+    Pendant ce temps, une écriture est reçue qui souhaite mettre à jour le même
+    emplacement mémoire accédé par la lecture. Si la cible traite l'écriture, elle
+    écrasera la mémoire utilisée par la lecture. Si la réponse de lecture est perdue
+    et que la lecture est retentée, la cible ne pourra pas renvoyer les données.
+    Pour gérer cela, la cible doit soit : différer le traitement de l'écriture
+    jusqu'à ce qu'elle reçoive un accusé de réception pour la réponse de lecture,
+    mettre en mémoire tampon la réponse de lecture afin qu'elle puisse être retransmise,
+    soit indiquer que l'ordre des données n'est pas garanti.</p>
+<p class="Pp">Comme l'opération de lecture ou d'écriture peut représenter des
+    gigaoctets, le report de l'écriture peut entraîner une latence significative,
+    et la mise en mémoire tampon de la réponse de lecture peut être irréalisable.
+    Les champs max_order_xxx_size indiquent la taille des opérations successives
+    pour lesquelles l'ordre est toujours maintenu. Dans de nombreux cas, l'ordre
+    lecture après écriture et écriture et lecture peut être considérablement limité,
+    mais toujours utilisable pour implémenter des algorithmes spécifiques, tels
+    qu'un mécanisme de verrouillage global.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Rx/Tx_Context_Attributes_(fi_rx_attr_/_fi_tx_attr)'><a class='permalink' href='#Rx/Tx_Context_Attributes_(fi_rx_attr_/_fi_tx_attr)'>Attributs de contexte Rx/Tx (fi_rx_attr / fi_tx_attr)</a></h2>
+<p class="Pp">Les attributs du point de terminaison définissent les capacités globales
+    du point de terminaison ; cependant, les attributs qui s'appliquent spécifiquement
+    aux contextes de réception ou d'émission sont définis par les structures fi_rx_attr
+    et fi_tx_attr, respectivement :</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>struct fi_rx_attr {
+    uint64_t caps;
+    uint64_t mode;
+    uint64_t op_flags;
+    uint64_t msg_order;
+    ...
+};
+struct fi_tx_attr {
+    uint64_t caps;
+    uint64_t mode;
+    uint64_t op_flags;
+    uint64_t msg_order;
+    size_t inject_size;
+    ...
+};
+</pre>
+  </dd>
+</dl>
+<p class="Pp">Les capacités du contexte Rx/Tx doivent être un sous-ensemble des
+    capacités du point de terminaison. Pour de nombreuses applications, les attributs
+    par défaut renvoyés par le fournisseur seront suffisants, l'application n'ayant
+    besoin que de spécifier les attributs du point de terminaison.</p>
+<p class="Pp">Les deux attributs de contexte incluent un champ op_flags. Ce champ
+    est utilisé par les applications pour spécifier les drapeaux d'opération par
+    défaut à utiliser avec tout appel. Par exemple, en définissant les op_flags
+    du contexte de transmission sur FI_INJECT, l'application a indiqué au fournisseur
+    que toutes les opérations de transmission doivent supposer que le comportement
+    "inject" est souhaité. C'est-à-dire que le tampon fourni à l'appel doit être
+    renvoyé à l'application après le retour de la fonction. Les op_flags s'appliquent
+    à toutes les opérations qui ne fournissent pas de drapeaux dans le cadre de
+    l'appel (par exemple, fi_sendmsg). Une utilisation des op_flags est de spécifier
+    la sémantique de complétion par défaut souhaitée (discutée ensuite) par
+    l'application. En définissant les op_flags par défaut au moment de l'initialisation,
+    nous pouvons éviter de passer les drapeaux comme arguments dans certains appels
+    de transfert de données, éviter d'analyser les drapeaux et préparer les commandes
+    soumises à l'avance.</p>
+<p class="Pp">Il convient de noter que certains attributs dépendent des attributs
+    de support du point de terminaison homologue pour garantir un comportement
+    correct de l'application. Par exemple, l'ordre des messages doit être compatible
+    entre les attributs de transmission de l'initiateur et les attributs de réception
+    de la cible. Toute incompatibilité peut entraîner un comportement incorrect
+    qui pourrait être difficile à déboguer.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='Completions'><a class='permalink' href='#Completions'>Completions</a></h1>
+<p class="Pp">Les opérations de transfert de données s'achèvent de manière asynchrone.
+    Libfabric définit deux mécanismes par lesquels une application peut être
+    notifiée qu'une opération est terminée : les files d'attente de complétion et
+    les compteurs. Quel que soit le mécanisme utilisé pour notifier l'application
+    qu'une opération est terminée, les développeurs doivent être conscients de ce
+    qu'indique une complétion.</p>
+<p class="Pp">Dans tous les cas, une complétion indique qu'il est sûr de réutiliser
+    les tampons associés au transfert de données. Ce mode de complétion est appelé
+    *inject complete* et correspond aux drapeaux opérationnels FI_INJECT_COMPLETE.
+    Cependant, une complétion peut également garantir des sémantiques plus fortes.</p>
+<p class="Pp">Bien que libfabric ne définisse pas d'implémentation, un fournisseur
+    peut répondre à l'exigence de *inject complete* en copiant le tampon de
+    l'application dans un tampon réseau avant de générer la complétion. Même si
+    l'opération de transmission est perdue et doit être retentée, le fournisseur
+    peut renvoyer les données d'origine à partir de l'emplacement copié. Pour les
+    transferts volumineux, un fournisseur peut ne pas marquer une requête comme
+    *inject complete* tant que les données n'ont pas été acquittées par la cible.
+    Les applications, cependant, ne devraient déduire qu'il est sûr de réutiliser
+    leur tampon de données pour une opération *inject complete*.</p>
+<p class="Pp">Le *transmit complete* est un mode de complétion qui offre des garanties
+    légèrement plus fortes à l'application. La signification de *transmit complete*
+    dépend du fait que le point de terminaison soit fiable ou non fiable. Pour un
+    point de terminaison non fiable (FI_EP_DGRAM), une complétion de transmission
+    indique que la requête a été livrée au réseau. C'est-à-dire que le message a été
+    livré au moins jusqu'aux files d'attente matérielles de la carte réseau locale.
+    Pour les points de terminaison fiables, une complétion de transmission se produit
+    lorsque la requête a atteint le point de terminaison cible. Typiquement, cela
+    indique que la cible a acquitté la requête. *Transmit complete* est mappé
+    au drapeau d'opération FI_TRANSMIT_COMPLETE.</p>
+<p class="Pp">Un troisième mode de complétion est défini pour fournir des garanties
+    au-delà de *transmit complete*. Avec</p>
+h transmit complete, une application sait que le
+    message ne dépend plus du NIC local ou du réseau
+    (par ex. commutateurs). Cependant, les données peuvent être mises en tampon au NIC distant et n'ont pas nécessairement été écrites dans la mémoire cible. En conséquence, les données envoyées dans la requête peuvent ne pas être visibles par tous les processus. Le troisième mode de complétion est delivery </p>complete.
+<p class="Pp">Delivery complete indique que les résultats de l'opération sont
+    disponibles pour tous les processus sur le fabric. La distinction entre transmit
+    et delivery complete est subtile, mais importante. Elle concerne souvent
+    <i>quand </i>l'endpoint cible génère un accusé de réception pour un message.
+    Pour les fournisseurs qui déchargent le protocole de transport sur le NIC, la prise en charge de
+    transmit complete est courante. Les garanties de delivery complete sont plus facilement
+    respectées par les fournisseurs qui implémentent des parties de leur protocole sur le
+    processeur hôte. Delivery complete correspond au drapeau d'opération
+    FI_DELIVERY_COMPLETE</p>.
+<p class="Pp">Les applications peuvent demander un mode de complétion par défaut lors de l'ouverture d'un
+    endpoint en définissant l'un des drapeaux de complétion mentionnés ci-dessus comme op_flags
+    pour les attributs du contexte. Cependant, il est généralement recommandé que
+    l'application utilise les drapeaux par défaut du fournisseur pour de meilleures performances,
+    et adapte son protocole pour atteindre sa sémantique de complétion. Par exemple,
+    de nombreuses applications effectueront une procédure `finalize' ou `commit' dans le cadre de
+    leur opération, ce qui synchronise le traitement de tous les pairs et
+    garantit que toutes les données précédemment envoyées ont été </p>reçues.
+<p class="Pp">Une discussion complète de la sémantique de complétion est donnée dans la page man
+    </p>fi_cq.
+<section class="Ss">
+<h2 class="Ss" id='CQs_(fid_cq)'><a class='permalink' href='#CQs_(fid_cq)'>CQs   </a></h2>(fid_cq)
+<p class="Pp">Les files de complétion correspondent souvent directement aux mécanismes matériels
+    du fournisseur, et libfabric est conçu pour minimiser l'impact logiciel de
+    l'accès à ces mécanismes. Contrairement aux autres objets discutés jusqu'à présent
+    (fabrics, domains, endpoints), les files de complétion ne font pas partie de la structure fi_info
+    ni ne sont impliquées dans l'appel fi_getinfo()</p>.
+<p class="Pp">Tous les endpoints actifs doivent être liés à une ou plusieurs files de
+    complétion. C'est vrai même si les complétions seront supprimées par
+    l'application (par ex. en utilisant le drapeau FI_SELECTIVE_COMPLETION). Les files de
+    complétion sont nécessaires pour signaler les opérations qui se terminent en erreur et aident à faire
+    progresser l'exécution en cas de progression </p>manuelle.
+<p class="Pp">Les CQ sont allouées séparément des e</p>ndpoints et sont associées
+    aux en</section>dpoints via la fonction fi_ep_bind().
+<section class="Ss">
+<h2 class="Ss" id='CQ_Format_(fi_cq_format)'><a class='permalink' href='#CQ_Format_(fi_cq_format)'>Format   CQ </a></h2>(fi_cq_format)
+<p class="Pp">Afin de minimiser la quantité de données qu'un fournisseur doit
+    signaler, le type de données de complétion écrites en retour à l'application est
+    sélectionnable. Cela limite le nombre d'octets que le fournisseur écrit en mémoire,
+    et permet aux données de complétion nécessaires de tenir dans une structure compacte. Chaque
+    format de CQ correspond à une structure de complétion spécifique. Les développeurs doivent analyser
+    chaque structure, sélectionner la plus petite structure qui contient toutes les données
+    dont ils ont besoin, et spécifier la valeur d'énumération correspondante comme format de </p>CQ.
+<p class="Pp">Par exemple, si une application a seulement besoin de savoir quelle requête
+    est terminée, ainsi que la taille d'un message reçu, elle peut sélectionner
+    ce qui suit </p>:
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>cq_attr-&gt;format = FI_CQ_FORMAT_MSG;
+struct fi_cq_msg_entry {
+    void      *op_context;
+    uint64_t  flags;
+    size_t    </pre>len;
+</dd>}</dl>;
+<p class="Pp">Une fois le format sélectionné, le fournisseur sous-jacent
+    supposera que les opérations de lecture sur la CQ</p> passeront un tableau de la
+    structure correspondante. Les formats de données de CQ sont conçus de telle sor</section>te qu'une
+    structure qui rapporte plus d'informations peut être convertie en celle qui en rapporte
+    moins.
+<section class="Ss">
+<h2 class="Ss" id='Reading_Completions_(fi_cq_read)'><a class='permalink' href='#Reading_Completions_(fi_cq_read)'>Lire   les Complétions </a></h2>(fi_cq_read)
+<p class="Pp">Les complétions peuvent être lues depuis une CQ en utilisant l'un des appels
+    non bloquants, fi_cq_read / fi_cq_readfrom, ou l'un des appels bloquants,
+    fi_cq_sread / fi_cq_sreadfrom. Quel que soit l'appel utilisé,
+    les applications passent un tableau de structures de complétion basé sur le format
+    de CQ sélectionné. Les interfaces de CQ sont optimisées pour le traitement par lots des complétions,
+    permettant à l'application de récupérer plusieurs complétions depuis un seul appel
+    de lecture. La différence entre les appels read et readfrom est que readfrom
+    retourne les données d'adressage source, si disponibles. La dérivée readfrom des
+    appels n'est utile que pour les endpoints non connectés, et seulement si
+    l'endpoint correspondant a été configuré avec la capacité
+  </p>FI_SOURCE.
+<p class="Pp">FI_SOURCE exige que le fournisseur utilise l'adresse source
+    disponible dans les données brutes de complétion, comme l'adresse sour</p>ce
+    du paquet, pour récupérer une entrée correspondante dans le vecteur d'adresses
+    de l'endpoint. Les applications qui transport</section>ent une sorte d'identifiant source dans leurs
+    paquets de données peuvent éviter le surcoût associé à l'utilisation de
+  FI_SOURCE.
+<section class="Ss">
+<h2 class="Ss" id='Retrieving_Errors'><a class='permalink' href='#Retrieving_Errors'>Récupérer   les </a></h2>Erreurs
+<p class="Pp">Étant donné que la structure de complétion sélectionnée est insuffisante pour
+    rapporter toutes les données nécessaires pour déboguer ou gérer une opération qui se termine en
+    erreur, les opérations échouées sont signalées en utilisant une fonction séparée fi_cq_readerr().
+    Cet appel prend en entrée une structure d'entrée d'erreur de CQ, ce qui permet
+    au fournisseur de rapporter plus d'informations concernant la raison de
+    </p>l'échec.
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>/* read error prototype */
+fi_cq_readerr(struct fid_cq *cq, struct fi_cq_err_entry *buf, uint64_t flags);
+/* error data structure */
+struct fi_cq_err_entry {
+    void      *op_context;
+    uint64_t  flags;
+    size_t    len;
+    void      *buf;
+    uint64_t  data;
+    uint64_t  tag;
+    size_t    olen;
+    int       err;
+    int       prov_errno;
+    void      *err_data;
+    size_t    err_data_size;
+};
+/* Sample error handling */
+struct fi_cq_msg_entry entry;
+struct fi_cq_err_entry err_entry;
+char err_data[256];
+int ret;
+err_entry.err_data = err_data;
+err_entry.err_data_size = 256;
+ret = fi_cq_read(cq, &amp;entry, 1);
+if (ret == -FI_EAVAIL)
+    ret = fi_cq_readerr(cq, &amp;err_entry,</pre> </dd>0)</dl>;
+<p class="Pp">Comme illustré, si une entrée d'erreur a été insérée dans la
+    file de complétion, alors la tentative de lecture de la CQ résultera en un appel de
+    lecture retournant -FI_EAVAIL (erreur disponible). Cela indique que
+    l'application doit utiliser l'appel fi_cq_readerr() pour retirer les informations de complétion
+    de l'opération échouée avant que d'autres complétions puissent être
+    récoltées depuis la </p>CQ.
+<p class="Pp">Un code d'erreur de fabric concernant l'échec est rapporté sous forme du champ
+    err dans la structure fi_cq</p>_err_entry. Un code d'erreur spécifique au
+    fournisseur est également disponible via le champ prov_errno. </section>Ce champ peut être décodé en
+    une chaîne affichable en utilisant la routine fi_cq_strerror(). Le champ
+   </section> err_data est une donnée spécifique au fournisseur qui aide le fournisseur à décoder la raison
+    de l'échec.
+<section class="Sh">
+<h1 class="Sh" id='Address_Vectors_(fid_av)'><a class='permalink' href='#Address_Vectors_(fid_av)'>Vecteurs   d'Adresses </a></h1>(fid_av)
+<p class="Pp">Un objectif principal des vecteurs d'adresses est de permettre aux applications de
+    communiquer avec des milliers à des millions de pairs tout en minimisant la quantité
+    de données nécessaires pour stocker les informations d'adressage des pairs. Il repousse les détails
+    d'adressage spécifiques au fabric de l'application vers le fournisseur. Cela
+    permet au fournisseur d'optimiser la façon dont il convertit les adresses en données de routage,
+    et permet des techniques de compression de données qui pourraient être difficiles pour une
+    application à réaliser sans être consciente des détails d'adressage de bas niveau du
+    fabric. Par exemple, les fournisseurs peuvent être en mesure de calculer
+    algorithmiquement les composants d'adressage, plutôt que de stocker les données localement. De plus,
+    les fournisseurs peuvent communiquer avec des entités de gestion de ressources ou des agents de gestion de fabric
+    pour obtenir des informations sur la qualité de service ou d'autres informations sur le
+    fabric, afin d'améliorer l'utilisation du </p>réseau.
+<p class="Pp">Un objectif tout aussi important est de s'assurer que les interfaces résultantes,
+    en particulier les opérations de transfert de données, sont rapides et faciles à utiliser.
+    Conceptuellement, un vecteur d'adresses convertit une adresse d'endpoint en un
+    fi_addr_t. Le fi_addr_t (datatype d'adresse d'interface de fabric) est une valeur
+    de 64 bits utilisée dans toutes les opérations `fast-path' – transferts de données et
+    </p>complétions.
+<p class="Pp">Les vecteurs d'adresses sont associés aux objets domain. Cela permet
+    aux fournisseurs d'implémenter des parties d'un vecteur d'adresses, comme les
+    mappages de qualité de service, dans le </p>matériel.
+<section class="Ss">
+<h2 class="Ss" id='AV_Type_(fi_av_type)'><a class='permalink' href='#AV_Type_(fi_av_type)'>Type   AV </a></h2>(fi_av_type)
+<p class="Pp">Il existe deux types de vecteurs d'adresses. Le type fait référence au
+    format des valeurs fi_addr_t retournées pour les adresses qui sont insérées dans le
+    AV. Avec le type FI_AV_TABLE, les adresses retournées sont de simples indices, et
+    les développeurs peuvent considérer le AV comme un tableau d'adresses. Chaque adresse qui
+    est insérée dans le AV est mappée à l'index du prochain emplacement libre du tableau.
+    L'avantage de FI_AV_TABLE est que les applications peuvent se référer aux pairs en utilisant un
+    simple index, éliminant le besoin pour l'application de stocker des
+    données d'adressage. C'est-à-dire que l'application peut générer les valeurs fi_addr_t
+    elle-même. Ce type correspond bien aux applications, comme MPI, où un pair
+    est référencé par son </p>rang.
+<p class="Pp">Le deuxième type est FI_AV_MAP. Ce type ne définit aucun
+    format spécifique pour la valeur fi_addr_t. Les applications qui utilisent le type map
+    doivent fournir le fi_addr_t correct pour un pair donné lors de l'émission d'une
+ </p>   opération de transfert de données. L'avantage de FI_AV_MAP est qu'un fournisseur peut
+    utiliser le fi_addr_t pour encoder l'adresse de la cible, ce qui évite
+    de récupérer les données depuis la mémoire. Comme exemple simple,</section> considérons un fabric qui
+    utilise un adressage basé sur TCP/IPv4. Un fi_addr_t est assez grand pour contenir
+    l'adresse, ce qui permet à un fournisseur de copier les données du fi_addr_t
+    directement dans un paquet sortant.
+<section class="Ss">
+<h2 class="Ss" id='Sharing_AVs_Between_Processes'><a class='permalink' href='#Sharing_AVs_Between_Processes'>Partager   les AV entre les </a></h2>Processus
+<p class="Pp">Les programmes parallèles à grande échelle s'exécutent généralement avec plusieurs
+    processus alloués sur chaque nœud. Comme ces processus communiquent avec le
+    même ensemble de pairs, les données d'adressage nécessaires à chaque processus sont les
+    mêmes. Libfabric définit un mécanisme par lequel les processus s'exécutant sur le même
+    nœud peuvent partager leurs vecteurs d'adresses. Cela permet à un système de maintenir une
+    seule copie des données d'adressage, plutôt qu'une copie par </p>processus.
+<p class="Pp">Bien que libfabric ne requière aucune implémentation pour la façon dont un
+    vecteur d'adresses est partagé, les interfaces correspondent bien à l'utilisation de la mémoire
+    partagée. Les vecteurs d'adresses qui seront partagés reçoivent un nom spécifique à l'application.
+    La façon dont une application sélectionne un nom qui évite les conflits avec des processus
+    non liés, ou la façon dont elle communique le nom aux processus pairs, est en dehors du
+    cadre de </p>libfabric.
+<p class="Pp">En plus d'avoir un nom, un AV partagé a aussi une adresse de mappage de base –
+    map_addr. L'utilisation de map_addr n'est importante que pour les vecteurs
+    d'adresses qui sont of type FI_AV_MAP, et permet aux applications de partager
+    des valeurs fi_addr_t. Du point de vue de l'application, le map_addr est la
+   </p> valeur de base pour toutes les valeurs fi_addr_t. Un usage courant du map_addr est pour
+    le processus qui crée le vecteur d'adresses init</section>ial de demander une valeur au
+    fournisseur, d'échanger le map_addr retourné avec ses pairs, et pour les pairs
+    d'ouvrir le AV partagé e</section>n utilisant le même map_addr. Cela permet aux valeurs fi_addr_t
+    d'être stockées dans une mémoire partagée accessible par tous les pairs.
+<section class="Sh">
+<h1 class="Sh" id='Using_Native_Wait_Objects:_TryWait'><a class='permalink' href='#Using_Native_Wait_Objects:_TryWait'>Utilisation   d'objets d'attente natifs : </a></h1>TryWait
+<p class="Pp">Il existe une différence importante entre l'utilisation des objets de
+    complétion de libfabric et celle des sockets, qui n'est peut-être pas évidente à
+    partir des discussions précédentes. Avec les sockets, l'objet qui est signalé est le même
+    objet qui abstrait les files d'attente, à savoir le descripteur de fichier. Lorsque des données sont
+    reçues sur une socket, ces données sont placées dans une file d'attente associée directement
+    avec le fd. La lecture à partir du fd récupère ces données. Si une application
+    souhaite se bloquer jusqu'à ce que des données arrivent sur une socket, elle appelle select() ou poll()
+    sur le fd. Le fd est signalé lorsqu'un message est reçu, ce qui libère le
+    thread bloqué, lui permettant de lire le </p>fd.
+<p class="Pp">En associant l'objet d'attente à la file de données sous-jacente,
+    les applications sont exposées à une interface qui est facile à utiliser et exempte de conditions de course.
+    Si des données sont disponibles à lire depuis la socket au moment où select() ou poll()
+    est appelé, ces appels renvoient simplement que le fd est </p>lisible.
+<p class="Pp">Il y a quelques inconvénients significatifs à cette approche,
+    qui ont été discutés précédemment, mais sous différents angles. Le
+    premier est que chaque socket doit être associée à son propre fd. Il n'y a pas
+    de moyen de partager un objet d'attente entre plusieurs sockets. (C'est une raison
+    principale du développement de la sémantique epoll). Le second est que la file d'attente est
+    maintenue dans le noyau, afin que les appels select() et poll() puissent les </p>vérifier.
+<p class="Pp">Libfabric permet la séparation de l'objet d'attente des
+    files de données. Pour les applications qui utilisent les interfaces libfabric pour attendre des
+    événements, comme fi_cq_sread, cette séparation est principalement cachée à
+    l'application. L'exception est que les applications peuvent recevoir un signal, mais aucun
+    événement n'est récupéré lors de la lecture d'une file. Cette séparation permet aux files
+    de résider dans l'espace mémoire de l'application, tandis que les objets d'attente peuvent
+    toujours utiliser des composants du noyau. Une raison pour ce dernier est que les objets d'attente
+    peuvent être signalés dans le cadre du traitement des interruptions système, ce qui passerait
+    par un pilote du </p>noyau.
+<p class="Pp">Les applications qui souhaitent utiliser des objets d'attente natifs
+    (p. ex. des descripteurs de fichier) directement dans les appels système doivent
+    effectuer une étape supplémentaire dans leur traitement. Afin de gérer les conditions de course
+    qui peuvent survenir entre l'insertion d'un événement dans un objet de complétion ou
+    d'événement et la signalisation de l'objet d'attente correspondant, libfabric définit
+    une fonction `fi_trywait()`. L'implémentation de fi_trywait est responsable du
+    traitement des conditions de course potentielles qui pourraient entraîner une perte d'événements ou un blocage de l'application.
+    L'exemple suivant démontre l'utilisation de fi_trywait()</p>.
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>/* Obtenir l'objet d'attente natif -- un fd dans ce cas */
+fi_control(&amp;cq-&gt;fid, FI_GETWAIT, (void *) &amp;fd);
+FD_ZERO(&amp;fds);
+FD_SET(fd, &amp;fds);
+while (1) {
+    ret = fi_trywait(fabric, &amp;cq-&gt;fid, 1);
+    if (ret == FI_SUCCESS) {
+        /* Il est sûr de se bloquer sur le fd */
+        select(fd + 1, &amp;fds, NULL, &amp;fds, &amp;timeout);
+    } else if (ret == -FI_EAGAIN) {
+        /* Lire et traiter toutes les complétions de la CQ */
+        do {
+            ret = fi_cq_read(cq, &amp;comp, 1);
+        } while (ret &gt; 0);
+    } else {
+        /* quelque chose de vraiment grave s'est produit */
+  </pre>  }</dd>
+</dl>}
+<p class="Pp">Dans cet exemple, l'application a alloué une CQ avec un fd comme
+    objet d'attente. Elle appelle select() sur le fd. Avant d'appeler select(), l'
+    application doit appeler fi_try</p>wait() avec succès (code de retour FI_SUCCESS).
+    Le succès indique qu'une opération bloquante peut maintenant être invoquée sur l'objet d'attente natif
+    sans craindre que l'appli</section>cation ne se bloque ou que des événements ne soient perdus. Si
+    fi_trywait() renvoie –FI_EAGAIN, cela indique généralement qu'il y a
+    des événements en file d'attente à traiter.
+<section class="Sh">
+<h1 class="Sh" id='Environment_Variables'><a class='permalink' href='#Environment_Variables'>Variables   </a></h1>d'environnement
+<p class="Pp">Les variables d'environnement sont utilisées par les fournisseurs pour configurer des
+    options internes pour des performances optimales ou une consommation mémoire. Libfabric fournit une
+    interface pour interroger quelles variables d'environnement sont utilisables, ainsi qu'une
+    application pour afficher les informations dans une fenêtre de commande. Bien que les
+    variables d'environnement soient généralement configurées par un administrateur, une
+    application peut interroger les variables de manière </p>programmatique.
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>/* APIs pour interroger les variables d'environnement prises en charge */
+enum fi_param_type {
+    FI_PARAM_STRING,
+    FI_PARAM_INT,
+    FI_PARAM_BOOL,</pre>
+    FI_PARAM_SIZE_T,
+};
+struct fi_param {
+    /* Le nom de la variable d'environnement */
+    const char *name;
+    /* Le type de valeur qu'elle stock</dd>e */
+    enum fi_param_type type;
+    /* Une description de la manière dont la variable est utilisée */
+    const char *help_string;
+    /* La valeur a</dl>ctuelle de la variable */
+    const char *value;
+};
+int fi_getparams(struct fi_param **params, int *count);
+void fi_freeparams(struct fi_param *params);
+<p class="Pp">La modification des variables d'environnement est généralement une activité de réglage
+    effectuée sur de grands clusters. Cependant, il y a quelques valeurs qui sont
+    utiles pour les développeurs. Celles-ci peuvent être vues en exécutant la commande
+  </p>fi_info.
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>
+    <pre>$ fi_info -e
+# FI_LOG_LEVEL: String
+# Spécifier le niveau de journalisation </pre>: warn, trace, info, debug (par défaut : warn)
+# FI_LOG_PROV: String
+# Spéci</dd>fier le fournisseur à journaliser (par défaut : tous)
+# FI_PROVIDER: String
+</dl># N'utiliser que le fournisseur spécifié (par défaut : tous les disponibles)
+<p class="Pp">L'application fi_info, fournie avec libfabric, peut être utilisée
+    pour lister toutes les variables d'environnement pour tous les fournisseurs. L'option `-e' listera
+    toutes les variables, et l'option `-g' peut être utilisée pour filtrer la sortie afin
+    d'afficher uniquement les variables correspondant à une sous-chaîne. Les variables sont documentées
+    directement dans le code avec la description disponible en sortie </p>help_string.
+<p class="Pp">La variable FI_LOG_LEVEL peut être utilisée pour augmenter la sortie de débogage de
+    libfabric et des fournisseurs. Notez que dans la version de libfabric,
+   </p> la sortie de débogage des opérations du chemin de données (transmission, réception et traitement
+    des complétions) peut ne pas être disponible. La variable F</section>I_PROVIDER peut être utilisée
+    pour activer ou désactiver des fournisseurs spécifiques. Cela est utile pour s'assurer qu'un
+    fournisseur donné sera utilisé.
+<section class="Sh">
+<h1 class="Sh" id='AUTHORS'><a class='permalink' href='#AUTHORS'>AUTEUR</a></h1>S
+<p class="Pp">Ope</p>nFa</section>bri</div>cs.
+<table class="foot">
+  <tr>
+    <td class="foot-date">2024-12</td>-31
+    <td class="foot-os">Manue</td>l du </tr>progra</table>mmeur</section> Libf</article>abric
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Search manual page" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le </p>paquet :
+    <dl>
+        <dt>Nom du </dt>paquet :
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/libfabric/">extra/lib</a></dd>fabric
+        <dt>Version </dt>:
+        <dd>2.</dd>3.1-1
+        <dt>Amont </dt>:
+        <dd><a href="https://ofiwg.github.io/libfabric/">https://ofiwg.github.</a></dd>io/libfabric/
+        <dt>Licences </dt>:
+        <dd>BSD-2-Clause OR GPL-2.</dd>0-or-later
+        <dt>Manuels </dt>:
+        <dd><a href="/listing/extra/libfabric/">/listi</a></dd>ng/ext</dl>ra/libf</section>abric/
+
+<details>
+    <summary>Table des </summary>matières
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">N</a></li>OM
+        
+            <li><a href="#OVERVIEW">VUE </a></li>D'ENSEMBLE
+        
+            <li><a href="#fi_getinfo()">fi_g</a></li>etinfo()
+        
+            <li><a href="#FIDs_(fid_t)">FIDs </a></li>(fid_t)
+        
+            <li><a href="#Fabric_(fid_fabric)">Tissu </a></li>(fid_fabric)
+        
+            <li><a href="#Domains_(fid_domain)">Domaines </a></li>(fid_domain)
+        
+            <li><a href="#Endpoints">Points </a></li>de terminaison
+        
+            <li><a href="#Completions">Comp</a></li>létions
+        
+            <li><a href="#Address_Vectors_(fid_av)">Vecteurs d'adresses </a></li>(fid_av)
+        
+            <li><a href="#Using_Native_Wait_Objects:_TryWait">Utilisation d'objets d'attente </a></li>natifs : TryWait
+        
+            <li><a href="#Environment_Variables">Variables </a></li>d'environnement
+        
+            <li><a href="#AUTHORS">A</a></li>UTE</ul>U</nav>R</details>S
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/fi_setup.7.en.txt">t</a>xt, 
+        
+            <a href="/man/fi_setup.7.en.raw">b</a></p>r</nav>u</aside></main>t
+        <footer>
+            de manuel.
+            <p>Le site web est disponible selon les termes de la <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">licence
+               GPL-3</a>.0, sauf pour le contenu des</p> pages de manuel, qui ont le</footer>ur propre licence
+         </body>      spécifiée dans le paqu</html>et Arch Linux correspondant.

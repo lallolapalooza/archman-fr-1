@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>SET TRANSACTION(7) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">SET_TRANSACTION(7)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/postgresql/">postgresql</a></p>
+<p class="lic">Licences: PostgreSQL</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">SET TRANSACTION(7)</td>
+    <td class="head-vol">Documentation PostgreSQL 18.1</td>
+    <td class="head-rtitle">SET TRANSACTION(7)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NOM"><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">SET_TRANSACTION - définir les caractéristiques de la transaction
+    en cours</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNTAXE"><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<pre>SET TRANSACTION <i>mode_transaction</i> [, ...]
+SET TRANSACTION SNAPSHOT <i>id_instantané</i>
+SET SESSION CHARACTERISTICS AS TRANSACTION <i>mode_transaction</i> [, ...]
+où <i>mode_transaction</i> est l'un des éléments suivants :
+    ISOLATION LEVEL { SERIALIZABLE | REPEATABLE READ | READ COMMITTED | READ UNCOMMITTED }
+    READ WRITE | READ ONLY
+    [ NOT ] DEFERRABLE</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">La commande <b>SET TRANSACTION</b> définit les caractéristiques de la
+    transaction en cours. Elle n'a aucun effet sur les transactions ultérieures.
+    <b>SET SESSION CHARACTERISTICS</b> définit les caractéristiques de transaction
+    par défaut pour les transactions ultérieures d'une session. Ces valeurs par
+    défaut peuvent être remplacées par <b>SET TRANSACTION</b> pour une transaction
+    individuelle.</p>
+<p class="Pp">Les caractéristiques de transaction disponibles sont le niveau d'isolation
+    de la transaction, le mode d'accès de la transaction (lecture/écriture ou
+    lecture seule) et le mode reportable. De plus, un instantané peut être
+    sélectionné, bien que uniquement pour la transaction en cours, et non comme
+    valeur par défaut de session.</p>
+<p class="Pp">Le niveau d'isolation d'une transaction détermine quelles données la
+    transaction peut voir lorsque d'autres transactions s'exécutent
+    simultanément :</p>
+<p class="Pp">READ COMMITTED</p>
+<div class="Bd-indent">Une instruction ne peut voir que les lignes validées avant
+  son début. C'est le défaut.</div>
+<p class="Pp">REPEATABLE READ</p>
+<div class="Bd-indent">Toutes les instructions de la transaction en cours ne peuvent
+  voir que les lignes validées avant que la première requête ou instruction de
+  modification de données ne soit exécutée dans cette transaction.</div>
+<p class="Pp">SERIALIZABLE</p>
+<div class="Bd-indent">Toutes les instructions de la transaction en cours ne peuvent
+  voir que les lignes validées avant que la première requête ou instruction de
+  modification de données ne soit exécutée dans cette transaction. Si un schéma
+  de lectures et d'écritures entre transactions sérialisables concurrentes créait
+  une situation qui n'aurait pas pu se produire pour une exécution sérielle
+  (une par une) de ces transactions, l'une d'elles sera annulée avec une erreur
+  serialization_failure.</div>
+La norme SQL définit un niveau supplémentaire, READ UNCOMMITTED. Dans PostgreSQL,
+  READ UNCOMMITTED est traité comme READ COMMITTED.
+<p class="Pp">Le niveau d'isolation de la transaction ne peut pas être modifié après
+    l'exécution de la première requête ou instruction de modification de données
+    (<b>SELECT</b>, <b>INSERT</b>, <b>DELETE</b>, <b>UPDATE</b>, <b>MERGE</b>,
+    <b>FETCH</b> ou <b>COPY</b>) d'une transaction. Voir le Chapitre 13 pour plus
+    d'informations sur l'isolation des transactions et le contrôle de
+    concurrence.</p>
+<p class="Pp">Le mode d'accès de la transaction détermine si la transaction est en
+    lecture/écriture ou en lecture seule. Lecture/écriture est le défaut. Lorsqu'une
+    transaction est en lecture seule, les commandes SQL suivantes sont
+    interdites : <b>INSERT</b>, <b>UPDATE</b>, <b>DELETE</b>, <b>MERGE</b> et
+    <b>COPY FROM</b> si la table qu'elles écriraient n'est pas une table temporaire ;
+    toutes les commandes CREATE, ALTER et DROP ; COMMENT, GRANT, REVOKE, TRUNCATE ;
+    et EXPLAIN ANALYZE et EXECUTE si la commande qu'ils exécuteraient fait partie
+    de celles listées. C'est une notion de haut niveau de lecture seule qui n'empêche
+    pas toutes les écritures sur disque.</p>
+<p class="Pp">La propriété de transaction DEFERRABLE n'a aucun effet à moins que la
+    transaction ne soit également SERIALIZABLE et READ ONLY. Lorsque ces trois
+    propriétés sont sélectionnées pour une transaction, la transaction peut se
+    bloquer lors de l'acquisition initiale de son instantané, après quoi elle est
+    en mesure de s'exécuter sans la surcharge normale d'une transaction
+    SERIALIZABLE et sans aucun risque de contribuer à un échec de sérialisation ou
+    d'être annulée par celui-ci. Ce mode est bien adapté aux rapports ou sauvegardes
+    de longue durée.</p>
+<p class="Pp">La commande SET TRANSACTION SNAPSHOT permet à une nouvelle transaction
+    de s'exécuter avec le même instantané qu'une transaction existante. La
+    transaction préexistante doit avoir exporté son instantané avec la fonction
+    pg_export_snapshot (voir la Section 9.28.5). Cette fonction renvoie un identifiant
+    d'instantané, qui doit être donné à SET TRANSACTION SNAPSHOT pour spécifier
+    quel instantané doit être importé. L'identifiant doit être écrit sous forme de
+    chaîne littérale dans cette commande, par exemple '00000003-0000001B-1'. SET
+    TRANSACTION SNAPSHOT ne peut être exécuté qu'au début d'une transaction, avant
+    la première requête ou instruction de modification de données (<b>SELECT</b>,
+    <b>INSERT</b>, <b>DELETE</b>, <b>UPDATE</b>, <b>MERGE</b>, <b>FETCH</b> ou
+    <b>COPY</b>) de la transaction. De plus, la transaction doit déjà être réglée sur
+    le niveau d'isolation SERIALIZABLE ou REPEATABLE READ (sinon, l'instantané serait
+    immédiatement rejeté, car le mode READ COMMITTED prend un nouvel instantané pour
+    chaque commande). Si la transaction importatrice utilise le niveau d'isolation
+    SERIALIZABLE, alors la transaction qui a exporté l'instantané doit également
+    utiliser ce niveau d'isolation. De plus, une transaction sérialisable non en lecture
+    seule ne peut pas importer un instantané d'une transaction en lecture seule.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="NOTES"><a class='permalink' href='#NOTES'>NOTES</a></h1>
+<p class="Pp">Si <b>SET TRANSACTION</b> est exécuté sans <b>START TRANSACTION</b> ou
+    <b>BEGIN</b> préalable, il émet un avertissement et n'a par ailleurs aucun
+    effet.</p>
+<p class="Pp">Il est possible de se passer de <b>SET TRANSACTION</b> en spécifiant
+    les <i>modes_transaction</i> souhaités dans <b>BEGIN</b> ou <b>START
+    TRANSACTION</b>. Mais cette option n'est pas disponible pour <b>SET TRANSACTION
+    SNAPSHOT</b>.</p>
+<p class="Pp">Les modes de transaction par défaut de la session peuvent également
+    être définis ou examinés via les paramètres de configuration
+    default_transaction_isolation, default_transaction_read_only et
+    default_transaction_deferrable. (En fait, <b>SET SESSION
+    CHARACTERISTICS</b> est juste un équivalent verbeux pour définir ces variables
+    avec <b>SET</b>.) Cela signifie que les valeurs par défaut peuvent être définies
+    dans le fichier de configuration, via <b>ALTER DATABASE</b>, etc. Consultez le
+    Chapitre 19 pour plus d'informations.</p>
+<p class="Pp">Les modes de la transaction en cours peuvent de même être définis ou
+    examinés via les paramètres de configuration transaction_isolation,
+    transaction_read_only et transaction_deferrable. La définition de l'un de ces
+    paramètres agit de la même manière que l'option correspondante de <b>SET
+    TRANSACTION</b>, avec les mêmes restrictions quant au moment où cela peut être
+    fait. Cependant, ces paramètres ne peuvent pas être définis dans le fichier de
+    configuration, ni à partir d'une source autre que SQL en direct.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXEMPLES"><a class='permalink' href='#EXEMPLES'>EXEMPLES</a></h1>
+<p class="Pp">Pour démarrer une nouvelle transaction avec le même instantané qu'une
+    transaction déjà existante, exportez d'abord l'instantané de la transaction
+    existante. Cela renverra l'identifiant de l'instantané, par exemple :</p>
+<div class="Bd-indent">
+<pre>BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+SELECT pg_export_snapshot();
+ pg_export_snapshot
+---------------------
+ 00000003-0000001B-1
+(1 ligne)</pre>
+</div>
+<p class="Pp">Donnez ensuite l'identifiant de l'instantané dans une commande <b>SET
+    TRANSACTION SNAPSHOT</b> au début de la transaction nouvellement ouverte :</p>
+<div class="Bd-indent">
+<pre>BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+SET TRANSACTION SNAPSHOT '00000003-0000001B-1';</pre>
+</div>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="COMPATIBILITE"><a class='permalink' href='#COMPATIBILITE'>COMPATIBILITÉ</a></h1>
+<p class="Pp">Ces commandes sont définies dans la norme SQL, à l'exception du mode de
+    transaction DEFERRABLE et de la forme <b>SET TRANSACTION SNAPSHOT</b>, qui sont
+    des extensions PostgreSQL.</p>
+<p class="Pp">SERIALIZABLE est le niveau d'isolation de transaction par défaut dans
+    la norme. Dans PostgreSQL, le défaut est généralement READ COMMITTED, mais vous
+    pouvez le modifier comme mentionné ci-dessus.</p>
+<p class="Pp">Dans la norme SQL, il existe une autre caractéristique de transaction qui
+    peut être définie avec ces commandes : la taille de la zone de diagnostic. Ce
+    concept est spécifique à SQL embarqué et n'est donc pas implémenté dans le serveur
+    PostgreSQL.</p>
+<p class="Pp">La norme SQL exige des virgules entre les <i>modes_transaction</i>
+    successifs, mais pour des raisons historiques, PostgreSQL autorise les virgules
+    à être omises.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025</td>
+    <td class="foot-os">PostgreSQL 18.1</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher une page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/postgresql/">extra/postgresql</a></dd>
+        <dt>Version :</dt>
+        <dd>18.1-1</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://www.postgresql.org/">https://www.postgresql.org/</a></dd>
+        <dt>Licences :</dt>
+        <dd>PostgreSQL</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/postgresql/">/listing/extra/postgresql/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+ 
+
+</details>
+
+            </aside>
+        </main>
+        <footer>
+            
+        </footer>
+    </body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>SET_TRANSACTION(7)</title>
+        <link rel="stylesheet" href="/styles.css">
+    </head>
+    <body>
+        
+        <main>
+            <aside>
+                <details>
+    <summary>Table of Contents</summary>
+    <nav>
+        <ul>
+            <li><a href="#NAME">NAME</a></li>
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+            <li><a href="#NOTES">NOTES</a></li>
+            <li><a href="#EXAMPLES">EXAMPLES</a></li>
+            <li><a href="#COMPATIBILITY">COMPATIBILITY</a></li>
+        </ul>
+    </nav>
+</details>
+
+<nav class="other-formats">
+    <p>Other formats:
+            <a href="/man/SET_TRANSACTION.7.en.txt">txt</a>,
+            <a href="/man/SET_TRANSACTION.7.en.raw">raw</a>
+    </p>
+</nav>
+            </aside>
+            <article>
+                <h2 id="NAME">NAME</h2>
+<p>SET_TRANSACTION - PostgreSQL transaction control</p>
+
+<h2 id="SYNOPSIS">SYNOPSIS</h2>
+<p>SET TRANSACTION
+    [ ISOLATION LEVEL { SERIALIZABLE | REPEATABLE READ | READ COMMITTED } ]
+    [ READ ONLY | READ WRITE ]
+    [ DEFERRABLE | NOT DEFERRABLE ]</p>
+
+<h2 id="DESCRIPTION">DESCRIPTION</h2>
+<p>SET TRANSACTION sets the characteristics of the current transaction. It can only be used at the beginning of a transaction (before any SQL statement other than SET or SHOW has been executed).</p>
+
+<p>The following transaction characteristics can be set:</p>
+
+<dl>
+    <dt>ISOLATION LEVEL</dt>
+    <dd>
+        <p>This clause specifies the isolation level of the transaction. The possible levels are:</p>
+        <dl>
+            <dt>SERIALIZABLE</dt>
+            <dd>The highest isolation level. It guarantees that concurrently executing transactions will produce results that would be possible if transactions were executed one after another (serially).</dd>
+            <dt>REPEATABLE READ</dt>
+            <dd>Guarantees that if a transaction reads data multiple times, it will see the same data each time. This prevents dirty reads and non-repeatable reads.</dd>
+            <dt>READ COMMITTED</dt>
+            <dd>Guarantees that only committed data will be read. This prevents dirty reads.</dd>
+        </dl>
+        <p>If this clause is omitted, the default isolation level is READ COMMITTED.</p>
+    </dd>
+    <dt>READ ONLY | READ WRITE</dt>
+    <dd>
+        <p>This clause specifies whether the transaction is read-only or read-write. By default, transactions are READ WRITE.</p>
+        <p>If a transaction is declared READ ONLY, it cannot execute commands that modify data. Any such command will result in an error. This can be useful for ensuring that a transaction does not accidentally modify data. It can also provide certain performance benefits, as PostgreSQL can make some optimizations knowing that no data will be changed.</p>
+    </dd>
+    <dt>DEFERRABLE | NOT DEFERRABLE</dt>
+    <dd>
+        <p>This clause specifies whether the transaction is deferrable. A deferrable transaction is one that can be delayed until it can be committed without causing conflicts with other transactions.</p>
+        <p>This option is only meaningful for SERIALIZABLE transactions. If the transaction is SERIALIZABLE and DEFERRABLE, the transaction may be allowed to proceed even if it would normally have to wait for other transactions to complete. However, it may be aborted later if it turns out that the transaction could not have committed immediately.</p>
+        <p>By default, transactions are NOT DEFERRABLE.</p>
+    </dd>
+</dl>
+
+<h2 id="NOTES">NOTES</h2>
+<p>The SET TRANSACTION command can only be issued at the beginning of a transaction. If it is issued after other SQL statements have been executed within the transaction, an error will be reported.</p>
+
+<p>The isolation levels SERIALIZABLE and REPEATABLE READ are implemented using snapshot isolation. This means that the transaction sees a consistent snapshot of the database as of the time the transaction began.</p>
+
+<p>For more details on transaction isolation levels and their implications, refer to the PostgreSQL documentation.</p>
+
+<h2 id="EXAMPLES">EXAMPLES</h2>
+<p>Start a transaction with the SERIALIZABLE isolation level:</p>
+<pre><code>BEGIN;
+SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+-- Transaction commands here...
+COMMIT;</code></pre>
+
+<p>Start a read-only transaction:</p>
+<pre><code>BEGIN;
+SET TRANSACTION READ ONLY;
+-- Transaction commands here...
+COMMIT;</code></pre>
+
+<p>Start a deferrable transaction with the SERIALIZABLE isolation level:</p>
+<pre><code>BEGIN;
+SET TRANSACTION ISOLATION LEVEL SERIALIZABLE DEFERRABLE;
+-- Transaction commands here...
+COMMIT;</code></pre>
+
+<h2 id="COMPATIBILITY">COMPATIBILITY</h2>
+<p>SET TRANSACTION is a PostgreSQL extension. Standard SQL supports SET TRANSACTION ISOLATION LEVEL, but not the READ ONLY/WRITE or DEFERRABLE options.</p>
+
+            </article>
+        </main>
+        <footer>
+            
+            <p>The website is available under the terms of the <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>
+               license, except for the contents of the manual pages, which have their own license
+               specified in the corresponding Arch Linux package.
+            </p>
+        </footer>
+    </body>
+</html>
+```
+
+```html
+<!DOCTYPE html>
+<html lang="fr">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>SET_TRANSACTION(7)</title>
+        <link rel="stylesheet" href="/styles.css">
+    </head>
+    <body>
+        
+        <main>
+            <aside>
+                <details>
+    <summary>Table des matières</summary>
+    <nav>
+        <ul>
+            <li><a href="#NAME">NOM</a></li>
+            <li><a href="#SYNOPSIS">SYNTAXE</a></li>
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+            <li><a href="#NOTES">NOTES</a></li>
+            <li><a href="#EXAMPLES">EXEMPLES</a></li>
+            <li><a href="#COMPATIBILITY">COMPATIBILITÉ</a></li>
+        </ul>
+    </nav>
+</details>
+
+<nav class="other-formats">
+    <p>Autres formats :
+            <a href="/man/SET_TRANSACTION.7.en.txt">txt</a>,
+            <a href="/man/SET_TRANSACTION.7.en.raw">raw</a>
+    </p>
+</nav>
+            </aside>
+            <article>
+                <h2 id="NAME">NOM</h2>
+<p>SET_TRANSACTION - Contrôle des transactions PostgreSQL</p>
+
+<h2 id="SYNOPSIS">SYNTAXE</h2>
+<p>SET TRANSACTION
+    [ ISOLATION LEVEL { SERIALIZABLE | REPEATABLE READ | READ COMMITTED } ]
+    [ READ ONLY | READ WRITE ]
+    [ DEFERRABLE | NOT DEFERRABLE ]</p>
+
+<h2 id="DESCRIPTION">DESCRIPTION</h2>
+<p>SET TRANSACTION définit les caractéristiques de la transaction courante. Il ne peut être utilisé qu'au début d'une transaction (avant toute instruction SQL autre que SET ou SHOW n'ait été exécutée).</p>
+
+<p>Les caractéristiques de transaction suivantes peuvent être définies :</p>
+
+<dl>
+    <dt>ISOLATION LEVEL</dt>
+    <dd>
+        <p>Cette clause spécifie le niveau d'isolation de la transaction. Les niveaux possibles sont :</p>
+        <dl>
+            <dt>SERIALIZABLE</dt>
+            <dd>Le niveau d'isolation le plus élevé. Il garantit que les transactions exécutées de manière concurrente produiront des résultats qui seraient possibles si les transactions étaient exécutées les unes après les autres (sérielement).</dd>
+            <dt>REPEATABLE READ</dt>
+            <dd>Garantit que si une transaction lit des données plusieurs fois, elle verra les mêmes données à chaque fois. Cela empêche les lectures sales et les lectures non répétables.</dd>
+            <dt>READ COMMITTED</dt>
+            <dd>Garantit que seules les données validées seront lues. Cela empêche les lectures sales.</dd>
+        </dl>
+        <p>Si cette clause est omise, le niveau d'isolation par défaut est READ COMMITTED.</p>
+    </dd>
+    <dt>READ ONLY | READ WRITE</dt>
+    <dd>
+        <p>Cette clause spécifie si la transaction est en lecture seule ou en lecture/écriture. Par défaut, les transactions sont READ WRITE.</p>
+        <p>Si une transaction est déclarée READ ONLY, elle ne peut pas exécuter de commandes qui modifient des données. Toute commande de ce type entraînera une erreur. Cela peut être utile pour s'assurer qu'une transaction ne modifie pas accidentellement des données. Cela peut également fournir certains avantages en termes de performances, car PostgreSQL peut effectuer des optimisations en sachant qu'aucune donnée ne sera modifiée.</p>
+    </dd>
+    <dt>DEFERRABLE | NOT DEFERRABLE</dt>
+    <dd>
+        <p>Cette clause spécifie si la transaction est différable. Une transaction différable est une transaction qui peut être retardée jusqu'à ce qu'elle puisse être validée sans causer de conflits avec d'autres transactions.</p>
+        <p>Cette option n'est significative que pour les transactions SERIALIZABLE. Si la transaction est SERIALIZABLE et DEFERRABLE, la transaction peut être autorisée à continuer même si elle devrait normalement attendre que d'autres transactions se terminent. Cependant, elle peut être annulée plus tard s'il s'avère que la transaction n'aurait pas pu être validée immédiatement.</p>
+        <p>Par défaut, les transactions sont NOT DEFERRABLE.</p>
+    </dd>
+</dl>
+
+<h2 id="NOTES">NOTES</h2>
+<p>La commande SET TRANSACTION ne peut être émise qu'au début d'une transaction. Si elle est émise après l'exécution d'autres instructions SQL dans la transaction, une erreur sera signalée.</p>
+
+<p>Les niveaux d'isolation SERIALIZABLE et REPEATABLE READ sont implémentés à l'aide de l'isolation par instantané (snapshot isolation). Cela signifie que la transaction voit un instantané cohérent de la base de données au moment où la transaction a commencé.</p>
+
+<p>Pour plus de détails sur les niveaux d'isolation des transactions et leurs implications, consultez la documentation PostgreSQL.</p>
+
+<h2 id="EXAMPLES">EXEMPLES</h2>
+<p>Démarrer une transaction avec le niveau d'isolation SERIALIZABLE :</p>
+<pre><code>BEGIN;
+SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+-- Commandes de transaction ici...
+COMMIT;</code></pre>
+
+<p>Démarrer une transaction en lecture seule :</p>
+<pre><code>BEGIN;
+SET TRANSACTION READ ONLY;
+-- Commandes de transaction ici...
+COMMIT;</code></pre>
+
+<p>Démarrer une transaction différable avec le niveau d'isolation SERIALIZABLE :</p>
+<pre><code>BEGIN;
+SET TRANSACTION ISOLATION LEVEL SERIALIZABLE DEFERRABLE;
+-- Commandes de transaction ici...
+COMMIT;</code></pre>
+
+<h2 id="COMPATIBILITY">COMPATIBILITÉ</h2>
+<p>SET TRANSACTION est une extension PostgreSQL. SQL standard prend en charge SET TRANSACTION ISOLATION LEVEL, mais pas les options READ ONLY/WRITE ou DEFERRABLE.</p>
+
+            </article>
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

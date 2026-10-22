@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>XML::LibXML::InputCallback(3pm) — Pages du manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">XML__LibXML__InputCallback(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/x86_64/perl-xml-libxml/">perl-xml-libxml</a></p>
+<p class="lic">Licences: GPL</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">XML::LibXML::InputCallback(3)</td>
+    <td class="head-vol">Documentation Perl contribuée par l'utilisateur</td>
+    <td class="head-rtitle">XML::LibXML::InputCallback(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">XML::LibXML::InputCallback - Classe XML::LibXML pour les rappels d'entrée</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPIS'><a class='permalink' href='#SYNOPIS'>SYNOPIS</a></h1>
+<pre>use XML::LibXML;</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Vous pourriez obtenir des résultats inattendus si vous essayez de charger des documents externes lors de l'analyse libxml2 si l'emplacement de la ressource n'est pas une URL HTTP, FTP ou un emplacement relatif, mais un chemin absolu par exemple. Pour contourner cette limitation, vous pouvez ajouter votre propre gestionnaire d'entrée pour ouvrir, lire et fermer des types particuliers d'emplacements ou de classes d'URI. En utilisant ces gestionnaires de rappel d'entrée, vous pouvez gérer vos propres schémas d'URI personnalisés par exemple.</p>
+<p class="Pp">Les rappels d'entrée sont utilisés chaque fois que XML::LibXML doit obtenir autre chose que des entités externes analysées à partir de quelque part. Ils sont implémentés à l'aide d'une pile de rappels au niveau Perl, par analogie avec la pile de rappels native de libxml2.</p>
+<p class="Pp">La classe XML::LibXML::InputCallback enregistre de manière transparente les rappels d'entrée pour les processus d'analyse de libxml2.</p>
+<section class="Ss">
+<h2 class="Ss" id='Comment_fonctionne_XML::LibXML::InputCallback_?'><a class='permalink' href='#Comment_fonctionne_XML::LibXML::InputCallback_?'>Comment fonctionne XML::LibXML::InputCallback ?</a></h2>
+<p class="Pp">La bibliothèque libxml2 offre une implémentation de rappel sous forme de fonctions globales uniquement. Pour contourner les problèmes résultant de n'avoir que des rappels globaux - par exemple, si la même pile de rappels globale est manipulée par différentes applications s'exécutant ensemble dans un seul environnement de serveur Web Apache -, XML::LibXML::InputCallback est livré avec une partie orientée objet et une partie orientée fonction.</p>
+<p class="Pp">En utilisant la partie orientée fonction, la pile de rappels globale de libxml2 peut être manipulée. Ces fonctions peuvent être utilisées comme interface pour les rappels au niveau C et XS. Dans la partie orientée objet, les opérations de travail avec la pile de rappels "pseudo-localisée" sont implémentées. Actuellement, vous pouvez enregistrer et désenregistrer des rappels au niveau Perl et les initialiser par analyseur.</p>
+<p class="Pp"><i>Groupes de rappels</i></p>
+<p class="Pp">Les rappels d'entrée libxml2 sont regroupés. Un groupe contient un moteur de recherche d'URI (<i>match</i>), un constructeur de flux de données (<i>open</i>), un lecteur de flux de données (<i>read</i>) et un destructeur de flux de données (<i>close</i>). Les rappels peuvent être manipulés uniquement par groupe.</p>
+<p class="Pp"><i>Le processus d'analyse</i></p>
+<p class="Pp">Le processus d'analyse fonctionne sur un flux de données XML, le long duquel, des liens vers d'autres ressources peuvent être intégrés. Il peut s'agir de liens vers des DTD externes ou des XIncludes par exemple. Ces ressources sont identifiées par des URI. L'implémentation de rappel de libxml2 suppose qu'un groupe de rappels peut gérer une certaine quantité d'URI et un certain schéma d'URI. Par défaut, des gestionnaires de rappels pour <i>file://*</i>, <i>file:://*.gz</i>, <i>http://*</i> et <i>ftp://*</i> sont enregistrés.</p>
+<p class="Pp">Les groupes de rappels dans la pile de rappels sont traités de haut en bas, ce qui signifie que les groupes de rappels enregistrés plus tard seront traités avant ceux enregistrés précédemment.</p>
+<p class="Pp">Lors de l'analyse du flux de données, l'analyseur libxml2 vérifie si un groupe de rappels enregistré gérera une URI - s'il ne le fait pas, l'URI sera interprétée comme <i>file://URI</i>. Pour gérer une URI, le rappel <i>match</i> devra retourner '1'. Si cela se produit, la gestion de l'URI sera transmise à ce groupe de rappels. Ensuite, l'URI sera passée au rappel <i>open</i>, qui devrait retourner une <i>référence</i> au flux de données s'il a réussi à ouvrir le fichier, '0' sinon. Si l'ouverture du flux a réussi, le rappel <i>read</i> sera appelé à plusieurs reprises jusqu'à ce qu'il retourne une chaîne vide. Après le rappel de lecture, le rappel <i>close</i> sera appelé pour fermer le flux.</p>
+<p class="Pp"><i>Organisation des groupes de rappels dans XML::LibXML::InputCallback</i></p>
+<p class="Pp">Les groupes de rappels sont implémentés sous forme de pile (tableau), chaque entrée contient une référence à un tableau de rappels. Pour la bibliothèque libxml2, l'implémentation de rappel XML::LibXML::InputCallback apparaît comme un seul groupe de rappels. Cependant, l'implémentation Perl permet de gérer différentes piles de rappels par analyseur libxml2.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Utilisation_de_XML::LibXML::InputCallback'><a class='permalink' href='#Utilisation_de_XML::LibXML::InputCallback'>Utilisation de XML::LibXML::InputCallback</a></h2>
+<p class="Pp">Après l'instanciation de l'objet à l'aide du constructeur sans paramètre, vous pouvez enregistrer des groupes de rappels.</p>
+<pre>my $input_callbacks = XML::LibXML::InputCallback-&gt;new();
+$input_callbacks-&gt;register_callbacks([ $match_cb1, $open_cb1,
+                                       $read_cb1, $close_cb1 ] );
+$input_callbacks-&gt;register_callbacks([ $match_cb2, $open_cb2,
+                                       $read_cb2, $close_cb2 ] );
+$input_callbacks-&gt;register_callbacks( [ $match_cb3, $open_cb3,
+                                        $read_cb3, $close_cb3 ] );
+$parser-&gt;input_callbacks( $input_callbacks );
+$parser-&gt;parse_file( $some_xml_file );</pre>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Quen_est-il_de_l_ancien_système_de_rappel_avant_XML::LibXML::InputCallback_?'><a class='permalink' href='#Quen_est-il_de_l_ancien_système_de_rappel_avant_XML::LibXML::InputCallback_?'>Qu'en est-il de l'ancien système de rappel avant XML::LibXML::InputCallback ?</a></h2>
+<p class="Pp">Dans les versions de XML::LibXML antérieures à 1.59 - c'est-à-dire sans le module XML::LibXML::InputCallback - vous pouviez définir vos rappels globalement ou localement. Vous pouvez toujours le faire en utilisant XML::LibXML::InputCallback, et en plus de cela, vous pouvez définir les rappels par analyseur !</p>
+<p class="Pp">Si vous utilisez l'ancienne interface de rappel via des rappels globaux, XML::LibXML::InputCallback les traitera avec une priorité inférieure à ceux enregistrés à l'aide de la nouvelle interface. Les rappels globaux ne remplaceront pas les groupes de rappels enregistrés à l'aide de la nouvelle interface. Les rappels locaux sont attachés à une instance d'analyseur spécifique, ils sont donc traités avec la priorité la plus élevée. Si le rappel <i>match</i> du groupe de rappels enregistré en tant que variable locale est identique à l'un des groupes de rappels enregistrés à l'aide de la nouvelle interface, ce groupe de rappels sera remplacé.</p>
+<p class="Pp">Les utilisateurs de l'ancienne implémentation de rappel dont le rappel <i>open</i> retournait une chaîne simple devront adapter leur code pour retourner une référence à cette chaîne après la mise à niveau vers la version &gt;= 1.59. Le nouveau système de rappel ne peut fonctionner qu'avec le rappel <i>open</i> retournant une référence !</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION_DE_L_INTERFACE'><a class='permalink' href='#DESCRIPTION_DE_L_INTERFACE'>DESCRIPTION DE L'INTERFACE</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='Variables_globales'><a class='permalink' href='#Variables_globales'>Variables globales</a></h2>
+<dl class="Bl-tag">
+  <dt>$_CUR_CB</dt>
+  <dd>Stocke le rappel actuel et peut être utilisé comme raccourci pour accéder à la pile de rappels.</dd>
+  <dt>@_GLOBAL_CALLBACKS</dt>
+  <dd>Stocke tous les groupes de rappels pour le processus d'analyse actuel.</dd>
+  <dt>@_CB_STACK</dt>
+  <dd>Stocke le groupe de rappels actuellement utilisé. Utilisé pour éviter les erreurs d'analyse lors du traitement de données XML imbriquées.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Callbacks_globaux'><a class='permalink' href='#Callbacks_globaux'>Callbacks globaux</a></h2>
+<dl class="Bl-tag">
+  <dt>_callback_match</dt>
+  <dd>Implémente l'interface pour le rappel <i>match</i> au niveau C et pour la sélection du groupe de rappels parmi les rappels définis au niveau Perl.</dd>
+  <dt>_callback_open</dt>
+  <dd>Transmet le rappel <i>open</i> de libxml2 à la fonction de rappel correspondante au niveau Perl.</dd>
+  <dt>_callback_read</dt>
+  <dd>Transmet la demande de lecture à la fonction de rappel correspondante au niveau Perl et retourne le résultat à libxml2.</dd>
+  <dt>_callback_close</dt>
+  <dd>Transmet le rappel <i>close</i> de libxml2 à la fonction de rappel correspondante au niveau Perl.</dd>
+</dl>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Méthodes_de_classe'><a class='permalink' href='#Méthodes_de_classe'>Méthodes de classe</a></h2>
+<dl class="Bl-tag">
+  <dt id="new()"><a class="permalink" href="#new()"><b>new()</b></a></dt>
+  <dd>Un constructeur simple.</dd>
+  <dt id="register_callbacks("><a class="permalink" href="#register_callbacks(">register_callbacks(
+    [ $match_cb, $open_cb, $read_cb, $close_cb ])</a></dt>
+  <dd>Les quatre rappels <i>doivent</i> être donnés sous forme de référence de tableau dans l'ordre ci-dessus : <i>match</i>, <i>open</i>, <i>read</i>, <i>close</i> !</dd>
+  <dt id="unregister_callbacks("><a class="permalink" href="#unregister_callbacks(">unregister_callbacks(
+    [ $match_cb, $open_cb, $read_cb, $close_cb ])</a></dt>
+  <dd>Sans arguments, <span class="Li">unregister_callbacks()</span> supprimera le dernier groupe de rappels enregistré de la pile. Si quatre rappels sont passés sous forme de référence de tableau, le groupe de rappels à désenregistrer sera identifié par le rappel <i>match</i> et supprimé de la pile de rappels. Notez que si plusieurs <i>match</i> identiques sont</dd>
+</dl>
+</section>
+</section>
+</div>
+</section>
+
+            </article>
+        </main>
+    </body>
+</html>
+défini dans des groupes de rappels différents, TOUS seront supprimés de la
+      pile.</dd>
+  <dt id="init_callbacks("><a class="permalink" href="#init_callbacks(">init_callbacks(
+    $parser )</a></dt>
+  <dd>Initialise le système de rappels pour l'analyseur fourni avant de démarrer un
+      processus d'analyse.</dd>
+  <dt id="cleanup_callbacks()"><a class="permalink" href="#cleanup_callbacks()"><b>cleanup_callbacks()</b></a></dt>
+  <dd>Réinitialise les variables globales et la pile de rappels libxml2.</dd>
+  <dt id="lib_init_callbacks()"><a class="permalink" href="#lib_init_callbacks()"><b>lib_init_callbacks()</b></a></dt>
+  <dd>Utilisé en interne pour l'enregistrement des rappels au niveau C.</dd>
+  <dt id="lib_cleanup_callbacks()"><a class="permalink" href="#lib_cleanup_callbacks()"><b>lib_cleanup_callbacks()</b></a></dt>
+  <dd>Utilisé en interne pour la réinitialisation des rappels au niveau C.</dd>
+</dl>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='EXEMPLE_DE_RAPPELS'><a class='permalink' href='#EXEMPLE_DE_RAPPELS'>EXEMPLE   DE RAPPELS</a></h1>
+<p class="Pp">L'exemple suivant est un exemple purement fictif qui utilise un objet
+    MyScheme::Handler qui répond à des méthodes similaires à un objet
+    IO::Handle.</p>
+<pre># Définir les quatre fonctions de rappel
+sub match_uri {
+    my $uri = shift;
+    return $uri =~ /^myscheme:/; # déclencher notre groupe de rappels pour les URI 'myscheme'
+}
+sub open_uri {
+    my $uri = shift;
+    my $handler = MyScheme::Handler-&gt;new($uri);
+    return $handler;
+}
+# Le $buffer retourné sera analysé par l'analyseur libxml2
+sub read_uri {
+    my $handler = shift;
+    my $length = shift;
+    my $buffer;
+    read($handler, $buffer, $length);
+    return $buffer; # $buffer sera une chaîne vide '' si read() est terminé
+}
+# Fermer le handle associé à la ressource.
+sub close_uri {
+    my $handler = shift;
+    close($handler);
+}
+# Les enregistrer avec une instance de XML::LibXML::InputCallback
+my $input_callbacks = XML::LibXML::InputCallback-&gt;new();
+$input_callbacks-&gt;register_callbacks([ \&amp;match_uri, \&amp;open_uri,
+                                       \&amp;read_uri, \&amp;close_uri ] );
+# Enregistrer le groupe de rappels auprès d'une instance de l'analyseur
+$parser-&gt;input_callbacks( $input_callbacks );
+# $some_xml_file sera analysé en utilisant nos rappels
+$parser-&gt;parse_file( $some_xml_file );</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='AUTEURS'><a class='permalink' href='#AUTEURS'>AUTEURS</a></h1>
+<p class="Pp">Matt Sergeant, Christian Glahn, Petr Pajas</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VERSION'><a class='permalink' href='#VERSION'>VERSION</a></h1>
+<p class="Pp">2.0210</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT'><a class='permalink' href='#COPYRIGHT'>COPYRIGHT</a></h1>
+<p class="Pp">2001-2007, AxKit.com Ltd.</p>
+<p class="Pp">2002-2006, Christian Glahn.</p>
+<p class="Pp">2006-2009, Petr Pajas.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='LICENCE'><a class='permalink' href='#LICENCE'>LICENCE</a></h1>
+<p class="Pp">Ce programme est un logiciel libre ; vous pouvez le redistribuer et/ou
+    le modifier selon les mêmes termes que Perl lui-même.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page de manuel" name="q" value=""
+         />
+    <input type="submit" name="go" value="Aller" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/x86_64/perl-xml-libxml/">extra/perl-xml-libxml</a></dd>
+        <dt>Version :</dt>
+        <dd>2.0210-4</dd>
+        <dt>Amont :</dt>
+        <dd><a href="https://search.cpan.org/dist/XML-LibXML">https://search.cpan.org/dist/XML-LibXML</a></dd>
+        <dt>Licences :</dt>
+        <dd>GPL</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-xml-libxml/">/listing/extra/perl-xml-libxml/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#SYNTAXE">SYNTAXE</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#DESCRIPTION_DE_L_INTERFACE">DESCRIPTION DE L'INTERFACE</a></li>
+        
+            <li><a href="#EXEMPLE_DE_RAPPELS">EXEMPLE DE RAPPELS</a></li>
+        
+            <li><a href="#AUTEURS">AUTEURS</a></li>
+        
+            <li><a href="#VERSION">VERSION</a></li>
+        
+            <li><a href="#COPYRIGHT">COPYRIGHT</a></li>
+        
+            <li><a href="#LICENCE">LICENCE</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/XML::LibXML::InputCallback.3pm.fr.txt">txt</a>, 
+        
+            <a href="/man/XML::LibXML::InputCallback.3pm.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>SSL_shutdown(3ssl) — Pages du manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">SSL_shutdown(3ssl)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/core/x86_64/openssl/">openssl</a></p>
+<p class="lic">Licences: Apache-2.0</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">SSL_SHUTDOWN(3ssl)</td>
+    <td class="head-vol">OpenSSL</td>
+    <td class="head-rtitle">SSL_SHUTDOWN(3ssl)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">SSL_shutdown, SSL_shutdown_ex - fermer une connexion TLS/SSL ou QUIC</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNTAXE'><a class='permalink' href='#SYNTAXE'>SYNTAXE</a></h1>
+<pre>#include &lt;openssl/ssl.h&gt;
+int SSL_shutdown(SSL *ssl);
+typedef struct ssl_shutdown_ex_args_st {
+    uint64_t    quic_error_code;
+    const char  *quic_reason;
+} SSL_SHUTDOWN_EX_ARGS;
+__owur int SSL_shutdown_ex(SSL *ssl, uint64_t flags,
+                           const SSL_SHUTDOWN_EX_ARGS *args,
+                           size_t args_len);</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp"><b>SSL_shutdown()</b> ferme une connexion active représentée par un objet SSL. <i>ssl</i> <b>NE DOIT PAS</b> être NULL.</p>
+<p class="Pp"><b>SSL_shutdown_ex()</b> est une version étendue de
+    <b>SSL_shutdown()</b>. Si non NULL, <i>args</i> doit pointer vers une structure
+    <b>SSL_SHUTDOWN_EX_ARGS</b> et <i>args_len</i> doit être défini sur
+    <span class="Li">sizeof(SSL_SHUTDOWN_EX_ARGS)</span>. La structure
+    <b>SSL_SHUTDOWN_EX_ARGS</b> doit être initialisée à zéro. Si <i>args</i> est
+    NULL, le comportement est le même qu'en passant une structure
+    <b>SSL_SHUTDOWN_EX_ARGS</b> initialisée à zéro. Actuellement, tous les arguments
+    étendus concernent l'utilisation avec QUIC, donc cet appel fonctionne de manière
+    identique à <b>SSL_shutdown()</b> lorsqu'il n'est pas utilisé avec QUIC.</p>
+<p class="Pp">Alors que le fonctionnement général de <b>SSL_shutdown()</b> est commun
+    entre les protocoles, la nature exacte de la fermeture dépend du protocole
+    sous-jacent utilisé. Voir la section ci-dessous concernant chaque protocole pour
+    plus d'informations.</p>
+<p class="Pp">En général, appeler <b>SSL_shutdown()</b> en mode non bloquant
+    initiera le processus de fermeture et retournera 0 pour indiquer que le
+    processus de fermeture n'est pas encore terminé. Une fois que le processus de
+    fermeture est terminé, les appels ultérieurs à <b>SSL_shutdown()</b> retourneront 1.
+    Voir la section VALEURS DE RETOUR pour plus d'informations.</p>
+<p class="Pp"><b>SSL_shutdown()</b> ne doit pas être appelé si une erreur fatale
+    précédente s'est produite sur une connexion ; c'est-à-dire si <a href='/man/SSL_get_error.3.en'>SSL_get_error(3)</a>
+    a retourné <b>SSL_ERROR_SYSCALL</b> ou <b>SSL_ERROR_SSL</b>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CONSIDÉRATIONS_SPÉCIFIQUES_TLS_ET_DTLS'><a class='permalink' href='#CONSIDÉRATIONS_SPÉCIFIQUES_TLS_ET_DTLS'>CONSIDÉRATIONS SPÉCIFIQUES TLS ET DTLS</a></h1>
+<p class="Pp">La fermeture pour SSL/TLS et DTLS est implémentée à l'aide du message
+    d'alerte de fermeture <code class="Nm">close_notify</code> SSL/TLS/DTLS. Le processus de fermeture
+    pour SSL/TLS et DTLS se compose de deux étapes :</p>
+<ul class="Bl-bullet">
+  <li>Un message d'alerte de fermeture <code class="Nm">close_notify</code> est envoyé au pair.</li>
+  <li>Un message d'alerte de fermeture <code class="Nm">close_notify</code> est reçu du pair.</li>
+</ul>
+<p class="Pp">Ces étapes peuvent se produire dans l'un ou l'autre ordre, selon que
+    le processus de fermeture de la connexion a été initié en premier par
+    l'application locale ou par le pair.</p>
+<section class="Ss">
+<h2 class="Ss" id='Fermeture_initiée_localement'><a class='permalink' href='#Fermeture_initiée_localement'>Fermeture initiée localement</a></h2>
+<p class="Pp">Appeler <b>SSL_shutdown()</b> sur un objet SSL SSL/TLS ou DTLS initie le
+    processus de fermeture et amène OpenSSL à tenter d'envoyer une alerte de fermeture
+    <code class="Nm">close_notify</code> au pair. Le processus de fermeture sera alors considéré
+    comme terminé une fois que le pair aura répondu en retour avec un message d'alerte de
+    fermeture <code class="Nm">close_notify</code>.</p>
+<p class="Pp">Appeler <b>SSL_shutdown()</b> ferme uniquement la direction d'écriture
+    de la connexion ; la direction de lecture est fermée par le pair. Une fois que
+    <b>SSL_shutdown()</b> est appelé, <a href='/man/SSL_write.3.en'>SSL_write(3)</a> ne peut plus être
+    utilisé, mais <a href='/man/SSL_read.3.en'>SSL_read(3)</a> peut toujours être utilisé jusqu'à ce que le
+    pair décide de fermer la connexion en retour. Le pair peut continuer à envoyer
+    des données pendant un certain temps avant de gérer l'indication de fermeture de
+    l'application locale.</p>
+<p class="Pp"><b>SSL_shutdown()</b> n'affecte pas une connexion réseau sous-jacente
+    telle qu'une connexion TCP, qui reste ouverte.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Fermeture_initiée_à_distance'><a class='permalink' href='#Fermeture_initiée_à_distance'>Fermeture initiée à distance</a></h2>
+<p class="Pp">Si le pair a été le premier à initier le processus de fermeture en
+    envoyant un message d'alerte <code class="Nm">close_notify</code>, une application en sera
+    notifiée comme d'une condition d'EOF lors de l'appel à <a href='/man/SSL_read.3.en'>SSL_read(3)</a> (c'est-à-dire
+    <a href='/man/SSL_read.3.en'>SSL_read(3)</a> échouera et <a href='/man/SSL_get_error.3.en'>SSL_get_error(3)</a> retournera
+    <b>SSL_ERROR_ZERO_RETURN</b>), après que toutes les données d'application envoyées par le pair
+    avant l'initiation de la fermeture aient été lues. Une application doit gérer
+    cette condition en appelant <b>SSL_shutdown()</b> pour répondre avec un
+    alerte <code class="Nm">close_notify</code> en retour, complétant ainsi le processus de fermeture,
+    bien qu'elle puisse choisir d'écrire des données d'application supplémentaires à l'aide
+    de <a href='/man/SSL_write.3.en'>SSL_write(3)</a> avant de le faire. Si une application n'appelle pas
+    <b>SSL_shutdown()</b> dans ce cas, une alerte <code class="Nm">close_notify</code> ne sera pas envoyée et
+    le comportement ne sera pas entièrement conforme aux normes.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Cycle_de_vie_de_la_fermeture'><a class='permalink' href='#Cycle_de_vie_de_la_fermeture'>Cycle de vie de la fermeture</a></h2>
+<p class="Pp">Indépendamment du fait qu'une fermeture ait été initiée localement ou
+    par le pair, si le BIO sous-jacent est bloquant, un appel à <b>SSL_shutdown()</b>
+    ne retournera d'abord qu'une fois qu'un message d'alerte <code class="Nm">close_notify</code>
+    sera écrit au pair (en retournant 0), et lors d'un deuxième appel et appels
+    subséquents, une fois qu'un message correspondant sera reçu du pair (en retournant 1
+    et en complétant le processus de fermeture). Les appels à <b>SSL_shutdown()</b> avec un
+    BIO sous-jacent bloquant retourneront également si une erreur se produit.</p>
+<p class="Pp">Si le BIO sous-jacent est non bloquant et que le processus de fermeture
+    n'est pas encore terminé (par exemple, parce qu'un message d'alerte
+    <code class="Nm">close_notify</code> n'a pas encore été reçu du pair, ou parce qu'un message d'alerte
+    <code class="Nm">close_notify</code> doit être envoyé mais bloquerait actuellement),
+    <b>SSL_shutdown()</b> retourne 0 pour indiquer que le processus de fermeture est toujours
+    en cours ; dans ce cas, un appel à <a href='/man/SSL_get_error.3.en'>SSL_get_error(3)</a> donnera
+    <b>SSL_ERROR_WANT_READ</b> ou <b>SSL_ERROR_WANT_WRITE</b>.</p>
+<p class="Pp">Une application peut alors détecter l'achèvement du processus de
+    fermeture en appelant à nouveau <b>SSL_shutdown()</b> de manière répétée jusqu'à ce qu'il
+    retourne 1, indiquant que le processus de fermeture est terminé (une alerte
+    <code class="Nm">close_notify</code> ayant été envoyée et reçue).</p>
+<p class="Pp">Cependant, la méthode préférée pour attendre l'achèvement de la fermeture
+    est d'utiliser <a href='/man/SSL_read.3.en'>SSL_read(3)</a> jusqu'à ce que <a href='/man/SSL_get_error.3.en'>SSL_get_error(3)</a>
+    indique EOF en retournant <b>SSL_ERROR_ZERO_RETURN</b>. Cela garantit que toutes les données
+    reçues immédiatement avant le <code class="Nm">close_notify</code> du pair sont toujours fournies à
+    l'application. Cela garantit également que tous les messages finaux de la couche de
+    handshake reçus sont traités (par exemple, les messages émettant de nouveaux tickets de
+    session).</p>
+<p class="Pp">Si cette approche n'est pas utilisée, le deuxième appel à
+    <b>SSL_shutdown()</b> (pour compléter la fermeture en confirmant la réception du message
+    <code class="Nm">close_notify</code> du pair) échouera s'il est appelé alors que l'application
+    n'a pas lu toutes les données d'application en attente envoyées par le pair à l'aide de
+    <a href='/man/SSL_read.3.en'>SSL_read(3)</a>.</p>
+<p class="Pp">Lors de l'appel à <b>SSL_shutdown()</b>, le drapeau <b>SSL_SENT_SHUTDOWN</b>
+    est défini une fois qu'une tentative d'envoi d'une alerte <code class="Nm">close_notify</code> est
+    effectuée, que la tentative ait réussi ou non. Le drapeau <b>SSL_RECEIVED_SHUTDOWN</b>
+    est défini une fois qu'une alerte <code class="Nm">close_notify</code> est reçue, ce qui peut se
+    produire lors de tout appel qui traite les données entrantes du réseau, tel que
+    <a href='/man/SSL_read.3.en'>SSL_read(3)</a> ou <b>SSL_shutdown()</b>. Ces drapeaux peuvent être vérifiés à
+    l'aide de <a href='/man/SSL_get_shutdown.3.en'>SSL_get_shutdown(3)</a>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Fermeture_rapide'><a class='permalink' href='#Fermeture_rapide'>Fermeture rapide</a></h2>
+<p class="Pp">Alternativement, il est acceptable qu'une application appelle
+    <b>SSL_shutdown()</b> une seule fois (de manière à ce qu'elle retourne 0) puis ferme la
+    connexion sous-jacente sans attendre la réponse du pair. Cela permet un processus
+    de fermeture plus rapide si l'application ne souhaite pas attendre le pair.</p>
+<p class="Pp">Cette approche alternative de "fermeture rapide" ne doit être utilisée que
+    s'il est connu que le pair n'enverra plus de données, sinon il y a un risque
+    qu'une application s'expose à une attaque par troncature. Le processus complet de
+    <b>SSL_shutdown()</b>, dans lequel les deux parties envoient des alertes
+    <code class="Nm">close_notify</code> et <b>SSL_shutdown()</b> retourne 1, fournit une indication cryptographiquement
+    authentifiée de la fin d'une connexion.</p>
+<p class="Pp">Cette approche d'un seul appel à <b>SSL_shutdown()</b> sans attendre
+    est préférable à un simple appel à <a href='/man/SSL_free.3.en'>SSL_free(3)</a> ou <a href='/man/SSL_clear.3.en'>SSL_clear(3)</a>,
+    car appeler <b>SSL_shutdown()</b> au préalable rend une session SSL éligible à une
+    réutilisation ultérieure et notifie le pair de la fermeture de la connexion.</p>
+<p class="Pp">L'approche de fermeture rapide ne peut être utilisée s'il n'y a aucune
+    intention de réutiliser la connexion sous-jacente (par exemple, une connexion TCP)
+    pour une communication ultérieure ; dans ce cas,</p>
+</section>
+</section>
+</div>
+</section>
+            </article>
+            
+        </main>
+        <footer>
+        </footer>
+    </body>
+</html>
+<section class="Ss">
+<h2 class="Ss" id='Full_Shutdown_Process'><a class='permalink' href='#Full_Shutdown_Process'>Processus de fermeture complet</a></h2>
+<p class="Pp">Le processus de fermeture complet doit être effectué pour assurer la synchronisation.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Effects_on_Session_Reuse'><a class='permalink' href='#Effects_on_Session_Reuse'>Effets sur la réutilisation de session</a></h2>
+<p class="Pp">L'appel de <b>SSL_shutdown()</b> définit l'indicateur <b>SSL_SENT_SHUTDOWN</b> (voir <a href='/man/SSL_set_shutdown.3.en'>SSL_set_shutdown(3)</a>), que la transmission de l'alerte <b>close_notify</b> ait réussi ou non. Cela rend la session SSL prête pour la réutilisation ; la session SSL est considérée comme correctement fermée et peut être utilisée pour des connexions futures.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Quiet_Shutdown'><a class='permalink' href='#Quiet_Shutdown'>Fermeture silencieuse</a></h2>
+<p class="Pp"><b>SSL_shutdown()</b> peut être modifié pour mettre la connexion en état de "fermeture" sans envoyer réellement le message d'alerte <b>close_notify</b> ; voir <a href='/man/SSL_CTX_set_quiet_shutdown.3.en'>SSL_CTX_set_quiet_shutdown(3)</a>. Lorsque la fermeture silencieuse est activée, <b>SSL_shutdown()</b> retourne toujours 1 immédiatement.</p>
+<p class="Pp">Ce comportement n'est pas conforme à la norme. Il ne doit être utilisé que lorsque le protocole applicatif utilisé permet à la partie opposée de s'assurer que toutes les données ont été reçues, de sorte qu'elle n'a pas besoin d'attendre un message d'alerte <b>close_notify</b>, faute de quoi les données applicatives pourraient être tronquées de manière inattendue.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Non-Compliant_Peers'><a class='permalink' href='#Non-Compliant_Peers'>Pairs non conformes</a></h2>
+<p class="Pp">Il existe des implémentations SSL/TLS qui n'envoient jamais le message d'alerte <b>close_notify</b> requis, mais ferment simplement la connexion sous-jacente (par exemple, une connexion TCP). Cela se traduit généralement par une erreur.</p>
+<p class="Pp">Si la compatibilité avec de tels pairs est souhaitée, l'option <b>SSL_OP_IGNORE_UNEXPECTED_EOF</b> peut être définie. Pour plus d'informations, voir <a href='/man/SSL_CTX_set_options.3.en'>SSL_CTX_set_options(3)</a>.</p>
+<p class="Pp">Remarque : l'utilisation de cette option implique que l'état de fermeture des données applicatives ne bénéficie pas d'une protection cryptographique, ce qui rend une application potentiellement vulnérable aux attaques par troncature. Par conséquent, cette option ne doit être utilisée qu'en combinaison avec un protocole applicatif indiquant clairement quand toutes les données ont été reçues.</p>
+<p class="Pp">Une alternative consiste à éviter d'appeler <a href='/man/SSL_read.3.en'>SSL_read(3)</a> s'il est connu qu'aucune autre donnée ne sera envoyée. Cela nécessite que le protocole applicatif indique clairement quand toutes les données ont été envoyées.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Session_Ticket_Handling'><a class='permalink' href='#Session_Ticket_Handling'>Gestion des tickets de session</a></h2>
+<p class="Pp">Si une application écrit uniquement sur une connexion SSL/TLS ou DTLS et ne lit jamais, OpenSSL ne traitera pas les tickets de session envoyés par la partie opposée. En effet, OpenSSL traite les messages de handshake reçus d'un côté lors des appels à <a href='/man/SSL_read.3.en'>SSL_read(3)</a> par l'application.</p>
+<p class="Pp">Par conséquent, les applications qui écrivent mais ne lisent pas et souhaitent bénéficier de la réutilisation de session doivent effectuer une fermeture complète en appelant <b>SSL_shutdown()</b> jusqu'à ce qu'il retourne 1, comme décrit. Cela garantira qu'OpenSSL aura la possibilité de recevoir et de traiter les tickets de session SSL/TLS.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='QUIC-SPECIFIC_SHUTDOWN_CONSIDERATIONS'><a class='permalink' href='#QUIC-SPECIFIC_SHUTDOWN_CONSIDERATIONS'>Considérations spécifiques à QUIC lors de la fermeture</a></h1>
+<p class="Pp">Lorsqu'un objet de connexion SSL/QUIC est utilisé, <b>SSL_shutdown()</b> déclenche une fermeture immédiate de QUIC en utilisant les trames <b>CONNECTION_CLOSE</b> de QUIC.</p>
+<p class="Pp">Il n'est pas possible d'utiliser <b>SSL_shutdown()</b> sur des objets de connexion SSL de flux QUIC. Pour conclure un flux normalement, voir <a href='/man/SSL_stream_conclude.3.en'>SSL_stream_conclude(3)</a> ; pour effectuer une fermeture de flux non normale, voir <a href='/man/SSL_stream_reset.3.en'>SSL_stream_reset(3)</a>.</p>
+<p class="Pp"><b>SSL_shutdown_ex()</b> peut être utilisé à la place de <b>SSL_shutdown()</b> par une application pour fournir des informations supplémentaires à la partie opposée sur la raison pour laquelle la connexion est fermée. Les informations qui peuvent être fournies sont les suivantes :</p>
+<dl class="Bl-tag">
+  <dt id="quic_error_code"><a class="permalink" href="#quic_error_code"><i>quic_error_code</i></a></dt>
+  <dd>Un code d'erreur applicatif optionnel de 62 bits à signaler à la partie opposée. La valeur doit être dans la plage [0, 2^62 - 1], sinon l'appel à <b>SSL_shutdown_ex()</b> échoue. Si non fournie, le code 0 est utilisé par défaut.</dd>
+  <dt id="quic_reason"><a class="permalink" href="#quic_reason"><i>quic_reason</i></a></dt>
+  <dd>Une chaîne de raison de fin optionnelle (UTF-8) à signaler à la partie opposée. L'application doit fournir une chaîne UTF-8 valide et OpenSSL ne validera pas la chaîne. Si non fournie, ou si <b>SSL_shutdown()</b> est utilisé, une chaîne de longueur 0 est utilisée. Si fournie, la chaîne est copiée et stockée dans l'objet de connexion SSL/QUIC et ne doit pas être conservée après le retour de l'appel à <b>SSL_shutdown_ex()</b>. Les chaînes de raison sont limitées par la taille du chemin MTU et peuvent être silencieusement tronquées si elles sont trop longues pour tenir dans un paquet QUIC.</dd>
+</dl>
+<p class="Pp">Les arguments de <b>SSL_shutdown_ex()</b> ne sont utilisés que lors du premier appel à <b>SSL_shutdown_ex()</b> (ou <b>SSL_shutdown()</b>) pour un objet de connexion SSL/QUIC. Ces arguments sont ignorés lors des appels ultérieurs.</p>
+<p class="Pp">Ces fonctions n'affectent pas un BIO sous-jacent ni les ressources qu'il représente ; par exemple, un datagramme UDP fourni à une connexion QUIC en tant que BIO réseau restera ouvert.</p>
+<p class="Pp">Remarque : lors de l'utilisation de QUIC, une application doit appeler <b>SSL_shutdown()</b> pour s'assurer que toutes les données transmises ont été reçues par la partie opposée. Ceci est différent d'une connexion TLS/TCP, où la transmission sécurisée des données mises en tampon est la responsabilité du système d'exploitation. Si une application appelle <b>SSL_free()</b> sur un objet de connexion SSL/QUIC ou se termine avant d'avoir terminé le processus de fermeture à l'aide de <b>SSL_shutdown()</b>, les données écrites par l'application à l'aide de <b>SSL_write()</b> mais non encore transmises, ou qui ont été envoyées mais perdues sur le réseau, ne seront pas reçues par la partie opposée.</p>
+<p class="Pp">Lors de l'utilisation de QUIC, l'appel de <b>SSL_shutdown()</b> permet le traitement des événements réseau internes. Il est important que ce traitement soit effectué régulièrement, soit pendant l'utilisation de la connexion, soit pendant la fermeture. Si une application n'utilise pas le mode asynchrone, une application qui effectue la fermeture doit s'assurer que <b>SSL_shutdown()</b> est appelé régulièrement, ou alternativement s'assurer que <b>SSL_handle_events()</b> est appelé régulièrement. Pour plus d'informations, voir <a href='/man/openssl-quic.7.en'>openssl-quic(7)</a> et <a href='/man/SSL_handle_events.3.en'>SSL_handle_events(3)</a>.</p>
+<section class="Ss">
+<h2 class="Ss" id='Application_Data_Drainage_Behaviour'><a class='permalink' href='#Application_Data_Drainage_Behaviour'>Comportement de vidange des données applicatives</a></h2>
+<p class="Pp">Lors de l'utilisation de QUIC, <b>SSL_shutdown()</b> ou <b>SSL_shutdown_ex()</b> attend généralement jusqu'à ce que les données écrites par l'application sur un flux aient été confirmées par la partie opposée. En d'autres termes, le processus de fermeture attend jusqu'à ce que les données écrites par l'application aient été envoyées à la partie opposée, et jusqu'à ce que la réception de ces données ait été confirmée par la partie opposée. Ce n'est qu'après l'achèvement de ce processus que la fermeture est considérée comme complète.</p>
+<p class="Pp">Une exception à cette règle concerne les flux qui se sont terminés dans un mode non normal, par exemple, en raison d'une réinitialisation de flux ; seuls les flux qui n'ont pas été terminés lors de l'appel de <b>SSL_shutdown()</b>, ou qui se sont terminés dans un mode normal, ont leurs tampons d'envoi en attente vidés dans ce sens.</p>
+<p class="Pp">Le comportement de vidange des flux pendant le processus de fermeture peut être contourné en définissant l'indicateur <b>SSL_SHUTDOWN_FLAG_NO_STREAM_FLUSH</b> dans un appel à <b>SSL_shutdown_ex()</b>. Dans ce cas, les données qui sont encore dans les tampons d'envoi de flux ne seront pas transmises à la partie opposée. Cet indicateur peut être utilisé lorsqu'une condition anormale s'est produite et que la livraison des données écrites dans les flux via <a href='/man/SSL_write.3.en'>SSL_write(3)</a> n'est plus pertinente.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Shutdown_Mode'><a class='permalink' href='#Shutdown_Mode'>Mode de fermeture</a></h2>
+<p class="Pp">Les aspects de la manière dont QUIC gère la fermeture de la connexion doivent être pris en compte par les applications. Normalement, QUIC s'attend à ce que la connexion soit maintenue pendant une période significative après avoir été nominalement fermée. Ceci est nécessaire pour garantir que toute notification de fermeture envoyée à la partie opposée ait été correctement reçue. Cependant, une conséquence de ceci est qu'une fermeture conforme à la RFC peut prendre de l'ordre de quelques secondes. Cela pourrait ne pas convenir à certaines applications, telles que des processus courts qui doivent se terminer immédiatement après avoir effectué une transaction de niveau applicatif.</p>
+<p class="Pp">Par conséquent, deux modes de fermeture sont disponibles pour les utilisateurs d'objets de connexion SSL/QUIC :</p>
+<dl class="Bl-tag">
+  <dt id="RFC"><a class="permalink" href="#RFC">Mode de fermeture conforme à la RFC</a></dt>
+  <dd>C'est le comportement par défaut. Le processus de fermeture peut prendre jusqu'à trois fois le RTT actuel estimé vers la partie opposée. Il est possible que le processus de fermeture se termine plus rapidement dans certains cas, mais cela ne peut pas être garanti.</dd>
+  <dt id="Rapid"><a class="permalink" href="#Rapid">Mode de fermeture rapide</a></dt>
+  <dd>Dans ce mode, la partie opposée est informée de la fermeture de la connexion approximativement en envoyant un seul paquet QUIC. Si ce paquet QUIC est perdu, la partie opposée ne sait pas que la connexion est terminée tant que le délai d'inactivité négocié (s'il existe) n'a pas expiré. Cela retourne généralement 0 en cas de succès, indiquant que la connexion n'est pas encore complètement fermée (sauf si elle l'est déjà, auquel cas il retourne 1).</dd>
+</dl>
+<p class="Pp">Si le paramètre <i>flags</i> inclut <b>SSL_SHUTDOWN_FLAG_RAPID</b>, une fermeture rapide est effectuée, sinon une fermeture conforme à la RFC est effectuée.</p>
+<p class="Pp">Si une application appelle <b>SSL_shutdown_ex()</b> avec <b>SSL_SHUTDOWN_FLAG_RAPID</b>, une application peut ultérieurement changer sa décision d'effectuer une fermeture rapide en appelant <b>SSL_shutdown_ex()</b> sans l'indicateur défini.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Peer-Initiated_Shutdown'><a class='permalink' href='#Peer-Initiated_Shutdown'>Fermeture initiée par le pair</a></h2>
+<p class="Pp">Dans certains cas, une application peut choisir de ne pas attendre une fermeture initiée par le pair au lieu d'une déclenchée localement. Pour ce faire, on peut appeler <b>SSL_shutdown_ex()</b> avec <i>SSL_SHUTDOWN_FLAG_</i>...</p>
+</section>
+</section><em>AG_WAIT_PEER</em> spécifié
+    dans <i>flags</i>. En mode bloquant, cela attend que le pair initie une
+    fermeture ou que la connexion soit autrement terminée pour une autre raison.
+    En mode non bloquant, il se termine immédiatement avec succès ou échec en fonction
+    de si une fermeture s'est produite.</p>
+<p class="Pp">Si une fermeture initiée localement a déjà été déclenchée ou si la
+    connexion a commencé à se terminer pour une autre raison, ce drapeau n'a aucun effet.</p>
+<p class="Pp"><b>SSL_SHUTDOWN_FLAG_WAIT_PEER</b> implique
+    <b>SSL_SHUTDOWN_FLAG_NO_STREAM_FLUSH</b>, car les données de flux ne peuvent pas être vidées
+    après que le pair a fermé la connexion. Les données de flux peuvent toujours être envoyées au
+    pair à tout moment passé à attendre avant que le pair ne ferme la connexion, bien qu'il n'y ait
+    aucune garantie à ce sujet.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Mode_Non-bloquant'><a class='permalink' href='#Mode_Non-bloquant'>Mode   Non-bloquant</a></h2>
+<p class="Pp"><b>SSL_shutdown()</b> et <b>SSL_shutdown_ex()</b> bloquent si la
+    connexion est configurée en mode bloquant. Cela peut être remplacé en spécifiant
+    <b>SSL_SHUTDOWN_FLAG_NO_BLOCK</b> dans <i>flags</i> lors de l'appel à
+    <b>SSL_shutdown_ex()</b>, ce qui fait que l'appel fonctionne comme en mode
+    non bloquant.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VALEURS_DE_RETOUR'><a class='permalink' href='#VALEURS_DE_RETOUR'>VALEURS   DE RETOUR</a></h1>
+<p class="Pp">Pour <b>SSL_shutdown()</b> et <b>SSL_shutdown_ex()</b>, les
+    valeurs de retour suivantes peuvent se produire :</p>
+<dl class="Bl-tag">
+  <dt>0</dt>
+  <dd>Le processus de fermeture est en cours et n'est pas encore terminé.
+    <p class="Pp">Pour TLS et DTLS, cela signifie qu'une alerte close_notify a
+        été envoyée mais que le pair n'a pas encore répondu en retour avec sa propre
+        alerte close_notify.</p>
+    <p class="Pp">Pour les objets SSL de connexion QUIC, une trame CONNECTION_CLOSE peut
+        avoir été envoyée mais le processus de fermeture de connexion n'est pas encore
+      terminé.</p>
+    <p class="Pp">Contrairement à la plupart des autres fonctions, retourner 0 n'indique pas une
+        erreur. <a href='/man/SSL_get_error.3.en'>SSL_get_error(3)</a> ne doit pas être appelé ; il peut indiquer trompeusement une erreur même si aucune erreur ne s'est produite.</p>
+  </dd>
+  <dt>1</dt>
+  <dd>La fermeture s'est terminée avec succès.
+    <p class="Pp">Pour TLS et DTLS, cela signifie qu'une alerte close_notify a
+        été envoyée et que l'alerte close_notify du pair a été reçue.</p>
+    <p class="Pp">Pour les objets SSL de connexion QUIC, cela signifie que le
+        processus de fermeture de la connexion est terminé.</p>
+  </dd>
+  <dt>&lt;0</dt>
+  <dd>La fermeture n'a pas réussi. Appelez <a href='/man/SSL_get_error.3.en'>SSL_get_error(3)</a> avec la
+      valeur de retour <b>ret</b> pour connaître la raison. Cela peut se produire si une action
+      est nécessaire pour continuer l'opération pour les BIOs non bloquants.
+    <p class="Pp">Cela peut également se produire lorsque toutes les données n'ont pas été lues à l'aide de
+        <b>SSL_read()</b>, ou si l'appel est effectué sur un objet SSL de flux QUIC.</p>
+    <p class="Pp">Cette valeur est également renvoyée lorsqu'elle est appelée sur des objets SSL de flux QUIC.</p>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR   AUSSI</a></h1>
+<p class="Pp"><a href='/man/SSL_get_error.3.en'>SSL_get_error(3)</a>, <a href='/man/SSL_connect.3.en'>SSL_connect(3)</a>,
+    <a href='/man/SSL_accept.3.en'>SSL_accept(3)</a>, <a href='/man/SSL_set_shutdown.3.en'>SSL_set_shutdown(3)</a>,
+    <a href='/man/SSL_CTX_set_quiet_shutdown.3.en'>SSL_CTX_set_quiet_shutdown(3)</a>, <a href='/man/SSL_CTX_set_options.3.en'>SSL_CTX_set_options(3)</a>
+    <a href='/man/SSL_clear.3.en'>SSL_clear(3)</a>, <a href='/man/SSL_free.3.en'>SSL_free(3)</a>, <a href='/man/ssl.7.en'>ssl(7)</a>, <a href='/man/bio.7.en'>bio(7)</a></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='HISTORIQUE'><a class='permalink' href='#HISTORIQUE'>HISTORIQUE</a></h1>
+<p class="Pp">La fonction <b>SSL_shutdown_ex()</b> a été ajoutée dans OpenSSL
+  3.2.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT'><a class='permalink' href='#COPYRIGHT'>COPYRIGHT</a></h1>
+<p class="Pp">Copyright 2000-2023 The OpenSSL Project Authors. All Rights
+    Reserved.</p>
+<p class="Pp">Licencié sous la licence Apache 2.0 (la &quot;Licence&quot;).
+    Vous ne pouvez pas utiliser ce fichier sauf en conformité avec la Licence. Vous pouvez
+    obtenir une copie dans le fichier LICENSE de la distribution source ou à l'adresse
+    <a href='https://www.openssl.org/source/license.html'>https://www.openssl.org/source/license.html</a>.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-10-01</td>
+    <td class="foot-os">3.6.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page man" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/core/x86_64/openssl/">core/openssl</a></dd>
+        <dt>Version :</dt>
+        <dd>3.6.0-1</dd>
+        <dt>En amont :</dt>
+        <dd><a href="https://www.openssl.org">https://www.openssl.org</a></dd>
+        <dt>Licences :</dt>
+        <dd>Apache-2.0</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/core/openssl/">/listing/core/openssl/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#SYNTAXE">SYNTAXE</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#CONSIDÉRATIONS_SPÉCIFIQUES_TLS_ET_DTLS">CONSIDÉRATIONS SPÉCIFIQUES TLS ET DTLS</a></li>
+        
+            <li><a href="#CONSIDÉRATIONS_DE_FERMETURE_SPÉCIFIQUES_À_QUIC">CONSIDÉRATIONS DE FERMETURE SPÉCIFIQUES À QUIC</a></li>
+        
+            <li><a href="#VALEURS_DE_RETOUR">VALEURS DE RETOUR</a></li>
+        
+            <li><a href="#VOIR_AUSSI">VOIR AUSSI</a></li>
+        
+            <li><a href="#HISTORIQUE">HISTORIQUE</a></li>
+        
+            <li><a href="#COPYRIGHT">COPYRIGHT</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/SSL_shutdown.3ssl.fr.txt">txt</a>, 
+        
+            <a href="/man/SSL_shutdown.3ssl.fr.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages man, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

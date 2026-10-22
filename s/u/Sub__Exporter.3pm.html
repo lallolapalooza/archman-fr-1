@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Sub::Exporter(3pm) — Pages manuelles Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">Sub__Exporter(3pm)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/extra/any/perl-sub-exporter/">perl-sub-exporter</a></p>
+<p class="lic">Licences: PerlArtistic, GPL</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Sub::Exporter(3)</td>
+    <td class="head-vol">Documentation Perl fournie par l'utilisateur</td>
+    <td class="head-rtitle">Sub::Exporter(3)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">Sub::Exporter - un exportateur sophistiqué pour des routines personnalisées</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VERSION'><a class='permalink' href='#VERSION'>VERSION</a></h1>
+<p class="Pp">version 0.991</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPIS'><a class='permalink' href='#SYNOPIS'>SYNOPIS</a></h1>
+<p class="Pp">Sub::Exporter doit être utilisé à deux endroits. D'abord, dans un module exportateur :</p>
+<pre># dans le module exportateur :
+package Text::Tweaker;
+use Sub::Exporter -setup =&gt; {
+  exports =&gt; [
+    qw(squish titlecase), # fonctionne toujours de la même manière
+    reformat =&gt; \&amp;build_reformatter, # générateur pour construire la fonction exportée
+    trim     =&gt; \&amp;build_trimmer,
+    indent   =&gt; \&amp;build_indenter,
+  ],
+  collectors =&gt; [ 'defaults' ],
+};</pre>
+<p class="Pp">Ensuite, dans un module importateur :</p>
+<pre># dans le module importateur :
+use Text::Tweaker
+  'squish',
+  indent   =&gt; { margin =&gt; 5 },
+  reformat =&gt; { width =&gt; 79, justify =&gt; 'full', -as =&gt; 'prettify_text' },
+  defaults =&gt; { eol =&gt; 'CRLF' };</pre>
+<p class="Pp">Avec cette configuration, le module importateur se retrouve avec trois routines :
+    <span class="Li">&quot;squish&quot;</span>,
+    <span class="Li">&quot;indent&quot;</span>, et
+    <span class="Li">&quot;prettify_text&quot;</span>. Ces deux dernières ont été construites selon les spécifications de l'importateur -- ce ne sont pas juste des copies du code du package exportateur.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp"><b>ATTENTION !</b> Si vous ne connaissez pas Exporter ou l'exportation, lisez d'abord Sub::Exporter::Tutorial !</p>
+<section class="Ss">
+<h2 class="Ss" id='Pourquoi_des_générateurs_?'><a class='permalink' href='#Pourquoi_des_générateurs_?'>Pourquoi des générateurs ?</a></h2>
+<p class="Pp">Le principal avantage de Sub::Exporter par rapport aux exportateurs existants (y compris l'omniprésent Exporter.pm) est sa capacité à construire de nouveaux réf de code à exporter, plutôt que de simplement exporter du code identique à celui trouvé dans le package exportateur.</p>
+<p class="Pp">Si les consommateurs de votre module obtiennent une routine qui fonctionne comme ceci :</p>
+<pre>use Data::Analyze qw(analyze);
+my $value = analyze($data, $tolerance, $passes);</pre>
+<p class="Pp">et qu'ils passent constamment seulement une ou deux ensembles de valeurs différentes pour les arguments non-<span class="Li">$data</span>, votre code peut bénéficier de Sub::Exporter. En écrivant un simple générateur, vous pouvez leur permettre de faire ceci, à la place :</p>
+<pre>use Data::Analyze
+  analyze =&gt; { tolerance =&gt; 0.10, passes =&gt; 10, -as =&gt; analyze10 },
+  analyze =&gt; { tolerance =&gt; 0.15, passes =&gt; 50, -as =&gt; analyze50 };
+my $value = analyze10($data);</pre>
+<p class="Pp">Le package avec le générateur pour cela ressemblerait à ceci :</p>
+<pre>package Data::Analyze;
+use Sub::Exporter -setup =&gt; {
+  exports =&gt; [
+    analyze =&gt; \&amp;build_analyzer,
+  ],
+};
+sub build_analyzer {
+  my ($class, $name, $arg) = @_;
+  return sub {
+    my $data      = shift;
+    my $tolerance = shift || $arg-&gt;{tolerance};
+    my $passes    = shift || $arg-&gt;{passes};
+    analyze($data, $tolerance, $passes);
+  }
+}</pre>
+<p class="Pp">L'utilisateur de votre module a maintenant moins de travail à faire pour en bénéficier -- et rappelez-vous, vous êtes souvent votre propre utilisateur ! Investir dans des sous-routines personnalisées est un investissement dans la paresse future.</p>
+<p class="Pp">Cela évite également une forme courante de laideur observée dans de nombreux modules : la configuration au niveau du package. C'est-à-dire, vous avez peut-être vu quelque chose comme ce qui précède implémenté ainsi :</p>
+<pre>use Data::Analyze qw(analyze);
+$Data::Analyze::default_tolerance = 0.10;
+$Data::Analyze::default_passes    = 10;</pre>
+<p class="Pp">Cela peut économiser du temps, jusqu'à ce que vous ayez plusieurs modules utilisant Data::Analyze. Comme il n'y a qu'une seule configuration globale, ils se marchent sur les pieds et votre code commence à avoir des erreurs mystérieuses.</p>
+<p class="Pp">Les générateurs peuvent également vous permettre d'exporter des méthodes de classe à appeler comme des sous-routines :</p>
+<pre>package Data::Methodical;
+use Sub::Exporter -setup =&gt; { exports =&gt; { some_method =&gt; \&amp;_curry_class } };
+sub _curry_class {
+  my ($class, $name) = @_;
+  return sub { $class-&gt;$name(@_); };
+}</pre>
+<p class="Pp">En raison de la manière dont les exportateurs et Sub::Exporter fonctionnent, tout package qui hérite de Data::Methodical peut hériter de son exportateur et remplacer sa <span class="Li">&quot;some_method&quot;</span>. Si un utilisateur importe <span class="Li">&quot;some_method&quot;</span> de ce package, il recevra une sous-routine qui appelle la méthode sur la sous-classe, plutôt que sur Data::Methodical lui-même. Gardez à l'esprit que si vous reconfigurez Sub::Exporter dans un package qui hérite de Data::Methodical, vous remplacerez bien sûr entièrement l'exportateur de Data::Methodical.
+    <span class="Li">&quot;import&quot;</span> est une méthode, et est cachée de la même manière que toute autre méthode.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Autres_personnalisations'><a class='permalink' href='#Autres_personnalisations'>Autres personnalisations</a></h2>
+<p class="Pp">La construction de routines personnalisées avec des générateurs n'est pas la seule façon dont Sub::Exporters permet au code importateur d'affiner son utilisation des routines exportées. Elles peuvent également être renommées pour éviter les collisions de noms.</p>
+<p class="Pp">Considérez le code suivant :</p>
+<pre># ce programme détermine à quel cercle de l'enfer vous serez condamné
+use Morality qw(sin virtue); # pour calculer la viciousité
+use Math::Trig qw(:all);     # pour traiter les cercles</pre>
+<p class="Pp">Le programmeur a accidentellement importé deux routines <span class="Li">&quot;sin&quot;</span>. La solution, dans les modules basés sur Exporter.pm, serait d'en importer une seule et ensuite d'appeler l'autre par son nom entièrement qualifié. Alternativement, l'importateur pourrait écrire une routine qui le ferait, ou pourrait jouer avec les typeglobs.</p>
+<p class="Pp">Combien plus facile est-il d'écrire :</p>
+<pre># ce programme détermine à quel cercle de l'enfer vous serez condamné
+use Morality qw(virtue), sin =&gt; { -as =&gt; 'offense' };
+use Math::Trig -all =&gt; { -prefix =&gt; 'trig_' };</pre>
+<p class="Pp">et d'avoir à sa disposition
+    <span class="Li">&quot;offense&quot;</span> et
+    <span class="Li">&quot;trig_sin&quot;</span> -- sans parler de
+    <span class="Li">&quot;trig_cos&quot;</span> et
+    <span class="Li">&quot;trig_tan&quot;</span>.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VERSION_PERL'><a class='permalink' href='#VERSION_PERL'>VERSION PERL</a></h1>
+<p class="Pp">Cette bibliothèque devrait fonctionner sur des versions de Perl même très anciennes. Elle devrait fonctionner sur n'importe quelle version de perl publiée au cours des cinq dernières années.</p>
+<p class="Pp">Bien qu'elle puisse fonctionner sur des versions plus anciennes de perl, aucune garantie n'est faite que la version minimale requise ne sera pas augmentée. La version peut être augmentée pour quelque raison que ce soit, et il n'y a aucune promesse que des correctifs seront acceptés pour abaisser la version minimale requise de perl.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CONFIGURATION_EXPORTER'><a class='permalink' href='#CONFIGURATION_EXPORTER'>CONFIGURATION EXPORTER</a></h1>
+<p class="Pp">Vous pouvez configurer un exportateur pour votre package en utilisant
+    Sub::Exporter comme ceci :</p>
+<pre>package Tools;
+use Sub::Exporter
+  -setup =&gt; { exports =&gt; [ qw(function1 function2 function3) ] };</pre>
+<p class="Pp">C'est la manière la plus simple d'utiliser l'exportateur, et elle équivaut essentiellement à ceci :</p>
+<pre>package Tools;
+use base qw(Exporter);
+our @EXPORT_OK = qw(function1 function2 function3);</pre>
+<p class="Pp">Toute utilisation basique de Sub::Exporter ressemblera à ceci :</p>
+<pre>package Tools;
+use Sub::Exporter -setup =&gt; \%config;</pre>
+<p class="Pp">Les clés suivantes sont valides dans
+  <span class="Li">%config</span> :</p>
+<pre>exports - une liste de routines à fournir pour l'exportation ; chaque routine peut être
+          suivie d'un générateur
+groups  - une liste de groupes à fournir pour l'exportation ; chacun doit être suivi par
+          soit (a) une liste d'exportations, éventuellement avec des arguments pour chaque
+          exportation, soit (b) un générateur
+collectors - une liste de noms dans lesquels les valeurs sont collectées pour être utilisées dans
+             la génération de routines ; chaque nom peut être suivi d'un validateur</pre>
+<p class="Pp">En plus des options de base ci-dessus, quelques options plus avancées peuvent être passées :</p>
+<pre>into_level - combien d'appels vers le haut de la pile d'appels rechercher une cible (par défaut 0)
+into       - une cible explicite (package) dans laquelle exporter les routines</pre>
+<p class="Pp">En d'autres termes : Sub::Exporter installe une routine
+    <span class="Li">&quot;import&quot;</span> qui, lorsqu'elle est appelée,
+    exporte des routines vers l'espace de noms appelant. Les options
+    <span class="Li">&quot;into&quot;</span> et
+    <span class="Li">&quot;into_level&quot;</span> modifient l'endroit où ces
+    routines exportées sont installées.</p>
+<pre>generator  - un rappel utilisé pour produire le code qui sera installé
+             défaut: Sub::Exporter::default_generator
+installer  - un rappel utilisé pour installer le code produit par le générateur
+             défaut: Sub::Exporter::default_installer</pre>
+<p class="Pp">Pour savoir comment ces rappels sont utilisés, consultez la documentation de
+    <span class="Li">&quot;default_generator&quot;</span> et
+    <span class="Li">&quot;default_installer&quot;</span>.</p>
+<section class="Ss">
+<h2 class="Ss" id='Configuration_d_exportation'><a class='permalink' href='#Configuration_d_exportation'>Configuration d'exportation</a></h2>
+<p class="Pp">La liste <span class="Li">&quot;exports&quot;</span> peut être
+    fournie sous forme de référence de tableau ou de référence de hachage. La liste est p</p>
+</section>
+</section>
+</div>
+</section>
+            </article>
+            
+        </main>
+        <footer>
+            
+        </footer>
+    </body>
+</html>
+rocessed in
+    such a way that the following are equivalent:</p>
+<pre>{ exports =&gt; [ qw(foo bar baz), quux =&gt; \&amp;quux_generator ] }
+{ exports =&gt;
+  { foo =&gt; undef, bar =&gt; undef, baz =&gt; undef, quux =&gt; \&amp;quux_generator } }</pre>
+<p class="Pp">Les générateurs sont du code qui renvoie des références de code. Ils sont appelés avec
+    quatre paramètres :</p>
+<pre> $class - la classe dont la méthode d'exportation a été appelée (la classe exportatrice)
+ $name  - le nom de l'export pour lequel la routine est construite
+\%arg   - les arguments passés pour cet export
+\%col   - les collections pour cette importation</pre>
+<p class="Pp">Compte tenu de la configuration dans le &quot;SYNOPSIS&quot;, la déclaration
+    <span class="Li">&quot;use&quot;</span> suivante :</p>
+<pre>use Text::Tweaker
+  reformat =&gt; { -as =&gt; 'make_narrow', width =&gt; 33 },
+  defaults =&gt; { eol =&gt; 'CR' };</pre>
+<p class="Pp">entraînerait l'appel suivant à
+    <span class="Li">&amp;build_reformatter</span> :</p>
+<pre>my $code = build_reformatter(
+  'Text::Tweaker',
+  'reformat',
+  { width =&gt; 33 }, # notez que -as n'est pas passé
+  { defaults =&gt; { eol =&gt; 'CR' } },
+);</pre>
+<p class="Pp">La référence de code retournée (<span class="Li">$code</span>) serait alors installée sous le nom
+    <span class="Li">&quot;make_narrow&quot;</span> dans le package appelant.</p>
+<p class="Pp">Au lieu de fournir une référence de code dans la configuration, une référence
+    au nom d'une méthode peut être fournie. Cette méthode sera alors appelée sur l'invocant
+    de la méthode <span class="Li">&quot;import&quot;</span>. (Dans ce cas, nous ne passons pas le paramètre
+    <span class="Li">$class</span>, car il serait redondant.)</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Group_Configuration'><a class='permalink' href='#Group_Configuration'>Configuration   des groupes</a></h2>
+<p class="Pp">La liste <span class="Li">&quot;groups&quot;</span> peut être passée
+    dans les mêmes formes que <span class="Li">&quot;exports&quot;</span>. Les groupes
+    doivent avoir des valeurs pour être significatifs, qui peuvent soit lister les exports
+    qui composent le groupe (éventuellement avec des arguments), soit fournir un moyen
+    de construire le groupe.</p>
+<p class="Pp">Le cas le plus simple est le premier : une définition de groupe est une liste
+    d'exports. Voici l'exemple qui pourrait aller dans l'exportateur du
+    &quot;SYNOPSIS&quot;.</p>
+<pre>groups  =&gt; {
+  default    =&gt; [ qw(reformat) ],
+  shorteners =&gt; [ qw(squish trim) ],
+  email_safe =&gt; [
+    'indent',
+    reformat =&gt; { -as =&gt; 'email_format', width =&gt; 72 }
+  ],
+},</pre>
+<p class="Pp">Les groupes sont importés en spécifiant leur nom préfixé par un tiret
+    ou deux-points. Cette ligne de code importerait le groupe
+    <span class="Li">&quot;shorteners&quot;</span> :</p>
+<pre>use Text::Tweaker qw(-shorteners);</pre>
+<p class="Pp">Les arguments passés à un groupe lors de l'importation sont fusionnés avec les
+    options du groupe et passés à tout générateur pertinent. Les groupes peuvent contenir
+    d'autres groupes, mais les structures de groupes en boucle sont ignorées.</p>
+<p class="Pp">L'autre valeur possible pour une définition de groupe, une référence de code,
+    permet à un générateur de construire plusieurs routines exportables simultanément. Ceci
+    est utile lorsque plusieurs routines doivent partager des variables lexicales encapsulées.
+    La référence de code doit retourner une référence de hachage. Les clés seront utilisées
+    comme noms d'export et les valeurs sont les subs qui seront exportées.</p>
+<p class="Pp">Cet exemple montre une utilisation simple du générateur de groupe.</p>
+<pre>package Data::Crypto;
+use Sub::Exporter -setup =&gt; { groups =&gt; { cipher =&gt; \&amp;build_cipher_group } };
+sub build_cipher_group {
+  my ($class, $group, $arg) = @_;
+  my ($encode, $decode) = build_codec($arg-&gt;{secret});
+  return { cipher =&gt; $encode, decipher =&gt; $decode };
+}</pre>
+<p class="Pp">Les routines <span class="Li">&quot;cipher&quot;</span> et
+    <span class="Li">&quot;decipher&quot;</span> sont construites dans un groupe car elles sont construites
+    ensemble par du code qui encapsule leur secret dans leur environnement.</p>
+<p class="Pp"><i>Groupes par défaut</i></p>
+<p class="Pp">Si un module qui utilise Sub::Exporter est
+    <span class="Li">&quot;use&quot;</span>d sans arguments, il essaiera d'exporter
+    le groupe nommé <span class="Li">&quot;default&quot;</span>. Si ce groupe n'a pas été spécifiquement
+    configuré, il sera vide, et rien ne se passera.</p>
+<p class="Pp">Un autre groupe est également créé s'il n'est pas défini :
+    <span class="Li">&quot;all&quot;</span>. Le groupe
+    <span class="Li">&quot;all&quot;</span> contient tous les exports de la liste
+    des exports.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Collector_Configuration'><a class='permalink' href='#Collector_Configuration'>Configuration   des collecteurs</a></h2>
+<p class="Pp">L'entrée <span class="Li">&quot;collectors&quot;</span> dans la configuration
+    de l'exportateur donne des noms qui, lorsqu'ils sont trouvés dans l'appel d'importation,
+    ont leurs valeurs collectées et passées à chaque générateur.</p>
+<p class="Pp">Par exemple, le générateur
+    <span class="Li">&quot;build_analyzer&quot;</span> que nous avons vu plus haut pourrait être réécrit comme suit :</p>
+<pre>sub build_analyzer {
+  my ($class, $name, $arg, $col) = @_;
+  return sub {
+    my $data      = shift;
+    my $tolerance = shift || $arg-&gt;{tolerance} || $col-&gt;{defaults}{tolerance};
+    my $passes    = shift || $arg-&gt;{passes}    || $col-&gt;{defaults}{passes};
+    analyze($data, $tolerance, $passes);
+  }
+}</pre>
+<p class="Pp">Cela permettrait à l'importateur de spécifier des valeurs par défaut globales pour ses
+    importations :</p>
+<pre>use Data::Analyze
+  'analyze',
+  analyze  =&gt; { tolerance =&gt; 0.10, -as =&gt; analyze10 },
+  analyze  =&gt; { tolerance =&gt; 0.15, passes =&gt; 50, -as =&gt; analyze50 },
+  defaults =&gt; { passes =&gt; 10 };
+my $A = analyze10($data);     # équivalent à analyze($data, 0.10, 10);
+my $C = analyze50($data);     # équivalent à analyze($data, 0.15, 50);
+my $B = analyze($data, 0.20); # équivalent à analyze($data, 0.20, 10);</pre>
+<p class="Pp">Si des valeurs sont fournies dans la liste
+    <span class="Li">&quot;collectors&quot;</span> lors de la configuration de l'exportateur,
+    elles doivent être des références de code, et sont utilisées pour valider les valeurs de
+    l'importateur. Le validateur est appelé lorsque la collection est trouvée, et s'il
+    renvoie faux, une exception est levée. Nous pourrions nous assurer que personne n'essaie
+    de définir une valeur de données globale facilement :</p>
+<pre>collectors =&gt; { defaults =&gt; sub { return (exists $_[0]-&gt;{data}) ? 0 : 1 } }</pre>
+<p class="Pp">Les références de code des collecteurs peuvent également être utilisées comme des
+    crochets pour effectuer des actions arbitraires avant que quoi que ce soit ne soit exporté.</p>
+<p class="Pp">Lorsque la référence de code est appelée, elle reçoit la valeur de la collection et une
+    référence de hachage contenant les entrées suivantes :</p>
+<pre>name        - le nom du collecteur
+config      - la configuration de l'exportateur (référence de hachage)
+import_args - les arguments passés à l'exportateur, sans les collections (référence d'tableau)
+class       - le package sur lequel l'importateur a été appelé
+into        - le package dans lequel les exports seront exportés</pre>
+<p class="Pp">Les collecteurs dont les noms sont entièrement en majuscules (c'est-à-dire composés
+    de _ ou de lettres majuscules de A à Z) sont réservés à un usage spécial. Le seul collecteur
+    spécial actuellement implémenté est <span class="Li">&quot;INIT&quot;</span>, dont le crochet (s'il est
+    présent dans la configuration de l'exportateur) est toujours exécuté avant tout autre
+    crochet.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='CALLING_THE_EXPORTER'><a class='permalink' href='#CALLING_THE_EXPORTER'>APPEL   DE L'EXPORTATEUR</a></h1>
+<p class="Pp">Les arguments de l'exportateur (c'est-à-dire les arguments après le nom du module
+    dans une déclaration <span class="Li">&quot;use&quot;</span>) sont analysés comme suit :</p>
+<p class="Pp">Premièrement, les collecteurs rassemblent toutes les collections trouvées dans les
+    arguments. Tout type de référence peut être donné comme valeur pour un collecteur. Pour
+    chaque collection donnée dans les arguments, son validateur (le cas échéant) est appelé.</p>
+<p class="Pp">Ensuite, les groupes sont développés. Si le groupe est implémenté par un générateur
+    de groupe, le générateur est appelé. Il y a deux arguments spéciaux qui, s'ils sont donnés
+    à un groupe, ont une signification spéciale :</p>
+<pre>-prefix - une chaîne à préfixer à tout export importé de ce groupe
+-suffix - une chaîne à suffixer à tout export importé de ce groupe</pre>
+<p class="Pp">Enfin, les générateurs d'exports individuels sont appelés et toutes les subs, générées
+    ou autrement, sont installées dans le package appelant. Il n'y a qu'un seul argument spécial
+    pour les générateurs d'exports :</p>
+<pre>-as     - où installer la sub exportée</pre>
+<p class="Pp">Normalement, <span class="Li">&quot;-as&quot;</span> contiendra un nom alternatif pour la routine. Il peut, cependant,
+    contenir une référence à un scalaire. Si c'est le cas, une référence à la routine générée sera
+    placée dans le scalaire référencé par <span class="Li">&quot;-as&quot;</span>. Elle ne sera pas installée dans le package
+    appelant.</p>
+<section class="Ss">
+<h2 class="Ss" id='Special_Exporter_Arguments'><a class='permalink' href='#Special_Exporter_Arguments'>Arguments   spéciaux de l'exportateur</a></h2>
+<p class="Pp">L'exportateur généré accepte certaines options spéciales, qui peuvent être passées comme
+    premier argument, dans une référence de hachage.</p>
+<p class="Pp">Ces options sont :</p>
+<pre>into_level
+into
+generator
+installer</pre>
+<p class="Pp">Ces options remplacent les options de configuration du même nom décrites dans
+    &quot;EXPORTER CONFIGURATION&quot;.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SUBROUTINES'><a class='permalink' href='#SUBROUTINES'>SOUS-ROUTINES</a></h1>
+<section class="Ss">
+<h2 class="Ss" id='setup_exporter'><a class='permalink' href='#setup_exporter'>setup_exporter</a></h2>
+<p class="Pp">Cette routine construit et installe une routine
+    <span class="Li">&quot;import&quot;</span>. Elle est appelée avec un seul argument, une référence de hachage contenant la
+    configuration de l'exportateur. En utilisant cela, elle construit un exportateur et l'installe
+    dans le package appelant sous le nom &quot;import.&quot; En plus de la configuration normale de l'exportateur,
+    quelques arguments nommés peuvent être passés dans la référence de hachage :</p>
+<pre>into       - dans quel package l'exportateur doit-il être installé
+into_level - jusqu'à quel niveau de la pile l'exportateur doit-il être installé
+as         - quel nom doit porter l'exportateur installé</pre>
+<p class="Pp">Par défaut, l'exportateur est installé sous le nom
+    <span class="Li">&quot;import&quot;</span> dans l'appelant immédiat de
+    <span class="Li">&quot;setup_exporter&quot;</span>. Autrement dit, si votre package appelle
+    <span class="Li">&quot;setup_exporter&quot;</span> sans fournir aucun des trois arguments ci-dessus, il aura une routine
+    <span class="Li">&quot;import&quot;</span> installée.</p>
+<p class="Pp">Fournir à la fois <span class="Li">&quot;into&quot;</span> et
+    <span class="Li">&quot;into_level&quot;</span> provoquera une exception.</p>
+<p class="Pp">L'exportateur est construit par
+    <span class="Li">&quot;build_exporter&quot;</span>.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='build_exporter'><a class='permalink' href='#build_exporter'>build_exporter</a></h2>
+<p class="Pp">Étant donné une configuration standard d'exportateur, cette routine construit et renvoie
+    un exportateur, c'est-à-dire une sous-routine qui peut être installée en tant que méthode de classe
+    pour effectuer l'exportation sur demande.</p>
+<p class="Pp">Habituellement, cette méthode est appelée par
+    <span class="Li">&quot;setup_exporter&quot;</span>, qui installe ensuite l'exportateur comme routine d'importation
+    d'un package.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='default_generator'><a class='permalink' href='#default_generator'>default_generator</a></h2>
+<p class="Pp">C'est le générateur par défaut de Sub::Exporter. Il prend des morceaux de configuration
+    qui ont été rassemblés lors de l'importation et les transforme en une référence de code qui peut
+    être installée.</p>
+<pre>my $code = default_generator(\%arg);</pre>
+<p class="Pp">Les arguments passés sont :</p>
+<pre>class - la classe sur laquelle la méthode d'importation a été appelée
+name  - le nom de l'export généré
+arg   - l</pre>
+<section class="section">
+<h2 class="section" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h2>
+<p class="Pp">Sub::Exporter</p>
+</section>
+<section class="section">
+<h2 class="section" id='VERSION'><a class='permalink' href='#VERSION'>VERSION</a></h2>
+<p class="Pp">Ceci est le numéro de version du paquet.</p>
+</section>
+<section class="section">
+<h2 class="section" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h2>
+<p class="Pp">Ceci est un résumé de l'utilisation du paquet.</p>
+</section>
+<section class="section">
+<h2 class="section" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h2>
+<p class="Pp">Ceci est une brève description du paquet.</p>
+</section>
+<section class="section">
+<h2 class="section" id='VERSION_PERL'><a class='permalink' href='#VERSION_PERL'>VERSION PERL</a></h2>
+<p class="Pp">Ceci est le numéro de version de Perl.</p>
+</section>
+<section class="section">
+<h2 class="section" id='CONFIGURATION_EXPORTEUR'><a class='permalink' href='#CONFIGURATION_EXPORTEUR'>CONFIGURATION EXPORTEUR</a></h2>
+<p class="Pp">Ceci est une description de la configuration de l'exportateur.</p>
+</section>
+<section class="section">
+<h2 class="section" id='APPELER_LEXPORTEUR'><a class='permalink' href='#APPELER_LEXPORTEUR'>APPELER L' EXPORTEUR</a></h2>
+<p class="Pp">Ceci est un guide sur la façon d'appeler l'exportateur.</p>
+</section>
+<section class="section">
+<h2 class="section" id='SOUS_ROUTINES'><a class='permalink' href='#SOUS_ROUTINES'>SOUS-ROUTINES</a></h2>
+<p class="Pp">Ceci est une liste de sous-routines.</p>
+</section>
+<section class="section">
+<h2 class="section" id='EXPORTATIONS'><a class='permalink' href='#EXPORTATIONS'>EXPORTATIONS</a></h2>
+<p class="Pp">Ceci est une description des exportations.</p>
+</section>
+<section class="section">
+<h2 class="section" id='COMPARAISONS'><a class='permalink' href='#COMPARAISONS'>COMPARAISONS</a></h2>
+<p class="Pp">Ceci est une comparaison d'autres exportateurs.</p>
+</section>
+<section class="section">
+<h2 class="section" id='A_FAIRE'><a class='permalink' href='#A_FAIRE'>À FAIRE</a></h2>
+<p class="Pp">Ceci est une liste de tâches.</p>
+</section>
+<section class="section">
+<h2 class="section" id='REMERCIEMENTS'><a class='permalink' href='#REMERCIEMENTS'>REMERCIEMENTS</a></h2>
+<p class="Pp">Ceci est une liste de remerciements.</p>
+</section>
+<section class="section">
+<h2 class="section" id='BOGUES'><a class='permalink' href='#BOGUES'>BOGUES</a></h2>
+<p class="Pp">Ceci est une liste de bogues.</p>
+</section>
+<section class="section">
+<h2 class="section" id='AUTEUR'><a class='permalink' href='#AUTEUR'>AUTEUR</a></h2>
+<p class="Pp">Ceci est le nom de l'auteur.</p>
+</section>
+<section class="section">
+<h2 class="section" id='CONTRIBUTEURS'><a class='permalink' href='#CONTRIBUTEURS'>CONTRIBUTEURS</a></h2>
+<p class="Pp">Ceci est une liste de contributeurs.</p>
+</section>
+<section class="section">
+<h2 class="section" id='DROITS_DAUTEL_ET_LICENCE'><a class='permalink' href='#DROITS_DAUTEL_ET_LICENCE'>DROITS D'AUTEL ET LICENCE</a></h2>
+<p class="Pp">Ceci est la licence et les informations de copyright.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-07-14</td>
+    <td class="foot-os">perl v5.42.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page man" name="q" value=""
+         />
+    <input type="submit" name="go" value="Aller" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/extra/any/perl-sub-exporter/">extra/perl-sub-exporter</a></dd>
+        <dt>Version :</dt>
+        <dd>0.991-3</dd>
+        <dt>En amont :</dt>
+        <dd><a href="https://metacpan.org/release/Sub-Exporter">https://metacpan.org/release/Sub-Exporter</a></dd>
+        <dt>Licences :</dt>
+        <dd>PerlArtistic, GPL</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/extra/perl-sub-exporter/">/listing/extra/perl-sub-exporter/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NOM">NOM</a></li>
+        
+            <li><a href="#VERSION">VERSION</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#VERSION_PERL">VERSION PERL</a></li>
+        
+            <li><a href="#CONFIGURATION_EXPORTEUR">CONFIGURATION EXPORTEUR</a></li>
+        
+            <li><a href="#APPELER_LEXPORTEUR">APPELER L' EXPORTEUR</a></li>
+        
+            <li><a href="#SOUS_ROUTINES">SOUS-ROUTINES</a></li>
+        
+            <li><a href="#EXPORTATIONS">EXPORTATIONS</a></li>
+        
+            <li><a href="#COMPARAISONS">COMPARAISONS</a></li>
+        
+            <li><a href="#A_FAIRE">À FAIRE</a></li>
+        
+            <li><a href="#REMERCIEMENTS">REMERCIEMENTS</a></li>
+        
+            <li><a href="#BOGUES">BOGUES</a></li>
+        
+            <li><a href="#AUTEUR">AUTEUR</a></li>
+        
+            <li><a href="#CONTRIBUTEURS">CONTRIBUTEURS</a></li>
+        
+            <li><a href="#DROITS_DAUTEL_ET_LICENCE">DROITS D'AUTEL ET LICENCE</a></li>
+        
+    </ul>
+</nav>
+</details>
+
+            </aside>
+        </div>
+    </body>
+</html>
+><a href="#COPYRIGHT_AND_LICENSE">DROITS D'AUTEUR ET LICENCE</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/Sub::Exporter.3pm.en.txt">txt</a>, 
+        
+            <a href="/man/Sub::Exporter.3pm.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site Web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>, à l'exception du contenu des pages de manuel, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>

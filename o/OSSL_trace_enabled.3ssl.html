@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>OSSL_trace_enabled(3ssl) — Pages de manuel Arch</title>
+        
+        
+        
+        
+        
+    
+    
+
+    <link rel="stylesheet" href="basic.css">
+</head>
+    <body>
+<p class="back"><a href="/archman-fr-1/">← Index</a></p>
+<h1 class="page-title">OSSL_trace_enabled(3ssl)</h1>
+<p class="pkg">Paquet: <a href="https://archlinux.org/packages/core/x86_64/openssl/">openssl</a></p>
+<p class="lic">Licences: Apache-2.0</p>
+
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">OSSL_TRACE_ENABLED(3ssl)</td>
+    <td class="head-vol">OpenSSL</td>
+    <td class="head-rtitle">OSSL_TRACE_ENABLED(3ssl)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NOM'><a class='permalink' href='#NOM'>NOM</a></h1>
+<p class="Pp">OSSL_trace_enabled, OSSL_trace_begin, OSSL_trace_end,
+    OSSL_TRACE_BEGIN, OSSL_TRACE_END, OSSL_TRACE_CANCEL, OSSL_TRACE,
+    OSSL_TRACE1, OSSL_TRACE2, OSSL_TRACE3, OSSL_TRACE4, OSSL_TRACE5,
+    OSSL_TRACE6, OSSL_TRACE7, OSSL_TRACE8, OSSL_TRACE9, OSSL_TRACEV,
+    OSSL_TRACE_STRING, OSSL_TRACE_STRING_MAX, OSSL_trace_string,
+    OSSL_TRACE_ENABLED - API de traçage OpenSSL</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPHIS'><a class='permalink' href='#SYNOPHIS'>SYNOPHIS</a></h1>
+<pre>#include &lt;openssl/trace.h&gt;
+int OSSL_trace_enabled(int category);
+BIO *OSSL_trace_begin(int category);
+void OSSL_trace_end(int category, BIO *channel);
+/* macros de groupe de traçage */
+OSSL_TRACE_BEGIN(category) {
+    ...
+    if (some_error) {
+        /* Quitter le groupe de traçage prématurément en cas d'erreur */
+        OSSL_TRACE_CANCEL(category);
+        goto err;
+    }
+    ...
+} OSSL_TRACE_END(category);
+/* macros de traçage instantané */
+OSSL_TRACE(category, text)
+OSSL_TRACE1(category, format, arg1)
+OSSL_TRACE2(category, format, arg1, arg2)
+...
+OSSL_TRACE9(category, format, arg1, ..., arg9)
+OSSL_TRACE_STRING(category, text, full, data, len)
+#define OSSL_TRACE_STRING_MAX 80
+int OSSL_trace_string(BIO *out, int text, int full,
+                      const unsigned char *data, size_t size);
+/* vérifier si une catégorie de traçage est activée */
+if (OSSL_TRACE_ENABLED(category)) {
+    ...
+}</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Les fonctions décrites ici intéressent principalement ceux qui
+    fournissent des fonctionnalités OpenSSL, que ce soit dans OpenSSL lui-même ou
+    dans des modules moteur ou des modules similaires.</p>
+<p class="Pp">Si le système de traçage est activé (voir &quot;Configurer le
+    traçage&quot; ci-dessous), ces fonctions sont utilisées pour générer des
+    sorties de traçage en texte libre.</p>
+<p class="Pp">La sortie de traçage est divisée en types qui sont activés
+    individuellement par l'application. Les types de traçage sont décrits en
+    détail dans &quot;Types de traçage&quot; dans <a href='/man/OSSL_trace_set_callback.3.en'>OSSL_trace_set_callback(3)</a>. Le
+    type de secours <b>OSSL_TRACE_CATEGORY_ALL</b> ne doit <i>pas</i> être utilisé
+    avec les fonctions décrites ici.</p>
+<p class="Pp">Le traçage pour une catégorie spécifique est activé à l'exécution si
+    un soi-disant <i>canal de traçage</i> lui est attaché. Un canal de traçage
+    est simplement un objet BIO dans lequel l'application peut écrire sa sortie
+    de traçage.</p>
+<p class="Pp">L'application dispose de deux manières différentes d'enregistrer un
+    canal de traçage, soit en fournissant directement un objet BIO à l'aide de
+    <a href='/man/OSSL_trace_set_channel.3.en'>OSSL_trace_set_channel(3)</a>, soit en fournissant une routine de rappel à l'aide de
+    <a href='/man/OSSL_trace_set_callback.3.en'>OSSL_trace_set_callback(3)</a>. Ce dernier est encapsulé en interne par un
+    objet BIO dédié, de sorte que pour le code de traçage, les deux types de canal
+    sont effectivement indiscernables. Nous les appelons respectivement un
+    <i>canal de traçage simple</i> et un <i>canal de traçage par rappel</i>.</p>
+<p class="Pp">Pour produire une sortie de traçage, il est nécessaire d'obtenir un
+    pointeur vers le canal de traçage (c'est-à-dire l'objet BIO) à l'aide de
+    <b>OSSL_trace_begin()</b>, d'écrire dedans à l'aide de routines de sortie BIO
+    arbitraires, et enfin de libérer le canal à l'aide de <b>OSSL_trace_end()</b>.
+    Les appels <b>OSSL_trace_begin()</b>/<b>OSSL_trace_end()</b> entourant la
+    sortie de traçage créent un groupe, qui agit comme une section critique (protégée par un mutex)
+    pour garantir que la sortie de traçage de différents threads ne soit pas mélangée.</p>
+<p class="Pp">Le code de traçage n'appelle normalement pas directement OSSL_trace_{begin,end}(),
+    mais utilise plutôt un ensemble de macros pratiques, voir la section
+    &quot;Macros&quot; ci-dessous.</p>
+<section class="Ss">
+<h2 class="Ss" id='Fonctions'><a class='permalink' href='#Fonctions'>Fonctions</a></h2>
+<p class="Pp"><b>OSSL_trace_enabled()</b> peut être utilisé pour vérifier si le
+    traçage pour la <i>catégorie</i> donnée est activé, c'est-à-dire si le système
+    de traçage a été activé statiquement (voir &quot;Configurer le traçage&quot;
+    ci-dessous) et qu'un canal de traçage a été enregistré à l'aide de
+    <a href='/man/OSSL_trace_set_channel.3.en'>OSSL_trace_set_channel(3)</a> ou
+    <a href='/man/OSSL_trace_set_callback.3.en'>OSSL_trace_set_callback(3)</a>.</p>
+<p class="Pp"><b>OSSL_trace_begin()</b> est utilisé pour démarrer une section de
+    traçage et obtenir le canal pour la <i>catégorie</i> donnée sous forme de
+    BIO. Ce BIO ne peut être utilisé que pour la sortie. Le pointeur retourné est
+    NULL si la catégorie est invalide ou non activée.</p>
+<p class="Pp"><b>OSSL_trace_end()</b> est utilisé pour terminer une section de
+    traçage.</p>
+<p class="Pp">L'utilisation de <b>OSSL_trace_begin()</b> et
+    <b>OSSL_trace_end()</b> pour entourer les sections de traçage est
+    <i>obligatoire</i>. Le résultat d'une tentative de production de sortie de
+    traçage en dehors de telles sections est indéfini.</p>
+<p class="Pp"><b>OSSL_trace_string()</b> sort les <i>données</i> de longueur
+    <i>size</i> sous forme de chaîne sur le BIO <i>out</i>. Si <i>text</i> est 0,
+    la fonction masque tous les caractères de contrôle inclus, à l'exception des
+    nouvelles lignes, et s'assure pour une entrée non vide que la sortie se termine
+    par une nouvelle ligne. Sauf si <i>full</i> est non nul, la longueur est limitée
+    (avec un avertissement approprié) à <b>OSSL_TRACE_STRING_MAX</b> caractères,
+    qui est actuellement de 80.</p>
+</section>
+<section class="Ss">
+<h2 class="Ss" id='Macros'><a class='permalink' href='#Macros'>Macros</a></h2>
+<p class="Pp">Il existe un certain nombre de macros pratiques définies pour
+    faciliter et uniformiser le traçage.</p>
+<p class="Pp"><b>OSSL_TRACE_BEGIN()</b> et <b>OSSL_TRACE_END()</b> réservent
+    le <b>BIO</b> <span class="Li">&quot;trc_out&quot;</span> et sont utilisés comme
+    suit pour entourer une section de traçage :</p>
+<pre>OSSL_TRACE_BEGIN(TLS) {
+    BIO_printf(trc_out, ... );
+} OSSL_TRACE_END(TLS);</pre>
+<p class="Pp">Cela se développera normalement en :</p>
+<pre>do {
+    BIO *trc_out = OSSL_trace_begin(OSSL_TRACE_CATEGORY_TLS);
+    if (trc_out != NULL) {
+        ...
+        BIO_printf(trc_out, ...);
+    }
+    OSSL_trace_end(OSSL_TRACE_CATEGORY_TLS, trc_out);
+} while (0);</pre>
+<p class="Pp"><b>OSSL_TRACE_CANCEL()</b> doit être utilisé avant de retourner ou
+    de sauter hors d'une section de traçage :</p>
+<pre>OSSL_TRACE_BEGIN(TLS) {
+    if (some_error) {
+        OSSL_TRACE_CANCEL(TLS);
+        goto err;
+    }
+    BIO_printf(trc_out, ... );
+} OSSL_TRACE_END(TLS);</pre>
+<p class="Pp">Cela se développera normalement en :</p>
+<pre>do {
+    BIO *trc_out = OSSL_trace_begin(OSSL_TRACE_CATEGORY_TLS);
+    if (trc_out != NULL) {
+        if (some_error) {
+            OSSL_trace_end(OSSL_TRACE_CATEGORY_TLS, trc_out);
+            goto err;
+        }
+        BIO_printf(trc_out, ... );
+    }
+    OSSL_trace_end(OSSL_TRACE_CATEGORY_TLS, trc_out);
+} while (0);</pre>
+<p class="Pp"><b>OSSL_TRACE()</b> et <b>OSSL_TRACE1()</b>,
+    <b>OSSL_TRACE2()</b>, ... <b>OSSL_TRACE9()</b> sont des macros dites
+    instantanées :</p>
+<p class="Pp">L'appel de macro <span class="Li">&quot;OSSL_TRACE(category,
+    text)&quot;</span>, produit une sortie de traçage en texte littéral.</p>
+<p class="Pp">L'appel de macro <span class="Li">&quot;OSSL_TRACEn(category,
+    format, arg1, ..., argn)&quot;</span> produit une sortie de traçage de style printf
+    avec n arguments de champ de format (n=1,...,9). Elle se développe en :</p>
+<pre>OSSL_TRACE_BEGIN(category) {
+    BIO_printf(trc_out, format, arg1, ..., argN);
+} OSSL_TRACE_END(category)</pre>
+<p class="Pp">En interne, toutes les macros instantanées sont implémentées à l'aide
+    d'une macro générique <b>OSSL_TRACEV()</b>, car C90 ne prend pas en charge les
+    macros variadiques. Cette macro d'aide a une synopsis plutôt étrange et ne
+    doit pas être utilisée directement.</p>
+<p class="Pp">L'appel de macro <span class="Li">&quot;OSSL_TRACE_STRING(category,
+    text, full, data, len)&quot;</span> sort les <i>données</i> de longueur
+    <i>size</i> sous forme de chaîne si le traçage pour la <i>catégorie</i> donnée
+    est activé. Elle se développe en :</p>
+<pre>OSSL_TRACE_BEGIN(category) {
+    OSSL_trace_string(trc_out, text, full, data, len);
+} OSSL_TRACE_END(category)</pre>
+<p class="Pp">La macro <b>OSSL_TRACE_ENABLED()</b> peut être utilisée pour
+    exécuter conditionnellement du code uniquement si une catégorie de traçage
+    spécifique est activée. Dans certaines situations, c'est plus simple que
+    d'entrer dans une section de traçage à l'aide de
+    <b>OSSL_TRACE_BEGIN()</b> et <b>OSSL_TRACE_END()</b>. Par exemple, le
+    code</p>
+<pre>if (OSSL_TRACE_ENABLED(TLS)) {
+    ...
+}</pre>
+<p class="Pp">se développe en</p>
+<pre>if (OSSL_trace_enabled(OSSL_TRACE_CATEGORY_TLS) {
+    ...
+}</pre>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='NOTES'><a class='permalink' href='#NOTES'>NOTES</a></h1>
+<p class="Pp">Il n'est pas nécessaire de protéger les appels de fonctions de sortie
+    de traçage comme <i>OSSL_TRACE(category, ...)</i> par
+    <i>OSSL_TRACE_ENABLED(category)</i>.</p>
+<p class="Pp">Si la production de la sortie de traçage nécessite d'effectuer des
+    calculs auxiliaires, ce code auxiliaire doit être placé à l'intérieur d'un
+    bloc conditionnel qui n'est exécuté que si la catégorie de traçage est
+    activée.</p>
+<p class="Pp">La manière la plus naturelle de le faire est de placer le code à
+    l'intérieur de la section de traçage elle-même car elle introduit déjà un tel
+    bloc conditionnel.</p>
+<pre>OSSL_TRACE_BEGIN(TLS) {
+    int var = do_some_auxiliary_calculation();
+    BIO_printf(trc_out, &quot;var = %d\n&quot;, var);
+} OSSL_TRACE_END(TLS);</pre>
+<p class="Pp">Dans certains cas, il est plus avantageux d'utiliser un simple groupe
+    conditionnel plutôt qu'une section de traçage. C'est le cas si les calculs et
+    le traçage se produisent à différents endroits du code, ou si les calculs sont
+    si coûteux en temps qu'il serait trop sujet à la contention de les placer
+    à l'intérieur d'une section de traçage (critique).</p>
+<pre>if (OSSL_TRACE_ENABLED(TLS)) {
+    int var = do_some_auxiliary_calculation();
+    OS</pre>
+</section>
+</div>
+</section>
+
+            </article>
+            
+        </main>
+        <footer>
+            
+        </footer>
+    </body>
+</html>
+SL_TRACE1(&quot;var = %d\n&quot;, var);
+}</pre>
+<p class="Pp">Notez cependant que l'optimisation prématurée du code de traçage est généralement futile et qu'il est préférable de garder le code de traçage aussi simple que possible. En effet, le plus souvent, le facteur limitant la vitesse de l'application est le temps nécessaire à l'impression de la sortie du traçage, et non son calcul.</p>
+<section class="Ss">
+<h2 class="Ss" id='Configurer_le_traçage'><a class='permalink' href='#Configure_Tracing'>Configurer le traçage</a></h2>
+<p class="Pp">Par défaut, la bibliothèque OpenSSL est compilée avec le traçage désactivé. Pour utiliser la fonctionnalité de traçage décrite ici, il est donc nécessaire de configurer et de compiler OpenSSL avec l'option 'enable-trace'.</p>
+<p class="Pp">Lorsque la bibliothèque est compilée avec le traçage désactivé :</p>
+<ul class="Bl-bullet">
+  <li>La macro <b>OPENSSL_NO_TRACE</b> est définie dans
+      <i>&lt;openssl/opensslconf.h&gt;</i>.</li>
+  <li>Toutes les fonctions sont toujours présentes, mais <b>OSSL_trace_enabled()</b> indiquera toujours que les catégories sont désactivées, et toutes les autres fonctions ne feront rien.</li>
+  <li>Les macros de commodité sont définies pour produire du code mort. Par exemple, prenons cet exemple de la section « Macros » ci-dessus :
+        <pre>OSSL_TRACE_BEGIN(TLS) {
+    if (condition) {
+        OSSL_TRACE_CANCEL(TLS);
+        goto err;
+    }
+    BIO_printf(trc_out, ... );
+} OSSL_TRACE_END(TLS);
+</pre>
+    <p class="Pp">Lorsque l'API de traçage n'est pas opérationnelle, cela se développe en :</p>
+        <pre>do {
+    BIO *trc_out = NULL;
+    if (0) {
+        if (condition) {
+            ((void)0);
+            goto err;
+        }
+        BIO_printf(trc_out, ... );
+    }
+} while (0);
+</pre>
+  </li>
+</ul>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VALEURS_DE_RETOUR'><a class='permalink' href='#RETURN_VALUES'>VALEURS DE RETOUR</a></h1>
+<p class="Pp"><b>OSSL_trace_enabled()</b> renvoie 1 si le traçage pour le
+    <i>type</i> donné est opérationnel et activé, sinon 0.</p>
+<p class="Pp"><b>OSSL_trace_begin()</b> renvoie un pointeur <b>BIO</b> si le
+    <i>type</i> donné est activé, sinon NULL.</p>
+<p class="Pp"><b>OSSL_trace_string()</b> renvoie le nombre de caractères
+    émis, ou -1 en cas d'erreur.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#SEE_ALSO'>VOIR AUSSI</a></h1>
+<p class="Pp"><a href='/man/OSSL_trace_set_channel.3.en'>OSSL_trace_set_channel(3)</a>,
+    <a href='/man/OSSL_trace_set_callback.3.en'>OSSL_trace_set_callback(3)</a></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='HISTORIQUE'><a class='permalink' href='#HISTORY'>HISTORIQUE</a></h1>
+<p class="Pp">Les fonctions de traçage OpenSSL ont été ajoutées dans OpenSSL 3.0.</p>
+<p class="Pp"><b>OSSL_TRACE_STRING()</b>, OSSL_TRACE_STRING_MAX et
+    OSSL_trace_string ont été ajoutés dans OpenSSL 3.2.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='COPYRIGHT'><a class='permalink' href='#COPYRIGHT'>COPYRIGHT</a></h1>
+<p class="Pp">Copyright 2019-2025 Les auteurs du projet OpenSSL. Tous droits réservés.</p>
+<p class="Pp">Licencié sous la licence Apache 2.0 (la « Licence »).
+    Vous ne pouvez pas utiliser ce fichier sauf en conformité avec la Licence. Vous pouvez
+    obtenir une copie dans le fichier LICENSE de la distribution source ou à
+    <a href='https://www.openssl.org/source/license.html'>https://www.openssl.org/source/license.html</a>.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2025-10-01</td>
+    <td class="foot-os">3.6.0</td>
+  </tr>
+</table>
+
+</section>
+
+            </article>
+            <aside id="sidebar">
+                
+<section class="search">
+    <form action="/search" class="search direct-search" role="search">
+    <input type="search" placeholder="Rechercher dans la page man" name="q" value=""
+         />
+    <input type="submit" name="go" value="Go" />
+</form>
+
+</section>
+
+<section class="package-info">
+    <p>Informations sur le paquet :</p>
+    <dl>
+        <dt>Nom du paquet :</dt>
+        <dd><a href="https://www.archlinux.org/packages/core/x86_64/openssl/">core/openssl</a></dd>
+        <dt>Version :</dt>
+        <dd>3.6.0-1</dd>
+        <dt>En amont :</dt>
+        <dd><a href="https://www.openssl.org">https://www.openssl.org</a></dd>
+        <dt>Licences :</dt>
+        <dd>Apache-2.0</dd>
+        <dt>Manuels :</dt>
+        <dd><a href="/listing/core/openssl/">/listing/core/openssl/</a></dd>
+    </dl>
+</section>
+
+<details>
+    <summary>Table des matières</summary>
+    <nav class="toc">
+        <ul>
+        
+            <li><a href="#NAME">NOM</a></li>
+        
+            <li><a href="#SYNOPSIS">SYNTAXE</a></li>
+        
+            <li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+        
+            <li><a href="#NOTES">NOTES</a></li>
+        
+            <li><a href="#RETURN_VALUES">VALEURS DE RETOUR</a></li>
+        
+            <li><a href="#SEE_ALSO">VOIR AUSSI</a></li>
+        
+            <li><a href="#HISTORY">HISTORIQUE</a></li>
+        
+            <li><a href="#COPYRIGHT">COPYRIGHT</a></li>
+        
+        </ul>
+    </nav>
+</details>
+
+
+
+
+
+
+
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/OSSL_trace_enabled.3ssl.en.txt">txt</a>, 
+        
+            <a href="/man/OSSL_trace_enabled.3ssl.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
+            
+        </main>
+        <footer>
+            
+            <p>Le site web est disponible sous les termes de la licence <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GPL-3.0</a>,
+               à l'exception du contenu des pages man, qui ont leur propre licence
+               spécifiée dans le paquet Arch Linux correspondant.
+            </p>
+        </footer>
+    </body>
+</html>
