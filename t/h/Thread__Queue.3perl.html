@@ -1,19 +1,215 @@
+<!DOCTYPE html>
 <html lang="fr" dir="ltr">
     <head>
-        <title>Thread::Queue(3pm) - Perl manual page — Page de manuel</title>
-        <meta charset="utf-8" />
-        <meta name="generator" content="mandoc 1.30.0" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="stylesheet" href="https://mandoc.bsd.lv/style.css" />
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Thread::Queue(3perl) — Page de manuel Linux</title>
+        
+        
+        
+        
+        
+    
+    
+
     <link rel="stylesheet" href="../../basic.css">
-    <meta name="description" content="Page de manuel, section ? : Thread::Queue(3pm) - Perl manual page. Paquet perl. Pages de manuel en français.">
+    <meta name="description" content="Page de manuel Linux, section 3perl : Thread::Queue. Paquet perl. Pages de manuel Linux en français.">
 </head>
     <body>
-<p class="back"><a href="/archman-fr-1/">← Index</a> · Page de manuel</p>
+<p class="back"><a href="/archman-fr-1/">← Index</a> · Page de manuel Linux</p>
 <h1 class="page-title">Thread__Queue.3perl</h1>
 <p class="pkg">Paquet: <a href="https://archlinux.org/packages/core/x86_64/perl/">perl</a></p>
 <p class="lic">Licences: Artistic-1.0-Perl OR GPL-1.0-or-later</p>
 
+        
+        <main id="content">
+            
+            <article id="content-left">
+                
+<section class="man-page-content">
+    <table class="head">
+  <tr>
+    <td class="head-ltitle">Thread::Queue(3perl)</td>
+    <td class="head-vol">Guide de référence des programmeurs Perl</td>
+    <td class="head-rtitle">Thread::Queue(3perl)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<br/>
+<section class="Sh">
+<h1 class="Sh" id='NAME'><a class='permalink' href='#NAME'>NOM</a></h1>
+<p class="Pp">Thread::Queue - Files d'attente sûres pour les threads</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='VERSION'><a class='permalink' href='#VERSION'>VERSION</a></h1>
+<p class="Pp">Ce document décrit Thread::Queue version 3.14</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='SYNOPSIS'><a class='permalink' href='#SYNOPSIS'>SYNOPSIS</a></h1>
+<pre>use strict;
+use warnings;
+use threads;
+use Thread::Queue;
+my $q = Thread::Queue-&gt;new();    # Une nouvelle file d'attente vide
+# Thread de travail
+my $thr = threads-&gt;create(
+    sub {
+        # Le thread bouclera jusqu'à ce qu'il n'y ait plus de travail
+        while (defined(my $item = $q-&gt;dequeue())) {
+            # Travailler sur $item
+            ...
+        }
+    }
+);
+# Envoyer du travail au thread
+$q-&gt;enqueue($item1, ...);
+# Signaler qu'il n'y a plus de travail à envoyer
+$q-&gt;end();
+# Rejoindre le thread lorsqu'il se termine
+$thr-&gt;join();
+...
+# Nombre d'éléments dans la file d'attente
+my $left = $q-&gt;pending();
+# Retrait non bloquant
+if (defined(my $item = $q-&gt;dequeue_nb())) {
+    # Travailler sur $item
+}
+# Retrait bloquant avec un délai d'attente de 5 secondes
+if (defined(my $item = $q-&gt;dequeue_timed(5))) {
+    # Travailler sur $item
+}
+# Définir une taille pour une file d'attente
+$q-&gt;limit = 5;
+# Obtenir le deuxième élément de la file d'attente sans rien retirer
+my $item = $q-&gt;peek(1);
+# Insérer deux éléments dans la file d'attente juste derrière la tête
+$q-&gt;insert(1, $item1, $item2);
+# Extraire les deux derniers éléments de la file d'attente
+my ($item1, $item2) = $q-&gt;extract(-2, 2);</pre>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='DESCRIPTION'><a class='permalink' href='#DESCRIPTION'>DESCRIPTION</a></h1>
+<p class="Pp">Ce module fournit des files d'attente FIFO sûres pour les threads qui peuvent être accédées en toute sécurité par un nombre quelconque de threads.</p>
+<p class="Pp">Tous les types de données pris en charge par threads::shared peuvent être transmis via les files d'attente :</p>
+<dl class="Bl-tag">
+  <dt id="Ordinary"><a class="permalink" href="#Ordinary">Scalaires
+    ordinaires</a></dt>
+  <dd></dd>
+  <dt id="Array"><a class="permalink" href="#Array">Références de
+    tableaux</a></dt>
+  <dd></dd>
+  <dt id="Hash"><a class="permalink" href="#Hash">Références de
+    hachages</a></dt>
+  <dd></dd>
+  <dt id="Scalar"><a class="permalink" href="#Scalar">Références de
+    scalaires</a></dt>
+  <dd></dd>
+  <dt id="Objects"><a class="permalink" href="#Objects">Objets basés sur ce qui
+    précède</a></dt>
+  <dd></dd>
+</dl>
+<p class="Pp">Les scalaires ordinaires sont ajoutés aux files d'attente tels quels.</p>
+<p class="Pp">S'ils ne sont pas déjà partagés entre threads, les autres types de données complexes seront clonés (récursivement, si nécessaire, et y compris tous les <span class="Li">&quot;bless&quot;</span>ages et paramètres en lecture seule) dans des structures partagées entre threads avant d'être placés dans une file d'attente.</p>
+<p class="Pp">Par exemple, ce qui suit amènerait Thread::Queue à créer une référence de tableau partagée vide via <span class="Li">&amp;shared([])</span>, à y copier les éléments 'foo', 'bar' et 'baz' depuis <span class="Li">@ary</span>, puis à placer cette référence partagée dans la file d'attente :</p>
+<pre>my @ary = qw/foo bar baz/;
+$q-&gt;enqueue(\@ary);</pre>
+<p class="Pp">Cependant, dans ce qui suit, les éléments sont déjà partagés, donc leurs références sont ajoutées directement à la file d'attente, et aucun clonage n'a lieu :</p>
+<pre>my @ary :shared = qw/foo bar baz/;
+$q-&gt;enqueue(\@ary);
+my $obj = &amp;shared({});
+$$obj{'foo'} = 'bar';
+$$obj{'qux'} = 99;
+bless($obj, 'My::Class');
+$q-&gt;enqueue($obj);</pre>
+<p class="Pp">Voir &quot;LIMITATIONS&quot; pour les mises en garde liées au passage d'objets via les files d'attente.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='QUEUE_CREATION'><a class='permalink' href='#QUEUE_CREATION'>CRÉATION   DE   FILE   D'ATTENTE</a></h1>
+<dl class="Bl-tag">
+  <dt>-&gt;<b>new()</b></dt>
+  <dd>Crée une nouvelle file d'attente vide.</dd>
+  <dt>-&gt;new(LISTE)</dt>
+  <dd>Crée une nouvelle file d'attente pré-remplie avec la liste d'éléments fournie.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='BASIC_METHODS'><a class='permalink' href='#BASIC_METHODS'>MÉTHODES   DE   BASE</a></h1>
+<p class="Pp">Les méthodes suivantes traitent les files d'attente selon un principe FIFO.</p>
+<dl class="Bl-tag">
+  <dt>-&gt;enqueue(LISTE)</dt>
+  <dd>Ajoute une liste d'éléments à la fin de la file d'attente.</dd>
+  <dt>-&gt;<b>dequeue()</b></dt>
+  <dd></dd>
+  <dt>-&gt;dequeue(NOMBRE)</dt>
+  <dd>Retire le nombre demandé d'éléments (1 par défaut) de la tête de la file d'attente et les renvoie. Si la file d'attente contient moins que le nombre demandé d'éléments, alors le thread sera bloqué jusqu'à ce que le nombre requis d'éléments soit disponible (c'est-à-dire jusqu'à ce que d'autres threads fassent un <span class="Li">&quot;enqueue&quot;</span> de plus d'éléments).</dd>
+  <dt>-&gt;<b>dequeue_nb()</b></dt>
+  <dd></dd>
+  <dt>-&gt;dequeue_nb(NOMBRE)</dt>
+  <dd>Retire le nombre demandé d'éléments (1 par défaut) de la tête de la file d'attente et les renvoie. Si la file d'attente contient moins que le nombre demandé d'éléments, alors elle renvoie immédiatement (c'est-à-dire de manière non bloquante) tous les éléments présents dans la file d'attente. Si la file d'attente est vide, alors <span class="Li">&quot;undef&quot;</span> est renvoyé.</dd>
+  <dt>-&gt;dequeue_timed(DÉLAI)</dt>
+  <dd></dd>
+  <dt>-&gt;dequeue_timed(DÉLAI, NOMBRE)</dt>
+  <dd>Retire le nombre demandé d'éléments (1 par défaut) de la tête de la file d'attente et les renvoie. Si la file d'attente contient moins que le nombre demandé d'éléments, alors le thread sera bloqué jusqu'à ce que le nombre requis d'éléments soit disponible, ou jusqu'à ce que le délai d'attente soit atteint. Si le délai d'attente est atteint, elle renvoie tous les éléments présents dans la file d'attente, ou <span class="Li">&quot;undef&quot;</span> si la file d'attente est vide.
+    <p class="Pp">Le délai d'attente peut être un nombre de secondes relatif à l'heure actuelle (par exemple, 5 secondes à partir du moment où l'appel est effectué), ou peut être un délai d'attente absolu en secondes <i>epoch</i> identique à celui qui serait utilisé avec <b>cond_timedwait()</b>. Les secondes fractionnaires (par exemple, 2,5 secondes) sont également prises en charge (dans la mesure de l'implémentation sous-jacente).</p>
+    <p class="Pp">Si <span class="Li">&quot;DÉLAI&quot;</span> est absent, <span class="Li">&quot;undef&quot;</span>, ou inférieur ou égal à 0, alors cet appel se comporte comme <span class="Li">&quot;dequeue_nb&quot;</span>.</p>
+  </dd>
+  <dt>-&gt;<b>pending()</b></dt>
+  <dd>Renvoie le nombre d'éléments encore présents dans la file d'attente. Renvoie <span class="Li">&quot;undef&quot;</span> si la file d'attente a été terminée (voir ci-dessous), et qu'il n'y a plus d'éléments dans la file d'attente.</dd>
+  <dt>-&gt;limit</dt>
+  <dd>Définit la taille de la file d'attente. Si elle est définie, les appels à <span class="Li">enqueue()</span> bloqueront jusqu'à ce que le nombre d'éléments en attente dans la file d'attente descende en dessous de la <span class="Li">&quot;limit&quot;</span>. La <span class="Li">&quot;limit&quot;</span> n'empêche pas de mettre en file d'attente des éléments au-delà de ce nombre :
+        <pre>my $q = Thread::Queue-&gt;new(1, 2);
+$q-&gt;limit = 4;
+$q-&gt;enqueue(3, 4, 5);   # Ne bloque pas
+$q-&gt;enqueue(6);         # Bloque jusqu'à ce qu'au moins 2 éléments soient
+                        # retirés
+my $size = $q-&gt;limit;   # Renvoie la limite actuelle (peut renvoyer
+                        # 'undef')
+$q-&gt;limit = 0;          # La taille de la file d'attente est maintenant illimitée
+</pre>
+    <p class="Pp">Appeler l'une des méthodes de retrait avec un <span class="Li">&quot;NOMBRE&quot;</span> supérieur à la <span class="Li">&quot;limit&quot;</span> d'une file d'attente générera une erreur.</p>
+  </dd>
+  <dt>-&gt;<b>end()</b></dt>
+  <dd>Déclare qu'aucun autre élément ne sera ajouté à la file d'attente.
+    <p class="Pp">Tous les threads bloqués sur des appels à <span class="Li">dequeue()</span> seront débloqués avec tous les éléments restants dans la file d'attente et/ou <span class="Li">&quot;undef&quot;</span> renvoyé. Tout appel ultérieur à <span class="Li">dequeue()</span> se comportera comme <span class="Li">dequeue_nb()</span>.</p>
+    <p class="Pp">Une fois terminée, aucun autre élément ne peut être placé dans la file d'attente.</p>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id='ADVANCED_METHODS'><a class='permalink' href='#ADVANCED_METHODS'>MÉTHODES   AVANCÉES</a></h1>
+<p class="Pp">Les méthodes suivantes peuvent être utilisées pour manipuler des éléments n'importe où dans une file d'attente.</p>
+<p class="Pp">Pour empêcher le contenu d'une file d'attente d'être modifié par un autre thread pendant qu'il est examiné et/ou modifié, verrouillez la file d'attente dans un bloc local :</p>
+<pre>{
+    lock($q);   # Empêcher les autres threads de modifier le contenu de la file d'attente
+    my $item = $q-&gt;peek();
+    if ($item ...) {
+        ...
+    }
+}
+# La file d'attente est maintenant déverrouillée</pre>
+<dl class="Bl-tag">
+  <dt>-&gt;<b>peek()</b></dt>
+  <dd></dd>
+  <dt>-&gt;peek(INDEX)</dt>
+  <dd>Renvoie un élément de la file d'attente sans rien retirer. Par défaut, la tête de la file d'attente (à la position d'index 0) si aucun index n'est spécifié. Les valeurs d'index négatives sont prises en charge comme avec les tableaux (c'est-à-dire que -1 est la fin de la file d'attente, -2 est l'avant-dernier, et ainsi de suite).
+    <p class="Pp">Si aucun élément n'existe à l'index spécifié (c'est-à-dire que la file d'attente est vide, ou que l'index dépasse le nombre d'éléments dans la file d'attente), alors <span class="Li">&quot;undef&quot;</span> est renvoyé.</p>
+    <p class="Pp">N'oubliez pas que l'élément renvoyé n'est pas retiré de la file d'attente, donc manipuler une référence obtenue par <span class="Li">&quot;peek&quot;</span> affecte l'élément dans la file d'attente.</p>
+  </dd>
+  <dt>-&gt;insert(INDEX, LISTE)</dt>
+  <dd>Ajoute la liste d'éléments à la file d'attente à la position d'index spécifiée (0 est la tête de la liste). Tous les éléments existants à cette position et au-delà sont repoussés après les éléments nouvellement ajoutés :
+        <pre>$q-&gt;enqueue(1, 2, 3, 4);
+$q-&gt;insert(1, qw/foo bar/);
+# La file d'attente contient maintenant :  1, foo, bar, 2, 3, 4
+</pre>
+    <p class="Pp">Spécifier un in<html>
+    <head>
+        <title>Thread::Queue(3pm) - Perl manual page</title>
+        <meta charset="utf-8" />
+        <meta name="generator" content="mandoc 1.30.0" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="stylesheet" href="https://mandoc.bsd.lv/style.css" />
+    </head>
+    <body>
         
         <article>
 <section class="Sh">
