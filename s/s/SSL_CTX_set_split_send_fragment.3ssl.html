@@ -65,7 +65,7 @@ uint8_t SSL_SESSION_get_max_fragment_length(const SSL_SESSION *session);</pre>
 <p class="Pp">Certains moteurs sont capables de traiter plusieurs opérations cryptographiques simultanément. Cette fonctionnalité peut être utilisée pour paralléliser le traitement d'une seule connexion. Par exemple, une seule opération d'écriture peut être divisée en plusieurs enregistrements, chacun étant chiffré indépendamment et en parallèle. Note : cela ne fonctionne qu'en TLS 1.1+. Il n'y a pas de support en SSLv3, TLSv1.0 ou DTLS (toute version). Cette fonctionnalité est connue sous le nom de "pipelining" dans OpenSSL.</p>
 <p class="Pp">Pour bénéficier de la capacité de pipelining, vous devez avoir un moteur qui fournit des chiffrements qui le supportent. Le moteur OpenSSL "dasync" fournit des chiffrements basés sur AES128-SHA qui ont cette capacité. Cependant, ceux-ci sont uniquement à des fins de développement et de test.</p>
 <p class="Pp"><b>SSL_CTX_set_max_send_fragment()</b> et <b>SSL_set_max_send_fragment()</b> définissent la valeur de <b>max_send_fragment</b> pour <b>SSL_CTX</b> et <b>SSL</b> respectivement. Cette valeur limite la quantité d'octets de texte brut qui seront envoyés dans n'importe quel enregistrement SSL/TLS. Par défaut, sa valeur est SSL3_RT_MAX_PLAIN_LENGTH (16384). Ces fonctions n'accepteront qu'une valeur dans la plage de 512 à SSL3_RT_MAX_PLAIN_LENGTH.</p>
-<p class="Pp"><b>SSL_CTX_set_max_pipelines()</b> et <b>SSL_set_max_pipelines()</b> définissent le nombre maximum de pipelines qui seront utilisés à tout moment. Cette valeur s'applique aux deux types de pipelining ("lecture" et "écriture"). Par défaut, un seul pipeline sera utilisé (c'est-à-dire une opération non parallèle). Le nombre de pipelines défini doit être dans la plage de 1 à SSL_MAX_PIPELINES (32). Définir cette valeur à plus de 1 activera également automatiquement le mode "read_ahead" (voir SSL_CTX_set_read_ahead(3)). Ceci est expliqué plus loin. OpenSSL n'utilisera plus d'un pipeline que si une suite de chiffrement négociée utilise une suite de chiffrement compatible avec le pipelining fournie par un moteur.</p>
+<p class="Pp"><b>SSL_CTX_set_max_pipelines()</b> et <b>SSL_set_max_pipelines()</b> définissent le nombre maximum de pipelines qui seront utilisés à tout moment. Cette valeur s'applique aux deux types de pipelining ("lecture" et "écriture"). Par défaut, un seul pipeline sera utilisé (c'est-à-dire une opération non parallèle). Le nombre de pipelines défini doit être dans la plage de 1 à SSL_MAX_PIPELINES (32). Définir cette valeur à plus de 1 activera également automatiquement le mode "read_ahead" (voir <a href='/man/SSL_CTX_set_read_ahead.3.en'>SSL_CTX_set_read_ahead(3)</a>). Ceci est expliqué plus loin. OpenSSL n'utilisera plus d'un pipeline que si une suite de chiffrement négociée utilise une suite de chiffrement compatible avec le pipelining fournie par un moteur.</p>
 <p class="Pp">Le pipelining fonctionne légèrement différemment lors de la lecture de données cryptographiques par rapport à l'écriture. <b>SSL_CTX_set_split_send_fragment()</b> et <b>SSL_set_split_send_fragment()</b> définissent comment les données sont divisées en pipelines lors de l'écriture de données cryptographiques. Le nombre de pipelines utilisés sera déterminé par la quantité de données fournie à l'appel à <b>SSL_write_ex()</b> ou <b>SSL_write()</b> divisée par <b>split_send_fragment</b>.</p>
 <p class="Pp">Par exemple, si <b>split_send_fragment</b> est défini à 2000 et <b>max_pipelines</b> à 4 alors :</p>
 <p class="Pp">Appel à SSL_write/SSL_write_ex avec 0-2000 octets == 1 pipeline utilisé</p>
@@ -73,7 +73,7 @@ uint8_t SSL_SESSION_get_max_fragment_length(const SSL_SESSION *session);</pre>
 <p class="Pp">Appel à SSL_write/SSL_write_ex avec 4001-6000 octets == 3 pipelines utilisés</p>
 <p class="Pp">Appel à SSL_write/SSL_write_ex avec 6001+ octets == 4 pipelines utilisés</p>
 <p class="Pp"><b>split_send_fragment</b> doit toujours être inférieur ou égal à <b>max_send_fragment</b>. Par défaut, il est égal à <b>max_send_fragment</b>. Cela signifie que le nombre d'enregistrements créés sera toujours le même que dans le cas non parallèle, bien que les données soient distribuées différemment. Dans le cas parallèle, les données sont distribuées équitablement entre les pipelines.</p>
-<p class="Pp">Le pipelining de lecture est contrôlé légèrement différemment que celui d'écriture. Lors de la lecture, nous sommes limités par le nombre d'enregistrements que le pair (et le réseau) peuvent nous fournir en retour. Plus nous pouvons recevoir d'enregistrements à la fois, plus nous avons d'opportunités de paralléliser le traitement. Comme mentionné précédemment, la définition de <b>max_pipelines</b> à une valeur supérieure à 1 active automatiquement <b>read_ahead</b>. Le paramètre <b>read_ahead</b> fait qu'OpenSSL essaie de lire autant de données que le réseau peut fournir et qui rentrent dans le tampon. Sans ce paramètre, les données sont lues un enregistrement à la fois dans le tampon de lecture. Plus de données peuvent être lues, plus il y a d'opportunités de paralléliser le traitement au prix d'une surcharge de mémoire plus importante par connexion. La définition de <b>read_ahead</b> peut affecter le comportement de la fonction <b>SSL_pending()</b> (voir SSL_pending(3)). De plus, la taille par défaut du tampon de lecture interne est multipliée par le nombre de pipelines disponibles pour garantir que nous puissions lire plusieurs enregistrements à la fois. Cela peut avoir un impact significatif sur l'utilisation de la mémoire.</p>
+<p class="Pp">Le pipelining de lecture est contrôlé légèrement différemment que celui d'écriture. Lors de la lecture, nous sommes limités par le nombre d'enregistrements que le pair (et le réseau) peuvent nous fournir en retour. Plus nous pouvons recevoir d'enregistrements à la fois, plus nous avons d'opportunités de paralléliser le traitement. Comme mentionné précédemment, la définition de <b>max_pipelines</b> à une valeur supérieure à 1 active automatiquement <b>read_ahead</b>. Le paramètre <b>read_ahead</b> fait qu'OpenSSL essaie de lire autant de données que le réseau peut fournir et qui rentrent dans le tampon. Sans ce paramètre, les données sont lues un enregistrement à la fois dans le tampon de lecture. Plus de données peuvent être lues, plus il y a d'opportunités de paralléliser le traitement au prix d'une surcharge de mémoire plus importante par connexion. La définition de <b>read_ahead</b> peut affecter le comportement de la fonction <b>SSL_pending()</b> (voir <a href='/man/SSL_pending.3.en'>SSL_pending(3)</a>). De plus, la taille par défaut du tampon de lecture interne est multipliée par le nombre de pipelines disponibles pour garantir que nous puissions lire plusieurs enregistrements à la fois. Cela peut avoir un impact significatif sur l'utilisation de la mémoire.</p>
 <p class="Pp">Les fonctions <b>SSL_CTX_set_default_read_buffer_len()</b> et <b>SSL_set_default_read_buffer_len()</b> contrôlent la taille du tampon de lecture qui sera utilisé. Le paramètre <b>len</b> définit la taille du tampon. La valeur ne sera utilisée que si elle est supérieure à la valeur par défaut qui aurait été utilisée. La valeur par défaut dépend de plusieurs facteurs, mais sera au moins SSL3_RT_MAX_PLAIN_LENGTH + SSL3_RT_MAX_ENCRYPTED_OVERHEAD (16704) octets.</p>
 <p class="Pp"><b>SSL_CTX_set_tlsext_max_fragment_length()</b> définit le mode de négociation de la longueur du fragment par la valeur <b>mode</b> pour <b>ctx</b>. Ce paramètre affecte uniquement les instances SSL créées après que cette fonction ait été appelée. Il n'affecte que le côté client si seul son côté peut initier cette extension.</p>
 <p class="Pp"><b>SSL_set_tlsext_max_fragment_length()</b> définit le mode de négociation de la longueur du fragment par la valeur <b>mode</b> pour <b>ssl</b>. Ce paramètre sera utilisé lors de l'échange d'extensions entre le client et le serveur pendant un handshake. Par conséquent, il n'affecte que les sessions SSL créées après que cette fonction ait été appelée. Il n'affecte que le côté client si seul son côté peut initier cette extension.</p>
@@ -107,8 +107,8 @@ uint8_t SSL_SESSION_get_max_fragment_length(const SSL_SESSION *session);</pre>
     <b>SSL_set_tlsext_max_fragment_length()</b> et <b>SSL_SESSION_get_max_fragment_length()</b>, toutes ces fonctions sont implémentées à l'aide de macros.</p>
 <<section class="Sh">
 <h1 class="Sh" id='VOIR_AUSSI'><a class='permalink' href='#VOIR_AUSSI'>VOIR AUSSI</a></h1>
-<p class="Pp">ssl(7), SSL_CTX_set_read_ahead(3),
-    SSL_pending(3)</p>
+<p class="Pp"><a href='/man/ssl.7.en'>ssl(7)</a>, <a href='/man/SSL_CTX_set_read_ahead.3.en'>SSL_CTX_set_read_ahead(3)</a>,
+    <a href='/man/SSL_pending.3.en'>SSL_pending(3)</a></p>
 </section>
 <section class="Sh">
 <h1 class="Sh" id='HISTORIQUE'><a class='permalink' href='#HISTORIQUE'>HISTORIQUE</a></h1>
@@ -163,7 +163,7 @@ uint8_t SSL_SESSION_get_max_fragment_length(const SSL_SESSION *session);</pre>
         <dt> Licences :</dt>
         <dd>Apache-2.0</dd>
         <dt>Manuels :</dt>
-        <dd><a href="https://archlinux.org/packages/?q=openssl">/listing/core/openssl/</a></dd>
+        <dd><a href="/listing/core/openssl/">/listing/core/openssl/</a></dd>
     </dl>
 </section>
 
@@ -198,7 +198,17 @@ uint8_t SSL_SESSION_get_max_fragment_length(const SSL_SESSION *session);</pre>
 
 
 
-</aside>
+<nav class="other-formats">
+    <p>Autres formats :
+        
+            <a href="/man/SSL_CTX_set_split_send_fragment.3ssl.en.txt">txt</a>, 
+        
+            <a href="/man/SSL_CTX_set_split_send_fragment.3ssl.en.raw">raw</a>
+        
+    </p>
+</nav>
+
+            </aside>
             
         </main>
         <footer>
